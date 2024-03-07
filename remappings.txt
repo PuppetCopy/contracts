@@ -1,0 +1,8 @@
+@balancer-labs/v2-interfaces/=node_modules/@balancer-labs/v2-interfaces/contracts/
+@solmate/contracts/=node_modules/@solmate/contracts/src/
+@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/
+@automate/contracts/=node_modules/@automate/contracts/
+forge-std/=node_modules/forge-std/
+@prb/test/=node_modules/@prb/test/
+@uniswap/v3-periphery/=node_modules/@uniswap/v3-periphery/contracts/
+@uniswap/v3-core/=node_modules/@uniswap/v3-core/contracts/

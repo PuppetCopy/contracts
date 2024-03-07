@@ -1,0 +1,51 @@
+{
+  "name": "contracts",
+  "version": "0.0.1",
+  "license": "BUSL-1.1",
+  "description": "Puppet DAO contracts",
+  "packageManager": "bun@1.0.18",
+  "keywords": [
+    "puppet",
+    "Copy Trading",
+    "dex",
+    "ethereum",
+    "arbitrum",
+    "DeFi"
+  ],
+  "files": [
+    "src/**/*.sol",
+    "!src/test/*",
+    "artifacts/contracts/**/*.json",
+    "!artifacts/contracts/test/**/*"
+  ],
+  "scripts": {
+    "test": "FOUNDRY_PROFILE=dev forge test --match-contract RewardRouterTest -vvvvv",
+    "build": "FOUNDRY_PROFILE=dev forge build --sizes",
+    "deploy": "forge script script/DeployTokenomics.s.sol:DeployTokenomics --rpc-url $ARBITRUM_RPC_URL --broadcast --verify -vvvv",
+    "gas-report": "forge test --gas-report",
+    "size-contracts": "bun hardhat size-contracts",
+    "lint": "bun run lint:sol",
+    "lint:sol": "forge fmt --check && bun solhint \"{script,src,test}/**/*.sol\""
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox-viem": "^2.0.0",
+    "@nomicfoundation/hardhat-foundry": "^1.1.1",
+    "@nomicfoundation/hardhat-viem": "^1.0.3",
+    "@nomiclabs/hardhat-solhint": "^3.0.1",
+    "hardhat": "^2.19.5",
+    "hardhat-contract-sizer": "^2.10.0",
+    "dotenv": "^16.4.1",
+    "prettier": "^3.2.5",
+    "prettier-plugin-solidity": "^1.3.1"
+  },
+  "dependencies": {
+    "@balancer-labs/v2-interfaces": "0.4.0",
+    "@openzeppelin/contracts": "5.0.1",
+    "@automate/contracts": "github:gelatodigital/automate#v3",
+    "@solmate/contracts": "github:transmissions11/solmate#c892309933b25c03d32b1b0d674df7ae292ba925",
+    "@uniswap/v3-periphery": "1.4.4",
+    "forge-std": "github:foundry-rs/forge-std#v1.7.6",
+    "solhint": "4.1.1",
+    "@prb/test": "0.6.4"
+  }
+}

@@ -1,0 +1,42 @@
+# Full reference https://github.com/foundry-rs/foundry/tree/master/config
+
+[profile.default]
+  auto_detect_solc = false
+  bytecode_hash = "none"
+  emv_version = "paris"
+  ffi = true
+  fs_permissions = [{ access = "read", path = "out-optimized" }]
+  gas_reports = [
+    "RewardRouter",
+  ]
+  optimizer = true
+  optimizer_runs = 10_000_000
+  out = "out"
+  script = "script"
+  solc = "0.8.23"
+  src = "src"
+  test = "test"
+
+[profile.default.fuzz]
+  max_test_rejects = 1_000_000 # Number of times `vm.assume` can fail
+  runs = 50
+
+[profile.dev]
+  optimizer = false
+
+[fmt]
+  bracket_spacing = false
+  int_types = "short"
+  number_underscore = "preserve"
+  quote_style = "double"
+  tab_width = 4
+  wrap_comments = true
+  func_attrs_with_params_multiline = true
+  line_length = 150
+
+[rpc_endpoints]
+  localhost = "http://localhost:8545"
+  arbitrum = "https://eth-mainnet.g.alchemy.com/v2/${API_KEY_ALCHEMY}"
+
+[etherscan]
+  arbitrum = { key = "${ARBISCAN_API_KEY}", chain = "arbitrum" }
