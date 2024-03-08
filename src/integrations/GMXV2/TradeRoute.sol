@@ -25,7 +25,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IOrderCallbackReceiver} from "./interfaces/IOrderCallbackReceiver.sol";
-import {IGMXEventUtils} from "./interfaces/IGMXEventUtils.sol";
 import {IGMXOrder} from "./interfaces/IGMXOrder.sol";
 import {GMXV2RouteHelper} from "./libraries/GMXV2RouteHelper.sol";
 import {OrderUtils} from "./libraries/OrderUtils.sol";
@@ -344,7 +343,7 @@ contract TradeRoute is IOrderCallbackReceiver, ReentrancyGuard {
     // ============================================================================================
 
     /// @inheritdoc IOrderCallbackReceiver
-    function afterOrderExecution(bytes32 _requestKey, IGMXOrder.Props memory _order, IGMXEventUtils.EventLogData memory) external {
+    function afterOrderExecution(bytes32 _requestKey, IGMXOrder.Props memory _order, bytes memory) external {
         if (OrderUtils.isLiquidationOrder(_order.numbers.orderType)) {
             _repayBalance(true, true, bytes32(0));
             _resetRoute();
@@ -385,13 +384,13 @@ contract TradeRoute is IOrderCallbackReceiver, ReentrancyGuard {
     }
 
     /// @inheritdoc IOrderCallbackReceiver
-    function afterOrderCancellation(bytes32 _requestKey, IGMXOrder.Props memory _order, IGMXEventUtils.EventLogData memory) external {
+    function afterOrderCancellation(bytes32 _requestKey, IGMXOrder.Props memory _order, bytes memory) external {
         _callback(_requestKey, false, OrderUtils.isIncrease(_order.numbers.orderType));
     }
 
     /// @inheritdoc IOrderCallbackReceiver
     /// @dev If an order is frozen, a Trader must call the ```cancelRequest``` function to cancel the order
-    function afterOrderFrozen(bytes32 _requestKey, IGMXOrder.Props memory _order, IGMXEventUtils.EventLogData memory) external {}
+    function afterOrderFrozen(bytes32 _requestKey, IGMXOrder.Props memory _order, bytes memory) external {}
 
     // ============================================================================================
     // Internal Mutated Functions
