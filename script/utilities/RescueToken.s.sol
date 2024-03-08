@@ -2,7 +2,7 @@
 pragma solidity 0.8.23;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IBaseOrchestrator} from "src/integrations/interfaces/IBaseOrchestrator.sol";
+import {Orchestrator} from "./../../src/integrations/GMXV2/Orchestrator.sol";
 import {DeployerUtilities} from "./DeployerUtilities.sol";
 
 // ---- Usage ----
@@ -12,7 +12,7 @@ contract RescueToken is DeployerUtilities {
   function run() public {
     vm.startBroadcast(_deployerPrivateKey);
 
-    IBaseOrchestrator _orchestrator = IBaseOrchestrator(payable(address(0x8992D776Ad36a92f29c6B3AB8DAd2c0520075364)));
+    Orchestrator _orchestrator = Orchestrator(payable(address(0x8992D776Ad36a92f29c6B3AB8DAd2c0520075364)));
 
     bytes4 _rescueTokensSig = _orchestrator.rescueToken.selector;
 

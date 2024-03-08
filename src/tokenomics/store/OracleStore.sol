@@ -6,15 +6,15 @@ import {StoreController} from "../../utilities/StoreController.sol";
 
 uint8 constant SLOT_COUNT = 7;
 
-struct OracleStore_SlotSeed {
-    uint price;
-    uint blockNumber;
-    uint timestamp;
-    uint updateInterval;
-}
-
 contract OracleStore is StoreController {
-    OracleStore_SlotSeed public seedUpdate;
+    struct SlotSeed {
+        uint price;
+        uint blockNumber;
+        uint timestamp;
+        uint updateInterval;
+    }
+
+    SlotSeed public seedUpdate;
 
     uint public slot;
 
@@ -27,7 +27,7 @@ contract OracleStore is StoreController {
     constructor(Authority _authority, address _initSetter, uint _seedPrice, uint _updateInterval) StoreController(_authority, _initSetter) {
         require(_seedPrice > 0, "Seed price cannot be 0");
 
-        seedUpdate = OracleStore_SlotSeed({price: _seedPrice, blockNumber: block.number, timestamp: block.timestamp, updateInterval: _updateInterval});
+        seedUpdate = SlotSeed({price: _seedPrice, blockNumber: block.number, timestamp: block.timestamp, updateInterval: _updateInterval});
 
         slot = (seedUpdate.timestamp / _updateInterval) % SLOT_COUNT;
 
@@ -41,7 +41,7 @@ contract OracleStore is StoreController {
         medianMax = _seedPrice;
     }
 
-    function getLatestSeed() external view returns (OracleStore_SlotSeed memory) {
+    function getLatestSeed() external view returns (SlotSeed memory) {
         return seedUpdate;
     }
 
@@ -53,12 +53,12 @@ contract OracleStore is StoreController {
         return slotMax;
     }
 
-    function setLatestUpdate(OracleStore_SlotSeed memory _seedUpdate) external isSetter {
+    function setLatestUpdate(SlotSeed memory _seedUpdate) external isSetter {
         seedUpdate = _seedUpdate;
     }
 
     function setSeedUpdateInterval(uint _updateInterval) external isSetter {
-        OracleStore_SlotSeed memory nextSeed = OracleStore_SlotSeed({
+        SlotSeed memory nextSeed = SlotSeed({
             price: seedUpdate.price,
             blockNumber: seedUpdate.blockNumber,
             timestamp: seedUpdate.timestamp,

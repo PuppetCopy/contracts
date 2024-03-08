@@ -26,8 +26,9 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {CommonHelper, Keys, IDataStore} from "./CommonHelper.sol";
 import {SharesHelper} from "./SharesHelper.sol";
 
-import {IBaseOrchestrator, IBaseRoute} from "../interfaces/IBaseOrchestrator.sol";
-import {IBaseRouteFactory} from "../interfaces/IBaseRouteFactory.sol";
+import {Orchestrator} from "./../GMXV2/Orchestrator.sol";
+import {TradeRoute} from "./../GMXV2/TradeRoute.sol";
+import {BaseRouteFactory} from "./../BaseRouteFactory.sol";
 
 /// @title OrchestratorHelper
 /// @author johnnyonline
@@ -66,8 +67,8 @@ library OrchestratorHelper {
 
     function validateExecutionFees(
         IDataStore _dataStore,
-        IBaseRoute.SwapParams memory _swapParams,
-        IBaseRoute.ExecutionFees memory _executionFees
+        TradeRoute.SwapParams memory _swapParams,
+        TradeRoute.ExecutionFees memory _executionFees
     ) external view {
         uint256 _executionFee = _executionFees.dexKeeper + _executionFees.puppetKeeper;
         if (
@@ -91,7 +92,7 @@ library OrchestratorHelper {
             int256 _puppetsPnL = _dataStore.getInt(Keys.puppetsPnLKey(_positionIndex, _route));
             address _collateralToken = CommonHelper.collateralToken(_dataStore, _route);
             if (_puppetsPnL < 0) {
-                _puppetsProfitInUSD = IBaseOrchestrator(CommonHelper.orchestrator(_dataStore)).getPrice(_collateralToken)
+                _puppetsProfitInUSD = Orchestrator(CommonHelper.orchestrator(_dataStore)).getPrice(_collateralToken)
                     * ((_puppetsPnL * -1).toUint256()) / CommonHelper.collateralTokenDecimals(_dataStore, _collateralToken);
             }
 
@@ -120,7 +121,7 @@ library OrchestratorHelper {
         _routeKey = CommonHelper.routeKey(_dataStore, _trader, _routeTypeKey);
         if (CommonHelper.isRouteRegistered(_dataStore, _routeKey)) revert RouteAlreadyRegistered();
 
-        _route = IBaseRouteFactory(_dataStore.getAddress(Keys.ROUTE_FACTORY)).registerRoute(_dataStore, _routeTypeKey);
+        _route = BaseRouteFactory(_dataStore.getAddress(Keys.ROUTE_FACTORY)).registerRoute(_dataStore, _routeTypeKey);
 
         _dataStore.updateOwnership(_route, true);
 
@@ -316,7 +317,7 @@ library OrchestratorHelper {
             int256 _traderPnL = _dataStore.getInt(Keys.traderPnLKey(_positionIndex, _route));
             if (_traderPnL < 0) {
                 address _collateralToken = CommonHelper.collateralToken(_dataStore, _route);
-                IBaseOrchestrator _orchestrator = IBaseOrchestrator(CommonHelper.orchestrator(_dataStore));
+                Orchestrator _orchestrator = Orchestrator(CommonHelper.orchestrator(_dataStore));
                 _profits[_puppetsLength] = _orchestrator.getPrice(_collateralToken)
                     * ((_traderPnL * -1).toUint256()) / CommonHelper.collateralTokenDecimals(_dataStore, _collateralToken);
             }

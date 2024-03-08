@@ -5,7 +5,7 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {OracleLogic} from "src/tokenomics/OracleLogic.sol";
-import {OracleStore, OracleStore_SlotSeed} from "src/tokenomics/store/OracleStore.sol";
+import {OracleStore} from "src/tokenomics/store/OracleStore.sol";
 
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
@@ -116,12 +116,12 @@ contract OracleTest is BasicSetup {
     }
 
     function _stepSlot() internal {
-        OracleStore_SlotSeed memory update = oracleStore.getLatestSeed();
+        OracleStore.SlotSeed memory update = oracleStore.getLatestSeed();
         skip(update.updateInterval);
     }
 
     function _storePrice(uint balanceInWnt) internal returns (uint) {
-        OracleStore_SlotSeed memory update = oracleStore.getLatestSeed();
+        OracleStore.SlotSeed memory update = oracleStore.getLatestSeed();
         vm.roll(update.blockNumber + 1);
         vault.setPoolBalances(20e18, balanceInWnt);
         return oracleLogic.syncTokenPrice(wntUsdPoolList, vault, oracleStore, 0, 0);

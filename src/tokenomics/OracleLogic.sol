@@ -5,7 +5,7 @@ import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 
-import {OracleStore, SLOT_COUNT, OracleStore_SlotSeed} from "./store/OracleStore.sol";
+import {OracleStore, SLOT_COUNT} from "./store/OracleStore.sol";
 import {Math} from "./../utilities/common/Math.sol";
 import {UniV3Prelude} from "./../utilities/UniV3Prelude.sol";
 
@@ -79,7 +79,7 @@ contract OracleLogic is Auth {
         returns (uint)
     {
         uint price = getPuppetExchangeRateInUsdc(wntUsdSourceList, vault, poolId, twapInterval);
-        OracleStore_SlotSeed memory seed = store.getLatestSeed();
+        OracleStore.SlotSeed memory seed = store.getLatestSeed();
 
         uint settledPrice = storeMinMax(store, seed, price);
 
@@ -103,14 +103,14 @@ contract OracleLogic is Auth {
 
     // Internal
 
-    function storeMinMax(OracleStore store, OracleStore_SlotSeed memory seed, uint price) internal returns (uint) {
+    function storeMinMax(OracleStore store, OracleStore.SlotSeed memory seed, uint price) internal returns (uint) {
         if (price == 0) revert OracleLogic__NonZeroPrice();
 
         uint8 slot = uint8(block.timestamp / seed.updateInterval % SLOT_COUNT);
         uint storedSlot = store.slot();
 
         store.setLatestUpdate(
-            OracleStore_SlotSeed({price: price, blockNumber: block.number, timestamp: block.timestamp, updateInterval: seed.updateInterval})
+            OracleStore.SlotSeed({price: price, blockNumber: block.number, timestamp: block.timestamp, updateInterval: seed.updateInterval})
         );
 
         uint max = store.slotMax(slot);

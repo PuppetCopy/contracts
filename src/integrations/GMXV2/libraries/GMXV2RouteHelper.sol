@@ -25,8 +25,8 @@ import {CommonHelper, Keys} from "src/integrations/libraries/CommonHelper.sol";
 import {OrderUtils} from "./OrderUtils.sol";
 import {GMXV2Keys} from "./GMXV2Keys.sol";
 
-import {IBaseRoute} from "../../interfaces/IBaseRoute.sol";
-import {IBaseOrchestrator} from "../../interfaces/IBaseOrchestrator.sol";
+import {Orchestrator} from "./../Orchestrator.sol";
+import {TradeRoute} from "./../TradeRoute.sol";
 
 import {IDataStore} from "../../utilities/interfaces/IDataStore.sol";
 
@@ -71,7 +71,7 @@ library GMXV2RouteHelper {
 
     function getCreateOrderParams(
         IDataStore _dataStore,
-        IBaseRoute.AdjustPositionParams memory _adjustPositionParams,
+        TradeRoute.AdjustPositionParams memory _adjustPositionParams,
         uint256 _executionFee,
         bool _isIncrease
     ) external view returns (OrderUtils.CreateOrderParams memory _params) {
@@ -106,7 +106,7 @@ library GMXV2RouteHelper {
     }
 
     function isOpenInterest(IDataStore _dataStore) external view returns (bool) {
-        bytes32 _positionKey = IBaseOrchestrator(_dataStore.getAddress(Keys.ORCHESTRATOR)).positionKey(address(this));
+        bytes32 _positionKey = Orchestrator(_dataStore.getAddress(Keys.ORCHESTRATOR)).positionKey(address(this));
         IGMXPosition.Props memory _position = IGMXReader(_dataStore.getAddress(GMXV2Keys.GMX_READER)).getPosition(gmxDataStore(_dataStore), _positionKey);
         return _position.numbers.sizeInUsd > 0 || _position.numbers.collateralAmount > 0;
     }
@@ -115,14 +115,14 @@ library GMXV2RouteHelper {
     // Private View Functions
     // ============================================================================================
 
-    function _getOrderType(IBaseRoute.OrderType _orderType) private pure returns (IGMXOrder.OrderType) {
-        if (_orderType == IBaseRoute.OrderType.MarketIncrease) {
+    function _getOrderType(TradeRoute.OrderType _orderType) private pure returns (IGMXOrder.OrderType) {
+        if (_orderType == TradeRoute.OrderType.MarketIncrease) {
             return IGMXOrder.OrderType.MarketIncrease;
-        } else if (_orderType == IBaseRoute.OrderType.LimitIncrease) {
+        } else if (_orderType == TradeRoute.OrderType.LimitIncrease) {
             return IGMXOrder.OrderType.LimitIncrease;
-        } else if (_orderType == IBaseRoute.OrderType.MarketDecrease) {
+        } else if (_orderType == TradeRoute.OrderType.MarketDecrease) {
             return IGMXOrder.OrderType.MarketDecrease;
-        } else if (_orderType == IBaseRoute.OrderType.LimitDecrease) {
+        } else if (_orderType == TradeRoute.OrderType.LimitDecrease) {
             return IGMXOrder.OrderType.LimitDecrease;
         } else {
             revert("GMXV2RouteHelper: invalid order type");

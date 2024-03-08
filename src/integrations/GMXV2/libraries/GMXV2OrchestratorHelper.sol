@@ -28,7 +28,7 @@ import {GMXV2Keys} from "./GMXV2Keys.sol";
 
 import {IDataStore} from "../../utilities/interfaces/IDataStore.sol";
 
-import {IBaseOrchestrator} from "../../interfaces/IBaseOrchestrator.sol";
+import {Orchestrator} from "./../Orchestrator.sol";
 
 import {IPriceFeed} from "../interfaces/IPriceFeed.sol";
 import {IGMXDataStore} from "../interfaces/IGMXDataStore.sol";
@@ -105,7 +105,7 @@ library GMXV2OrchestratorHelper {
         _size = _position.numbers.sizeInUsd; // already in USD with 30 decimals
 
         address _collateralToken = CommonHelper.collateralToken(_dataStore, _route);
-        uint256 _collateralTokenPrice = IBaseOrchestrator(CommonHelper.orchestrator(_dataStore)).getPrice(_collateralToken);
+        uint256 _collateralTokenPrice = Orchestrator(CommonHelper.orchestrator(_dataStore)).getPrice(_collateralToken);
         _collateral = _collateralTokenPrice * _position.numbers.collateralAmount / CommonHelper.collateralTokenDecimals(_dataStore, _collateralToken);
     }
 

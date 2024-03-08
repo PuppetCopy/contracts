@@ -26,8 +26,8 @@ import {Keys} from "../libraries/Keys.sol";
 import {CommonHelper} from "./CommonHelper.sol";
 
 import {IDataStore} from "../utilities/interfaces/IDataStore.sol";
-import {IBaseOrchestrator} from "../interfaces/IBaseOrchestrator.sol";
-import {IBaseRoute} from "../interfaces/IBaseRoute.sol";
+import {Orchestrator} from "../GMXV2/Orchestrator.sol";
+import {TradeRoute} from "./../GMXV2/TradeRoute.sol";
 
 /// @title RouteReader
 /// @author johnnyonline
@@ -118,7 +118,7 @@ library RouteReader {
         uint256 _totalAssets,
         address[] memory _puppets
     ) external view returns (
-        IBaseRoute.PuppetsRequest memory _puppetsRequest,
+        TradeRoute.PuppetsRequest memory _puppetsRequest,
         bool _isAdjustmentRequired
     ) {
         uint256 _puppetsLength = _puppets.length;
@@ -204,7 +204,7 @@ library RouteReader {
         uint256 _traderPositionSize;
         uint256 _traderPositionCollateral;
         {
-            (uint256 _positionSize, uint256 _positionCollateral) = IBaseOrchestrator(orchestrator(_dataStore)).positionAmounts(address(this));
+            (uint256 _positionSize, uint256 _positionCollateral) = Orchestrator(orchestrator(_dataStore)).positionAmounts(address(this));
             uint256 _positionTotalSupply = positionTotalSupply(_dataStore);
             uint256 _traderPositionShares = traderShares(_dataStore);
             _traderPositionSize = SharesHelper.convertToAssets(_positionSize, _positionTotalSupply, _traderPositionShares);
@@ -218,7 +218,7 @@ library RouteReader {
 
         {
             address _collateralToken = CommonHelper.collateralToken(_dataStore, address(this));
-            _traderCollateralIncrease = IBaseOrchestrator(orchestrator(_dataStore)).getPrice(_collateralToken) *
+            _traderCollateralIncrease = Orchestrator(orchestrator(_dataStore)).getPrice(_collateralToken) *
             _traderCollateralIncrease /
             CommonHelper.collateralTokenDecimals(_dataStore, _collateralToken);
         }

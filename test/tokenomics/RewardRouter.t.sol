@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {RewardRouter} from "src/tokenomics/RewardRouter.sol";
+import {RewardRouter} from "src/RewardRouter.sol";
 import {DataStore} from "src/integrations/utilities/DataStore.sol";
 import {OracleLogic} from "src/tokenomics/OracleLogic.sol";
 import {OracleStore} from "src/tokenomics/store/OracleStore.sol";

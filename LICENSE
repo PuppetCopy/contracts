@@ -12,13 +12,12 @@ Parameters
 Licensor:             Puppet DAO
 
 Licensed Work:        Puppet Contracts.
-                      The Licensed Work is (c) 2024 Puppet DAO
+                      The Licensed Work is (c) 2024 puppetdao.eth
 
 Licensed Usage Grant: Any uses listed and defined at contracts-license-
-                      grants.puppet.eth                            
+                      puppetdao.eth                            
 
-Change Data:          The earlier of 31 October 2027 or a date specified
-                      at contracts-license-date.puppet.eth
+Change Data:          The earlier of 31 October 2027 or a date
 
 Change License:       Version 2 or later of the GNU General Public License as
                       published by the Free Software Foundation.

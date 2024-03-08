@@ -3,7 +3,7 @@ pragma solidity 0.8.23;
 
 import {IDataStore} from "src/integrations/utilities/interfaces/IDataStore.sol";
 
-import {IBaseOrchestrator} from "src/integrations/interfaces/IBaseOrchestrator.sol";
+import {Orchestrator} from "./../../src/integrations/GMXV2/Orchestrator.sol";
 
 struct Users {
     // default owner for all contracts
@@ -66,7 +66,7 @@ struct Context {
     Users users;
     Expectations expectations;
     ForkIDs forkIDs;
-    IBaseOrchestrator orchestrator;
+    Orchestrator orchestrator;
     IDataStore dataStore;
     address payable decreaseSizeResolver;
     address wnt;

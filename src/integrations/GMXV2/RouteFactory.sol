@@ -40,4 +40,10 @@ contract RouteFactory is BaseRouteFactory {
 
         emit RegisterRoute(msg.sender, _route, address(_dataStore), _routeTypeKey);
     }
+
+    // ============================================================================================
+    // Events
+    // ============================================================================================
+
+    event RegisterRoute(address indexed caller, address route, address dataStore, bytes32 routeTypeKey);
 }

@@ -52,12 +52,12 @@ contract DeployToken is PRBTest {
         amounts[0] = 100_000e18 / 10;
         amounts[1] = 0.1e18;
 
-        address[] memory assets = new address[](tokens.length);
+        IAsset[] memory assets = new IAsset[](tokens.length);
 
         for (uint _i = 0; _i < tokens.length; _i++) {
             SafeERC20.forceApprove(tokens[_i], address(vault), amounts[_i]);
             // Cast each IERC20 token to IAsset and assign it to the assets array
-            assets[_i] = address(address(tokens[_i]));
+            assets[_i] = IAsset(address(tokens[_i]));
         }
 
         bytes32 poolId = pool.getPoolId();

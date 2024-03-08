@@ -15,16 +15,16 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 contract PuppetToken is Auth, ERC20 {
     event PuppetToken__MintLimitRateSet(uint rateLimitFactor, uint timeframeLimit);
 
-    string constant _NAME = "Muppet Test";
-    string constant _SYMBOL = "MUPPET";
+    string private constant _NAME = "Muppet Test";
+    string private constant _SYMBOL = "MUPPET";
 
-    uint public constant DAO_SUPPLY = 2_000_000e18;
-    uint public constant CORE_SUPPLY = 1_000_000e18;
-    uint public constant ESCROWED_SUPPLY = DAO_SUPPLY + CORE_SUPPLY;
-    uint public constant LP_BOOTSTRAP = 100_000e18;
-    uint public constant INITIAL_SUPPLY = ESCROWED_SUPPLY + LP_BOOTSTRAP;
+    uint private constant DAO_SUPPLY = 2_000_000e18;
+    uint private constant CORE_SUPPLY = 1_000_000e18;
+    uint private constant ESCROWED_SUPPLY = DAO_SUPPLY + CORE_SUPPLY;
+    uint private constant LP_BOOTSTRAP = 100_000e18;
+    uint private constant INITIAL_SUPPLY = ESCROWED_SUPPLY + LP_BOOTSTRAP;
 
-    uint constant BASIS_DIVISOR = 10000;
+    uint private constant BASIS_DIVISOR = 10000;
 
     // Rate limit for minting new tokens (100 basis points = 1% of total emitted tokens per hour)
     uint public rateLimitFactor = 100;

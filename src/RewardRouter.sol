@@ -5,19 +5,18 @@ import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 
-import {MulticallRouter} from "../utilities/MulticallRouter.sol";
-import {WNT} from "../utilities/common/WNT.sol";
-import {Router} from "../utilities/Router.sol";
-import {Dictator} from "../utilities/Dictator.sol";
-import {IDataStore} from "../integrations/utilities/interfaces/IDataStore.sol";
-import {IVeRevenueDistributor} from "../utilities/interfaces/IVeRevenueDistributor.sol";
+import {MulticallRouter} from "./utilities/MulticallRouter.sol";
+import {WNT} from "./utilities/common/WNT.sol";
+import {Router} from "./utilities/Router.sol";
+import {Dictator} from "./utilities/Dictator.sol";
+import {IDataStore} from "./integrations/utilities/interfaces/IDataStore.sol";
+import {IVeRevenueDistributor} from "./utilities/interfaces/IVeRevenueDistributor.sol";
 
-import {VotingEscrow} from "./VotingEscrow.sol";
-
-import {PuppetToken} from "./PuppetToken.sol";
-import {OracleStore} from "./store/OracleStore.sol";
-import {RewardLogic} from "./RewardLogic.sol";
-import {OracleLogic} from "./OracleLogic.sol";
+import {VotingEscrow} from "./tokenomics/VotingEscrow.sol";
+import {PuppetToken} from "./tokenomics/PuppetToken.sol";
+import {OracleStore} from "./tokenomics/store/OracleStore.sol";
+import {RewardLogic} from "./tokenomics/RewardLogic.sol";
+import {OracleLogic} from "./tokenomics/OracleLogic.sol";
 
 
 contract RewardRouter is MulticallRouter {
@@ -173,6 +172,5 @@ contract RewardRouter is MulticallRouter {
     error RewardRouter__InvalidWeightFactors();
     error RewardRouter__SourceCountNotOdd();
     error RewardRouter__NotEnoughSources();
-    error NoRouteTypeGiven();
     error RewardRouter__PoolDoesNotExit();
 }

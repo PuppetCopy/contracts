@@ -4,7 +4,7 @@ pragma solidity 0.8.23;
 import {IGMXMarket} from "src/integrations/GMXV2/interfaces/IGMXMarket.sol";
 import {IGMXReader} from "src/integrations/GMXV2/interfaces/IGMXReader.sol";
 
-import {IBaseOrchestrator} from "src/integrations/interfaces/IBaseOrchestrator.sol";
+import {Orchestrator} from "./../src/integrations/GMXV2/Orchestrator.sol";
 
 import {DataStore} from "src/integrations/utilities/DataStore.sol";
 import {DecreaseSizeResolver} from "src/integrations/utilities/DecreaseSizeResolver.sol";
@@ -121,7 +121,7 @@ contract DeployGMXV2 is DeployerUtilities {
         uint256 _performanceFee = 500; // 5% max fee
         _orchestratorInstance.updateFees(_managementFee, _withdrawalFee, _performanceFee);
 
-        IBaseOrchestrator(_orchestrator).depositExecutionFees{ value: 0.1 ether }();
+        Orchestrator(_orchestrator).depositExecutionFees{ value: 0.1 ether }();
     }
 
     function _initializeResolver() internal {

@@ -20,13 +20,11 @@ pragma solidity 0.8.23;
 
 // ==============================================================
 
-import {IBaseRouteFactory, IDataStore} from "./interfaces/IBaseRouteFactory.sol";
+import {IDataStore} from "./utilities/interfaces/IDataStore.sol";
 
 /// @title BaseRouteFactory
 /// @author johnnyonline
 /// @notice BaseRouteFactory is used by the Orchestrator to create new Route Accounts
-abstract contract BaseRouteFactory is IBaseRouteFactory {
-
-    /// @inheritdoc IBaseRouteFactory
+abstract contract BaseRouteFactory {
     function registerRoute(IDataStore _dataStore, bytes32 _routeTypeKey) virtual external returns (address _route);
 }

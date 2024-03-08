@@ -28,8 +28,8 @@ import {Keys} from "../libraries/Keys.sol";
 
 import {IDataStore} from "./interfaces/IDataStore.sol";
 
-import {IBaseOrchestrator} from "../interfaces/IBaseOrchestrator.sol";
-import {IBaseRoute} from "../interfaces/IBaseRoute.sol";
+import {Orchestrator} from "./../GMXV2/Orchestrator.sol";
+import {TradeRoute} from "./../GMXV2/TradeRoute.sol";
 
 /// @title DecreaseSizeResolver
 /// @author johnnyonline
@@ -84,7 +84,7 @@ contract DecreaseSizeResolver is AutomateTaskCreator, Auth {
     /// @return _size The required adjustment size, USD denominated, with 30 decimals of precision
     function requiredAdjustmentSize(address _route) public view returns (uint256) {
         IDataStore _dataStore = dataStore;
-        (uint256 _size, uint256 _collateral) = IBaseOrchestrator(CommonHelper.orchestrator(_dataStore)).positionAmounts(_route);
+        (uint256 _size, uint256 _collateral) = Orchestrator(CommonHelper.orchestrator(_dataStore)).positionAmounts(_route);
 
         uint256 _targetLeverage = _dataStore.getUint(Keys.targetLeverageKey(_route));
         return _targetLeverage != 0 ? _size - (_collateral * _targetLeverage / CommonHelper.basisPointsDivisor()) : 0;
@@ -96,8 +96,8 @@ contract DecreaseSizeResolver is AutomateTaskCreator, Auth {
         for (uint256 i = 0; i < _routes.length; i++) {
             address _route = _routes[i];
             if (_dataStore.getBool(Keys.isKeeperAdjustmentEnabledKey(_route))) {
-                IBaseRoute.AdjustPositionParams memory _adjustPositionParams = IBaseRoute.AdjustPositionParams({
-                    orderType: IBaseRoute.OrderType.MarketDecrease,
+                TradeRoute.AdjustPositionParams memory _adjustPositionParams = TradeRoute.AdjustPositionParams({
+                    orderType: TradeRoute.OrderType.MarketDecrease,
                     collateralDelta: 0, // we don't remove collateral
                     sizeDelta: requiredAdjustmentSize(_route),
                     acceptablePrice: _getAcceptablePrice(_route),
@@ -106,7 +106,7 @@ contract DecreaseSizeResolver is AutomateTaskCreator, Auth {
                 });
 
                 _execPayload = abi.encodeWithSelector(
-                    IBaseOrchestrator.decreaseSize.selector,
+                    Orchestrator.decreaseSize.selector,
                     _adjustPositionParams,
                     executionFee,
                     CommonHelper.routeKey(_dataStore, _route)
@@ -152,7 +152,7 @@ contract DecreaseSizeResolver is AutomateTaskCreator, Auth {
 
         bytes32 _id = _createTask(
             _orchestrator,
-            abi.encode(IBaseOrchestrator.decreaseSize.selector),
+            abi.encode(Orchestrator.decreaseSize.selector),
             _moduleData,
             ETH
         );
@@ -177,7 +177,7 @@ contract DecreaseSizeResolver is AutomateTaskCreator, Auth {
     function _getAcceptablePrice(address _route) internal view returns (uint256) {
         IDataStore _dataStore = dataStore;
         uint256 _basisPointsDivisor = CommonHelper.basisPointsDivisor();
-        uint256 _indexTokenPrice = IBaseOrchestrator(CommonHelper.orchestrator(_dataStore)).getPrice(CommonHelper.indexToken(_dataStore, _route));
+        uint256 _indexTokenPrice = Orchestrator(CommonHelper.orchestrator(_dataStore)).getPrice(CommonHelper.indexToken(_dataStore, _route));
         return CommonHelper.isLong(_dataStore, _route) 
         ? _indexTokenPrice * _basisPointsDivisor / priceFeedSlippage
         : _indexTokenPrice * priceFeedSlippage / _basisPointsDivisor;

@@ -15,7 +15,7 @@ import {IBasePoolErc20} from "src/utilities/BalancerOperations.sol";
 
 import {OracleLogic} from "src/tokenomics/OracleLogic.sol";
 import {OracleStore} from "src/tokenomics/store/OracleStore.sol";
-import {RewardRouter} from "src/tokenomics/RewardRouter.sol";
+import {RewardRouter} from "src/RewardRouter.sol";
 import {DataStore} from "src/integrations/utilities/DataStore.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {VotingEscrow} from "src/tokenomics/VotingEscrow.sol";
