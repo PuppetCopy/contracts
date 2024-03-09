@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.23;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -14,7 +14,7 @@ contract PuppetLogic is Auth {
     constructor(Authority _authority) Auth(address(0), _authority) {}
 
     function subscribe(PuppetStore store, address puppet, PuppetStore.PuppetTraderSubscription calldata subscriptionParams) external requiresAuth {
-        if (subscriptionParams.expiry < (block.timestamp + 1 days)) {
+        if (subscriptionParams.expiry < block.timestamp + 1 days) {
             revert PuppetLogic__InvalidExpiry();
         }
 

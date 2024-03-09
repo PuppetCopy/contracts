@@ -9,7 +9,7 @@ contract PositionStore is StoreController {
     struct MirrorPosition {
         uint deposit;
         uint[] puppetAccountList;
-        uint[] puppetDepositList;
+        uint[] puppetCollateralList;
     }
 
     address public positionLogicImplementation;
