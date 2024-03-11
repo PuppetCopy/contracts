@@ -2,18 +2,15 @@
 pragma solidity 0.8.23;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
-import {Router} from "../utilities/Router.sol";
-import {PuppetStore} from "./store/PuppetStore.sol";
+import {Router} from "../../utilities/Router.sol";
+import {PuppetStore} from "../store/PuppetStore.sol";
 
-contract PuppetLogic is Auth {
+library PuppetLogic {
     event PuppetLogic__UpdateDeposit(address from, address to, bool isIncrease, IERC20 token, uint amount);
     event PuppetLogic__UpdateSubscription(bytes32 key, address puppet, address trader, bytes32 routeKey, uint allowanceFactor, uint expiry);
 
-    constructor(Authority _authority) Auth(address(0), _authority) {}
-
-    function subscribe(PuppetStore store, address puppet, PuppetStore.PuppetTraderSubscription calldata subscriptionParams) external requiresAuth {
+    function subscribe(PuppetStore store, address puppet, PuppetStore.PuppetTraderSubscription calldata subscriptionParams) external {
         if (subscriptionParams.expiry < block.timestamp + 1 days) {
             revert PuppetLogic__InvalidExpiry();
         }
@@ -43,7 +40,7 @@ contract PuppetLogic is Auth {
         );
     }
 
-    function removeSubscription(PuppetStore store, address puppet, address trader, bytes32 routeKey) external requiresAuth {
+    function removeSubscription(PuppetStore store, address puppet, address trader, bytes32 routeKey) external {
         bytes32 subscriptionKey = keccak256(abi.encodePacked(puppet, trader, routeKey));
 
         store.removePuppetTraderSubscription(subscriptionKey);
@@ -51,7 +48,7 @@ contract PuppetLogic is Auth {
         emit PuppetLogic__UpdateSubscription(subscriptionKey, puppet, trader, routeKey, 0, 0);
     }
 
-    function deposit(Router router, PuppetStore store, IERC20 token, address from, address to, uint amount) external requiresAuth {
+    function deposit(Router router, PuppetStore store, IERC20 token, address from, address to, uint amount) external {
         if (amount == 0) {
             revert PuppetLogic__ZeroAmount();
         }
@@ -68,7 +65,7 @@ contract PuppetLogic is Auth {
         emit PuppetLogic__UpdateDeposit(from, to, true, token, amount);
     }
 
-    function withdraw(Router router, PuppetStore store, IERC20 token, address from, address to, uint amount) external requiresAuth {
+    function withdraw(Router router, PuppetStore store, IERC20 token, address from, address to, uint amount) external {
         PuppetStore.PuppetAccount memory pa = store.getPuppetAccount(from);
 
         if (amount > pa.deposit) {

@@ -14,10 +14,10 @@ contract PositionStore is StoreController {
 
     struct RequestMirrorPositionAdjustment {
         address[] puppetList;
-        uint[] puppetDepositDeltaList;
-        uint depositDelta;
+        uint[] puppetcollateralDeltaList;
+        uint collateralDelta;
         uint sizeDelta;
-        uint leverageDelta;
+        uint leverage;
     }
 
     struct MirrorPosition {
