@@ -7,6 +7,8 @@ import {StoreController} from "../../utilities/StoreController.sol";
 contract PuppetStore is StoreController {
     struct PuppetAccount {
         uint deposit;
+        uint throttleMatchingPeriod;
+        uint latestMatchTimestamp;
     }
 
     struct PuppetTraderSubscription {
