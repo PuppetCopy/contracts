@@ -5,12 +5,13 @@ import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {Router} from "../utilities/Router.sol";
+import {Math} from "./../utils/Math.sol";
+
+import {RewardStore} from "./store/RewardStore.sol";
+import {Router} from "../utils/Router.sol";
 import {PuppetToken} from "./PuppetToken.sol";
-import {IDataStore} from "./../integrations/utilities/interfaces/IDataStore.sol";
-import {CommonHelper} from "./../integrations/libraries/CommonHelper.sol";
 import {VotingEscrow, MAXTIME} from "./VotingEscrow.sol";
-import {IVeRevenueDistributor} from "./../utilities/interfaces/IVeRevenueDistributor.sol";
+import {IVeRevenueDistributor} from "./../utils/interfaces/IVeRevenueDistributor.sol";
 
 contract RewardLogic is Auth {
     enum Choice {
@@ -22,50 +23,38 @@ contract RewardLogic is Auth {
         Choice choice,
         address indexed account,
         address dao,
-        IERC20 revenueInToken,
-        uint revenueInTokenAmount,
+        IERC20 revenueToken,
+        uint revenueInToken,
+        uint revenueInUsd,
         uint maxTokenAmount,
         uint rate,
         uint amount,
         uint daoRate,
         uint daoAmount
     );
+
     event RewardLogic__ReferralOwnershipTransferred(address referralStorage, bytes32 code, address newOwner, uint timestamp);
 
     struct OptionParams {
-        IDataStore dataStore;
+        RewardStore rewardStore;
         PuppetToken puppetToken;
         address dao;
         address account;
-        IERC20 revenueInToken;
+        IERC20 revenueToken;
         uint rate;
         uint daoRate;
         uint tokenPrice;
     }
 
-    uint internal constant BASIS_POINT_DIVISOR = 10000;
-
     constructor(Authority _authority) Auth(address(0), _authority) {}
 
     function getClaimableAmount(uint distributionRatio, uint tokenAmount) public pure returns (uint) {
-        uint claimableAmount = tokenAmount * distributionRatio / BASIS_POINT_DIVISOR;
+        uint claimableAmount = tokenAmount * distributionRatio / Math.BASIS_POINT_DIVISOR;
         return claimableAmount;
     }
 
-    function getAccountGeneratedRevenue(IDataStore dataStore, address account) public view returns (uint) {
-        return dataStore.getUint(keccak256(abi.encode("USER_REVENUE", account)));
-    }
-
-    function getAccountRouteList(IDataStore dataStore, bytes32[] calldata routeTypeKeys, address account)
-        public
-        view
-        returns (address[] memory routeList)
-    {
-        routeList = new address[](routeTypeKeys.length);
-
-        for (uint i = 0; i < routeTypeKeys.length; i++) {
-            routeList[i] = CommonHelper.routeAddress(dataStore, CommonHelper.routeKey(dataStore, account, routeTypeKeys[i]));
-        }
+    function getAccountGeneratedRevenue(RewardStore rewardStore, address account) public view returns (RewardStore.UserGeneratedRevenue memory) {
+        return rewardStore.getUserGeneratedRevenue(getUserGeneratedRevenueKey(account));
     }
 
     function getRewardTimeMultiplier(VotingEscrow votingEscrow, address account, uint unlockTime) public view returns (uint) {
@@ -75,21 +64,21 @@ contract RewardLogic is Auth {
 
         uint maxTime = block.timestamp + MAXTIME;
 
-        if (unlockTime >= maxTime) return BASIS_POINT_DIVISOR;
+        if (unlockTime >= maxTime) return Math.BASIS_POINT_DIVISOR;
 
-        return unlockTime * BASIS_POINT_DIVISOR / maxTime;
+        return unlockTime * Math.BASIS_POINT_DIVISOR / maxTime;
     }
 
     // state
 
     function lock(Router router, VotingEscrow votingEscrow, OptionParams calldata params, uint unlockTime) public requiresAuth {
-        uint revenueInTokenAmount = getAndResetUserRevenue(params.dataStore, params.account);
-        uint maxRewardTokenAmount = revenueInTokenAmount * 1e18 / params.tokenPrice;
+        RewardStore.UserGeneratedRevenue memory revenueInToken = getAccountGeneratedRevenue(params.rewardStore, params.account);
+        uint maxRewardTokenAmount = revenueInToken.amountInUsd * 1e18 / params.tokenPrice;
 
-        if (revenueInTokenAmount == 0 || maxRewardTokenAmount == 0) revert RewardLogic__NoClaimableAmount();
+        if (revenueInToken.amountInUsd == 0 || maxRewardTokenAmount == 0) revert RewardLogic__NoClaimableAmount();
 
         uint amount = getClaimableAmount(params.rate, maxRewardTokenAmount) * getRewardTimeMultiplier(votingEscrow, params.account, unlockTime)
-            / BASIS_POINT_DIVISOR;
+            / Math.BASIS_POINT_DIVISOR;
         params.puppetToken.mint(address(this), amount);
         SafeERC20.forceApprove(params.puppetToken, address(router), amount);
         votingEscrow.lock(address(this), params.account, amount, unlockTime);
@@ -97,12 +86,15 @@ contract RewardLogic is Auth {
         uint daoAmount = getClaimableAmount(params.daoRate, maxRewardTokenAmount);
         params.puppetToken.mint(params.dao, daoAmount);
 
+        resetUserRevenue(params.rewardStore, params.account);
+
         emit RewardLogic__ClaimOption(
             Choice.LOCK,
             params.account,
             params.dao,
-            params.revenueInToken,
-            revenueInTokenAmount,
+            params.revenueToken,
+            revenueInToken.amountInToken,
+            revenueInToken.amountInUsd,
             maxRewardTokenAmount,
             params.rate,
             amount,
@@ -112,10 +104,11 @@ contract RewardLogic is Auth {
     }
 
     function exit(OptionParams calldata params) public requiresAuth {
-        uint revenueInTokenAmount = getAndResetUserRevenue(params.dataStore, params.account);
-        uint maxRewardTokenAmount = revenueInTokenAmount * 1e18 / params.tokenPrice;
+        RewardStore.UserGeneratedRevenue memory revenueInToken = getAccountGeneratedRevenue(params.rewardStore, params.account);
 
-        if (revenueInTokenAmount == 0 || maxRewardTokenAmount == 0) revert RewardLogic__NoClaimableAmount();
+        uint maxRewardTokenAmount = revenueInToken.amountInUsd * 1e18 / params.tokenPrice;
+
+        if (revenueInToken.amountInUsd == 0 || maxRewardTokenAmount == 0) revert RewardLogic__NoClaimableAmount();
 
         uint daoAmount = getClaimableAmount(params.daoRate, maxRewardTokenAmount);
         uint amount = getClaimableAmount(params.rate, maxRewardTokenAmount);
@@ -123,12 +116,15 @@ contract RewardLogic is Auth {
         params.puppetToken.mint(params.dao, daoAmount);
         params.puppetToken.mint(params.account, amount);
 
+        resetUserRevenue(params.rewardStore, params.account);
+
         emit RewardLogic__ClaimOption(
             Choice.EXIT,
             params.account,
             params.dao,
-            params.revenueInToken,
-            revenueInTokenAmount,
+            params.revenueToken,
+            revenueInToken.amountInToken,
+            revenueInToken.amountInUsd,
             maxRewardTokenAmount,
             params.rate,
             amount,
@@ -137,15 +133,21 @@ contract RewardLogic is Auth {
         );
     }
 
-    function claim(IVeRevenueDistributor revenueDistributor, IERC20 revenueInToken, address from, address to) public requiresAuth returns (uint) {
-        return revenueDistributor.claim(revenueInToken, from, to);
+    function claim(IVeRevenueDistributor revenueDistributor, IERC20 revenueToken, address from, address to) public requiresAuth returns (uint) {
+        return revenueDistributor.claim(revenueToken, from, to);
     }
 
-    // internal
+    function setUserGeneratedRevenue(RewardStore rewardStore, address account, RewardStore.UserGeneratedRevenue calldata revenue)
+        public
+        requiresAuth
+    {
+        rewardStore.setUserGeneratedRevenue(getUserGeneratedRevenueKey(account), revenue);
+    }
 
-    function getAndResetUserRevenue(IDataStore dataStore, address account) internal returns (uint revenue) {
-        revenue = dataStore.getUint(keccak256(abi.encode("USER_REVENUE", account)));
-        dataStore.setUint(keccak256(abi.encode("USER_REVENUE", account)), 0);
+    // internal logic
+
+    function resetUserRevenue(RewardStore rewardStore, address account) internal {
+        rewardStore.removeUserGeneratedRevenue(getUserGeneratedRevenueKey(account));
     }
 
     // governance
@@ -158,6 +160,12 @@ contract RewardLogic is Auth {
         if (!success) revert RewardLogic__TransferReferralFailed();
 
         emit RewardLogic__ReferralOwnershipTransferred(_referralStorage, _code, _newOwner, block.timestamp);
+    }
+
+    // internal view
+
+    function getUserGeneratedRevenueKey(address account) internal pure returns (bytes32) {
+        return keccak256(abi.encode("USER_REVENUE", account));
     }
 
     error RewardLogic__TransferReferralFailed();

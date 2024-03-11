@@ -32,8 +32,8 @@ import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Router} from "../utilities/Router.sol";
-import {Math} from "./../utilities/common/Math.sol";
+import {Router} from "../utils/Router.sol";
+import {Math} from "./../utils/Math.sol";
 
 uint constant MAXTIME = 2 * 365 * 86400; // 2 years
 

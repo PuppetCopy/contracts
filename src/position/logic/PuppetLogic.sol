@@ -3,19 +3,19 @@ pragma solidity 0.8.23;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Router} from "../../utilities/Router.sol";
+import {Router} from "src/utils/Router.sol";
 import {PuppetStore} from "../store/PuppetStore.sol";
 
 library PuppetLogic {
     event PuppetLogic__UpdateDeposit(address from, address to, bool isIncrease, IERC20 token, uint amount);
-    event PuppetLogic__UpdateSubscription(bytes32 key, address puppet, address trader, bytes32 routeKey, uint allowanceFactor, uint expiry);
+    event PuppetLogic__UpdateSubscription(bytes32 key, address puppet, address trader, bytes32 routeKey, uint allowanceRate, uint expiry);
 
     function subscribe(PuppetStore store, address puppet, PuppetStore.PuppetTraderSubscription calldata subscriptionParams) external {
         if (subscriptionParams.expiry < block.timestamp + 1 days) {
             revert PuppetLogic__InvalidExpiry();
         }
 
-        if (subscriptionParams.allowanceFactor < 100) {
+        if (subscriptionParams.allowanceRate < 100) {
             revert PuppetLogic__DepositLimitReached();
         }
 
@@ -25,7 +25,7 @@ library PuppetLogic {
 
         pts.trader = subscriptionParams.trader;
         pts.routeKey = subscriptionParams.routeKey;
-        pts.allowanceFactor = subscriptionParams.allowanceFactor;
+        pts.allowanceRate = subscriptionParams.allowanceRate;
         pts.expiry = subscriptionParams.expiry;
 
         store.setPuppetTraderSubscription(pts, subscriptionKey);
@@ -35,7 +35,7 @@ library PuppetLogic {
             puppet,
             subscriptionParams.trader,
             subscriptionParams.routeKey,
-            subscriptionParams.allowanceFactor,
+            subscriptionParams.allowanceRate,
             subscriptionParams.expiry
         );
     }
@@ -56,7 +56,6 @@ library PuppetLogic {
         PuppetStore.PuppetAccount memory pa = store.getPuppetAccount(from);
 
         router.pluginTransfer(token, from, address(store), amount);
-
         unchecked {
             pa.deposit += amount;
         }

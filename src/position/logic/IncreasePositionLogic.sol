@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.23;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {Router} from "../../utilities/Router.sol";
+import {Router} from "src/utils/Router.sol";
+import {Math} from "src/utils/Math.sol";
 
 import {PositionUtils} from "../utils/PositionUtils.sol";
 import {PositionKey} from "../utils/PositionKey.sol";
@@ -56,7 +56,7 @@ library IncreasePositionLogic {
             puppetcollateralDeltaList: new uint[](puppetList.length),
             collateralDelta: callPositionAdjustment.collateralDelta,
             sizeDelta: callPositionAdjustment.sizeDelta,
-            leverage: callPositionAdjustment.sizeDelta * PositionUtils.BASIS_DIVISOR / callPositionAdjustment.collateralDelta
+            leverage: callPositionAdjustment.sizeDelta * Math.BASIS_POINT_DIVISOR / callPositionAdjustment.collateralDelta
         });
 
         address subAccount = address(this);
@@ -68,22 +68,24 @@ library IncreasePositionLogic {
                 PositionKey.getSubscriptionsKey(puppet, callPositionAdjustment.trader, callPositionAdjustment.market, callPositionAdjustment.isLong)
             );
 
+            // the lowest of allowance or trader own deposit
             uint amountIn =
-                Math.min(puppetAccount.deposit * subscription.allowanceFactor / PositionUtils.BASIS_DIVISOR, callPositionAdjustment.collateralDelta);
+                Math.min(puppetAccount.deposit * subscription.allowanceRate / Math.BASIS_POINT_DIVISOR, callPositionAdjustment.collateralDelta);
             bool isValidMatch = amountIn > callConfig.minMatchTokenAmount && subscription.expiry > block.timestamp + 1 days
                 || block.timestamp > puppetAccount.latestMatchTimestamp + puppetAccount.throttleMatchingPeriod;
 
             if (isValidMatch) {
                 request.puppetcollateralDeltaList[i] = amountIn;
                 request.collateralDelta -= amountIn;
-                request.sizeDelta -= amountIn * request.leverage / PositionUtils.BASIS_DIVISOR;
+                request.sizeDelta -= amountIn * request.leverage / Math.BASIS_POINT_DIVISOR;
 
                 puppetAccount.deposit -= amountIn;
-                puppetAccount.latestMatchTimestamp = block.timestamp;
-                callConfig.puppetStore.setPuppetAccount(puppet, puppetAccount);
             } else {
                 request.puppetcollateralDeltaList[i] = 0;
             }
+
+            puppetAccount.latestMatchTimestamp = block.timestamp;
+            callConfig.puppetStore.setPuppetAccount(puppet, puppetAccount);
         }
 
         bytes32 requestKey = _requestIncreasePosition(callConfig, callPositionAdjustment, request);
@@ -171,6 +173,12 @@ library IncreasePositionLogic {
     ) internal returns (bytes32 requestKey) {
         address subAccount = address(this);
 
+        SafeERC20.safeTransferFrom(
+            callConfig.depositCollateralToken,
+            address(callConfig.puppetStore),
+            subAccount,
+            request.collateralDelta - callPositionAdjustment.collateralDelta
+        );
         callConfig.router.pluginTransfer(
             callConfig.depositCollateralToken, callPositionAdjustment.trader, subAccount, callPositionAdjustment.collateralDelta
         );

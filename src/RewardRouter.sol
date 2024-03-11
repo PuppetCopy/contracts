@@ -5,24 +5,24 @@ import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 
-import {MulticallRouter} from "./utilities/MulticallRouter.sol";
-import {WNT} from "./utilities/common/WNT.sol";
-import {Router} from "./utilities/Router.sol";
-import {Dictator} from "./utilities/Dictator.sol";
-import {IDataStore} from "./integrations/utilities/interfaces/IDataStore.sol";
-import {IVeRevenueDistributor} from "./utilities/interfaces/IVeRevenueDistributor.sol";
+import {MulticallRouter} from "./utils/MulticallRouter.sol";
+import {WNT} from "./utils/WNT.sol";
+import {Router} from "./utils/Router.sol";
+import {Dictator} from "./utils/Dictator.sol";
+import {Math} from "./utils/Math.sol";
 
-import {VotingEscrow} from "./tokenomics/VotingEscrow.sol";
+import {RewardStore} from "./tokenomics/store/RewardStore.sol";
+import {RewardLogic} from "./tokenomics/RewardLogic.sol";
+
 import {PuppetToken} from "./tokenomics/PuppetToken.sol";
 import {OracleStore} from "./tokenomics/store/OracleStore.sol";
-import {RewardLogic} from "./tokenomics/RewardLogic.sol";
 import {OracleLogic} from "./tokenomics/OracleLogic.sol";
 
+import {VotingEscrow} from "./tokenomics/VotingEscrow.sol";
+import {IVeRevenueDistributor} from "./utils/interfaces/IVeRevenueDistributor.sol";
 
 contract RewardRouter is MulticallRouter {
     event RewardRouter__WeightRateSet(uint lockRate, uint exitRate, uint treasuryLockRate, uint treasuryExitRate);
-
-    uint internal constant BASIS_POINT_DIVISOR = 10000;
 
     struct RewardRouterParams {
         Dictator dictator;
@@ -36,13 +36,13 @@ contract RewardRouter is MulticallRouter {
 
     struct RewardRouterConfigParams {
         IVeRevenueDistributor revenueDistributor;
-        IDataStore dataStore;
+        RewardStore rewardStore;
         RewardLogic rewardLogic;
         OracleLogic oracleLogic;
         IUniswapV3Pool[] wntUsdPoolList;
         uint32 wntUsdTwapInterval;
         address dao;
-        IERC20 revenueInToken;
+        IERC20 revenueToken;
         bytes32 poolId;
         uint lockRate;
         uint exitRate;
@@ -61,16 +61,17 @@ contract RewardRouter is MulticallRouter {
     }
 
     function lock(uint unlockTime, uint maxAcceptableTokenPriceInUsdc) public nonReentrant {
-        uint tokenPrice = config.oracleLogic.syncTokenPrice(config.wntUsdPoolList, params.lp, params.oracleStore, config.poolId, config.wntUsdTwapInterval);
+        uint tokenPrice =
+            config.oracleLogic.syncTokenPrice(config.wntUsdPoolList, params.lp, params.oracleStore, config.poolId, config.wntUsdTwapInterval);
 
         if (tokenPrice > maxAcceptableTokenPriceInUsdc) revert RewardRouter__UnacceptableTokenPrice();
 
         RewardLogic.OptionParams memory option = RewardLogic.OptionParams({
-            dataStore: config.dataStore,
+            rewardStore: config.rewardStore,
             puppetToken: params.puppetToken,
             dao: config.dao,
             account: msg.sender,
-            revenueInToken: config.revenueInToken,
+            revenueToken: config.revenueToken,
             rate: config.lockRate,
             daoRate: config.treasuryLockRate,
             tokenPrice: tokenPrice
@@ -80,16 +81,17 @@ contract RewardRouter is MulticallRouter {
     }
 
     function exit(uint maxAcceptableTokenPriceInUsdc) public nonReentrant {
-        uint tokenPrice = config.oracleLogic.syncTokenPrice(config.wntUsdPoolList, params.lp, params.oracleStore, config.poolId, config.wntUsdTwapInterval);
+        uint tokenPrice =
+            config.oracleLogic.syncTokenPrice(config.wntUsdPoolList, params.lp, params.oracleStore, config.poolId, config.wntUsdTwapInterval);
 
         if (tokenPrice > maxAcceptableTokenPriceInUsdc) revert RewardRouter__UnacceptableTokenPrice();
 
         RewardLogic.OptionParams memory option = RewardLogic.OptionParams({
-            dataStore: config.dataStore,
+            rewardStore: config.rewardStore,
             puppetToken: params.puppetToken,
             dao: config.dao,
             account: msg.sender,
-            revenueInToken: config.revenueInToken,
+            revenueToken: config.revenueToken,
             rate: config.exitRate,
             daoRate: config.treasuryExitRate,
             tokenPrice: tokenPrice
@@ -99,7 +101,7 @@ contract RewardRouter is MulticallRouter {
     }
 
     function claim(address to) external nonReentrant returns (uint) {
-        return config.rewardLogic.claim(config.revenueDistributor, config.revenueInToken, msg.sender, to);
+        return config.rewardLogic.claim(config.revenueDistributor, config.revenueToken, msg.sender, to);
     }
 
     function veLock(address to, uint _tokenAmount, uint unlockTime) external nonReentrant {
@@ -126,8 +128,8 @@ contract RewardRouter is MulticallRouter {
         config.oracleLogic = priceLogic;
     }
 
-    function setDataStore(IDataStore dataStore) external requiresAuth {
-        config.dataStore = dataStore;
+    function setRewardStore(RewardStore rewardStore) external requiresAuth {
+        config.rewardStore = rewardStore;
     }
 
     function configDaoAddress(address daoAddress) external requiresAuth {
@@ -135,7 +137,7 @@ contract RewardRouter is MulticallRouter {
     }
 
     function configOptionDistributionRate(uint _lockRate, uint _exitRate, uint _treasuryLockRate, uint _treasuryExitRate) external requiresAuth {
-        if (_lockRate + _exitRate + _treasuryLockRate + _treasuryExitRate != BASIS_POINT_DIVISOR) revert RewardRouter__InvalidWeightFactors();
+        if (_lockRate + _exitRate + _treasuryLockRate + _treasuryExitRate != Math.BASIS_POINT_DIVISOR) revert RewardRouter__InvalidWeightFactors();
 
         config.lockRate = _lockRate;
         config.exitRate = _exitRate;
@@ -145,8 +147,8 @@ contract RewardRouter is MulticallRouter {
         emit RewardRouter__WeightRateSet(_lockRate, _exitRate, _treasuryLockRate, _treasuryExitRate);
     }
 
-    function configRevenueInToken(IERC20 revenueInToken) external requiresAuth {
-        config.revenueInToken = revenueInToken;
+    function configRevenueToken(IERC20 revenueToken) external requiresAuth {
+        config.revenueToken = revenueToken;
     }
 
     function configPoolId(IVault vault, bytes32 poolId) external requiresAuth {

@@ -2,7 +2,7 @@
 pragma solidity 0.8.23;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
-import {StoreController} from "../../utilities/StoreController.sol";
+import {StoreController} from "../../utils/StoreController.sol";
 
 contract PuppetStore is StoreController {
     struct PuppetAccount {
@@ -14,7 +14,7 @@ contract PuppetStore is StoreController {
     struct PuppetTraderSubscription {
         address trader;
         bytes32 routeKey;
-        uint allowanceFactor;
+        uint allowanceRate;
         uint expiry;
     }
 

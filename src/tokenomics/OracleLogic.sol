@@ -6,8 +6,8 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 
 import {OracleStore, SLOT_COUNT} from "./store/OracleStore.sol";
-import {Math} from "./../utilities/common/Math.sol";
-import {UniV3Prelude} from "./../utilities/UniV3Prelude.sol";
+import {Math} from "./../utils/Math.sol";
+import {UniV3Prelude} from "./../utils/UniV3Prelude.sol";
 
 /**
  * @title OracleStore

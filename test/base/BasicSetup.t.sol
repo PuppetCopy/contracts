@@ -6,16 +6,22 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {StdCheats} from "forge-std/src/StdCheats.sol";
 import {StdUtils} from "forge-std/src/StdUtils.sol";
 import {PRBTest} from "@prb/test/src/PRBTest.sol";
-import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 
-import {Users} from "test/utilities/Types.sol";
-import {Dictator} from "src/utilities/Dictator.sol";
-import {Router} from "src/utilities/Router.sol";
-import {WNT} from "src/utilities/common/WNT.sol";
+import {Dictator} from "src/utils/Dictator.sol";
+import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+import {Router} from "src/utils/Router.sol";
+import {WNT} from "src/utils/WNT.sol";
 
 contract BasicSetup is PRBTest, StdCheats, StdUtils {
+    struct Users {
+        address payable owner;
+        address payable alice;
+        address payable bob;
+        address payable yossi;
+    }
+
     uint8 constant TOKEN_ROUTER_ROLE = 0;
-    uint8 constant PUPPET_MINTER = 1;
+    uint8 constant PUPPET_MINTER_ROLE = 1;
 
     uint internal constant BASIS_POINTS_DIVISOR = 10_000;
     Users users;
@@ -32,19 +38,12 @@ contract BasicSetup is PRBTest, StdCheats, StdUtils {
 
         vm.startPrank(owner);
 
-        dictator.setUserRole(owner, PUPPET_MINTER, true);
+        dictator.setUserRole(owner, PUPPET_MINTER_ROLE, true);
 
-        users = Users({
-            owner: owner,
-            alice: _createUser("Alice", 2),
-            bob: _createUser("Bob", 2),
-            yossi: _createUser("Yossi", 2),
-            trader: _createUser("Trader", 2),
-            keeper: _createUser("Keeper", 2)
-        });
+        users = Users({owner: owner, alice: _createUser("Alice", 2), bob: _createUser("Bob", 2), yossi: _createUser("Yossi", 2)});
 
         puppetToken = new PuppetToken(dictator, dictator.owner());
-        dictator.setRoleCapability(PUPPET_MINTER, address(puppetToken), puppetToken.mint.selector, true);
+        dictator.setRoleCapability(PUPPET_MINTER_ROLE, address(puppetToken), puppetToken.mint.selector, true);
 
         router = new Router(dictator);
         dictator.setRoleCapability(TOKEN_ROUTER_ROLE, address(router), router.pluginTransfer.selector, true);

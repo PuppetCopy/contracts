@@ -23,8 +23,8 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
 import {VotingEscrow} from "./VotingEscrow.sol";
-import {Router} from "../utilities/Router.sol";
-import {IVeRevenueDistributor} from "../utilities/interfaces/IVeRevenueDistributor.sol";
+import {Router} from "../utils/Router.sol";
+import {IVeRevenueDistributor} from "../utils/interfaces/IVeRevenueDistributor.sol";
 
 /**
  * @title Fee Distributor

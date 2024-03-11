@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {Dictator} from "src/utilities/Dictator.sol";
+import {Dictator} from "src/utils/Dictator.sol";
 import {PRBTest} from "@prb/test/src/PRBTest.sol";
 import {StdCheats} from "forge-std/src/StdCheats.sol";
 

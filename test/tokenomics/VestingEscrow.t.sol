@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.23;
 
-import {VestingEscrow} from "src/utilities/VestingEscrow.sol";
+import {VestingEscrow} from "src/utils/VestingEscrow.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 

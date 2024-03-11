@@ -6,17 +6,19 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {PRBTest} from "@prb/test/src/PRBTest.sol";
 
-import {IDataStore} from "./../src/integrations/utilities/interfaces/IDataStore.sol";
+// import {IDataStore} from "./../src/integrations/utils/interfaces/IDataStore.sol";
 
-import {Dictator} from "src/utilities/Dictator.sol";
-import {Router} from "src/utilities/Router.sol";
-import {WNT} from "src/utilities/common/WNT.sol";
-import {IBasePoolErc20} from "src/utilities/BalancerOperations.sol";
+import {PositionStore} from "./../src/position/store/PositionStore.sol";
+
+import {Dictator} from "src/utils/Dictator.sol";
+import {Router} from "src/utils/Router.sol";
+import {WNT} from "src/utils/WNT.sol";
+import {IBasePoolErc20} from "src/utils/BalancerOperations.sol";
 
 import {OracleLogic} from "src/tokenomics/OracleLogic.sol";
 import {OracleStore} from "src/tokenomics/store/OracleStore.sol";
 import {RewardRouter} from "src/RewardRouter.sol";
-import {DataStore} from "src/integrations/utilities/DataStore.sol";
+// import {DataStore} from "src/integrations/utils/DataStore.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {VotingEscrow} from "src/tokenomics/VotingEscrow.sol";
 import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
@@ -28,7 +30,7 @@ contract DeployTokenomics is PRBTest {
     uint8 constant TOKEN_ROUTER_ROLE = 0;
     uint8 constant PUPPET_MINTER = 1;
     uint8 constant ORACLE_LOGIC_ROLE = 2;
-    uint8 constant OPTION_LOGIC_ROLE = 3;
+    uint8 constant REWARD_LOGIC_ROLE = 3;
     uint8 constant ROUTER_ROLE = 4;
     uint8 constant REWARD_DISTRIBUTOR_ROLE = 5;
 
@@ -39,8 +41,7 @@ contract DeployTokenomics is PRBTest {
     }
 
     function _deployContracts() internal {
-        IDataStore datastore = IDataStore(DeployerEnv.datastore);
-
+        // PositionStore datastore = PositionStore(DeployerEnv.datastore);
 
         // Dictator dictator = Dictator(DeployerEnv.Dictator);
         // PuppetToken puppetToken = PuppetToken(DeployerEnv.PuppetToken);
@@ -64,9 +65,12 @@ contract DeployTokenomics is PRBTest {
 
         // IUniswapV3Pool[] memory wntUsdPoolList = new IUniswapV3Pool[](3);
 
-        // wntUsdPoolList[0] = IUniswapV3Pool(0xC6962004f452bE9203591991D15f6b388e09E8D0); // https://arbiscan.io/address/0xc6962004f452be9203591991d15f6b388e09e8d0
-        // wntUsdPoolList[1] = IUniswapV3Pool(0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443); // https://arbiscan.io/address/0xc31e54c7a869b9fcbecc14363cf510d1c41fa443
-        // wntUsdPoolList[2] = IUniswapV3Pool(0x641C00A822e8b671738d32a431a4Fb6074E5c79d); // https://arbiscan.io/address/0x641c00a822e8b671738d32a431a4fb6074e5c79d
+        // wntUsdPoolList[0] = IUniswapV3Pool(0xC6962004f452bE9203591991D15f6b388e09E8D0); //
+        // https://arbiscan.io/address/0xc6962004f452be9203591991d15f6b388e09e8d0
+        // wntUsdPoolList[1] = IUniswapV3Pool(0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443); //
+        // https://arbiscan.io/address/0xc31e54c7a869b9fcbecc14363cf510d1c41fa443
+        // wntUsdPoolList[2] = IUniswapV3Pool(0x641C00A822e8b671738d32a431a4Fb6074E5c79d); //
+        // https://arbiscan.io/address/0x641c00a822e8b671738d32a431a4fb6074e5c79d
 
         // IBasePoolErc20 lpPool = IBasePoolErc20(DeployerEnv.BasePool);
         // IVault vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
@@ -79,7 +83,7 @@ contract DeployTokenomics is PRBTest {
 
         // RewardLogic rewardLogic = new RewardLogic(dictator);
         // dictator.setUserRole(address(rewardLogic), PUPPET_MINTER, true);
-        // dictator.setUserRole(address(rewardLogic), OPTION_LOGIC_ROLE, true);
+        // dictator.setUserRole(address(rewardLogic), REWARD_LOGIC_ROLE, true);
         // dictator.setRoleCapability(ROUTER_ROLE, address(rewardLogic), rewardLogic.lock.selector, true);
         // dictator.setRoleCapability(ROUTER_ROLE, address(rewardLogic), rewardLogic.exit.selector, true);
         // dictator.setRoleCapability(ROUTER_ROLE, address(rewardLogic), rewardLogic.claim.selector, true);
@@ -89,13 +93,12 @@ contract DeployTokenomics is PRBTest {
         // dictator.setRoleCapability(ROUTER_ROLE, address(votingEscrow), votingEscrow.lock.selector, true);
         // dictator.setRoleCapability(ROUTER_ROLE, address(votingEscrow), votingEscrow.depositFor.selector, true);
         // dictator.setRoleCapability(ROUTER_ROLE, address(votingEscrow), votingEscrow.withdraw.selector, true);
-        // dictator.setRoleCapability(OPTION_LOGIC_ROLE, address(votingEscrow), votingEscrow.lock.selector, true);
+        // dictator.setRoleCapability(REWARD_LOGIC_ROLE, address(votingEscrow), votingEscrow.lock.selector, true);
 
         // VeRevenueDistributor revenueDistributor = new VeRevenueDistributor(dictator, votingEscrow, router, block.timestamp + 1 weeks);
         // dictator.setUserRole(address(revenueDistributor), TOKEN_ROUTER_ROLE, true);
-        // dictator.setRoleCapability(OPTION_LOGIC_ROLE, address(revenueDistributor), revenueDistributor.claim.selector, true);
+        // dictator.setRoleCapability(REWARD_LOGIC_ROLE, address(revenueDistributor), revenueDistributor.claim.selector, true);
         // dictator.setRoleCapability(REWARD_DISTRIBUTOR_ROLE, address(revenueDistributor), revenueDistributor.depositToken.selector, true);
-
 
         // RewardRouter rewardRouter = new RewardRouter(
         //     RewardRouter.RewardRouterParams({
@@ -125,6 +128,6 @@ contract DeployTokenomics is PRBTest {
         // );
         // dictator.setUserRole(address(rewardRouter), ROUTER_ROLE, true);
 
-        datastore.updateOwnership(DeployerEnv.governance, true);
+        // datastore.updateOwnership(DeployerEnv.governance, true);
     }
 }

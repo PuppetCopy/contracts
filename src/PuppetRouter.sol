@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.23;
 
-import {MulticallRouter} from "./utilities/MulticallRouter.sol";
-import {WNT} from "./utilities/common/WNT.sol";
-import {Router} from "./utilities/Router.sol";
-import {Dictator} from "./utilities/Dictator.sol";
+import {MulticallRouter} from "./utils/MulticallRouter.sol";
+import {WNT} from "./utils/WNT.sol";
+import {Router} from "./utils/Router.sol";
+import {Dictator} from "./utils/Dictator.sol";
 
 import {PuppetToken} from "./tokenomics/PuppetToken.sol";
 import {RewardLogic} from "./tokenomics/RewardLogic.sol";

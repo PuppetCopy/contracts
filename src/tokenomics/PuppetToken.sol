@@ -4,6 +4,8 @@ pragma solidity 0.8.23;
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
+import {Math} from "./../utils/Math.sol";
+
 /**
  * @title PuppetToken
  * @dev An ERC20 token with a governance-controlled mint rate limit to mitigate possible abuse and ensure stability until it reaches clarity through
@@ -23,8 +25,6 @@ contract PuppetToken is Auth, ERC20 {
     uint private constant ESCROWED_SUPPLY = DAO_SUPPLY + CORE_SUPPLY;
     uint private constant LP_BOOTSTRAP = 100_000e18;
     uint private constant INITIAL_SUPPLY = ESCROWED_SUPPLY + LP_BOOTSTRAP;
-
-    uint private constant BASIS_DIVISOR = 10000;
 
     // Rate limit for minting new tokens (100 basis points = 1% of total emitted tokens per hour)
     uint public rateLimitFactor = 100;
@@ -46,7 +46,7 @@ contract PuppetToken is Auth, ERC20 {
     }
 
     function rateLimit() public view returns (uint) {
-        return totalEmitted() * rateLimitFactor / BASIS_DIVISOR;
+        return totalEmitted() * rateLimitFactor / Math.BASIS_POINT_DIVISOR;
     }
 
     /**
@@ -82,7 +82,7 @@ contract PuppetToken is Auth, ERC20 {
      * @param _timeframeLimit The new mint window timeframe in seconds.
      */
     function setMintLimitRate(uint _rateLimitFactor, uint _timeframeLimit) external requiresAuth {
-        if (_rateLimitFactor > BASIS_DIVISOR) {
+        if (_rateLimitFactor > Math.BASIS_POINT_DIVISOR) {
             revert PuppetToken__InvalidRate();
         }
 

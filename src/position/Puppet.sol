@@ -4,7 +4,7 @@ pragma solidity 0.8.23;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
-import {Router} from "../utilities/Router.sol";
+import {Router} from "../utils/Router.sol";
 
 import {PuppetStore} from "./store/PuppetStore.sol";
 import {PuppetLogic} from "./logic/PuppetLogic.sol";

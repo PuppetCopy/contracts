@@ -27,8 +27,6 @@ import {IVault, IAsset} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {WeightedPoolUserData} from "@balancer-labs/v2-interfaces/pool-weighted/WeightedPoolUserData.sol";
 import {IBasePool} from "@balancer-labs/v2-interfaces/vault/IBasePool.sol";
 
-import {IWETH} from "./interfaces/IWETH.sol";
-
 interface IBasePoolErc20 is IBasePool, IERC20 {}
 
 /// @title BalancerOperations
@@ -224,9 +222,5 @@ library BalancerUtil {
             }
         }
         return _noBPTAmounts;
-    }
-
-    function _wrapETH(uint _amount) internal {
-        IWETH(WETH).deposit{value: _amount}();
     }
 }

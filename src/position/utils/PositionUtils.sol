@@ -4,15 +4,13 @@ pragma solidity 0.8.23;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IGmxExchangeRouter} from "./IGmxExchangeRouter.sol";
-import {Router} from "../../utilities/Router.sol";
+import {Router} from "../../utils/Router.sol";
 
 import {PositionStore} from "./../store/PositionStore.sol";
 import {PuppetStore} from "./../store/PuppetStore.sol";
 
 // gmx-synthetics/blob/main/contracts/order/Order.sol
 library PositionUtils {
-    uint constant BASIS_DIVISOR = 10000;
-
     enum OrderType {
         MarketSwap,
         LimitSwap,

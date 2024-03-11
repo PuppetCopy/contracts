@@ -1,32 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.23;
 
-// ==============================================================
-//  _____                 _      _____ _                        |
-// |  _  |_ _ ___ ___ ___| |_   |   __|_|___ ___ ___ ___ ___    |
-// |   __| | | . | . | -_|  _|  |   __| |   | .'|   |  _| -_|   |
-// |__|  |___|  _|  _|___|_|    |__|  |_|_|_|__,|_|_|___|___|   |
-//           |_| |_|                                            |
-// ==============================================================
-// ========================== oPuppet ===========================
-// ==============================================================
-
-// Puppet Finance: https://github.com/GMX-Blueberry-Club/puppet-contracts
-
-// Primary Author
-// johnnyonline: https://github.com/johnnyonline
-
-// Reviewers
-// itburnz: https://github.com/nissoh
-
-// ==============================================================
-
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {Authority} from "@solmate/contracts/auth/Auth.sol";
+import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {WNT} from "./common/WNT.sol";
-import {TransferUtils} from "./common/TransferUtils.sol";
+
+import {WNT} from "./WNT.sol";
+import {TransferUtils} from "./TransferUtils.sol";
 import {Router} from "./Router.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 

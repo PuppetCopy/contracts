@@ -8,10 +8,10 @@ import {IVault, IAsset} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {WeightedPoolUserData} from "@balancer-labs/v2-interfaces/pool-weighted/WeightedPoolUserData.sol";
 import {DeployerEnv} from "script/Env.s.sol";
 
-import {Dictator} from "src/utilities/Dictator.sol";
-import {WNT} from "src/utilities/common/WNT.sol";
+import {Dictator} from "src/utils/Dictator.sol";
+import {WNT} from "src/utils/WNT.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
-import {IBasePoolErc20} from "src/utilities/BalancerOperations.sol";
+import {IBasePoolErc20} from "src/utils/BalancerOperations.sol";
 
 contract DeployToken is PRBTest {
     address internal DEPLOYER_ADDRESS = vm.envAddress("GBC_DEPLOYER_ADDRESS");

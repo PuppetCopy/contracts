@@ -43,7 +43,7 @@ contract OracleTest is BasicSetup {
 
         assertAlmostEq(oracleLogic.getMaxPrice(oracleStore, oracleStore.getLatestSeed().price), 100e6, 1e4, "initial $100");
 
-        dictator.setRoleCapability(PUPPET_MINTER, address(oracleLogic), oracleLogic.syncTokenPrice.selector, true);
+        dictator.setRoleCapability(PUPPET_MINTER_ROLE, address(oracleLogic), oracleLogic.syncTokenPrice.selector, true);
     }
 
     function testMedianWntPriceInUsd() public {
