@@ -17,10 +17,10 @@ library IncreasePositionLogic {
     event IncreasePositionLogic__CreateTraderSubAccount(address trader, address subAccount);
     event IncreasePositionLogic__RequestMatchPosition(address subAccount, bytes32 requestKey, address[] puppetList);
     event IncreasePositionLogic__RequestIncreasePosition(
-        address subAccount, bytes32 requestKey, uint[] puppetDepositDeltaList, uint depositDelta, uint sizeDelta
+        address subAccount, bytes32 requestKey, uint[] puppetCollateralDeltaList, uint collateralDelta, uint sizeDelta
     );
 
-    function createTraderProxy(PositionStore store, address trader) external {
+    function createTraderSubAccount(PositionStore store, address trader) external {
         if (address(store.traderSubAccountMap(trader)) != address(0)) revert IncreasePositionLogic__TraderProxyAlreadyExists();
 
         TraderSubAccount proxy = new TraderSubAccount(store, trader);
@@ -52,14 +52,13 @@ library IncreasePositionLogic {
         }
 
         PositionStore.RequestMirrorPositionAdjustment memory request = PositionStore.RequestMirrorPositionAdjustment({
+            requestKey: PositionUtils.getNextRequestKey(callConfig.gmxDatastore),
             puppetList: puppetList,
-            puppetcollateralDeltaList: new uint[](puppetList.length),
-            collateralDelta: callPositionAdjustment.collateralDelta,
-            sizeDelta: callPositionAdjustment.sizeDelta,
+            puppetCollateralDeltaList: new uint[](puppetList.length),
+            collateralDelta: 0,
+            sizeDelta: 0,
             leverage: callPositionAdjustment.sizeDelta * Math.BASIS_POINT_DIVISOR / callPositionAdjustment.collateralDelta
         });
-
-        address subAccount = address(this);
 
         for (uint i = 0; i < puppetList.length; i++) {
             address puppet = puppetList[i];
@@ -68,31 +67,33 @@ library IncreasePositionLogic {
                 PositionKey.getSubscriptionsKey(puppet, callPositionAdjustment.trader, callPositionAdjustment.market, callPositionAdjustment.isLong)
             );
 
+            uint allowanceRate = puppetAccount.deposit * subscription.allowanceRate / Math.BASIS_POINT_DIVISOR;
+
             // the lowest of allowance or trader own deposit
-            uint amountIn =
-                Math.min(puppetAccount.deposit * subscription.allowanceRate / Math.BASIS_POINT_DIVISOR, callPositionAdjustment.collateralDelta);
-            bool isValidMatch = amountIn > callConfig.minMatchTokenAmount && subscription.expiry > block.timestamp + 1 days
-                || block.timestamp > puppetAccount.latestMatchTimestamp + puppetAccount.throttleMatchingPeriod;
+            uint amountIn = Math.min(allowanceRate, callPositionAdjustment.collateralDelta);
+            bool isInvalidMatch = amountIn < callConfig.minMatchTokenAmount && subscription.expiry < block.timestamp + 1 days
+                || puppetAccount.latestMatchTimestamp + puppetAccount.throttleMatchingPeriod > block.timestamp;
 
-            if (isValidMatch) {
-                request.puppetcollateralDeltaList[i] = amountIn;
-                request.collateralDelta -= amountIn;
-                request.sizeDelta -= amountIn * request.leverage / Math.BASIS_POINT_DIVISOR;
-
-                puppetAccount.deposit -= amountIn;
-            } else {
-                request.puppetcollateralDeltaList[i] = 0;
+            if (isInvalidMatch) {
+                request.puppetCollateralDeltaList[i] = 0;
+                continue;
             }
+
+            request.puppetCollateralDeltaList[i] = amountIn;
+            request.sizeDelta -= amountIn * request.leverage / Math.BASIS_POINT_DIVISOR;
+            request.collateralDelta -= amountIn;
+
+            puppetAccount.deposit -= amountIn;
 
             puppetAccount.latestMatchTimestamp = block.timestamp;
             callConfig.puppetStore.setPuppetAccount(puppet, puppetAccount);
         }
 
-        bytes32 requestKey = _requestIncreasePosition(callConfig, callPositionAdjustment, request);
+        bytes32 requestKey = _requestIncreasePosition(callConfig, callPositionAdjustment, request, address(this));
 
-        emit IncreasePositionLogic__RequestMatchPosition(subAccount, requestKey, puppetList);
+        emit IncreasePositionLogic__RequestMatchPosition(address(this), requestKey, puppetList);
         emit IncreasePositionLogic__RequestIncreasePosition(
-            subAccount, requestKey, request.puppetcollateralDeltaList, callPositionAdjustment.collateralDelta, callPositionAdjustment.sizeDelta
+            address(this), requestKey, request.puppetCollateralDeltaList, callPositionAdjustment.collateralDelta, callPositionAdjustment.sizeDelta
         );
     }
 
@@ -151,34 +152,68 @@ library IncreasePositionLogic {
         PositionUtils.CallPositionConfig calldata callConfig,
         PositionUtils.CallPositionAdjustment calldata callPositionAdjustment
     ) external {
-        // PositionStore.MirrorPosition memory matchMp = positionStore.getMirrorPosition(
-        //     PositionUtils.getPositionKey(
-        //         reqIncreaseCallParams.trader, reqIncreaseCallParams.market, address(config.depositCollateralToken), reqIncreaseCallParams.isLong
-        //     )
-        // );
+        PositionStore.MirrorPosition memory matchMp = callConfig.positionStore.getMirrorPosition(
+            PositionUtils.getPositionKey(
+                callPositionAdjustment.trader,
+                callPositionAdjustment.market,
+                address(callConfig.depositCollateralToken),
+                callPositionAdjustment.isLong
+            )
+        );
 
-        // if (matchMp.deposit == 0) {
-        //     revert IncreasePositionLogic__PositionDoesNotExists();
-        // }
+        if (matchMp.deposit == 0) {
+            revert IncreasePositionLogic__PositionDoesNotExists();
+        }
 
-        // address subAccount = address(this);
+        PositionStore.RequestMirrorPositionAdjustment memory request = PositionStore.RequestMirrorPositionAdjustment({
+            requestKey: PositionUtils.getNextRequestKey(callConfig.gmxDatastore),
+            puppetList: matchMp.puppetList,
+            puppetCollateralDeltaList: new uint[](matchMp.puppetList.length),
+            collateralDelta: 0,
+            sizeDelta: 0,
+            leverage: callPositionAdjustment.sizeDelta * Math.BASIS_POINT_DIVISOR / callPositionAdjustment.collateralDelta
+        });
 
-        // router.pluginTransfer(config.depositCollateralToken, reqIncreaseCallParams.trader, subAccount, reqIncreaseCallParams.collateralDelta);
+        for (uint i = 0; i < matchMp.puppetList.length; i++) {
+            address puppet = matchMp.puppetList[i];
+
+            PuppetStore.PuppetTraderSubscription memory subscription = callConfig.puppetStore.getPuppetTraderSubscription(
+                PositionKey.getSubscriptionsKey(puppet, callPositionAdjustment.trader, callPositionAdjustment.market, callPositionAdjustment.isLong)
+            );
+
+            uint positionDeposit = matchMp.puppetDepositList[i];
+            uint amountIn = callPositionAdjustment.sizeDelta / positionDeposit;
+            bool isReduceMode = amountIn < callConfig.minMatchTokenAmount && subscription.expiry < block.timestamp + 1 days;
+
+            if (isReduceMode) {} else {
+                request.puppetCollateralDeltaList[i] += amountIn;
+
+                request.sizeDelta -= amountIn * request.leverage / Math.BASIS_POINT_DIVISOR;
+                request.collateralDelta -= amountIn;
+            }
+        }
+
+        bytes32 requestKey = _requestIncreasePosition(callConfig, callPositionAdjustment, request, address(this));
+
+        emit IncreasePositionLogic__RequestIncreasePosition(
+            address(this), requestKey, request.puppetCollateralDeltaList, callPositionAdjustment.collateralDelta, callPositionAdjustment.sizeDelta
+        );
     }
 
     function _requestIncreasePosition(
         PositionUtils.CallPositionConfig calldata callConfig,
         PositionUtils.CallPositionAdjustment calldata callPositionAdjustment,
-        PositionStore.RequestMirrorPositionAdjustment memory request
+        PositionStore.RequestMirrorPositionAdjustment memory request,
+        address subAccount
     ) internal returns (bytes32 requestKey) {
-        address subAccount = address(this);
+        // callConfig.positionStore.setRequestMirrorPositionAdjustment(
+        //     ,
+        //     request
+        // );
 
-        SafeERC20.safeTransferFrom(
-            callConfig.depositCollateralToken,
-            address(callConfig.puppetStore),
-            subAccount,
-            request.collateralDelta - callPositionAdjustment.collateralDelta
-        );
+        // setRequestMirrorPositionAdjustment
+
+        SafeERC20.safeTransferFrom(callConfig.depositCollateralToken, address(callConfig.puppetStore), subAccount, request.collateralDelta);
         callConfig.router.pluginTransfer(
             callConfig.depositCollateralToken, callPositionAdjustment.trader, subAccount, callPositionAdjustment.collateralDelta
         );
@@ -195,8 +230,8 @@ library IncreasePositionLogic {
                     new address[](0) // swapPath
                 ),
                 PositionUtils.CreateOrderParamsNumbers(
-                    request.sizeDelta,
-                    request.collateralDelta,
+                    request.sizeDelta + callPositionAdjustment.sizeDelta,
+                    request.collateralDelta + callPositionAdjustment.collateralDelta,
                     callPositionAdjustment.triggerPrice,
                     callPositionAdjustment.acceptablePrice,
                     callPositionAdjustment.executionFee,

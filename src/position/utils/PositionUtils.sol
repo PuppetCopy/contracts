@@ -4,12 +4,12 @@ pragma solidity 0.8.23;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IGmxExchangeRouter} from "./IGmxExchangeRouter.sol";
+import {IGmxDatastore} from "./IGmxDatastore.sol";
 import {Router} from "../../utils/Router.sol";
 
 import {PositionStore} from "./../store/PositionStore.sol";
 import {PuppetStore} from "./../store/PuppetStore.sol";
 
-// gmx-synthetics/blob/main/contracts/order/Order.sol
 library PositionUtils {
     enum OrderType {
         MarketSwap,
@@ -33,6 +33,7 @@ library PositionUtils {
         PuppetStore puppetStore;
         Router router;
         IGmxExchangeRouter gmxExchangeRouter;
+        IGmxDatastore gmxDatastore;
         IERC20 depositCollateralToken;
         address feeReceiver;
         uint limitPuppetList;
@@ -134,7 +135,14 @@ library PositionUtils {
         return orderType == OrderType.Liquidation;
     }
 
+
     function getPositionKey(address account, address market, address collateralToken, bool isLong) internal pure returns (bytes32) {
         return keccak256(abi.encode(account, market, collateralToken, isLong));
+    }
+
+    function getNextRequestKey(IGmxDatastore dataStore) internal returns (bytes32) {
+        uint nonce = dataStore.incrementUint(keccak256(abi.encode("NONCE")), 1);
+
+        return keccak256(abi.encode(address(dataStore), nonce));
     }
 }

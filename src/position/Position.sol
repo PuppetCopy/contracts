@@ -15,7 +15,7 @@ contract Position is Auth, IOrderCallbackReceiver {
     constructor(Authority _authority) Auth(address(0), _authority) {}
 
     function createTraderProxy(PositionStore store, address trader) external {
-        IncreasePositionLogic.createTraderProxy(store, trader);
+        IncreasePositionLogic.createTraderSubAccount(store, trader);
     }
 
     function requestMatchPosition(

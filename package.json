@@ -19,7 +19,7 @@
     "!artifacts/contracts/test/**/*"
   ],
   "scripts": {
-    "test": "FOUNDRY_PROFILE=dev forge test --match-contract RewardRouterTest -vvvvv",
+    "test": "FOUNDRY_PROFILE=dev forge test --match-contract VotingEscrowTests -vvvvv",
     "build": "FOUNDRY_PROFILE=dev forge build --sizes",
     "deploy": "forge script script/DeployTokenomics.s.sol:DeployTokenomics --rpc-url $ARBITRUM_RPC_URL --broadcast --verify -vvvv",
     "gas-report": "forge test --gas-report",

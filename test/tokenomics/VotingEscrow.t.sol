@@ -15,6 +15,8 @@ contract VotingEscrowTests is BasicSetup {
     function setUp() public override {
         BasicSetup.setUp();
 
+        dictator.setUserRole(users.owner, PUPPET_MINTER_ROLE, true);
+
         router = new Router(dictator);
         votingEscrow = new VotingEscrow(dictator, router, puppetToken);
 
@@ -335,14 +337,8 @@ contract VotingEscrowTests is BasicSetup {
     function _checkLockTimesAfterSkipHalf(uint _aliceBalanceBefore, uint _bobBalanceBefore, uint _totalSupplyBefore) internal {
         assertAlmostEq(votingEscrow.balanceOf(users.alice), _aliceBalanceBefore / 2, 1e21, "_checkLockTimesAfterSkipHalf: E0");
         assertAlmostEq(votingEscrow.balanceOf(users.bob), _bobBalanceBefore / 2, 1e21, "_checkLockTimesAfterSkipHalf: E1");
-        assertEq(
-            votingEscrow.balanceOf(users.alice, block.timestamp - MAXTIME / 2),
-            _aliceBalanceBefore,
-            "_checkLockTimesAfterSkipHalf: E2"
-        );
-        assertEq(
-            votingEscrow.balanceOf(users.bob, block.timestamp - MAXTIME / 2), _bobBalanceBefore, "_checkLockTimesAfterSkipHalf: E3"
-        );
+        assertEq(votingEscrow.balanceOf(users.alice, block.timestamp - MAXTIME / 2), _aliceBalanceBefore, "_checkLockTimesAfterSkipHalf: E2");
+        assertEq(votingEscrow.balanceOf(users.bob, block.timestamp - MAXTIME / 2), _bobBalanceBefore, "_checkLockTimesAfterSkipHalf: E3");
         assertAlmostEq(votingEscrow.totalSupply(), _totalSupplyBefore / 2, 1e21, "_checkLockTimesAfterSkipHalf: E4");
         assertEq(votingEscrow.totalSupply(block.timestamp - MAXTIME / 2), _totalSupplyBefore, "_checkLockTimesAfterSkipHalf: E5");
     }

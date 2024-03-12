@@ -2,17 +2,17 @@
 pragma solidity 0.8.23;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {StoreController} from "../../utils/StoreController.sol";
 import {TraderSubAccount} from "./../utils/TraderSubAccount.sol";
 
 contract PositionStore is StoreController {
     struct RequestMirrorPositionAdjustment {
+        bytes32 requestKey;
         address[] puppetList;
-        uint[] puppetcollateralDeltaList;
-        uint collateralDelta;
+        uint[] puppetCollateralDeltaList;
         uint sizeDelta;
+        uint collateralDelta;
         uint leverage;
     }
 

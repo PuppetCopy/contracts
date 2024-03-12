@@ -3,6 +3,7 @@ pragma solidity 0.8.23;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {PuppetUtils} from "./../utils/PuppetUtils.sol";
 import {Router} from "src/utils/Router.sol";
 import {PuppetStore} from "../store/PuppetStore.sol";
 
@@ -21,7 +22,7 @@ library PuppetLogic {
 
         PuppetStore.PuppetTraderSubscription memory pts = store.getPuppetTraderSubscription(subscriptionParams.routeKey);
 
-        bytes32 subscriptionKey = keccak256(abi.encodePacked(puppet, subscriptionParams.trader, subscriptionParams.routeKey));
+        bytes32 subscriptionKey = PuppetUtils.getSubscriptionKey(puppet, subscriptionParams.trader, subscriptionParams.routeKey);
 
         pts.trader = subscriptionParams.trader;
         pts.routeKey = subscriptionParams.routeKey;
@@ -41,7 +42,7 @@ library PuppetLogic {
     }
 
     function removeSubscription(PuppetStore store, address puppet, address trader, bytes32 routeKey) external {
-        bytes32 subscriptionKey = keccak256(abi.encodePacked(puppet, trader, routeKey));
+        bytes32 subscriptionKey = PuppetUtils.getSubscriptionKey(puppet, trader, routeKey);
 
         store.removePuppetTraderSubscription(subscriptionKey);
 

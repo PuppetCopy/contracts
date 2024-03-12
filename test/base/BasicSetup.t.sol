@@ -38,11 +38,9 @@ contract BasicSetup is PRBTest, StdCheats, StdUtils {
 
         vm.startPrank(owner);
 
-        dictator.setUserRole(owner, PUPPET_MINTER_ROLE, true);
-
         users = Users({owner: owner, alice: _createUser("Alice", 2), bob: _createUser("Bob", 2), yossi: _createUser("Yossi", 2)});
 
-        puppetToken = new PuppetToken(dictator, dictator.owner());
+        puppetToken = new PuppetToken(dictator);
         dictator.setRoleCapability(PUPPET_MINTER_ROLE, address(puppetToken), puppetToken.mint.selector, true);
 
         router = new Router(dictator);

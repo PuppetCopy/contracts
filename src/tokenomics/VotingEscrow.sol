@@ -1,33 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-// ==============================================================
-//  _____                 _      _____ _                        |
-// |  _  |_ _ ___ ___ ___| |_   |   __|_|___ ___ ___ ___ ___    |
-// |   __| | | . | . | -_|  _|  |   __| |   | .'|   |  _| -_|   |
-// |__|  |___|  _|  _|___|_|    |__|  |_|_|_|__,|_|_|___|___|   |
-//           |_| |_|                                            |
-// ==============================================================
-// ======================== VotingEscrow ========================
-// ==============================================================
-
-// Modified fork from Curve Finance: https://github.com/curvefi
-// @title Voting Escrow
-// @author Curve Finance
-// @license MIT
-// @notice Votes have a weight depending on time, so that users are committed to the future of (whatever they are voting for)
-// @dev Vote weight decays linearly over time. Lock time cannot be more than `MAXTIME` (4 years).
-
-// Puppet Finance: https://github.com/GMX-Blueberry-Club/puppet-contracts
-
-// Primary Author
-// johnnyonline: https://github.com/johnnyonline
-
-// Reviewers
-// itburnz: https://github.com/nissoh
-
-// ==============================================================
-
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
