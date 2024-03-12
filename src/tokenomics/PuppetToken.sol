@@ -85,6 +85,11 @@ contract PuppetToken is Auth, ERC20 {
         }
 
         uint endTime = GENESIS_START_TIME + CORE_RELEASE_DURATION;
+
+        if (block.timestamp > endTime + 1 weeks) {
+            revert("PuppetToken__CoreRelease: core release ended");
+        }
+
         uint timeElapsed = block.timestamp - GENESIS_START_TIME;
         uint totalTime = endTime - GENESIS_START_TIME;
         uint timeMultiplier = Math.min((timeElapsed * Math.BASIS_POINT_DIVISOR) / totalTime, Math.BASIS_POINT_DIVISOR);
