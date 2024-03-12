@@ -12,12 +12,12 @@ import {PuppetLogic} from "./logic/PuppetLogic.sol";
 contract Puppet is Auth {
     constructor(Authority _authority) Auth(address(0), _authority) {}
 
-    function subscribe(PuppetStore store, address puppet, PuppetStore.PuppetTraderSubscription calldata subscriptionParams) external requiresAuth {
-        PuppetLogic.subscribe(store, puppet, subscriptionParams);
+    function setRule(PuppetStore store, address puppet, PuppetStore.Rule calldata ruleParams) external requiresAuth {
+        PuppetLogic.setRule(store, puppet, ruleParams);
     }
 
-    function removeSubscription(PuppetStore store, address puppet, address trader, bytes32 routeKey) external requiresAuth {
-        PuppetLogic.removeSubscription(store, puppet, trader, routeKey);
+    function removeRule(PuppetStore store, address puppet, address trader, bytes32 routeKey) external requiresAuth {
+        PuppetLogic.removeRule(store, puppet, trader, routeKey);
     }
 
     function deposit(Router router, PuppetStore store, IERC20 token, address from, address to, uint amount) external requiresAuth {

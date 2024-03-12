@@ -7,7 +7,7 @@ import {StoreController} from "../../utils/StoreController.sol";
 import {TraderSubAccount} from "./../utils/TraderSubAccount.sol";
 
 contract PositionStore is StoreController {
-    struct RequestMirrorPositionAdjustment {
+    struct RequestAdjustment {
         bytes32 requestKey;
         address[] puppetList;
         uint[] puppetCollateralDeltaList;
@@ -24,24 +24,24 @@ contract PositionStore is StoreController {
         uint leverage;
     }
 
-    address public positionLogicImplementation;
-
-    mapping(bytes32 requestKey => RequestMirrorPositionAdjustment) public requestAdjustmentMap;
+    mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
     mapping(bytes32 positionKey => MirrorPosition) public positionMap;
 
-    mapping(address => TraderSubAccount) public traderSubAccountMap;
+    mapping(address => TraderSubAccount) public traderSubaccountMap;
+
+    address public logicContractImplementation;
 
     constructor(Authority _authority, address _initSetter) StoreController(_authority, _initSetter) {}
 
-    function getRequestMirrorPositionAdjustment(bytes32 _requestKey) external view returns (RequestMirrorPositionAdjustment memory) {
+    function getRequestAdjustment(bytes32 _requestKey) external view returns (RequestAdjustment memory) {
         return requestAdjustmentMap[_requestKey];
     }
 
-    function setRequestMirrorPositionAdjustment(bytes32 _requestKey, RequestMirrorPositionAdjustment memory _rmpa) external isSetter {
+    function setRequestAdjustment(bytes32 _requestKey, RequestAdjustment memory _rmpa) external isSetter {
         requestAdjustmentMap[_requestKey] = _rmpa;
     }
 
-    function removeRequestMirrorPositionAdjustment(bytes32 _requestKey) external isSetter {
+    function removeRequestAdjustment(bytes32 _requestKey) external isSetter {
         delete requestAdjustmentMap[_requestKey];
     }
 
@@ -57,11 +57,11 @@ contract PositionStore is StoreController {
         delete positionMap[_positionKey];
     }
 
-    function setPositionLogicImplementation(address _positionLogicImplementation) external isSetter {
-        positionLogicImplementation = _positionLogicImplementation;
+    function setTraderSubaccount(address _trader, TraderSubAccount _proxy) external isSetter {
+        traderSubaccountMap[_trader] = _proxy;
     }
 
-    function setTraderProxy(address _trader, TraderSubAccount _proxy) external isSetter {
-        traderSubAccountMap[_trader] = _proxy;
+    function setLogicContractImplementation(address _positionLogicImplementation) external isSetter {
+        logicContractImplementation = _positionLogicImplementation;
     }
 }

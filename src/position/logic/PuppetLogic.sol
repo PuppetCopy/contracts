@@ -9,44 +9,44 @@ import {PuppetStore} from "../store/PuppetStore.sol";
 
 library PuppetLogic {
     event PuppetLogic__UpdateDeposit(address from, address to, bool isIncrease, IERC20 token, uint amount);
-    event PuppetLogic__UpdateSubscription(bytes32 key, address puppet, address trader, bytes32 routeKey, uint allowanceRate, uint expiry);
+    event PuppetLogic__UpdateRule(bytes32 key, address puppet, address trader, bytes32 routeKey, uint allowanceRate, uint expiry);
 
-    function subscribe(PuppetStore store, address puppet, PuppetStore.PuppetTraderSubscription calldata subscriptionParams) external {
-        if (subscriptionParams.expiry < block.timestamp + 1 days) {
+    function setRule(PuppetStore store, address puppet, PuppetStore.Rule calldata ruleParams) external {
+        if (ruleParams.expiry < block.timestamp + 1 days) {
             revert PuppetLogic__InvalidExpiry();
         }
 
-        if (subscriptionParams.allowanceRate < 100) {
-            revert PuppetLogic__DepositLimitReached();
+        if (ruleParams.allowanceRate < 100) {
+            revert PuppetLogic__MinAllowanceRate(100);
         }
 
-        PuppetStore.PuppetTraderSubscription memory pts = store.getPuppetTraderSubscription(subscriptionParams.routeKey);
+        PuppetStore.Rule memory pts = store.getRule(ruleParams.routeKey);
 
-        bytes32 subscriptionKey = PuppetUtils.getSubscriptionKey(puppet, subscriptionParams.trader, subscriptionParams.routeKey);
+        bytes32 key = PuppetUtils.getRuleKey(puppet, ruleParams.trader, ruleParams.routeKey);
 
-        pts.trader = subscriptionParams.trader;
-        pts.routeKey = subscriptionParams.routeKey;
-        pts.allowanceRate = subscriptionParams.allowanceRate;
-        pts.expiry = subscriptionParams.expiry;
+        pts.trader = ruleParams.trader;
+        pts.routeKey = ruleParams.routeKey;
+        pts.allowanceRate = ruleParams.allowanceRate;
+        pts.expiry = ruleParams.expiry;
 
-        store.setPuppetTraderSubscription(pts, subscriptionKey);
+        store.setRule(pts, key);
 
-        emit PuppetLogic__UpdateSubscription(
-            subscriptionKey,
+        emit PuppetLogic__UpdateRule(
+            key,
             puppet,
-            subscriptionParams.trader,
-            subscriptionParams.routeKey,
-            subscriptionParams.allowanceRate,
-            subscriptionParams.expiry
+            ruleParams.trader,
+            ruleParams.routeKey,
+            ruleParams.allowanceRate,
+            ruleParams.expiry
         );
     }
 
-    function removeSubscription(PuppetStore store, address puppet, address trader, bytes32 routeKey) external {
-        bytes32 subscriptionKey = PuppetUtils.getSubscriptionKey(puppet, trader, routeKey);
+    function removeRule(PuppetStore store, address puppet, address trader, bytes32 routeKey) external {
+        bytes32 key = PuppetUtils.getRuleKey(puppet, trader, routeKey);
 
-        store.removePuppetTraderSubscription(subscriptionKey);
+        store.removeRule(key);
 
-        emit PuppetLogic__UpdateSubscription(subscriptionKey, puppet, trader, routeKey, 0, 0);
+        emit PuppetLogic__UpdateRule(key, puppet, trader, routeKey, 0, 0);
     }
 
     function deposit(Router router, PuppetStore store, IERC20 token, address from, address to, uint amount) external {
@@ -54,19 +54,19 @@ library PuppetLogic {
             revert PuppetLogic__ZeroAmount();
         }
 
-        PuppetStore.PuppetAccount memory pa = store.getPuppetAccount(from);
+        PuppetStore.Account memory pa = store.getAccount(from);
 
         router.pluginTransfer(token, from, address(store), amount);
         unchecked {
             pa.deposit += amount;
         }
-        store.setPuppetAccount(from, pa);
+        store.setAccount(from, pa);
 
         emit PuppetLogic__UpdateDeposit(from, to, true, token, amount);
     }
 
     function withdraw(Router router, PuppetStore store, IERC20 token, address from, address to, uint amount) external {
-        PuppetStore.PuppetAccount memory pa = store.getPuppetAccount(from);
+        PuppetStore.Account memory pa = store.getAccount(from);
 
         if (amount > pa.deposit) {
             revert PuppetLogic__WithdrawExceedsDeposit();
@@ -75,12 +75,12 @@ library PuppetLogic {
         router.pluginTransfer(token, address(store), to, amount);
 
         pa.deposit -= amount; // underflow check is guranteed above?
-        store.setPuppetAccount(from, pa);
+        store.setAccount(from, pa);
 
         emit PuppetLogic__UpdateDeposit(from, to, false, token, amount);
     }
 
-    error PuppetLogic__DepositLimitReached();
+    error PuppetLogic__MinAllowanceRate(uint rate);
     error PuppetLogic__ZeroAmount();
     error PuppetLogic__WithdrawExceedsDeposit();
     error PuppetLogic__InvalidExpiry();

@@ -21,10 +21,10 @@ library IncreasePositionLogic {
     );
 
     function createTraderSubAccount(PositionStore store, address trader) external {
-        if (address(store.traderSubAccountMap(trader)) != address(0)) revert IncreasePositionLogic__TraderProxyAlreadyExists();
+        if (address(store.traderSubaccountMap(trader)) != address(0)) revert IncreasePositionLogic__TraderProxyAlreadyExists();
 
         TraderSubAccount proxy = new TraderSubAccount(store, trader);
-        store.setTraderProxy(trader, proxy);
+        store.setTraderSubaccount(trader, proxy);
 
         emit IncreasePositionLogic__CreateTraderSubAccount(trader, address(proxy));
     }
@@ -51,7 +51,7 @@ library IncreasePositionLogic {
             revert IncreasePositionLogic__PuppetListLimitExceeded();
         }
 
-        PositionStore.RequestMirrorPositionAdjustment memory request = PositionStore.RequestMirrorPositionAdjustment({
+        PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
             requestKey: PositionUtils.getNextRequestKey(callConfig.gmxDatastore),
             puppetList: puppetList,
             puppetCollateralDeltaList: new uint[](puppetList.length),
@@ -62,17 +62,17 @@ library IncreasePositionLogic {
 
         for (uint i = 0; i < puppetList.length; i++) {
             address puppet = puppetList[i];
-            PuppetStore.PuppetAccount memory puppetAccount = callConfig.puppetStore.getPuppetAccount(puppet);
-            PuppetStore.PuppetTraderSubscription memory subscription = callConfig.puppetStore.getPuppetTraderSubscription(
-                PositionKey.getSubscriptionsKey(puppet, callPositionAdjustment.trader, callPositionAdjustment.market, callPositionAdjustment.isLong)
+            PuppetStore.Account memory puppetAccount = callConfig.puppetStore.getAccount(puppet);
+            PuppetStore.Rule memory rule = callConfig.puppetStore.getRule(
+                PositionKey.getRuleKey(puppet, callPositionAdjustment.trader, callPositionAdjustment.market, callPositionAdjustment.isLong)
             );
 
-            uint allowanceRate = puppetAccount.deposit * subscription.allowanceRate / Math.BASIS_POINT_DIVISOR;
+            uint allowanceRate = puppetAccount.deposit * rule.allowanceRate / Math.BASIS_POINT_DIVISOR;
 
             // the lowest of allowance or trader own deposit
             uint amountIn = Math.min(allowanceRate, callPositionAdjustment.collateralDelta);
-            bool isInvalidMatch = amountIn < callConfig.minMatchTokenAmount && subscription.expiry < block.timestamp + 1 days
-                || puppetAccount.latestMatchTimestamp + puppetAccount.throttleMatchingPeriod > block.timestamp;
+            bool isInvalidMatch = amountIn < callConfig.minMatchTokenAmount && rule.expiry < block.timestamp + 1 days
+                || puppetAccount.latestMatchTimestamp + puppetAccount.throttlePeriod > block.timestamp;
 
             if (isInvalidMatch) {
                 request.puppetCollateralDeltaList[i] = 0;
@@ -86,7 +86,7 @@ library IncreasePositionLogic {
             puppetAccount.deposit -= amountIn;
 
             puppetAccount.latestMatchTimestamp = block.timestamp;
-            callConfig.puppetStore.setPuppetAccount(puppet, puppetAccount);
+            callConfig.puppetStore.setAccount(puppet, puppetAccount);
         }
 
         bytes32 requestKey = _requestIncreasePosition(callConfig, callPositionAdjustment, request, address(this));
@@ -165,7 +165,7 @@ library IncreasePositionLogic {
             revert IncreasePositionLogic__PositionDoesNotExists();
         }
 
-        PositionStore.RequestMirrorPositionAdjustment memory request = PositionStore.RequestMirrorPositionAdjustment({
+        PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
             requestKey: PositionUtils.getNextRequestKey(callConfig.gmxDatastore),
             puppetList: matchMp.puppetList,
             puppetCollateralDeltaList: new uint[](matchMp.puppetList.length),
@@ -177,13 +177,13 @@ library IncreasePositionLogic {
         for (uint i = 0; i < matchMp.puppetList.length; i++) {
             address puppet = matchMp.puppetList[i];
 
-            PuppetStore.PuppetTraderSubscription memory subscription = callConfig.puppetStore.getPuppetTraderSubscription(
-                PositionKey.getSubscriptionsKey(puppet, callPositionAdjustment.trader, callPositionAdjustment.market, callPositionAdjustment.isLong)
+            PuppetStore.Rule memory rule = callConfig.puppetStore.getRule(
+                PositionKey.getRuleKey(puppet, callPositionAdjustment.trader, callPositionAdjustment.market, callPositionAdjustment.isLong)
             );
 
             uint positionDeposit = matchMp.puppetDepositList[i];
             uint amountIn = callPositionAdjustment.sizeDelta / positionDeposit;
-            bool isReduceMode = amountIn < callConfig.minMatchTokenAmount && subscription.expiry < block.timestamp + 1 days;
+            bool isReduceMode = amountIn < callConfig.minMatchTokenAmount && rule.expiry < block.timestamp + 1 days;
 
             if (isReduceMode) {} else {
                 request.puppetCollateralDeltaList[i] += amountIn;
@@ -203,7 +203,7 @@ library IncreasePositionLogic {
     function _requestIncreasePosition(
         PositionUtils.CallPositionConfig calldata callConfig,
         PositionUtils.CallPositionAdjustment calldata callPositionAdjustment,
-        PositionStore.RequestMirrorPositionAdjustment memory request,
+        PositionStore.RequestAdjustment memory request,
         address subAccount
     ) internal returns (bytes32 requestKey) {
         // callConfig.positionStore.setRequestMirrorPositionAdjustment(

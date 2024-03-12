@@ -15,7 +15,7 @@ contract TraderSubAccount is Proxy {
     }
 
     function _implementation() internal view override returns (address) {
-        return store.positionLogicImplementation();
+        return store.logicContractImplementation();
     }
 
     // Add a receive function to handle plain ether transfers

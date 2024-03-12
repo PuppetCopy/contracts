@@ -5,45 +5,45 @@ import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {StoreController} from "../../utils/StoreController.sol";
 
 contract PuppetStore is StoreController {
-    struct PuppetAccount {
+    struct Account {
         uint deposit;
-        uint throttleMatchingPeriod;
+        uint throttlePeriod;
         uint latestMatchTimestamp;
     }
 
-    struct PuppetTraderSubscription {
+    struct Rule {
         address trader;
         bytes32 routeKey;
         uint allowanceRate;
         uint expiry;
     }
 
-    mapping(address => PuppetAccount) public puppetAccountMap;
-    mapping(bytes32 => PuppetTraderSubscription) public puppetTraderSubscriptionMap;
+    mapping(address => Account) public accountMap;
+    mapping(bytes32 => Rule) public ruleMap;
 
     constructor(Authority _authority, address _initSetter) StoreController(_authority, _initSetter) {}
 
-    function getPuppetAccount(address account) external view returns (PuppetAccount memory) {
-        return puppetAccountMap[account];
+    function getAccount(address account) external view returns (Account memory) {
+        return accountMap[account];
     }
 
-    function getPuppetTraderSubscription(bytes32 subscriptionKey) external view returns (PuppetTraderSubscription memory) {
-        return puppetTraderSubscriptionMap[subscriptionKey];
+    function getRule(bytes32 key) external view returns (Rule memory) {
+        return ruleMap[key];
     }
 
-    function setPuppetAccount(address puppet, PuppetAccount calldata account) external isSetter {
-        puppetAccountMap[puppet] = account;
+    function setAccount(address puppet, Account calldata account) external isSetter {
+        accountMap[puppet] = account;
     }
 
-    function removePuppetAccount(address account) external isSetter {
-        delete puppetAccountMap[account];
+    function removeAccount(address account) external isSetter {
+        delete accountMap[account];
     }
 
-    function setPuppetTraderSubscription(PuppetTraderSubscription memory subscription, bytes32 subscriptionKey) external isSetter {
-        puppetTraderSubscriptionMap[subscriptionKey] = subscription;
+    function setRule(Rule memory rule, bytes32 key) external isSetter {
+        ruleMap[key] = rule;
     }
 
-    function removePuppetTraderSubscription(bytes32 subscriptionKey) external isSetter {
-        delete puppetTraderSubscriptionMap[subscriptionKey];
+    function removeRule(bytes32 key) external isSetter {
+        delete ruleMap[key];
     }
 }
