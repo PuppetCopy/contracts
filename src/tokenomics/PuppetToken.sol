@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.23;
 
-import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
+import {Auth} from "@solmate/contracts/auth/Auth.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Dictator} from "./../utils/Dictator.sol";
 
 import {Math} from "./../utils/Math.sol";
 
@@ -16,37 +17,39 @@ import {Math} from "./../utils/Math.sol";
  */
 contract PuppetToken is Auth, ERC20 {
     event PuppetToken__MintLimitRateSet(uint rateLimitFactor, uint timeframeLimit);
+    event PuppetToken__CoreRelease(address to, uint timestamp, uint amount, uint releasedAmount);
 
     string private constant _NAME = "Muppet Test";
     string private constant _SYMBOL = "MUPPET";
 
-    uint private constant DAO_SUPPLY = 2_000_000e18;
-    uint private constant CORE_SUPPLY = 1_000_000e18;
-    uint private constant ESCROWED_SUPPLY = DAO_SUPPLY + CORE_SUPPLY;
-    uint private constant LP_BOOTSTRAP = 100_000e18;
-    uint private constant INITIAL_SUPPLY = ESCROWED_SUPPLY + LP_BOOTSTRAP;
+    uint private constant CORE_RELEASE_DURATION = 31540000 * 2; // 2 years
+    uint private constant CORE_RELEASE_RATE = 3500; // 35%
+    uint private constant GENESIS_MINT_AMOUNT = 100_000;
+    uint private constant GENESIS_START_TIME = 1710253930; // Tue Mar 12 2024
 
-    // Rate limit for minting new tokens (100 basis points = 1% of total emitted tokens per hour)
-    uint public rateLimitFactor = 100;
-    // Time window for rate limit calculation (1 hour)
-    uint public timeframeLimit = 1 hours;
+    // Rate limit for minting new tokens in basis points
+    uint public rateLimitFactor;
+    // Time window for rate limit calculation in seconds
+    uint public timeframeLimit;
     // Amount minted in the current window
     uint public mintWindowCount;
     // Current epoch for rate limit calculation
     uint public epoch;
 
-    constructor(Authority _authority, address _governance) Auth(address(0), _authority) ERC20(_NAME, _SYMBOL) {
-        _mint(_governance, INITIAL_SUPPLY);
+    // the  amount of tokens released to the core
+    uint public coreReleasedAmount;
 
-        emit PuppetToken__MintLimitRateSet(rateLimitFactor, timeframeLimit);
-    }
-
-    function totalEmitted() public view returns (uint) {
-        return totalSupply() - ESCROWED_SUPPLY;
+    constructor(Dictator _authority) Auth(address(0), _authority) ERC20(_NAME, _SYMBOL) {
+        _setMintLimitRate(100, 1 hours);
+        _mint(_authority.owner(), GENESIS_MINT_AMOUNT);
     }
 
     function rateLimit() public view returns (uint) {
-        return totalEmitted() * rateLimitFactor / Math.BASIS_POINT_DIVISOR;
+        return totalSupply() * rateLimitFactor / Math.BASIS_POINT_DIVISOR;
+    }
+
+    function rateMargin() public view returns (uint) {
+        return rateLimit() - mintWindowCount;
     }
 
     /**
@@ -76,16 +79,38 @@ contract PuppetToken is Auth, ERC20 {
         return _amount;
     }
 
+    function mintCoreRelease(address _to) external requiresAuth returns (uint) {
+        if (GENESIS_START_TIME > block.timestamp) {
+            revert("PuppetToken__CoreRelease: core release not started yet");
+        }
+
+        uint endTime = GENESIS_START_TIME + CORE_RELEASE_DURATION;
+        uint timeElapsed = block.timestamp - GENESIS_START_TIME;
+        uint totalTime = endTime - GENESIS_START_TIME;
+        uint timeMultiplier = Math.min((timeElapsed * Math.BASIS_POINT_DIVISOR) / totalTime, Math.BASIS_POINT_DIVISOR);
+        uint maxMintableAmount = totalSupply() * CORE_RELEASE_RATE / Math.BASIS_POINT_DIVISOR;
+        uint maxMintableAmountForPeriod = maxMintableAmount * timeMultiplier / Math.BASIS_POINT_DIVISOR;
+        uint mintableAmount = maxMintableAmountForPeriod - coreReleasedAmount;
+
+        _mint(_to, mintableAmount);
+
+        coreReleasedAmount += mintableAmount;
+
+        emit PuppetToken__CoreRelease(_to, block.timestamp, mintableAmount, coreReleasedAmount);
+
+        return mintableAmount;
+    }
+
     /**
      * @dev Allows governance to adjust the mint rate limit and window.
      * @param _rateLimitFactor The new rate limit as a basis point percentage of total emitted tokens.
      * @param _timeframeLimit The new mint window timeframe in seconds.
      */
     function setMintLimitRate(uint _rateLimitFactor, uint _timeframeLimit) external requiresAuth {
-        if (_rateLimitFactor > Math.BASIS_POINT_DIVISOR) {
-            revert PuppetToken__InvalidRate();
-        }
+        _setMintLimitRate(_rateLimitFactor, _timeframeLimit);
+    }
 
+    function _setMintLimitRate(uint _rateLimitFactor, uint _timeframeLimit) internal {
         rateLimitFactor = _rateLimitFactor;
         timeframeLimit = _timeframeLimit;
         mintWindowCount = 0; // Reset the mint count window on rate limit change
