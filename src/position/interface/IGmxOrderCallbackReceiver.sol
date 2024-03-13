@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.23;
 
-import {PositionUtils} from "./../utils/PositionUtils.sol";
+import {PositionUtils} from "./../util/PositionUtils.sol";
 
-interface IOrderCallbackReceiver {
+interface IGmxOrderCallbackReceiver {
     /// @dev called after an order execution
     /// @param key the key of the order
     /// @param order the order that was executed

@@ -4,11 +4,12 @@ pragma solidity 0.8.23;
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
 import {StoreController} from "../../utils/StoreController.sol";
-import {TraderSubAccount} from "./../utils/TraderSubAccount.sol";
+import {Subaccount} from "./../util/Subaccount.sol";
 
 contract PositionStore is StoreController {
     struct RequestAdjustment {
         bytes32 requestKey;
+        bytes32 positionKey;
         address[] puppetList;
         uint[] puppetCollateralDeltaList;
         uint sizeDelta;
@@ -27,37 +28,37 @@ contract PositionStore is StoreController {
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
     mapping(bytes32 positionKey => MirrorPosition) public positionMap;
 
-    mapping(address => TraderSubAccount) public traderSubaccountMap;
+    mapping(address => Subaccount) public traderSubaccountMap;
 
     address public logicContractImplementation;
 
     constructor(Authority _authority, address _initSetter) StoreController(_authority, _initSetter) {}
 
-    function getRequestAdjustment(bytes32 _requestKey) external view returns (RequestAdjustment memory) {
-        return requestAdjustmentMap[_requestKey];
+    function getRequestAdjustment(bytes32 _key) external view returns (RequestAdjustment memory) {
+        return requestAdjustmentMap[_key];
     }
 
-    function setRequestAdjustment(bytes32 _requestKey, RequestAdjustment memory _rmpa) external isSetter {
-        requestAdjustmentMap[_requestKey] = _rmpa;
+    function setRequestAdjustment(bytes32 _key, RequestAdjustment memory _ra) external isSetter {
+        requestAdjustmentMap[_key] = _ra;
     }
 
-    function removeRequestAdjustment(bytes32 _requestKey) external isSetter {
-        delete requestAdjustmentMap[_requestKey];
+    function removeRequestAdjustment(bytes32 _key) external isSetter {
+        delete requestAdjustmentMap[_key];
     }
 
-    function getMirrorPosition(bytes32 _positionKey) external view returns (MirrorPosition memory) {
-        return positionMap[_positionKey];
+    function getMirrorPosition(bytes32 _key) external view returns (MirrorPosition memory) {
+        return positionMap[_key];
     }
 
-    function setMirrorPosition(bytes32 _positionKey, MirrorPosition memory _mp) external isSetter {
-        positionMap[_positionKey] = _mp;
+    function setMirrorPosition(bytes32 _key, MirrorPosition memory _mp) external isSetter {
+        positionMap[_key] = _mp;
     }
 
-    function removeMirrorPosition(bytes32 _positionKey) external isSetter {
-        delete positionMap[_positionKey];
+    function removeMirrorPosition(bytes32 _key) external isSetter {
+        delete positionMap[_key];
     }
 
-    function setTraderSubaccount(address _trader, TraderSubAccount _proxy) external isSetter {
+    function setTraderSubaccount(address _trader, Subaccount _proxy) external isSetter {
         traderSubaccountMap[_trader] = _proxy;
     }
 

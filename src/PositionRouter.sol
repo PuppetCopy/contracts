@@ -7,14 +7,16 @@ import {Router} from "./utils/Router.sol";
 import {Dictator} from "./utils/Dictator.sol";
 
 import {PuppetToken} from "./tokenomics/PuppetToken.sol";
-import {RewardLogic} from "./tokenomics/RewardLogic.sol";
+import {PositionLogic} from "./position/PositionLogic.sol";
+import {PuppetLogic} from "./position/PuppetLogic.sol";
 
 contract TraderRouter is MulticallRouter {
     struct RewardRouterParams {
         Dictator dictator;
-        PuppetToken puppetToken;
         WNT wnt;
         Router router;
+        PositionLogic positionLogic;
+        PuppetLogic puppetLogic;
     }
 
     struct PositionRouterConfigParams {
@@ -30,6 +32,8 @@ contract TraderRouter is MulticallRouter {
         params = _params;
         config = _config;
     }
+
+
 
     // governance
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.23;
 
-import {PositionUtils} from "./PositionUtils.sol";
+import {PositionUtils} from "./../util/PositionUtils.sol";
 
 interface IGmxExchangeRouter {
     /// @dev Creates a new order with the given amount, order parameters. The order is

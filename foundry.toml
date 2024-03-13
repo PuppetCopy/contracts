@@ -7,7 +7,8 @@
   ffi = true
   fs_permissions = [{ access = "read", path = "out-optimized" }]
   gas_reports = [
-    "RewardRouter",
+    "IncreasePosition",
+    "PositionLogic"
   ]
   optimizer = true
   optimizer_runs = 10_000_000
@@ -16,13 +17,17 @@
   solc = "0.8.23"
   src = "src"
   test = "test"
+  extra_output = [
+    "abi",
+    "evm.deployedBytecode",
+  ]
+
+[profile.dev]
+  optimizer = false
 
 [profile.default.fuzz]
   max_test_rejects = 1_000_000 # Number of times `vm.assume` can fail
   runs = 50
-
-[profile.dev]
-  optimizer = false
 
 [fmt]
   bracket_spacing = false
