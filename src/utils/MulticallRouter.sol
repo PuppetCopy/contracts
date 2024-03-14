@@ -5,11 +5,11 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 
 import {WNT} from "./WNT.sol";
 import {TransferUtils} from "./TransferUtils.sol";
 import {Router} from "./Router.sol";
-import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 
 abstract contract MulticallRouter is ReentrancyGuard, Router, Multicall {
     WNT public immutable wnt;

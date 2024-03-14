@@ -5,7 +5,6 @@ import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {WNT} from "./../utils/WNT.sol";
-import {Router} from "./../utils/Router.sol";
 
 import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
 import {IGmxOrderCallbackReceiver} from "./interface/IGmxOrderCallbackReceiver.sol";
@@ -20,11 +19,11 @@ contract PositionLogic is Auth, IGmxOrderCallbackReceiver {
 
     constructor(Authority _authority) Auth(address(0), _authority) {}
 
-    function createTraderSubaccount(WNT _wnt, Router _router, SubaccountStore store, address trader) external {
+    function createTraderSubaccount(WNT _wnt, SubaccountStore store, address trader) external {
         if (address(store.getSubaccount(trader)) == trader) revert PositionLogic__TraderProxyAlreadyExists();
 
         Subaccount subaccount = new Subaccount(_wnt, store, trader);
-        store.createSubaccount(trader, subaccount);
+        store.setSubaccount(trader, subaccount);
 
         emit PositionLogic__CreateTraderSubaccount(trader, address(subaccount));
     }

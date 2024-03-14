@@ -1,40 +1,56 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.23;
 
-import {MulticallRouter} from "./utils/MulticallRouter.sol";
-import {WNT} from "./utils/WNT.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
+
+import {Router} from "./utils/Router.sol";
 import {Router} from "./utils/Router.sol";
 import {Dictator} from "./utils/Dictator.sol";
 
-import {PuppetToken} from "./tokenomics/PuppetToken.sol";
-import {RewardLogic} from "./tokenomics/RewardLogic.sol";
+import {PuppetStore} from "./position/store/PuppetStore.sol";
+import {PuppetLogic} from "./position/PuppetLogic.sol";
+import {PuppetUtils} from "./position/util/PuppetUtils.sol";
 
-contract PuppetRouter is MulticallRouter {
+contract PuppetRouter is Router, Multicall {
+    Router router;
+    PuppetUtils.ConfigParams config;
 
-    struct RewardRouterParams {
-        Dictator dictator;
-        PuppetToken puppetToken;
-        WNT wnt;
-        Router router;
-    }
+    PuppetStore public immutable puppetStore;
+    PuppetLogic puppetLogic;
 
-    struct PositionRouterConfigParams {
-        address dao;
-    }
-
-    RewardRouterParams params;
-    PositionRouterConfigParams config;
-
-    constructor(Dictator dictator, WNT wnt, Router router, PositionRouterConfigParams memory _config, RewardRouterParams memory _params)
-        MulticallRouter(dictator, wnt, router, _config.dao)
+    constructor(Dictator dictator, Router _router, PuppetUtils.ConfigParams memory _config, PuppetStore _puppetStore, PuppetLogic _puppetLogc)
+        Router(dictator)
     {
-        params = _params;
+        router = _router;
+        puppetStore = _puppetStore;
         config = _config;
+        puppetLogic = _puppetLogc;
+    }
+
+    function setRule(address puppet, PuppetStore.Rule calldata ruleParams) external {
+        puppetLogic.setRule(config, puppetStore, puppet, ruleParams);
+    }
+
+    function removeRule(address puppet, address trader) external {
+        puppetLogic.removeRule(puppetStore, puppet, trader);
+    }
+
+    function deposit(IERC20 token, address to, uint amount) external {
+        puppetLogic.deposit(router, puppetStore, token, msg.sender, to, amount);
+    }
+
+    function withdraw(IERC20 token, address to, uint amount) external {
+        puppetLogic.withdraw(router, puppetStore, token, msg.sender, to, amount);
     }
 
     // governance
 
-    // function setRewardLogic(RewardLogic rewardLogic) external requiresAuth {
-    //     config.rewardLogic = rewardLogic;
-    // }
+    function setConfig(PuppetUtils.ConfigParams memory _config) external requiresAuth {
+        config = _config;
+    }
+
+    function setPuppetLogic(PuppetLogic _puppetLogic) external requiresAuth {
+        puppetLogic = _puppetLogic;
+    }
 }

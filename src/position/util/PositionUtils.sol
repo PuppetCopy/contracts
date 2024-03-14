@@ -46,6 +46,7 @@ library PositionUtils {
         address feeReceiver;
         uint limitPuppetList;
         uint adjustmentFeeFactor;
+        uint minMatchExpiryDuration;
         uint minExecutionFee;
         uint maxCallbackGasLimit;
         uint minMatchTokenAmount;

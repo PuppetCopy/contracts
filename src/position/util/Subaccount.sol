@@ -2,10 +2,12 @@
 pragma solidity 0.8.23;
 
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {WNT} from "./../../utils/WNT.sol";
 import {TransferUtils} from "./../../utils/TransferUtils.sol";
 import {SubaccountStore} from "./../store/SubaccountStore.sol";
+import {Router} from "./../../utils/Router.sol";
 
 contract Subaccount is ReentrancyGuard {
     WNT wnt;
@@ -19,7 +21,7 @@ contract Subaccount is ReentrancyGuard {
     }
 
     modifier onlyLogicOperator() {
-        if (msg.sender != store.getLogicOperator()) revert Subaccount__NotCallbackCaller();
+        if (msg.sender != store.logicOperator()) revert Subaccount__NotCallbackCaller();
         _;
     }
 
@@ -43,6 +45,11 @@ contract Subaccount is ReentrancyGuard {
         uint balance = store.wntBalance(msg.sender);
 
         store.setWntBalance(msg.sender, balance + amount);
+    }
+
+    function depositToken(Router router, IERC20 token, uint amount) external {
+        router.pluginTransfer(token, account, address(this), amount);
+        token.approve(address(router), amount);
     }
 
     error Subaccount__InvalidNativeTokenSender(address sender);

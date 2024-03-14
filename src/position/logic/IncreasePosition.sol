@@ -29,7 +29,18 @@ library IncreasePosition {
     ) external {
         uint puppetListLength = puppetList.length;
 
+        if (callConfig.positionStore.getPendingTraderRequest(callPositionAdjustment.trader).requestKey != 0) {
+            revert IncreasePosition__PendingRequestExists();
+        }
+
+        bytes32[] memory ruleKeyList = new bytes32[](puppetListLength);
+
+        for (uint i = 0; i < puppetListLength; i++) {
+            ruleKeyList[i] = PuppetUtils.getRuleKey(puppetList[i], callPositionAdjustment.trader);
+        }
+
         PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
+            ruleKeyList: ruleKeyList,
             requestKey: PositionUtils.getNextRequestKey(callConfig.gmxDatastore),
             positionKey: PositionUtils.getPositionKey(
                 callPositionAdjustment.trader, callPositionAdjustment.market, callConfig.depositCollateralToken, callPositionAdjustment.isLong
@@ -51,14 +62,8 @@ library IncreasePosition {
             revert IncreasePosition__PuppetListLimitExceeded();
         }
 
-        bytes32[] memory ruleKeyList = new bytes32[](puppetListLength);
-
-        for (uint i = 0; i < puppetListLength; i++) {
-            ruleKeyList[i] = PuppetUtils.getRuleKey(puppetList[i], callPositionAdjustment.trader);
-        }
-
-        PuppetStore.Account[] memory accountList = callConfig.puppetStore.getBatchAccount(puppetList);
-        PuppetStore.Rule[] memory ruleList = callConfig.puppetStore.getBatchRule(ruleKeyList);
+        PuppetStore.Account[] memory accountList = callConfig.puppetStore.getAccountList(puppetList);
+        PuppetStore.Rule[] memory ruleList = callConfig.puppetStore.getRuleList(ruleKeyList);
 
         for (uint i = 0; i < puppetListLength; i++) {
             PuppetStore.Account memory account = accountList[i];
@@ -71,8 +76,8 @@ library IncreasePosition {
 
             if ( // invalid match
                 amountIn < callConfig.minMatchTokenAmount // minimum deposit
-                    || rule.expiry < block.timestamp + 1 days // rule expired or about to expire
-                    || account.latestMatchTimestamp + rule.throttlePeriod > block.timestamp // throttle in case of frequent matching
+                    || rule.expiry < block.timestamp + callConfig.minMatchExpiryDuration // rule expired or about to expire
+                    || account.latestMatchTimestamp + rule.throttle > block.timestamp // throttle in case of frequent matching
             ) {
                 request.puppetCollateralDeltaList[i] = 0;
             } else {
@@ -87,7 +92,7 @@ library IncreasePosition {
             accountList[i] = account;
         }
 
-        callConfig.puppetStore.setBatchAccount(puppetList, accountList);
+        callConfig.puppetStore.setAccountList(puppetList, accountList);
 
         emit IncreasePosition__RequestMatchPosition(address(this), request.requestKey, puppetList);
 
@@ -122,7 +127,7 @@ library IncreasePosition {
 
     in the following cases Puppet B cannot add any funds (due to insolvency, throttle or expiry rule), to match MP leverage only size will be adjusted
     to
-    maintain the same leverage
+    if size i greater than deposit, size can be adjust to match the leverage without adding funds
 
     2.A Increase size: 100% Collateral: 50% (13.33x)
     Trader                +1000   / +50        2000   / 150
@@ -150,13 +155,24 @@ library IncreasePosition {
         PositionUtils.CallPositionConfig calldata callConfig,
         PositionUtils.CallPositionAdjustment calldata callPositionAdjustment
     ) external {
+        if (callConfig.positionStore.getPendingTraderRequest(callPositionAdjustment.trader).requestKey != 0) {
+            revert IncreasePosition__PendingRequestExists();
+        }
+
         bytes32 positionKey = PositionUtils.getPositionKey(
             callPositionAdjustment.trader, callPositionAdjustment.market, callConfig.depositCollateralToken, callPositionAdjustment.isLong
         );
         PositionStore.MirrorPosition memory matchMp = callConfig.positionStore.getMirrorPosition(positionKey);
         uint puppetListLength = matchMp.puppetList.length;
 
+        bytes32[] memory ruleKeyList = new bytes32[](puppetListLength);
+
+        for (uint i = 0; i < puppetListLength; i++) {
+            ruleKeyList[i] = PuppetUtils.getRuleKey(matchMp.puppetList[i], callPositionAdjustment.trader);
+        }
+
         PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
+            ruleKeyList: ruleKeyList,
             requestKey: PositionUtils.getNextRequestKey(callConfig.gmxDatastore),
             positionKey: positionKey,
             puppetList: matchMp.puppetList,
@@ -170,14 +186,8 @@ library IncreasePosition {
             revert IncreasePosition__PositionDoesNotExists();
         }
 
-        bytes32[] memory ruleKeyList = new bytes32[](puppetListLength);
-
-        for (uint i = 0; i < puppetListLength; i++) {
-            ruleKeyList[i] = PuppetUtils.getRuleKey(matchMp.puppetList[i], callPositionAdjustment.trader);
-        }
-
-        PuppetStore.Account[] memory accountList = callConfig.puppetStore.getBatchAccount(matchMp.puppetList);
-        PuppetStore.Rule[] memory ruleList = callConfig.puppetStore.getBatchRule(ruleKeyList);
+        PuppetStore.Account[] memory accountList = callConfig.puppetStore.getAccountList(matchMp.puppetList);
+        PuppetStore.Rule[] memory ruleList = callConfig.puppetStore.getRuleList(ruleKeyList);
 
         for (uint i = 0; i < puppetListLength; i++) {
             PuppetStore.Account memory account = accountList[i];
@@ -186,9 +196,9 @@ library IncreasePosition {
             uint amountIn = callPositionAdjustment.sizeDelta / matchMp.puppetDepositList[i];
 
             if ( // reduce mode
-                amountIn < callConfig.minMatchTokenAmount // minimum deposit
-                    || rule.expiry < block.timestamp + 1 days // rule expired or about to expire
-                    || account.latestMatchTimestamp + rule.throttlePeriod > block.timestamp // throttle in case of frequent matching
+                amountIn > account.deposit // deposit is greater than required
+                    || block.timestamp > rule.expiry // rule expired or about to expire
+                    || account.latestMatchTimestamp + rule.throttle > block.timestamp // throttle in case of frequent matching
             ) {
                 // request.puppetCollateralDeltaList[i] = 0;
                 // continue;
@@ -204,7 +214,7 @@ library IncreasePosition {
             accountList[i] = account;
         }
 
-        callConfig.puppetStore.setBatchAccount(matchMp.puppetList, accountList);
+        callConfig.puppetStore.setAccountList(matchMp.puppetList, accountList);
 
         _requestIncreasePosition(callConfig, callPositionAdjustment, request);
 
@@ -219,15 +229,12 @@ library IncreasePosition {
         PositionStore.RequestAdjustment memory request
     ) internal returns (bytes32 requestKey) {
         Subaccount subaccount = callConfig.subaccountStore.getSubaccount(callPositionAdjustment.trader);
+        address subaccountAddress = subaccount.getAccount();
 
-        if (subaccount.getAccount() != callPositionAdjustment.trader) revert IncreasePosition__InvalidSubaccountCaller();
+        if (subaccountAddress != callPositionAdjustment.trader) revert IncreasePosition__InvalidSubaccountCaller();
 
-        address subaccountAddress = address(subaccount);
+        subaccount.depositToken(callConfig.router, callConfig.depositCollateralToken, callPositionAdjustment.collateralDelta);
         SafeERC20.safeTransferFrom(callConfig.depositCollateralToken, address(callConfig.puppetStore), subaccountAddress, request.collateralDelta);
-        callConfig.router.pluginTransfer(
-            callConfig.depositCollateralToken, callPositionAdjustment.trader, subaccountAddress, callPositionAdjustment.collateralDelta
-        );
-        SafeERC20.forceApprove(callConfig.depositCollateralToken, address(callConfig.gmxExchangeRouter), request.collateralDelta);
 
         PositionUtils.CreateOrderParams memory params = PositionUtils.CreateOrderParams(
             PositionUtils.CreateOrderParamsAddresses(
@@ -264,7 +271,7 @@ library IncreasePosition {
 
         requestKey = abi.decode(returnData, (bytes32));
 
-        callConfig.positionStore.setRequestAdjustment(requestKey, request);
+        callConfig.positionStore.setPendingTraderRequest(callPositionAdjustment.trader, request);
 
         emit IncreasePosition__RequestIncreasePosition(
             address(this), requestKey, request.puppetCollateralDeltaList, callPositionAdjustment.collateralDelta, callPositionAdjustment.sizeDelta
@@ -274,8 +281,7 @@ library IncreasePosition {
     error IncreasePosition__PositionAlreadyExists();
     error IncreasePosition__PositionDoesNotExists();
     error IncreasePosition__PuppetListLimitExceeded();
-    error IncreasePosition__TraderProxyAlreadyExists();
     error IncreasePosition__InvalidRequestKey(bytes32 requestKey, bytes32 expectedRequestKey);
-    error IncreasePosition__RequestFailed(string message);
     error IncreasePosition__InvalidSubaccountCaller();
+    error IncreasePosition__PendingRequestExists();
 }

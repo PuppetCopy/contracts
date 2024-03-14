@@ -23,39 +23,35 @@ contract SubaccountStore is StoreController {
         holdingAddress = _holdingAddress;
     }
 
-    function getSubaccount(address _account) external view returns (Subaccount) {
-        return subaccountMap[_account];
+    function setWntBalance(address _address, uint _value) external isSetter {
+        wntBalance[_address] = _value;
     }
 
-    function createSubaccount(address _account, Subaccount _subaccount) external {
-        subaccountMap[_account] = _subaccount;
+    function getSubaccount(address _address) external view returns (Subaccount) {
+        return subaccountMap[_address];
     }
 
-    function removeSubaccount(address _account) external {
-        delete subaccountMap[_account];
+    function setSubaccount(address _address, Subaccount _subaccount) external {
+        subaccountMap[_address] = _subaccount;
     }
 
-    function setNativeTokenGasLimit(uint _nativeTokenGasLimit) external requiresAuth {
-        nativeTokenGasLimit = _nativeTokenGasLimit;
+    function removeSubaccount(address _address) external {
+        delete subaccountMap[_address];
     }
 
-    function setHoldingAddress(address _holdingAddress) external requiresAuth {
-        holdingAddress = _holdingAddress;
+    function setNativeTokenGasLimit(uint _value) external isSetter {
+        nativeTokenGasLimit = _value;
     }
 
-    function setTokenGasLimit(uint _tokenGasLimit) external requiresAuth {
-        tokenGasLimit = _tokenGasLimit;
+    function setTokenGasLimit(uint _value) external isSetter {
+        tokenGasLimit = _value;
     }
 
-    function setWntBalance(address _account, uint _balance) external requiresAuth {
-        wntBalance[_account] = _balance;
+    function setHoldingAddress(address _address) external isSetter {
+        holdingAddress = _address;
     }
 
-    function setLogicOperator(address _subaccountImplementation) external requiresAuth {
-        logicOperator = _subaccountImplementation;
-    }
-
-    function getLogicOperator() external view returns (address) {
-        return logicOperator;
+    function setLogicOperator(address _address) external isSetter {
+        logicOperator = _address;
     }
 }

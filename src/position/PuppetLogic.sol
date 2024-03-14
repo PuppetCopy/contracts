@@ -9,35 +9,38 @@ import {PuppetUtils} from "./util/PuppetUtils.sol";
 import {PuppetStore} from "./store/PuppetStore.sol";
 
 contract PuppetLogic is Auth {
+    event PuppetLogic__UpdateDeposit(address from, address to, bool isIncrease, IERC20 token, uint amount);
+    event PuppetLogic__UpdateRule(bytes32 ruleKey, address puppet, address trader, uint allowanceRate, uint throttle, uint expiry);
+
     constructor(Authority _authority) Auth(address(0), _authority) {}
 
-    event PuppetLogic__UpdateDeposit(address from, address to, bool isIncrease, IERC20 token, uint amount);
-    event PuppetLogic__UpdateRule(bytes32 ruleKey, address puppet, address trader, uint allowanceRate, uint throttlePeriod, uint expiry);
-
-    function setRule(PuppetStore store, address puppet, PuppetStore.Rule calldata ruleParams) external {
-        if (ruleParams.expiry < block.timestamp + 1 days) {
+    function setRule(PuppetUtils.ConfigParams calldata config, PuppetStore store, address puppet, PuppetStore.Rule calldata rule)
+        external
+        requiresAuth
+    {
+        if (rule.expiry < block.timestamp + config.minExpiryDuration) {
             revert PuppetLogic__InvalidExpiry();
         }
 
-        if (ruleParams.allowanceRate < 100) {
+        if (rule.allowanceRate < config.minAllowanceRate || rule.allowanceRate > config.maxAllowanceRate) {
             revert PuppetLogic__MinAllowanceRate(100);
         }
 
-        bytes32 key = PuppetUtils.getRuleKey(puppet, ruleParams.trader);
+        bytes32 key = PuppetUtils.getRuleKey(puppet, rule.trader);
         PuppetStore.Rule memory pts = store.getRule(key);
 
-        pts.trader = ruleParams.trader;
-        pts.positionKey = ruleParams.positionKey;
-        pts.throttlePeriod = ruleParams.throttlePeriod;
-        pts.allowanceRate = ruleParams.allowanceRate;
-        pts.expiry = ruleParams.expiry;
+        pts.trader = rule.trader;
+        pts.positionKey = rule.positionKey;
+        pts.throttle = rule.throttle;
+        pts.allowanceRate = rule.allowanceRate;
+        pts.expiry = rule.expiry;
 
         store.setRule(pts, key);
 
-        emit PuppetLogic__UpdateRule(key, puppet, ruleParams.trader, ruleParams.allowanceRate, ruleParams.throttlePeriod, ruleParams.expiry);
+        emit PuppetLogic__UpdateRule(key, puppet, rule.trader, rule.allowanceRate, rule.throttle, rule.expiry);
     }
 
-    function removeRule(PuppetStore store, address puppet, address trader) external {
+    function removeRule(PuppetStore store, address puppet, address trader) external requiresAuth {
         bytes32 key = PuppetUtils.getRuleKey(puppet, trader);
 
         store.removeRule(key);
@@ -45,7 +48,7 @@ contract PuppetLogic is Auth {
         emit PuppetLogic__UpdateRule(key, puppet, trader, 0, 0, 0);
     }
 
-    function deposit(Router router, PuppetStore store, IERC20 token, address from, address to, uint amount) external {
+    function deposit(Router router, PuppetStore store, IERC20 token, address from, address to, uint amount) external requiresAuth {
         if (amount == 0) {
             revert PuppetLogic__ZeroAmount();
         }
@@ -61,7 +64,7 @@ contract PuppetLogic is Auth {
         emit PuppetLogic__UpdateDeposit(from, to, true, token, amount);
     }
 
-    function withdraw(Router router, PuppetStore store, IERC20 token, address from, address to, uint amount) external {
+    function withdraw(Router router, PuppetStore store, IERC20 token, address from, address to, uint amount) external requiresAuth {
         PuppetStore.Account memory pa = store.getAccount(from);
 
         if (amount > pa.deposit) {
