@@ -97,7 +97,7 @@ contract RewardLogic is Auth {
         uint daoAmount = getClaimableAmount(params.daoRate, maxRewardTokenAmount);
         params.puppetToken.mint(params.dao, daoAmount);
 
-        resetUserRevenue(params.rewardStore, params.account);
+        resetUserGeneratedRevenue(params.rewardStore, params.account);
 
         emit RewardLogic__ClaimOption(
             Choice.LOCK,
@@ -126,7 +126,7 @@ contract RewardLogic is Auth {
         callParams.puppetToken.mint(callParams.dao, daoAmount);
         callParams.puppetToken.mint(callParams.account, amount);
 
-        resetUserRevenue(callParams.rewardStore, callParams.account);
+        resetUserGeneratedRevenue(callParams.rewardStore, callParams.account);
 
         emit RewardLogic__ClaimOption(
             Choice.EXIT,
@@ -161,7 +161,7 @@ contract RewardLogic is Auth {
 
     // internal logic
 
-    function resetUserRevenue(RewardStore rewardStore, address account) internal {
+    function resetUserGeneratedRevenue(RewardStore rewardStore, address account) internal {
         rewardStore.removeUserGeneratedRevenue(getUserGeneratedRevenueKey(account));
     }
 

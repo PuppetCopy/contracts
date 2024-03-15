@@ -25,7 +25,7 @@ contract PuppetToken is Auth, ERC20 {
 
     uint private constant CORE_RELEASE_DURATION = 31540000 * 2; // 2 years
     uint private constant CORE_RELEASE_RATE = 3500; // 35%
-    uint private constant GENESIS_MINT_AMOUNT = 100_000;
+    uint private constant GENESIS_MINT_AMOUNT = 100_000e18;
     uint private constant GENESIS_START_TIME = 1710253930; // Tue Mar 12 2024
 
     // Rate limit for minting new tokens in basis points
@@ -45,12 +45,12 @@ contract PuppetToken is Auth, ERC20 {
         _mint(_authority.owner(), GENESIS_MINT_AMOUNT);
     }
 
-    function getLimitRate() public view returns (uint) {
+    function getLimitAmount() public view returns (uint) {
         return totalSupply() * limitRate / Calc.BASIS_POINT_DIVISOR;
     }
 
-    function rateMargin() public view returns (uint) {
-        return getLimitRate() - mintWindowCount;
+    function getMarginAmount() public view returns (uint) {
+        return getLimitAmount() - mintWindowCount;
     }
 
     /**
@@ -72,8 +72,8 @@ contract PuppetToken is Auth, ERC20 {
         mintWindowCount += _amount;
 
         // Enforce the mint rate limit based on total emitted tokens
-        if (mintWindowCount > getLimitRate()) {
-            revert PuppetToken__ExceededRateLimit(durationWindow, limitRate, getLimitRate());
+        if (mintWindowCount > getLimitAmount()) {
+            revert PuppetToken__ExceededRateLimit(durationWindow, limitRate, getLimitAmount());
         }
 
         _mint(_for, _amount);

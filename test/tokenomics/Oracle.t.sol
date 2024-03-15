@@ -43,7 +43,8 @@ contract OracleTest is BasicSetup {
 
         assertAlmostEq(oracleLogic.getMaxPrice(oracleStore, oracleStore.getLatestSeed().price), 100e6, 1e4, "initial $100");
 
-        dictator.setRoleCapability(PUPPET_MINTER_ROLE, address(oracleLogic), oracleLogic.syncTokenPrice.selector, true);
+        dictator.setRoleCapability(1, address(oracleLogic), oracleLogic.syncTokenPrice.selector, true);
+        dictator.setUserRole(users.owner, 1, true);
     }
 
     function testMedianWntPriceInUsd() public {
@@ -128,7 +129,7 @@ contract OracleTest is BasicSetup {
     }
 
     function getPuppetExchangeRateInUsdc() public view returns (uint) {
-        return oracleLogic.getPuppetExchangeRateInUsdc(wntUsdPoolList, vault, 0, 0);
+        return oracleLogic.getTokenPriceInUsd(wntUsdPoolList, vault, 0, 0);
     }
 
     function fromPriceToSqrt(uint usdcPerWeth) public pure returns (uint160) {

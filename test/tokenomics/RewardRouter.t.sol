@@ -57,7 +57,7 @@ contract RewardRouterTest is BasicSetup {
         oracleLogic = new OracleLogic(dictator);
         dictator.setRoleCapability(ORACLE_LOGIC_ROLE, address(oracleLogic), oracleLogic.syncTokenPrice.selector, true);
 
-        oracleStore = new OracleStore(dictator, address(oracleLogic), oracleLogic.getPuppetExchangeRateInUsdc(wntUsdPoolList, vault, 0, 0), 1 days);
+        oracleStore = new OracleStore(dictator, address(oracleLogic), oracleLogic.getTokenPriceInUsd(wntUsdPoolList, vault, 0, 0), 1 days);
 
         rewardLogic = new RewardLogic(dictator);
         dictator.setRoleCapability(REWARD_LOGIC_ROLE, address(rewardLogic), rewardLogic.lock.selector, true);
@@ -112,9 +112,9 @@ contract RewardRouterTest is BasicSetup {
         dictator.setUserRole(address(rewardLogic), PUPPET_MINTER_ROLE, true);
         dictator.setUserRole(address(rewardLogic), VESTING_ROLE, true);
         dictator.setUserRole(address(rewardLogic), REWARD_DISTRIBUTOR_ROLE, true);
+        dictator.setUserRole(address(rewardLogic), ORACLE_LOGIC_ROLE, true);
 
         dictator.setUserRole(address(rewardRouter), REWARD_LOGIC_ROLE, true);
-        dictator.setUserRole(address(rewardRouter), ORACLE_LOGIC_ROLE, true);
         dictator.setUserRole(address(rewardRouter), VESTING_ROLE, true);
     }
 

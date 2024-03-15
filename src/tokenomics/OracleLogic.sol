@@ -33,18 +33,18 @@ contract OracleLogic is Auth {
         return Math.min(store.medianMin(), exchangeRate);
     }
 
-    function getPuppetPriceInWnt(IVault vault, bytes32 poolId) public view returns (uint price) {
-        return _getPuppetExchangeRate(vault, poolId);
+    function getTokenPriceInWnt(IVault vault, bytes32 poolId) public view returns (uint price) {
+        return _getTokenExchangeRate(vault, poolId);
     }
 
-    function getPuppetExchangeRateInUsdc(IUniswapV3Pool[] calldata wntUsdSourceList, IVault vault, bytes32 poolId, uint32 twapInterval)
+    function getTokenPriceInUsd(IUniswapV3Pool[] calldata wntUsdSourceList, IVault vault, bytes32 poolId, uint32 twapInterval)
         public
         view
         returns (uint)
     {
         uint usdPerWnt = getMedianWntPriceInUsd(wntUsdSourceList, twapInterval);
-        uint puppetPerWnt = getPuppetPriceInWnt(vault, poolId);
-        return usdPerWnt * 1e30 / puppetPerWnt;
+        uint tokenPerWnt = getTokenPriceInWnt(vault, poolId);
+        return usdPerWnt * 1e30 / tokenPerWnt;
     }
 
     function getMedianWntPriceInUsd(IUniswapV3Pool[] calldata wntUsdSourceList, uint32 twapInterval) public view returns (uint medianPrice) {
@@ -78,7 +78,7 @@ contract OracleLogic is Auth {
         requiresAuth
         returns (uint)
     {
-        uint price = getPuppetExchangeRateInUsdc(wntUsdSourceList, vault, poolId, twapInterval);
+        uint price = getTokenPriceInUsd(wntUsdSourceList, vault, poolId, twapInterval);
         OracleStore.SlotSeed memory seed = store.getLatestSeed();
 
         uint settledPrice = storeMinMax(store, seed, price);
@@ -171,15 +171,15 @@ contract OracleLogic is Auth {
         return arr[3]; // The median is at index 3 in 7 fixed size array
     }
 
-    // returns price of puppet token in wnt with 30d precision
-    function _getPuppetExchangeRate(IVault vault, bytes32 poolId) internal view returns (uint) {
+    // returns token price in wnt with 30d precision
+    function _getTokenExchangeRate(IVault vault, bytes32 poolId) internal view returns (uint) {
         (, uint[] memory balances,) = vault.getPoolTokens(poolId);
 
-        uint puppetBalance = balances[0];
+        uint tokenBalance = balances[0];
         uint nSlotBalance = balances[1];
         uint precision = 10 ** 30;
 
-        uint balanceRatio = (puppetBalance * 80 * precision) / (nSlotBalance * 20);
+        uint balanceRatio = (tokenBalance * 80 * precision) / (nSlotBalance * 20);
         uint price = balanceRatio;
 
         if (price == 0) revert OracleLogic__NonZeroPrice();
