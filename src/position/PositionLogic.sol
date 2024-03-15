@@ -6,9 +6,6 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {WNT} from "./../utils/WNT.sol";
 
-import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
-import {IGmxOrderCallbackReceiver} from "./interface/IGmxOrderCallbackReceiver.sol";
-import {IGmxEventUtils} from "./interface/IGmxEventUtils.sol";
 import {PositionUtils} from "./util/PositionUtils.sol";
 import {Subaccount} from "./util/Subaccount.sol";
 
@@ -30,30 +27,22 @@ contract PositionLogic is Auth {
         emit PositionLogic__CreateTraderSubaccount(trader, address(subaccount));
     }
 
-    function requestMatchPosition(
-        PositionUtils.CallPositionConfig calldata callConfig,
-        PositionUtils.CallPositionAdjustment calldata callPositionAdjustment,
-        address[] calldata puppetList
-    ) external requiresAuth {
-        IncreasePosition.requestMatchPosition(callConfig, callPositionAdjustment, puppetList);
-    }
-
     function requestIncreasePosition(
-        PositionUtils.CallPositionConfig calldata callConfig,
-        PositionUtils.CallPositionAdjustment calldata callPositionAdjustment
+        IncreasePosition.CallConfig calldata callConfig,
+        PositionUtils.CallPositionAdjustment calldata callIncreaseParams
     ) external requiresAuth {
-        IncreasePosition.requestIncreasePosition(callConfig, callPositionAdjustment);
+        IncreasePosition.requestIncreasePosition(callConfig, callIncreaseParams);
     }
 
-    function executeIncreasePosition(
-        PositionUtils.CallbackCallPositionConfig calldata callConfig,
-        PositionStore.CallbackResponse memory callbackResponse
-    ) internal requiresAuth {
+    function executeIncreasePosition(IncreasePosition.CallbackConfig calldata callConfig, PositionStore.CallbackResponse memory callbackResponse)
+        internal
+        requiresAuth
+    {
         // IncreasePosition.requestDecreasePosition(callConfig, callPositionAdjustment);
     }
 
     function handlOperatorCallback(
-        PositionUtils.CallbackCallPositionConfig calldata callConfig,
+        IncreasePosition.CallbackConfig calldata callConfig,
         bytes32 key,
         PositionUtils.Props calldata order,
         bytes calldata eventData
@@ -78,7 +67,7 @@ contract PositionLogic is Auth {
     }
 
     function handlCancelledCallback(
-        PositionUtils.CallbackCallPositionConfig calldata callConfig,
+        IncreasePosition.CallbackConfig calldata callConfig,
         bytes32 key,
         PositionUtils.Props calldata order,
         bytes calldata eventData
@@ -101,7 +90,7 @@ contract PositionLogic is Auth {
     }
 
     function handlFrozenCallback(
-        PositionUtils.CallbackCallPositionConfig calldata callConfig,
+        IncreasePosition.CallbackConfig calldata callConfig,
         bytes32 key,
         PositionUtils.Props calldata order,
         bytes calldata eventData

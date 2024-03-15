@@ -9,10 +9,9 @@ import {Router} from "./utils/Router.sol";
 import {Dictator} from "./utils/Dictator.sol";
 
 import {IGmxExchangeRouter} from "./position/interface/IGmxExchangeRouter.sol";
-import {IGmxEventUtils} from "./position/interface/IGmxEventUtils.sol";
+import {IncreasePosition} from "./position/logic/IncreasePosition.sol";
 
 import {PositionUtils} from "./position/util/PositionUtils.sol";
-
 import {PositionLogic} from "./position/PositionLogic.sol";
 
 import {PositionStore} from "./position/store/PositionStore.sol";
@@ -34,11 +33,11 @@ contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
     }
 
     struct PositionRouterConfig {
+        Router router;
         PositionLogic positionLogic;
         SubaccountStore subaccountStore;
         PositionStore positionStore;
         PuppetStore puppetStore;
-        Router router;
         IGmxExchangeRouter gmxExchangeRouter;
         IGmxDatastore gmxDatastore;
         IERC20 depositCollateralToken;
@@ -49,7 +48,8 @@ contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
         uint adjustmentFeeFactor;
         uint minMatchExpiryDuration;
         uint minExecutionFee;
-        uint maxCallbackGasLimit;
+        uint callbackGasLimit;
+        uint minMatchTokenAmount;
         bytes32 referralCode;
     }
 
@@ -61,6 +61,28 @@ contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
     {
         _setConfig(_config);
         params = _params;
+    }
+
+    function requestIncreasePosition(PositionUtils.CallPositionAdjustment calldata callIncreaseParams) external nonReentrant {
+        IncreasePosition.CallConfig memory callConfig = IncreasePosition.CallConfig({
+            router: params.router,
+            subaccountStore: config.subaccountStore,
+            positionStore: config.positionStore,
+            puppetStore: config.puppetStore,
+            gmxExchangeRouter: config.gmxExchangeRouter,
+            gmxDatastore: config.gmxDatastore,
+            depositCollateralToken: config.depositCollateralToken,
+            feeReceiver: config.feeReceiver,
+            trader: msg.sender,
+            referralCode: config.referralCode,
+            limitPuppetList: config.limitPuppetList,
+            adjustmentFeeFactor: config.adjustmentFeeFactor,
+            minMatchExpiryDuration: config.minMatchExpiryDuration,
+            callbackGasLimit: config.callbackGasLimit,
+            minMatchTokenAmount: config.minMatchTokenAmount
+        });
+
+        config.positionLogic.requestIncreasePosition(callConfig, callIncreaseParams);
     }
 
     function afterOrderExecution(bytes32 key, PositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant {
@@ -82,7 +104,7 @@ contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
     // internal
 
     function _handlOperatorCallback(bytes32 key, PositionUtils.Props calldata order, bytes calldata eventData) internal {
-        PositionUtils.CallbackCallPositionConfig memory callConfig = PositionUtils.CallbackCallPositionConfig({
+        IncreasePosition.CallbackConfig memory callConfig = IncreasePosition.CallbackConfig({
             positionStore: config.positionStore,
             gmxCallbackOperator: config.gmxCallbackOperator,
             caller: msg.sender

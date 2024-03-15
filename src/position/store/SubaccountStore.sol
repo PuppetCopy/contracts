@@ -5,8 +5,6 @@ pragma solidity 0.8.23;
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
 import {StoreController} from "src/utils/StoreController.sol";
-
-// import {ISubaccount} from "./../interface/ISubaccount.sol";
 import {Subaccount} from "./../util/Subaccount.sol";
 
 contract SubaccountStore is StoreController {

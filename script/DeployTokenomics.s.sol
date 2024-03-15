@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {PRBTest} from "@prb/test/src/PRBTest.sol";
+import {IBasePool} from "@balancer-labs/v2-interfaces/vault/IBasePool.sol";
 
 // import {IDataStore} from "./../src/integrations/utils/interfaces/IDataStore.sol";
 
@@ -13,7 +14,6 @@ import {PositionStore} from "./../src/position/store/PositionStore.sol";
 import {Dictator} from "src/utils/Dictator.sol";
 import {Router} from "src/utils/Router.sol";
 import {WNT} from "src/utils/WNT.sol";
-import {IBasePoolErc20} from "src/utils/BalancerOperations.sol";
 
 import {OracleLogic} from "src/tokenomics/OracleLogic.sol";
 import {OracleStore} from "src/tokenomics/store/OracleStore.sol";

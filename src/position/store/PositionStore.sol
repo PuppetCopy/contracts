@@ -7,7 +7,7 @@ import {StoreController} from "../../utils/StoreController.sol";
 import {PositionUtils} from "./../util/PositionUtils.sol";
 
 contract PositionStore is StoreController {
-    struct RequestIncreaseAdjustment {
+    struct RequestIncrease {
         bytes32 requestKey;
         int sizeDelta;
         uint collateralDelta;
@@ -30,17 +30,17 @@ contract PositionStore is StoreController {
         bytes eventData;
     }
 
-    mapping(bytes32 positionKey => RequestIncreaseAdjustment) public pendingRequestIncreaseAdjustmentMap;
+    mapping(bytes32 positionKey => RequestIncrease) public pendingRequestIncreaseAdjustmentMap;
     mapping(bytes32 positionKey => MirrorPosition) public positionMap;
     mapping(bytes32 positionKey => CallbackResponse) public callbackResponseMap;
 
     constructor(Authority _authority, address _initSetter) StoreController(_authority, _initSetter) {}
 
-    function getPendingRequestIncreaseAdjustmentMap(bytes32 _key) external view returns (RequestIncreaseAdjustment memory) {
+    function getPendingRequestIncreaseAdjustmentMap(bytes32 _key) external view returns (RequestIncrease memory) {
         return pendingRequestIncreaseAdjustmentMap[_key];
     }
 
-    function setPendingRequestIncreaseAdjustmentMap(bytes32 _key, RequestIncreaseAdjustment memory _req) external isSetter {
+    function setPendingRequestIncreaseAdjustmentMap(bytes32 _key, RequestIncrease memory _req) external isSetter {
         pendingRequestIncreaseAdjustmentMap[_key] = _req;
     }
 

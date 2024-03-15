@@ -3,13 +3,7 @@ pragma solidity 0.8.23;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {IGmxExchangeRouter} from "../interface/IGmxExchangeRouter.sol";
 import {IGmxDatastore} from "../interface/IGmxDatastore.sol";
-import {Router} from "../../utils/Router.sol";
-
-import {PositionStore} from "./../store/PositionStore.sol";
-import {PuppetStore} from "./../store/PuppetStore.sol";
-import {SubaccountStore} from "./../store/SubaccountStore.sol";
 
 library PositionUtils {
     enum OrderType {
@@ -35,32 +29,7 @@ library PositionUtils {
         SwapCollateralTokenToPnlToken
     }
 
-    struct CallPositionConfig {
-        SubaccountStore subaccountStore;
-        PositionStore positionStore;
-        PuppetStore puppetStore;
-        Router router;
-        IGmxExchangeRouter gmxExchangeRouter;
-        IGmxDatastore gmxDatastore;
-        IERC20 depositCollateralToken;
-        address feeReceiver;
-        uint limitPuppetList;
-        uint adjustmentFeeFactor;
-        uint minMatchExpiryDuration;
-        uint minExecutionFee;
-        uint maxCallbackGasLimit;
-        uint minMatchTokenAmount;
-        bytes32 referralCode;
-    }
-
-    struct CallbackCallPositionConfig {
-        PositionStore positionStore;
-        address gmxCallbackOperator;
-        address caller;
-    }
-
     struct CallPositionAdjustment {
-        address trader;
         address receiver;
         address market;
         uint executionFee;
@@ -69,6 +38,7 @@ library PositionUtils {
         uint acceptablePrice;
         uint triggerPrice;
         bool isLong;
+        address[] puppetList;
     }
 
     struct Props {

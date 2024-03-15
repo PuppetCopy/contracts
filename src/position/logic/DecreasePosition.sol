@@ -7,18 +7,9 @@ import {PositionUtils} from "../util/PositionUtils.sol";
 import {PositionStore} from "../store/PositionStore.sol";
 
 library DecreasePosition {
-    function executeDecreasePosition(
-        PositionUtils.CallPositionConfig calldata callConfig,
-        PositionUtils.CallPositionAdjustment calldata callPositionAdjustment,
-        PositionStore.RequestIncreaseAdjustment calldata request
-    ) external {}
+    function executeDecreasePosition() external {}
 
-    function _requestDecreasePosition(
-        PositionUtils.CallPositionConfig calldata callConfig,
-        PositionUtils.CallPositionAdjustment calldata callPositionAdjustment,
-        PositionStore.RequestIncreaseAdjustment memory request,
-        bytes32 positionKey
-    ) internal returns (bytes32 requestKey) {
+    function _requestDecreasePosition() internal returns (bytes32 requestKey) {
         // ...
     }
 }

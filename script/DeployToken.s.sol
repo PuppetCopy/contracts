@@ -6,12 +6,13 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {PRBTest} from "@prb/test/src/PRBTest.sol";
 import {IVault, IAsset} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {WeightedPoolUserData} from "@balancer-labs/v2-interfaces/pool-weighted/WeightedPoolUserData.sol";
+import {IBasePool} from "@balancer-labs/v2-interfaces/vault/IBasePool.sol";
+
 import {DeployerEnv} from "script/Env.s.sol";
 
 import {Dictator} from "src/utils/Dictator.sol";
 import {WNT} from "src/utils/WNT.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
-import {IBasePoolErc20} from "src/utils/BalancerOperations.sol";
 
 contract DeployToken is PRBTest {
     address internal DEPLOYER_ADDRESS = vm.envAddress("GBC_DEPLOYER_ADDRESS");
@@ -102,3 +103,5 @@ interface IWeightedPoolFactory {
         bytes32 salt
     ) external returns (address);
 }
+
+interface IBasePoolErc20 is IBasePool, IERC20 {}
