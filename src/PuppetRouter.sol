@@ -3,6 +3,7 @@ pragma solidity 0.8.23;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {Router} from "./utils/Router.sol";
 import {Router} from "./utils/Router.sol";
@@ -10,47 +11,66 @@ import {Dictator} from "./utils/Dictator.sol";
 
 import {PuppetStore} from "./position/store/PuppetStore.sol";
 import {PuppetLogic} from "./position/PuppetLogic.sol";
-import {PuppetUtils} from "./position/util/PuppetUtils.sol";
 
-contract PuppetRouter is Router, Multicall {
-    Router router;
-    PuppetUtils.ConfigParams config;
+contract PuppetRouter is Router, Multicall, ReentrancyGuard {
+    event PuppetRouter__SetConfig(uint timestamp, PuppetRouterConfig config);
 
-    PuppetStore public immutable puppetStore;
-    PuppetLogic puppetLogic;
-
-    constructor(Dictator dictator, Router _router, PuppetUtils.ConfigParams memory _config, PuppetStore _puppetStore, PuppetLogic _puppetLogc)
-        Router(dictator)
-    {
-        router = _router;
-        puppetStore = _puppetStore;
-        config = _config;
-        puppetLogic = _puppetLogc;
+    struct PuppetRouterParams {
+        PuppetStore puppetStore;
+        Router router;
     }
 
-    function setRule(address puppet, PuppetStore.Rule calldata ruleParams) external {
-        puppetLogic.setRule(config, puppetStore, puppet, ruleParams);
+    struct PuppetRouterConfig {
+        PuppetLogic puppetLogic;
+        address dao;
+        uint minExpiryDuration;
+        uint minAllowanceRate;
+        uint maxAllowanceRate;
     }
 
-    function removeRule(address puppet, address trader) external {
-        puppetLogic.removeRule(puppetStore, puppet, trader);
+    PuppetRouterConfig config;
+    PuppetRouterParams params;
+
+    constructor(Dictator dictator, PuppetRouterConfig memory _config, PuppetRouterParams memory _params) Router(dictator) {
+        _setConfig(_config);
+        params = _params;
     }
 
-    function deposit(IERC20 token, address to, uint amount) external {
-        puppetLogic.deposit(router, puppetStore, token, msg.sender, to, amount);
+    function setRule(PuppetStore.Rule calldata ruleParams) external nonReentrant {
+        PuppetLogic.CallSetRuleParams memory callParams = PuppetLogic.CallSetRuleParams({
+            store: params.puppetStore,
+            minExpiryDuration: config.minExpiryDuration,
+            minAllowanceRate: config.minAllowanceRate,
+            maxAllowanceRate: config.maxAllowanceRate,
+            puppet: msg.sender
+        });
+
+        config.puppetLogic.setRule(callParams, ruleParams);
     }
 
-    function withdraw(IERC20 token, address to, uint amount) external {
-        puppetLogic.withdraw(router, puppetStore, token, msg.sender, to, amount);
+    function removeRule(address trader) external nonReentrant {
+        config.puppetLogic.removeRule(params.puppetStore, msg.sender, trader);
+    }
+
+    function deposit(IERC20 token, address to, uint amount) external nonReentrant {
+        config.puppetLogic.deposit(params.router, params.puppetStore, token, msg.sender, to, amount);
+    }
+
+    function withdraw(IERC20 token, address to, uint amount) external nonReentrant {
+        config.puppetLogic.withdraw(params.router, params.puppetStore, token, msg.sender, to, amount);
     }
 
     // governance
 
-    function setConfig(PuppetUtils.ConfigParams memory _config) external requiresAuth {
-        config = _config;
+    function setConfig(PuppetRouterConfig memory _config) external requiresAuth {
+        _setConfig(_config);
     }
 
-    function setPuppetLogic(PuppetLogic _puppetLogic) external requiresAuth {
-        puppetLogic = _puppetLogic;
+    // internal
+
+    function _setConfig(PuppetRouterConfig memory _config) internal {
+        config = _config;
+
+        emit PuppetRouter__SetConfig(block.timestamp, _config);
     }
 }

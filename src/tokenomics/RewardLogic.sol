@@ -4,10 +4,16 @@ pragma solidity 0.8.23;
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
+import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 
-import {Math} from "./../utils/Math.sol";
+import {Calc} from "./../utils/Calc.sol";
 
 import {RewardStore} from "./store/RewardStore.sol";
+import {OracleStore} from "./store/OracleStore.sol";
+
+import {OracleLogic} from "./OracleLogic.sol";
+
 import {Router} from "../utils/Router.sol";
 import {PuppetToken} from "./PuppetToken.sol";
 import {VotingEscrow, MAXTIME} from "./VotingEscrow.sol";
@@ -22,20 +28,24 @@ contract RewardLogic is Auth {
     event RewardLogic__ClaimOption(
         Choice choice,
         address indexed account,
-        address dao,
         IERC20 revenueToken,
         uint revenueInToken,
         uint revenueInUsd,
         uint maxTokenAmount,
-        uint rate,
         uint amount,
-        uint daoRate,
         uint daoAmount
     );
 
     event RewardLogic__ReferralOwnershipTransferred(address referralStorage, bytes32 code, address newOwner, uint timestamp);
 
-    struct OptionParams {
+    struct CallOptionConfig {
+        IUniswapV3Pool[] wntUsdPoolList;
+        OracleStore oracleStore;
+        OracleLogic oracleLogic;
+        uint32 wntUsdTwapInterval;
+        bytes32 poolId;
+        uint maxAcceptableTokenPriceInUsdc;
+        IVault lp;
         RewardStore rewardStore;
         PuppetToken puppetToken;
         address dao;
@@ -43,13 +53,12 @@ contract RewardLogic is Auth {
         IERC20 revenueToken;
         uint rate;
         uint daoRate;
-        uint tokenPrice;
     }
 
     constructor(Authority _authority) Auth(address(0), _authority) {}
 
     function getClaimableAmount(uint distributionRatio, uint tokenAmount) public pure returns (uint) {
-        uint claimableAmount = tokenAmount * distributionRatio / Math.BASIS_POINT_DIVISOR;
+        uint claimableAmount = tokenAmount * distributionRatio / Calc.BASIS_POINT_DIVISOR;
         return claimableAmount;
     }
 
@@ -64,21 +73,23 @@ contract RewardLogic is Auth {
 
         uint maxTime = block.timestamp + MAXTIME;
 
-        if (unlockTime >= maxTime) return Math.BASIS_POINT_DIVISOR;
+        if (unlockTime >= maxTime) return Calc.BASIS_POINT_DIVISOR;
 
-        return unlockTime * Math.BASIS_POINT_DIVISOR / maxTime;
+        return unlockTime * Calc.BASIS_POINT_DIVISOR / maxTime;
     }
 
     // state
 
-    function lock(Router router, VotingEscrow votingEscrow, OptionParams calldata params, uint unlockTime) public requiresAuth {
+    function lock(Router router, VotingEscrow votingEscrow, CallOptionConfig calldata params, uint unlockTime) public requiresAuth {
+        uint tokenPrice = storePrice(params);
+
         RewardStore.UserGeneratedRevenue memory revenueInToken = getAccountGeneratedRevenue(params.rewardStore, params.account);
-        uint maxRewardTokenAmount = revenueInToken.amountInUsd * 1e18 / params.tokenPrice;
+        uint maxRewardTokenAmount = revenueInToken.amountInUsd * 1e18 / tokenPrice;
 
         if (revenueInToken.amountInUsd == 0 || maxRewardTokenAmount == 0) revert RewardLogic__NoClaimableAmount();
 
         uint amount = getClaimableAmount(params.rate, maxRewardTokenAmount) * getRewardTimeMultiplier(votingEscrow, params.account, unlockTime)
-            / Math.BASIS_POINT_DIVISOR;
+            / Calc.BASIS_POINT_DIVISOR;
         params.puppetToken.mint(address(this), amount);
         SafeERC20.forceApprove(params.puppetToken, address(router), amount);
         votingEscrow.lock(address(this), params.account, amount, unlockTime);
@@ -91,46 +102,50 @@ contract RewardLogic is Auth {
         emit RewardLogic__ClaimOption(
             Choice.LOCK,
             params.account,
-            params.dao,
             params.revenueToken,
             revenueInToken.amountInToken,
             revenueInToken.amountInUsd,
             maxRewardTokenAmount,
-            params.rate,
             amount,
-            params.daoRate,
             daoAmount
         );
     }
 
-    function exit(OptionParams calldata params) public requiresAuth {
-        RewardStore.UserGeneratedRevenue memory revenueInToken = getAccountGeneratedRevenue(params.rewardStore, params.account);
+    function exit(CallOptionConfig calldata callParams) public requiresAuth {
+        uint tokenPrice = storePrice(callParams);
 
-        uint maxRewardTokenAmount = revenueInToken.amountInUsd * 1e18 / params.tokenPrice;
+        RewardStore.UserGeneratedRevenue memory revenueInToken = getAccountGeneratedRevenue(callParams.rewardStore, callParams.account);
+
+        uint maxRewardTokenAmount = revenueInToken.amountInUsd * 1e18 / tokenPrice;
 
         if (revenueInToken.amountInUsd == 0 || maxRewardTokenAmount == 0) revert RewardLogic__NoClaimableAmount();
 
-        uint daoAmount = getClaimableAmount(params.daoRate, maxRewardTokenAmount);
-        uint amount = getClaimableAmount(params.rate, maxRewardTokenAmount);
+        uint daoAmount = getClaimableAmount(callParams.daoRate, maxRewardTokenAmount);
+        uint amount = getClaimableAmount(callParams.rate, maxRewardTokenAmount);
 
-        params.puppetToken.mint(params.dao, daoAmount);
-        params.puppetToken.mint(params.account, amount);
+        callParams.puppetToken.mint(callParams.dao, daoAmount);
+        callParams.puppetToken.mint(callParams.account, amount);
 
-        resetUserRevenue(params.rewardStore, params.account);
+        resetUserRevenue(callParams.rewardStore, callParams.account);
 
         emit RewardLogic__ClaimOption(
             Choice.EXIT,
-            params.account,
-            params.dao,
-            params.revenueToken,
+            callParams.account,
+            callParams.revenueToken,
             revenueInToken.amountInToken,
             revenueInToken.amountInUsd,
             maxRewardTokenAmount,
-            params.rate,
             amount,
-            params.daoRate,
             daoAmount
         );
+    }
+
+    function storePrice(CallOptionConfig calldata callParams) public returns (uint tokenPrice) {
+        tokenPrice = callParams.oracleLogic.syncTokenPrice(
+            callParams.wntUsdPoolList, callParams.lp, callParams.oracleStore, callParams.poolId, callParams.wntUsdTwapInterval
+        );
+
+        if (tokenPrice > callParams.maxAcceptableTokenPriceInUsdc) revert RewardLogic__UnacceptableTokenPrice();
     }
 
     function claim(IVeRevenueDistributor revenueDistributor, IERC20 revenueToken, address from, address to) public requiresAuth returns (uint) {
@@ -170,4 +185,5 @@ contract RewardLogic is Auth {
 
     error RewardLogic__TransferReferralFailed();
     error RewardLogic__NoClaimableAmount();
+    error RewardLogic__UnacceptableTokenPrice();
 }

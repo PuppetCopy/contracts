@@ -7,19 +7,20 @@ import {StoreController} from "../../utils/StoreController.sol";
 contract PuppetStore is StoreController {
     struct Account {
         uint deposit;
-        uint latestMatchTimestamp;
+        uint latestActivityTimestamp;
     }
 
     struct Rule {
         address trader;
+        address puppet;
         bytes32 positionKey;
-        uint throttle;
+        uint throttleActivity;
         uint allowanceRate;
         uint expiry;
     }
 
     mapping(address => Account) public accountMap;
-    mapping(bytes32 => Rule) public ruleMap;
+    mapping(bytes32 puppetTraderKey => Rule) public ruleMap;
 
     constructor(Authority _authority, address _initSetter) StoreController(_authority, _initSetter) {}
 
@@ -68,4 +69,6 @@ contract PuppetStore is StoreController {
         }
         return rules;
     }
+
+
 }

@@ -86,7 +86,7 @@ contract RewardRouterTest is BasicSetup {
                 votingEscrow: votingEscrow,
                 wnt: wnt
             }),
-            RewardRouter.RewardRouterConfigParams({
+            RewardRouter.RewardRouterConfig({
                 revenueDistributor: revenueDistributor,
                 wntUsdPoolList: wntUsdPoolList,
                 wntUsdTwapInterval: 0,
@@ -127,7 +127,7 @@ contract RewardRouterTest is BasicSetup {
         vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
         rewardRouter.lock(getMaxTime(), 100e6);
 
-        vm.expectRevert(RewardRouter.RewardRouter__UnacceptableTokenPrice.selector);
+        vm.expectRevert(RewardLogic.RewardLogic__UnacceptableTokenPrice.selector);
         rewardRouter.lock(getMaxTime(), 9e5);
 
         generateUserRevenue(users.alice, 100e6);

@@ -4,9 +4,9 @@ pragma solidity 0.8.23;
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {OracleStore, SLOT_COUNT} from "./store/OracleStore.sol";
-import {Math} from "./../utils/Math.sol";
 import {UniV3Prelude} from "./../utils/UniV3Prelude.sol";
 
 /**

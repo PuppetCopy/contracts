@@ -53,6 +53,12 @@ library PositionUtils {
         bytes32 referralCode;
     }
 
+    struct CallbackCallPositionConfig {
+        PositionStore positionStore;
+        address gmxCallbackOperator;
+        address caller;
+    }
+
     struct CallPositionAdjustment {
         address trader;
         address receiver;
@@ -136,8 +142,7 @@ library PositionUtils {
     }
 
     function isDecreaseOrder(OrderType orderType) internal pure returns (bool) {
-        return orderType == OrderType.MarketDecrease || orderType == OrderType.LimitDecrease || orderType == OrderType.StopLossDecrease
-            || orderType == OrderType.Liquidation;
+        return orderType == OrderType.MarketDecrease || orderType == OrderType.Liquidation;
     }
 
     function isLiquidationOrder(OrderType orderType) internal pure returns (bool) {
