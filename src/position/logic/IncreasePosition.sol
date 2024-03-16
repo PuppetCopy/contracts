@@ -44,16 +44,24 @@ library IncreasePosition {
         uint minMatchTokenAmount;
     }
 
+    struct CallParams {
+        address market;
+        uint executionFee;
+        uint sizeDelta;
+        uint collateralDelta;
+        uint acceptablePrice;
+        uint triggerPrice;
+        bool isLong;
+        address[] puppetList;
+    }
+
     struct CallbackConfig {
         PositionStore positionStore;
         address gmxCallbackOperator;
         address caller;
     }
 
-    function requestIncreasePosition(
-        IncreasePosition.CallConfig calldata callConfig,
-        PositionUtils.CallPositionAdjustment calldata callIncreaseParams
-    ) external {
+    function requestIncreasePosition(CallConfig calldata callConfig, CallParams calldata callIncreaseParams) external {
         bytes32 positionKey =
             PositionUtils.getPositionKey(callConfig.trader, callIncreaseParams.market, callConfig.depositCollateralToken, callIncreaseParams.isLong);
 
@@ -62,22 +70,16 @@ library IncreasePosition {
         }
 
         Subaccount subaccount = callConfig.subaccountStore.getSubaccount(callConfig.trader);
-
         PositionStore.MirrorPosition memory matchMp = callConfig.positionStore.getMirrorPosition(positionKey);
 
         if (matchMp.size == 0) {
-            IncreasePosition.requestMatch(callConfig, callIncreaseParams, positionKey, subaccount);
+            requestMatch(callConfig, callIncreaseParams, positionKey, subaccount);
         } else {
-            IncreasePosition.requestAdjust(callConfig, callIncreaseParams, positionKey, subaccount);
+            requestAdjust(callConfig, callIncreaseParams, positionKey, subaccount);
         }
     }
 
-    function requestMatch(
-        CallConfig calldata callConfig,
-        PositionUtils.CallPositionAdjustment calldata callMatchParams,
-        bytes32 positionKey,
-        Subaccount subaccount
-    ) internal {
+    function requestMatch(CallConfig calldata callConfig, CallParams calldata callMatchParams, bytes32 positionKey, Subaccount subaccount) internal {
         uint puppetListLength = callMatchParams.puppetList.length;
 
         if (puppetListLength > callConfig.limitPuppetList) revert IncreasePosition__PuppetListLimitExceeded();
@@ -110,16 +112,16 @@ library IncreasePosition {
                     callMatchParams.collateralDelta // trader own deposit
                 );
 
-            if (amountIn > callConfig.minMatchTokenAmount) {
-                request.puppetCollateralDeltaList[i] = amountIn;
-                request.sizeDelta += int(amountIn * request.targetLeverage / Calc.BASIS_POINT_DIVISOR);
-                request.collateralDelta += amountIn;
-
-                account.deposit -= amountIn;
-                account.latestActivityTimestamp = block.timestamp;
-            } else {
-                request.puppetCollateralDeltaList[i] = 0;
+            if (amountIn < callConfig.minMatchTokenAmount) {
+                continue;
             }
+
+            request.puppetCollateralDeltaList[i] = amountIn;
+            request.sizeDelta += int(amountIn * request.targetLeverage / Calc.BASIS_POINT_DIVISOR);
+            request.collateralDelta += amountIn;
+
+            account.deposit -= amountIn;
+            account.latestActivityTimestamp = block.timestamp;
 
             accountList[i] = account;
         }
@@ -182,12 +184,9 @@ library IncreasePosition {
 
 
     */
-    function requestAdjust(
-        CallConfig calldata callConfig,
-        PositionUtils.CallPositionAdjustment calldata callIncreaseParams,
-        bytes32 positionKey,
-        Subaccount subaccount
-    ) internal {
+    function requestAdjust(CallConfig calldata callConfig, CallParams calldata callIncreaseParams, bytes32 positionKey, Subaccount subaccount)
+        internal
+    {
         PositionStore.MirrorPosition memory matchMp = callConfig.positionStore.getMirrorPosition(positionKey);
         uint puppetListLength = matchMp.puppetList.length;
 
@@ -252,7 +251,7 @@ library IncreasePosition {
 
     function _requestIncreasePosition(
         CallConfig calldata callConfig,
-        PositionUtils.CallPositionAdjustment calldata callPositionAdjustment,
+        CallParams calldata callPositionAdjustment,
         PositionStore.RequestIncrease memory request,
         bytes32 positionKey,
         Subaccount subaccount
@@ -290,12 +289,8 @@ library IncreasePosition {
         );
 
         bytes memory data = abi.encodeWithSelector(callConfig.gmxExchangeRouter.createOrder.selector, params);
-
         (bool success, bytes memory returnData) = subaccount.execute(address(callConfig.gmxExchangeRouter), data);
-
-        if (!success) {
-            ErrorUtils.revertWithParsedMessage(returnData);
-        }
+        if (!success) ErrorUtils.revertWithParsedMessage(returnData);
 
         requestKey = abi.decode(returnData, (bytes32));
 
@@ -308,8 +303,6 @@ library IncreasePosition {
         );
     }
 
-    error IncreasePosition__PositionAlreadyExists();
-    error IncreasePosition__PositionDoesNotExists();
     error IncreasePosition__PuppetListLimitExceeded();
     error IncreasePosition__InvalidRequestKey(bytes32 requestKey, bytes32 expectedRequestKey);
     error IncreasePosition__InvalidSubaccountCaller();

@@ -29,7 +29,7 @@ contract PositionLogic is Auth {
 
     function requestIncreasePosition(
         IncreasePosition.CallConfig calldata callConfig,
-        PositionUtils.CallPositionAdjustment calldata callIncreaseParams
+        IncreasePosition.CallIncreaseParams calldata callIncreaseParams
     ) external requiresAuth {
         IncreasePosition.requestIncreasePosition(callConfig, callIncreaseParams);
     }

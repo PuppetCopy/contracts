@@ -29,17 +29,7 @@ library PositionUtils {
         SwapCollateralTokenToPnlToken
     }
 
-    struct CallPositionAdjustment {
-        address receiver;
-        address market;
-        uint executionFee;
-        uint collateralDelta;
-        uint sizeDelta;
-        uint acceptablePrice;
-        uint triggerPrice;
-        bool isLong;
-        address[] puppetList;
-    }
+
 
     struct Props {
         Addresses addresses;
