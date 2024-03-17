@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 
-pragma solidity 0.8.23;
+pragma solidity 0.8.24;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
@@ -8,7 +8,6 @@ import {StoreController} from "src/utils/StoreController.sol";
 import {Subaccount} from "./../util/Subaccount.sol";
 
 contract SubaccountStore is StoreController {
-    mapping(address => uint) public wntBalance;
     mapping(address => Subaccount) public subaccountMap;
 
     uint public nativeTokenGasLimit = 50_000;
@@ -21,19 +20,15 @@ contract SubaccountStore is StoreController {
         holdingAddress = _holdingAddress;
     }
 
-    function setWntBalance(address _address, uint _value) external isSetter {
-        wntBalance[_address] = _value;
-    }
-
     function getSubaccount(address _address) external view returns (Subaccount) {
         return subaccountMap[_address];
     }
 
-    function setSubaccount(address _address, Subaccount _subaccount) external {
+    function setSubaccount(address _address, Subaccount _subaccount) external isSetter {
         subaccountMap[_address] = _subaccount;
     }
 
-    function removeSubaccount(address _address) external {
+    function removeSubaccount(address _address) external isSetter {
         delete subaccountMap[_address];
     }
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.23;
+pragma solidity 0.8.24;
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -13,127 +13,13 @@ import {Calc} from "src/utils/Calc.sol";
 
 import {ErrorUtils} from "./../../utils/ErrorUtils.sol";
 import {PositionUtils} from "../util/PositionUtils.sol";
-import {PuppetUtils} from "./../util/PuppetUtils.sol";
 import {Subaccount} from "../util/Subaccount.sol";
 
 import {PuppetStore} from "../store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
 import {SubaccountStore} from "./../store/SubaccountStore.sol";
 
-library IncreasePosition {
-    event IncreasePosition__RequestMatchPosition(address trader, address subAccount, bytes32 requestKey, address[] puppetList);
-    event IncreasePosition__RequestIncreasePosition(
-        address trader, address subAccount, bytes32 requestKey, uint[] puppetCollateralDeltaList, uint collateralDelta, uint sizeDelta
-    );
-
-    struct CallConfig {
-        Router router;
-        SubaccountStore subaccountStore;
-        PositionStore positionStore;
-        PuppetStore puppetStore;
-        IGmxExchangeRouter gmxExchangeRouter;
-        IGmxDatastore gmxDatastore;
-        IERC20 depositCollateralToken;
-        address feeReceiver;
-        address trader;
-        bytes32 referralCode;
-        uint limitPuppetList;
-        uint adjustmentFeeFactor;
-        uint minMatchExpiryDuration;
-        uint callbackGasLimit;
-        uint minMatchTokenAmount;
-    }
-
-    struct CallParams {
-        address market;
-        uint executionFee;
-        uint sizeDelta;
-        uint collateralDelta;
-        uint acceptablePrice;
-        uint triggerPrice;
-        bool isLong;
-        address[] puppetList;
-    }
-
-    struct CallbackConfig {
-        PositionStore positionStore;
-        address gmxCallbackOperator;
-        address caller;
-    }
-
-    function requestIncreasePosition(CallConfig calldata callConfig, CallParams calldata callIncreaseParams) external {
-        bytes32 positionKey =
-            PositionUtils.getPositionKey(callConfig.trader, callIncreaseParams.market, callConfig.depositCollateralToken, callIncreaseParams.isLong);
-
-        if (callConfig.positionStore.getPendingRequestIncreaseAdjustmentMap(positionKey).requestKey != 0) {
-            revert IncreasePosition__PendingRequestExists();
-        }
-
-        Subaccount subaccount = callConfig.subaccountStore.getSubaccount(callConfig.trader);
-        PositionStore.MirrorPosition memory matchMp = callConfig.positionStore.getMirrorPosition(positionKey);
-
-        if (matchMp.size == 0) {
-            requestMatch(callConfig, callIncreaseParams, positionKey, subaccount);
-        } else {
-            requestAdjust(callConfig, callIncreaseParams, positionKey, subaccount);
-        }
-    }
-
-    function requestMatch(CallConfig calldata callConfig, CallParams calldata callMatchParams, bytes32 positionKey, Subaccount subaccount) internal {
-        uint puppetListLength = callMatchParams.puppetList.length;
-
-        if (puppetListLength > callConfig.limitPuppetList) revert IncreasePosition__PuppetListLimitExceeded();
-
-        PositionStore.RequestIncrease memory request = PositionStore.RequestIncrease({
-            requestKey: PositionUtils.getNextRequestKey(callConfig.gmxDatastore),
-            sizeDelta: int(callMatchParams.sizeDelta),
-            collateralDelta: callMatchParams.collateralDelta,
-            targetLeverage: callMatchParams.sizeDelta * Calc.BASIS_POINT_DIVISOR / callMatchParams.collateralDelta,
-            puppetCollateralDeltaList: new uint[](puppetListLength)
-        });
-
-        bytes32[] memory ruleKeyList = new bytes32[](callMatchParams.puppetList.length);
-
-        for (uint i = 0; i < callMatchParams.puppetList.length; i++) {
-            ruleKeyList[i] = PuppetUtils.getRuleKey(callMatchParams.puppetList[i], callConfig.trader);
-        }
-        PuppetStore.Account[] memory accountList = callConfig.puppetStore.getAccountList(callMatchParams.puppetList);
-        PuppetStore.Rule[] memory ruleList = callConfig.puppetStore.getRuleList(ruleKeyList);
-
-        for (uint i = 0; i < puppetListLength; i++) {
-            PuppetStore.Account memory account = accountList[i];
-            PuppetStore.Rule memory rule = ruleList[i];
-
-            uint amountIn = rule.expiry < block.timestamp + callConfig.minMatchExpiryDuration // rule expired or about to expire
-                || account.latestActivityTimestamp + rule.throttleActivity < block.timestamp // throttle in case of frequent matching
-                ? 0
-                : Math.min( // the lowest of either the allowance or the trader's deposit
-                    account.deposit * rule.allowanceRate / Calc.BASIS_POINT_DIVISOR, // amount allowed by the rule
-                    callMatchParams.collateralDelta // trader own deposit
-                );
-
-            if (amountIn < callConfig.minMatchTokenAmount) {
-                continue;
-            }
-
-            request.puppetCollateralDeltaList[i] = amountIn;
-            request.sizeDelta += int(amountIn * request.targetLeverage / Calc.BASIS_POINT_DIVISOR);
-            request.collateralDelta += amountIn;
-
-            account.deposit -= amountIn;
-            account.latestActivityTimestamp = block.timestamp;
-
-            accountList[i] = account;
-        }
-
-        callConfig.puppetStore.setAccountList(callMatchParams.puppetList, accountList);
-
-        emit IncreasePosition__RequestMatchPosition(callConfig.trader, address(subaccount), request.requestKey, callMatchParams.puppetList);
-
-        _requestIncreasePosition(callConfig, callMatchParams, request, positionKey, subaccount);
-    }
-
-    /*
+/*
 
     increase adjustment case study
     increase require more complex accounting compared to decrease, matching the same leverage which may require additional funds
@@ -182,91 +68,195 @@ library IncreasePosition {
     Puppet B (Reduce)     -450*   / 0          550   / 100
     MP 5.5x               -450*   / +110       1760  / 320
 
-
     */
-    function requestAdjust(CallConfig calldata callConfig, CallParams calldata callIncreaseParams, bytes32 positionKey, Subaccount subaccount)
-        internal
-    {
-        PositionStore.MirrorPosition memory matchMp = callConfig.positionStore.getMirrorPosition(positionKey);
-        uint puppetListLength = matchMp.puppetList.length;
+library IncreasePosition {
+    event IncreasePosition__RequestMatchPosition(address trader, address subAccount, bytes32 requestKey, address[] puppetList);
+    event IncreasePosition__RequestIncreasePosition(
+        address trader, address subAccount, bytes32 requestKey, uint[] puppetCollateralDeltaList, uint collateralDelta, uint sizeDelta
+    );
 
-        PositionStore.RequestIncrease memory request = PositionStore.RequestIncrease({
-            requestKey: PositionUtils.getNextRequestKey(callConfig.gmxDatastore),
-            sizeDelta: int(callIncreaseParams.sizeDelta),
-            collateralDelta: callIncreaseParams.collateralDelta,
-            targetLeverage: (matchMp.size + callIncreaseParams.sizeDelta) * Calc.BASIS_POINT_DIVISOR
-                / (matchMp.collateral + callIncreaseParams.collateralDelta),
-            puppetCollateralDeltaList: new uint[](puppetListLength)
-        });
-
-        bytes32[] memory ruleKeyList = new bytes32[](puppetListLength);
-
-        for (uint i = 0; i < puppetListLength; i++) {
-            ruleKeyList[i] = PuppetUtils.getRuleKey(matchMp.puppetList[i], callConfig.trader);
-        }
-        PuppetStore.Account[] memory accountList = callConfig.puppetStore.getAccountList(matchMp.puppetList);
-        PuppetStore.Rule[] memory ruleList = callConfig.puppetStore.getRuleList(ruleKeyList);
-
-        for (uint i = 0; i < puppetListLength; i++) {
-            PuppetStore.Account memory account = accountList[i];
-            PuppetStore.Rule memory rule = ruleList[i];
-
-            uint amountIn = account.latestActivityTimestamp + rule.throttleActivity < block.timestamp // filter out frequent deposit activity
-                || rule.expiry < block.timestamp // expired rule
-                ? 0
-                : callIncreaseParams.sizeDelta / matchMp.puppetDepositList[i];
-
-            if (amountIn > 0) {
-                request.puppetCollateralDeltaList[i] += amountIn;
-                request.collateralDelta += amountIn;
-
-                account.deposit -= Math.min(amountIn, account.deposit);
-                account.latestActivityTimestamp = block.timestamp;
-            } else {}
-
-            request.sizeDelta +=
-                int(amountIn * request.targetLeverage) * (int(matchMp.leverage) - int(request.targetLeverage)) / int(matchMp.leverage);
-
-            accountList[i] = account;
-        }
-
-        callConfig.puppetStore.setAccountList(matchMp.puppetList, accountList);
-
-        _requestIncreasePosition(callConfig, callIncreaseParams, request, positionKey, subaccount);
-
-        // if (requestKey != request.requestKey) {
-        //     revert IncreasePosition__InvalidRequestKey(requestKey, request.requestKey);
-        // }
+    struct CallConfig {
+        Router router;
+        SubaccountStore subaccountStore;
+        PositionStore positionStore;
+        PuppetStore puppetStore;
+        IGmxExchangeRouter gmxExchangeRouter;
+        IGmxDatastore gmxDatastore;
+        IERC20 depositCollateralToken;
+        address gmxCallbackOperator;
+        address feeReceiver;
+        address trader;
+        bytes32 referralCode;
+        uint limitPuppetList;
+        uint adjustmentFeeFactor;
+        uint callbackGasLimit;
+        uint minMatchTokenAmount;
     }
 
-    function executeIncreasePosition(
-        CallbackConfig calldata callConfig,
-        PositionStore.CallbackResponse calldata callbackResponse,
-        PositionStore.RequestIncrease calldata request
-    ) external {
-        // if (callConfig.positionStore.getPendingRequestIncreaseAdjustmentMap(positionKey).requestKey != 0) {
-        //     revert IncreasePosition__PendingRequestExists();
-        // }
+    struct CallParams {
+        address market;
+        uint executionFee;
+        uint sizeDelta;
+        uint collateralDelta;
+        uint acceptablePrice;
+        uint triggerPrice;
+        bool isLong;
+        address[] puppetList;
+    }
+
+    struct CallbackConfig {
+        PositionStore positionStore;
+        PuppetStore puppetStore;
+        address gmxCallbackOperator;
+        address caller;
+    }
+
+    function requestIncreasePosition(CallConfig calldata callConfig, CallParams calldata callParams) external {
+        bytes32 positionKey = PositionUtils.getPositionKey(callConfig.trader, callParams.market, callConfig.depositCollateralToken, callParams.isLong);
+
+        if (callConfig.positionStore.getPendingRequestIncreaseAdjustmentMap(positionKey).requestKey != 0) {
+            revert IncreasePosition__PendingRequestExists();
+        }
+
+        Subaccount subaccount = callConfig.subaccountStore.getSubaccount(callConfig.trader);
+        PositionStore.MirrorPosition memory matchMp = callConfig.positionStore.getMirrorPosition(positionKey);
+        PositionStore.RequestIncrease memory request = PositionStore.RequestIncrease({
+            requestKey: PositionUtils.getNextRequestKey(callConfig.gmxDatastore),
+            sizeDelta: int(callParams.sizeDelta),
+            collateralDelta: callParams.collateralDelta,
+            targetLeverage: 0,
+            puppetCollateralDeltaList: new uint[](callParams.puppetList.length),
+            positionKey: positionKey,
+            subaccount: subaccount,
+            subaccountAddress: address(subaccount)
+        });
+
+        if (matchMp.size == 0) {
+            requestMatch(callConfig, callParams, request);
+        } else {
+            requestAdjust(callConfig, callParams, request);
+        }
+    }
+
+    function requestMatch(CallConfig calldata callConfig, CallParams calldata callParams, PositionStore.RequestIncrease memory request) internal {
+        uint puppetListLength = callParams.puppetList.length;
+        if (puppetListLength > callConfig.limitPuppetList) revert IncreasePosition__PuppetListLimitExceeded();
+
+        (PuppetStore.Rule[] memory ruleList, PuppetStore.Activity[] memory activityList) =
+            callConfig.puppetStore.getTraderRuleAndActivityList(callConfig.trader, callParams.puppetList);
+
+        request.targetLeverage = callParams.sizeDelta * Calc.BASIS_POINT_DIVISOR / callParams.collateralDelta;
+
+        for (uint i = 0; i < puppetListLength; i++) {
+            PuppetStore.Rule memory rule = ruleList[i];
+            PuppetStore.Activity memory activity = activityList[i];
+
+            uint amountIn = rule.expiry < block.timestamp // rule expired or about to expire
+                || activity.latestFunding + rule.throttleActivity < block.timestamp // throttle in case of frequent matching
+                || activity.pnl < -int(rule.stopLoss) // stop loss. accounted every reduce adjustment
+                ? 0
+                : transferTokenFrom(
+                    callConfig.depositCollateralToken,
+                    callParams.puppetList[i],
+                    request.subaccountAddress,
+                    Math.min( // the lowest of either the allowance or the trader's deposit
+                        rule.stopLoss * rule.allowanceRate / Calc.BASIS_POINT_DIVISOR, // amount allowed by the rule
+                        callParams.collateralDelta // trader own deposit
+                    )
+                );
+
+            if (amountIn < callConfig.minMatchTokenAmount) {
+                continue;
+            }
+
+            request.puppetCollateralDeltaList[i] = amountIn;
+            request.sizeDelta += int(amountIn * request.targetLeverage / Calc.BASIS_POINT_DIVISOR);
+            request.collateralDelta += amountIn;
+
+            activity.latestFunding = block.timestamp;
+            activityList[i] = activity;
+        }
+
+        emit IncreasePosition__RequestMatchPosition(callConfig.trader, request.subaccountAddress, request.requestKey, callParams.puppetList);
+
+        _requestIncreasePosition(callConfig, callParams, request);
+
+        callConfig.positionStore.setPendingRequestIncreaseAdjustmentMap(request.positionKey, request);
+    }
+
+    function requestAdjust(CallConfig calldata callConfig, CallParams calldata callParams, PositionStore.RequestIncrease memory request) internal {
+        PositionStore.MirrorPosition memory matchMp = callConfig.positionStore.getMirrorPosition(request.positionKey);
+        uint puppetListLength = matchMp.puppetList.length;
+
+        request.targetLeverage = (matchMp.size + callParams.sizeDelta) * Calc.BASIS_POINT_DIVISOR / (matchMp.collateral + callParams.collateralDelta);
+
+        (PuppetStore.Rule[] memory ruleList, PuppetStore.Activity[] memory activityList) =
+            callConfig.puppetStore.getTraderRuleAndActivityList(callConfig.trader, matchMp.puppetList);
+
+        for (uint i = 0; i < puppetListLength; i++) {
+            PuppetStore.Rule memory rule = ruleList[i];
+            PuppetStore.Activity memory activity = activityList[i];
+
+            address puppet = matchMp.puppetList[i];
+
+            // puppet's rule and activtiy applied per trader
+            uint amountInTarget = rule.expiry < block.timestamp // filter out frequent deposit activity. defined during rule setup
+                || activity.latestFunding + rule.throttleActivity < block.timestamp // expired rule. acounted every increase deposit
+                || activity.pnl < -int(rule.stopLoss) // stop loss. accounted every reduce adjustment
+                || matchMp.puppetDepositList[i] == 0 // no activity
+                ? 0
+                : transferTokenFrom(
+                    callConfig.depositCollateralToken, puppet, request.subaccountAddress, callParams.sizeDelta / matchMp.puppetDepositList[i]
+                );
+
+            if (amountInTarget > 0) {
+                request.puppetCollateralDeltaList[i] += amountInTarget;
+                request.collateralDelta += amountInTarget;
+
+                activity.latestFunding = block.timestamp;
+                activityList[i] = activity;
+                request.sizeDelta += int(matchMp.puppetDepositList[i] * callParams.sizeDelta / matchMp.size);
+            } else {
+                if (matchMp.leverage > request.targetLeverage) {
+                    request.sizeDelta += int(amountInTarget * request.targetLeverage * (matchMp.leverage - request.targetLeverage) / matchMp.leverage);
+                } else {
+                    request.sizeDelta -= int(amountInTarget * request.targetLeverage * (matchMp.leverage - request.targetLeverage) / matchMp.leverage);
+                }
+            }
+        }
+
+        callConfig.puppetStore.setTraderActivityList(callConfig.trader, matchMp.puppetList, activityList);
+
+        _requestIncreasePosition(callConfig, callParams, request);
+
+        // size delta is negative and deposit positive, additional transaction is required to match the leverage
+        if (request.sizeDelta < 0) {
+            callConfig.positionStore.setPendingRequestIncreaseAdjustmentMap(request.positionKey, request);
+        }
+    }
+
+    function executeIncreasePosition(CallbackConfig calldata callConfig, bytes32 key, PositionUtils.Props calldata order, bytes calldata eventData)
+        external
+    {
+        callConfig.positionStore.removePendingRequestIncreaseAdjustmentMap(key);
     }
 
     function _requestIncreasePosition(
         CallConfig calldata callConfig,
         CallParams calldata callPositionAdjustment,
-        PositionStore.RequestIncrease memory request,
-        bytes32 positionKey,
-        Subaccount subaccount
+        PositionStore.RequestIncrease memory request
     ) internal returns (bytes32 requestKey) {
-        address subaccountAddress = subaccount.getAccount();
+        address subaccountAddress = request.subaccount.account();
 
-        if (subaccountAddress != callConfig.trader) revert IncreasePosition__InvalidSubaccountCaller();
+        if (subaccountAddress != callConfig.trader) revert IncreasePosition__InvalidSubaccountTrader();
 
-        subaccount.depositToken(callConfig.router, callConfig.depositCollateralToken, callPositionAdjustment.collateralDelta);
-        SafeERC20.safeTransferFrom(callConfig.depositCollateralToken, address(callConfig.puppetStore), address(subaccount), request.collateralDelta);
+        request.subaccount.depositToken(callConfig.router, callConfig.depositCollateralToken, callPositionAdjustment.collateralDelta);
+        SafeERC20.safeTransferFrom(callConfig.depositCollateralToken, address(callConfig.puppetStore), subaccountAddress, request.collateralDelta);
 
         PositionUtils.CreateOrderParams memory params = PositionUtils.CreateOrderParams(
             PositionUtils.CreateOrderParamsAddresses(
-                address(subaccount),
-                address(this), // callbackContract
+                address(callConfig.subaccountStore),
+                callConfig.gmxCallbackOperator,
                 callConfig.feeReceiver,
                 callPositionAdjustment.market,
                 address(callConfig.depositCollateralToken),
@@ -289,22 +279,28 @@ library IncreasePosition {
         );
 
         bytes memory data = abi.encodeWithSelector(callConfig.gmxExchangeRouter.createOrder.selector, params);
-        (bool success, bytes memory returnData) = subaccount.execute(address(callConfig.gmxExchangeRouter), data);
+        (bool success, bytes memory returnData) = request.subaccount.execute(address(callConfig.gmxExchangeRouter), data);
         if (!success) ErrorUtils.revertWithParsedMessage(returnData);
 
         requestKey = abi.decode(returnData, (bytes32));
-
-        callConfig.positionStore.setPendingRequestIncreaseAdjustmentMap(positionKey, request);
-
-        // Decrease position if sizeDelta < 0
 
         emit IncreasePosition__RequestIncreasePosition(
             callConfig.trader, subaccountAddress, requestKey, request.puppetCollateralDeltaList, request.collateralDelta, uint(request.sizeDelta)
         );
     }
 
+    function transferTokenFrom(IERC20 token, address from, address to, uint amount) internal returns (uint) {
+        (bool success, bytes memory returndata) = address(token).call(abi.encodeCall(token.transferFrom, (from, to, amount)));
+
+        if (success && returndata.length == 0 && abi.decode(returndata, (bool))) {
+            return amount;
+        }
+
+        return 0;
+    }
+
     error IncreasePosition__PuppetListLimitExceeded();
     error IncreasePosition__InvalidRequestKey(bytes32 requestKey, bytes32 expectedRequestKey);
-    error IncreasePosition__InvalidSubaccountCaller();
+    error IncreasePosition__InvalidSubaccountTrader();
     error IncreasePosition__PendingRequestExists();
 }

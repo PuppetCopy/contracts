@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.23;
+pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
@@ -50,14 +50,6 @@ contract PuppetRouter is Router, Multicall, ReentrancyGuard {
 
     function removeRule(address trader) external nonReentrant {
         config.puppetLogic.removeRule(params.puppetStore, msg.sender, trader);
-    }
-
-    function deposit(IERC20 token, address to, uint amount) external nonReentrant {
-        config.puppetLogic.deposit(params.router, params.puppetStore, token, msg.sender, to, amount);
-    }
-
-    function withdraw(IERC20 token, address to, uint amount) external nonReentrant {
-        config.puppetLogic.withdraw(params.router, params.puppetStore, token, msg.sender, to, amount);
     }
 
     // governance

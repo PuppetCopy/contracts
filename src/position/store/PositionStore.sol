@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.23;
+pragma solidity 0.8.24;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
 import {StoreController} from "../../utils/StoreController.sol";
 import {PositionUtils} from "./../util/PositionUtils.sol";
+import {Subaccount} from "./../util/Subaccount.sol";
 
 contract PositionStore is StoreController {
     struct RequestIncrease {
@@ -13,6 +14,9 @@ contract PositionStore is StoreController {
         uint collateralDelta;
         uint targetLeverage;
         uint[] puppetCollateralDeltaList;
+        bytes32 positionKey;
+        Subaccount subaccount;
+        address subaccountAddress;
     }
 
     struct MirrorPosition {
@@ -24,15 +28,14 @@ contract PositionStore is StoreController {
         address[] puppetList;
     }
 
-    struct CallbackResponse {
-        bytes32 key;
+    struct UnhandledCallbackMap {
         PositionUtils.Props order;
         bytes eventData;
     }
 
     mapping(bytes32 positionKey => RequestIncrease) public pendingRequestIncreaseAdjustmentMap;
     mapping(bytes32 positionKey => MirrorPosition) public positionMap;
-    mapping(bytes32 positionKey => CallbackResponse) public callbackResponseMap;
+    mapping(bytes32 positionKey => UnhandledCallbackMap) public unhandledCallbackMap;
 
     constructor(Authority _authority, address _initSetter) StoreController(_authority, _initSetter) {}
 
@@ -60,11 +63,13 @@ contract PositionStore is StoreController {
         delete positionMap[_key];
     }
 
-    function setCallbackResponse(bytes32 _key, CallbackResponse calldata _callbackResponse) external isSetter {
-        callbackResponseMap[_key] = _callbackResponse;
+    function setUnhandledCallbackMap(bytes32 _key, PositionUtils.Props calldata _order, bytes calldata _eventData) external isSetter {
+        PositionStore.UnhandledCallbackMap memory callbackResponse = PositionStore.UnhandledCallbackMap({order: _order, eventData: _eventData});
+
+        unhandledCallbackMap[_key] = callbackResponse;
     }
 
-    function getCallbackResponse(bytes32 _key) external view returns (CallbackResponse memory) {
-        return callbackResponseMap[_key];
+    function getUnhandledCallbackMap(bytes32 _key) external view returns (UnhandledCallbackMap memory) {
+        return unhandledCallbackMap[_key];
     }
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity 0.8.24;
 
 import {Dictator} from "src/utils/Dictator.sol";
 import {PRBTest} from "@prb/test/src/PRBTest.sol";

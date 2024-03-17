@@ -1,21 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.23;
+pragma solidity 0.8.24;
 
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {WNT} from "./../../utils/WNT.sol";
-import {TransferUtils} from "./../../utils/TransferUtils.sol";
-import {SubaccountStore} from "./../store/SubaccountStore.sol";
 import {Router} from "./../../utils/Router.sol";
+import {SubaccountStore} from "./../store/SubaccountStore.sol";
 
-contract Subaccount is ReentrancyGuard {
-    WNT wnt;
+contract Subaccount {
     SubaccountStore store;
-    address account;
 
-    constructor(WNT _wnt, SubaccountStore _store, address _account) {
-        wnt = _wnt;
+    address public account;
+    uint public balance;
+
+    constructor(SubaccountStore _store, address _account) {
         store = _store;
         account = _account;
     }
@@ -25,33 +22,43 @@ contract Subaccount is ReentrancyGuard {
         _;
     }
 
-    function getAccount() external view returns (address) {
-        return account;
+    function deposit() public payable onlyLogicOperator {
+        balance += msg.value;
     }
 
-    receive() external payable {
-        if (msg.sender != address(wnt)) {
-            revert Subaccount__InvalidNativeTokenSender(msg.sender);
+    function withdraw(uint _amount) external onlyLogicOperator {
+        if (_amount > balance) revert Subaccount__TransferFailed(msg.sender, _amount);
+
+        balance -= _amount;
+
+        (bool _success,) = msg.sender.call{value: _amount}("");
+        if (!_success) {
+            revert Subaccount__TransferFailed(msg.sender, _amount);
         }
     }
 
-    function execute(address _to, bytes calldata _data) external payable onlyLogicOperator returns (bool success, bytes memory returnData) {
-        return _to.call{value: msg.value}(_data);
+    function execute(address _from, bytes calldata _data) external payable onlyLogicOperator returns (bool _success, bytes memory _returnData) {
+        uint _startLimit = gasleft();
+
+        if (_startLimit > balance) revert Subaccount__NotEnoughGas(account, _startLimit);
+        if (_from != account) revert Subaccount__NotAccountOwner();
+
+        (_success, _returnData) = account.call{gas: _startLimit}(_data);
+
+        uint _gasCost = (_startLimit - gasleft()) * tx.gasprice;
+
+        balance -= _gasCost;
+
+        return (_success, _returnData);
     }
 
-    function depositWnt(uint amount) external payable nonReentrant {
-        TransferUtils.depositAndSendWrappedNativeToken(wnt, store.holdingAddress(), store.tokenGasLimit(), address(store), amount);
-
-        uint balance = store.wntBalance(msg.sender);
-
-        store.setWntBalance(msg.sender, balance + amount);
+    function depositToken(Router _router, IERC20 _token, uint _amount) external {
+        _router.pluginTransfer(_token, account, address(this), _amount);
+        _token.approve(address(_router), _amount);
     }
 
-    function depositToken(Router router, IERC20 token, uint amount) external {
-        router.pluginTransfer(token, account, address(this), amount);
-        token.approve(address(router), amount);
-    }
-
-    error Subaccount__InvalidNativeTokenSender(address sender);
+    error Subaccount__NotAccountOwner();
     error Subaccount__NotCallbackCaller();
+    error Subaccount__TransferFailed(address to, uint amount);
+    error Subaccount__NotEnoughGas(address account, uint gasCost);
 }

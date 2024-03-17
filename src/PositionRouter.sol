@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.23;
+pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -61,9 +61,10 @@ contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
     {
         _setConfig(_config);
         params = _params;
+        config.gmxCallbackOperator = address(this);
     }
 
-    function requestIncreasePosition(PositionUtils.CallPositionAdjustment calldata callIncreaseParams) external nonReentrant {
+    function requestIncreasePosition(IncreasePosition.CallParams calldata callParams) external nonReentrant {
         IncreasePosition.CallConfig memory callConfig = IncreasePosition.CallConfig({
             router: params.router,
             subaccountStore: config.subaccountStore,
@@ -72,17 +73,17 @@ contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
             gmxExchangeRouter: config.gmxExchangeRouter,
             gmxDatastore: config.gmxDatastore,
             depositCollateralToken: config.depositCollateralToken,
+            gmxCallbackOperator: config.gmxCallbackOperator,
             feeReceiver: config.feeReceiver,
             trader: msg.sender,
             referralCode: config.referralCode,
             limitPuppetList: config.limitPuppetList,
             adjustmentFeeFactor: config.adjustmentFeeFactor,
-            minMatchExpiryDuration: config.minMatchExpiryDuration,
             callbackGasLimit: config.callbackGasLimit,
             minMatchTokenAmount: config.minMatchTokenAmount
         });
 
-        config.positionLogic.requestIncreasePosition(callConfig, callIncreaseParams);
+        config.positionLogic.requestIncreasePosition(callConfig, callParams);
     }
 
     function afterOrderExecution(bytes32 key, PositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant {
@@ -104,13 +105,23 @@ contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
     // internal
 
     function _handlOperatorCallback(bytes32 key, PositionUtils.Props calldata order, bytes calldata eventData) internal {
-        IncreasePosition.CallbackConfig memory callConfig = IncreasePosition.CallbackConfig({
-            positionStore: config.positionStore,
-            gmxCallbackOperator: config.gmxCallbackOperator,
-            caller: msg.sender
-        });
+        if (config.gmxCallbackOperator != msg.sender) revert PositionLogic__UnauthorizedCaller();
 
-        config.positionLogic.handlOperatorCallback(callConfig, key, order, eventData);
+        try config.positionLogic.handlOperatorCallback(
+            IncreasePosition.CallbackConfig({
+                positionStore: config.positionStore,
+                puppetStore: config.puppetStore,
+                gmxCallbackOperator: config.gmxCallbackOperator,
+                caller: msg.sender
+            }),
+            key,
+            order,
+            eventData
+        ) {} catch {
+            // store callback data, the rest of the logic will attempt to execute the callback data
+            // in case of failure we can recovery the callback data and attempt to execute it again
+            config.positionStore.setUnhandledCallbackMap(key, order, eventData);
+        }
     }
 
     function _setConfig(PositionRouterConfig memory _config) internal {
@@ -124,4 +135,6 @@ contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
     // function setRewardLogic(RewardLogic rewardLogic) external requiresAuth {
     //     config.rewardLogic = rewardLogic;
     // }
+
+    error PositionLogic__UnauthorizedCaller();
 }

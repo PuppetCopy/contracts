@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity 0.8.24;
 
 library DeployerEnv {
     address constant governance = 0x189b21eda0cff16461913D616a0A4F711Cd986cB;

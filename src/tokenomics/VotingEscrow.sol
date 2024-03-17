@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity 0.8.24;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
