@@ -14,7 +14,7 @@ contract SubaccountLogic is Auth {
 
     constructor(Authority _authority) Auth(address(0), _authority) {}
 
-    function createSubaccount(SubaccountStore store, address account) external {
+    function createSubaccount(SubaccountStore store, address account) external requiresAuth {
         if (address(store.getSubaccount(account)) == account) revert SubaccountLogic__AlreadyExists();
 
         Subaccount subaccount = new Subaccount(store, account);
@@ -23,24 +23,27 @@ contract SubaccountLogic is Auth {
         emit PositionLogic__CreateSubaccount(account, address(subaccount));
     }
 
-    function execute(SubaccountStore store, address from, bytes calldata data) external {
-        Subaccount subaccount = store.getSubaccount(from);
-        subaccount.execute(from, data);
-    }
+    // function execute(SubaccountStore store, address from, address ctr, bytes calldata data) external {
+    //     Subaccount subaccount = store.getSubaccount(from);
+    //     if (subaccount.account() != from) revert SubaccountLogic__NotAccountOwner();
 
-    function deposit(SubaccountStore store, address from) external payable {
-        Subaccount subaccount = store.getSubaccount(from);
-        subaccount.deposit{value: msg.value}();
+    //     subaccount.execute(ctr, data);
+    // }
 
-        emit SubaccountLogic__Deposit(from, msg.value);
-    }
+    // function deposit(SubaccountStore store, address from) external payable {
+    //     Subaccount subaccount = store.getSubaccount(from);
+    //     subaccount.deposit{value: msg.value}();
 
-    function withdraw(SubaccountStore store, address from, uint amount) external {
-        Subaccount subaccount = store.getSubaccount(from);
-        subaccount.withdraw(amount);
+    //     emit SubaccountLogic__Deposit(from, msg.value);
+    // }
 
-        emit SubaccountLogic__Withdraw(from, amount);
-    }
+    // function withdraw(SubaccountStore store, address from, uint amount) external {
+    //     Subaccount subaccount = store.getSubaccount(from);
+    //     subaccount.withdraw(amount);
+
+    //     emit SubaccountLogic__Withdraw(from, amount);
+    // }
 
     error SubaccountLogic__AlreadyExists();
+    error SubaccountLogic__NotAccountOwner();
 }

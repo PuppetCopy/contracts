@@ -7,6 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IGmxExchangeRouter} from "../interface/IGmxExchangeRouter.sol";
 import {IGmxDatastore} from "../interface/IGmxDatastore.sol";
+import {IGmxEventUtils} from "./../interface/IGmxEventUtils.sol";
 
 import {Router} from "src/utils/Router.sol";
 import {Calc} from "src/utils/Calc.sol";
@@ -72,7 +73,7 @@ import {SubaccountStore} from "./../store/SubaccountStore.sol";
 library IncreasePosition {
     event IncreasePosition__RequestMatchPosition(address trader, address subAccount, bytes32 requestKey, address[] puppetList);
     event IncreasePosition__RequestIncreasePosition(
-        address trader, address subAccount, bytes32 requestKey, uint[] puppetCollateralDeltaList, uint collateralDelta, uint sizeDelta
+        address trader, address subAccount, bytes32 requestKey, uint[] puppetCollateralDeltaList, uint sizeDelta, uint collateralDelta
     );
 
     struct CallConfig {
@@ -82,6 +83,7 @@ library IncreasePosition {
         PuppetStore puppetStore;
         IGmxExchangeRouter gmxExchangeRouter;
         IGmxDatastore gmxDatastore;
+        address gmxRouter;
         IERC20 depositCollateralToken;
         address gmxCallbackOperator;
         address feeReceiver;
@@ -104,21 +106,17 @@ library IncreasePosition {
         address[] puppetList;
     }
 
-    struct CallbackConfig {
-        PositionStore positionStore;
-        PuppetStore puppetStore;
-        address gmxCallbackOperator;
-        address caller;
-    }
-
     function requestIncreasePosition(CallConfig calldata callConfig, CallParams calldata callParams) external {
-        bytes32 positionKey = PositionUtils.getPositionKey(callConfig.trader, callParams.market, callConfig.depositCollateralToken, callParams.isLong);
+        Subaccount subaccount = callConfig.subaccountStore.getSubaccount(callConfig.trader);
+        address subaccountAddress = address(subaccount);
+
+        bytes32 positionKey =
+            PositionUtils.getPositionKey(subaccountAddress, callParams.market, address(callConfig.depositCollateralToken), callParams.isLong);
 
         if (callConfig.positionStore.getPendingRequestIncreaseAdjustmentMap(positionKey).requestKey != 0) {
             revert IncreasePosition__PendingRequestExists();
         }
 
-        Subaccount subaccount = callConfig.subaccountStore.getSubaccount(callConfig.trader);
         PositionStore.MirrorPosition memory matchMp = callConfig.positionStore.getMirrorPosition(positionKey);
         PositionStore.RequestIncrease memory request = PositionStore.RequestIncrease({
             requestKey: PositionUtils.getNextRequestKey(callConfig.gmxDatastore),
@@ -128,7 +126,7 @@ library IncreasePosition {
             puppetCollateralDeltaList: new uint[](callParams.puppetList.length),
             positionKey: positionKey,
             subaccount: subaccount,
-            subaccountAddress: address(subaccount)
+            subaccountAddress: subaccountAddress
         });
 
         if (matchMp.size == 0) {
@@ -217,10 +215,11 @@ library IncreasePosition {
                 activityList[i] = activity;
                 request.sizeDelta += int(matchMp.puppetDepositList[i] * callParams.sizeDelta / matchMp.size);
             } else {
-                if (matchMp.leverage > request.targetLeverage) {
-                    request.sizeDelta += int(amountInTarget * request.targetLeverage * (matchMp.leverage - request.targetLeverage) / matchMp.leverage);
+                uint leverage = matchMp.collateral * Calc.BASIS_POINT_DIVISOR / matchMp.size;
+                if (leverage > request.targetLeverage) {
+                    request.sizeDelta += int(amountInTarget * request.targetLeverage * (leverage - request.targetLeverage) / leverage);
                 } else {
-                    request.sizeDelta -= int(amountInTarget * request.targetLeverage * (matchMp.leverage - request.targetLeverage) / matchMp.leverage);
+                    request.sizeDelta -= int(amountInTarget * request.targetLeverage * (leverage - request.targetLeverage) / leverage);
                 }
             }
         }
@@ -235,57 +234,79 @@ library IncreasePosition {
         }
     }
 
-    function executeIncreasePosition(CallbackConfig calldata callConfig, bytes32 key, PositionUtils.Props calldata order, bytes calldata eventData)
-        external
-    {
-        callConfig.positionStore.removePendingRequestIncreaseAdjustmentMap(key);
+    function executeIncreasePosition(
+        PositionUtils.CallbackConfig calldata callConfig,
+        bytes32 key,
+        PositionUtils.Props calldata order,
+        bytes calldata eventData
+    ) external {
+        bytes32 positionKey =
+            PositionUtils.getPositionKey(order.addresses.account, order.addresses.market, order.addresses.initialCollateralToken, order.flags.isLong);
+
+        (IGmxEventUtils.EventLogData memory eventLogData) = abi.decode(eventData, (IGmxEventUtils.EventLogData));
+
+        // Check if there is at least one uint item available
+        if (eventLogData.uintItems.items.length == 0 && eventLogData.uintItems.arrayItems.length == 0) {
+            revert IncreasePosition__UnexpectedEventData();
+        }
+
+        PositionStore.MirrorPosition memory matchMp = callConfig.positionStore.getMirrorPosition(positionKey);
+
+        matchMp.size += order.numbers.sizeDeltaUsd;
+        matchMp.collateral += order.numbers.initialCollateralDeltaAmount;
+
+        callConfig.positionStore.setMirrorPosition(key, matchMp);
+        callConfig.positionStore.removePendingRequestIncreaseAdjustmentMap(positionKey);
+
+        // address outputToken = eventLogData.addressItems.items[0].value;
+        // uint outputAmount = eventLogData.uintItems.items[0].value;
     }
 
-    function _requestIncreasePosition(
-        CallConfig calldata callConfig,
-        CallParams calldata callPositionAdjustment,
-        PositionStore.RequestIncrease memory request
-    ) internal returns (bytes32 requestKey) {
+    function _requestIncreasePosition(CallConfig calldata callConfig, CallParams calldata callParams, PositionStore.RequestIncrease memory request)
+        internal
+        returns (bytes32 requestKey)
+    {
         address subaccountAddress = request.subaccount.account();
 
         if (subaccountAddress != callConfig.trader) revert IncreasePosition__InvalidSubaccountTrader();
 
-        request.subaccount.depositToken(callConfig.router, callConfig.depositCollateralToken, callPositionAdjustment.collateralDelta);
-        SafeERC20.safeTransferFrom(callConfig.depositCollateralToken, address(callConfig.puppetStore), subaccountAddress, request.collateralDelta);
+        PositionUtils.CreateOrderParams memory params = PositionUtils.CreateOrderParams({
+            addresses: PositionUtils.CreateOrderParamsAddresses({
+                receiver: address(callConfig.positionStore),
+                callbackContract: callConfig.gmxCallbackOperator,
+                uiFeeReceiver: callConfig.feeReceiver,
+                market: callParams.market,
+                initialCollateralToken: address(callConfig.depositCollateralToken),
+                swapPath: new address[](0) // swapPath
+            }),
+            numbers: PositionUtils.CreateOrderParamsNumbers({
+                sizeDeltaUsd: request.sizeDelta > 0 ? uint(request.sizeDelta) : 0,
+                initialCollateralDeltaAmount: request.collateralDelta,
+                triggerPrice: callParams.triggerPrice,
+                acceptablePrice: callParams.acceptablePrice,
+                executionFee: callParams.executionFee,
+                callbackGasLimit: callConfig.callbackGasLimit,
+                minOutputAmount: 0
+            }),
+            orderType: PositionUtils.OrderType.MarketIncrease,
+            decreasePositionSwapType: PositionUtils.DecreasePositionSwapType.NoSwap,
+            isLong: callParams.isLong,
+            shouldUnwrapNativeToken: false,
+            referralCode: callConfig.referralCode
+        });
 
-        PositionUtils.CreateOrderParams memory params = PositionUtils.CreateOrderParams(
-            PositionUtils.CreateOrderParamsAddresses(
-                address(callConfig.subaccountStore),
-                callConfig.gmxCallbackOperator,
-                callConfig.feeReceiver,
-                callPositionAdjustment.market,
-                address(callConfig.depositCollateralToken),
-                new address[](0) // swapPath
-            ),
-            PositionUtils.CreateOrderParamsNumbers(
-                request.sizeDelta > 0 ? uint(request.sizeDelta) : 0,
-                request.collateralDelta,
-                callPositionAdjustment.triggerPrice,
-                callPositionAdjustment.acceptablePrice,
-                callPositionAdjustment.executionFee,
-                callConfig.callbackGasLimit,
-                0 // _minOut - 0 since we are not swapping
-            ),
-            PositionUtils.OrderType.MarketIncrease,
-            PositionUtils.DecreasePositionSwapType.NoSwap,
-            callPositionAdjustment.isLong,
-            false, // shouldUnwrapNativeToken
-            callConfig.referralCode
+        request.subaccount.depositToken(callConfig.router, callConfig.depositCollateralToken, callParams.collateralDelta);
+        request.subaccount.approveToken(callConfig.gmxRouter, callConfig.depositCollateralToken, request.collateralDelta);
+
+        (bool orderSuccess, bytes memory orderReturnData) = request.subaccount.execute(
+            address(callConfig.gmxExchangeRouter), abi.encodeWithSelector(callConfig.gmxExchangeRouter.createOrder.selector, params)
         );
+        if (!orderSuccess) ErrorUtils.revertWithParsedMessage(orderReturnData);
 
-        bytes memory data = abi.encodeWithSelector(callConfig.gmxExchangeRouter.createOrder.selector, params);
-        (bool success, bytes memory returnData) = request.subaccount.execute(address(callConfig.gmxExchangeRouter), data);
-        if (!success) ErrorUtils.revertWithParsedMessage(returnData);
-
-        requestKey = abi.decode(returnData, (bytes32));
+        requestKey = abi.decode(orderReturnData, (bytes32));
 
         emit IncreasePosition__RequestIncreasePosition(
-            callConfig.trader, subaccountAddress, requestKey, request.puppetCollateralDeltaList, request.collateralDelta, uint(request.sizeDelta)
+            callConfig.trader, subaccountAddress, requestKey, request.puppetCollateralDeltaList, uint(request.sizeDelta), request.collateralDelta
         );
     }
 
@@ -300,7 +321,7 @@ library IncreasePosition {
     }
 
     error IncreasePosition__PuppetListLimitExceeded();
-    error IncreasePosition__InvalidRequestKey(bytes32 requestKey, bytes32 expectedRequestKey);
     error IncreasePosition__InvalidSubaccountTrader();
     error IncreasePosition__PendingRequestExists();
+    error IncreasePosition__UnexpectedEventData();
 }

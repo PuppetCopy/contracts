@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {PuppetStore} from "./../store/PuppetStore.sol";
+import {PositionStore} from "./../store/PositionStore.sol";
 
 import {IGmxDatastore} from "../interface/IGmxDatastore.sol";
 
@@ -28,8 +29,6 @@ library PositionUtils {
         SwapPnlTokenToCollateralToken,
         SwapCollateralTokenToPnlToken
     }
-
-
 
     struct Props {
         Addresses addresses;
@@ -109,13 +108,22 @@ library PositionUtils {
         return orderType == OrderType.Liquidation;
     }
 
-    function getPositionKey(address account, address market, IERC20 collateralToken, bool isLong) internal pure returns (bytes32) {
-        return keccak256(abi.encode(account, market, address(collateralToken), isLong));
+    function getPositionKey(address account, address market, address collateralToken, bool isLong) internal pure returns (bytes32) {
+        return keccak256(abi.encode(account, market, collateralToken, isLong));
     }
 
-    function getNextRequestKey(IGmxDatastore dataStore) internal returns (bytes32) {
-        uint nonce = dataStore.incrementUint(keccak256(abi.encode("NONCE")), 1);
+    function getCurrentNonce(IGmxDatastore dataStore) internal view returns (uint) {
+        return dataStore.getUint(keccak256(abi.encode("NONCE")));
+    }
 
-        return keccak256(abi.encode(address(dataStore), nonce));
+    function getNextRequestKey(IGmxDatastore dataStore) internal view returns (bytes32) {
+        return keccak256(abi.encode(address(dataStore), getCurrentNonce(dataStore) + 1));
+    }
+
+    struct CallbackConfig {
+        PositionStore positionStore;
+        PuppetStore puppetStore;
+        address gmxCallbackOperator;
+        address caller;
     }
 }

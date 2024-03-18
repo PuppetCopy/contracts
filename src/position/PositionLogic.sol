@@ -8,6 +8,7 @@ import {PositionUtils} from "./util/PositionUtils.sol";
 import {Subaccount} from "./util/Subaccount.sol";
 
 import {IncreasePosition} from "./logic/IncreasePosition.sol";
+import {DecreasePosition} from "./logic/DecreasePosition.sol";
 import {PositionStore} from "./store/PositionStore.sol";
 
 contract PositionLogic is Auth {
@@ -23,20 +24,20 @@ contract PositionLogic is Auth {
     }
 
     function handlOperatorCallback(
-        IncreasePosition.CallbackConfig calldata callConfig,
+        PositionUtils.CallbackConfig calldata callConfig,
         bytes32 key,
         PositionUtils.Props calldata order,
         bytes calldata eventData
     ) external requiresAuth {
         if (PositionUtils.isIncreaseOrder(order.numbers.orderType)) {
             return IncreasePosition.executeIncreasePosition(callConfig, key, order, eventData);
-        } else if (PositionUtils.isDecreaseOrder(order.numbers.orderType)) {
-            // return executeDecreasePosition(callConfig, callbackResponse);
+        } else {
+            return DecreasePosition.executeDecreasePosition(callConfig, key, order, eventData);
         }
     }
 
     function handlCancelledCallback(
-        IncreasePosition.CallbackConfig calldata callConfig,
+        PositionUtils.CallbackConfig calldata callConfig,
         bytes32 key,
         PositionUtils.Props calldata order,
         bytes calldata eventData
@@ -50,7 +51,7 @@ contract PositionLogic is Auth {
     }
 
     function handlFrozenCallback(
-        IncreasePosition.CallbackConfig calldata callConfig,
+        PositionUtils.CallbackConfig calldata callConfig,
         bytes32 key,
         PositionUtils.Props calldata order,
         bytes calldata eventData

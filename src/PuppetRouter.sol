@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -9,6 +8,9 @@ import {Router} from "./utils/Router.sol";
 import {Router} from "./utils/Router.sol";
 import {Dictator} from "./utils/Dictator.sol";
 
+import {SubaccountLogic} from "./position/util/SubaccountLogic.sol";
+
+import {SubaccountStore} from "./position/store/SubaccountStore.sol";
 import {PuppetStore} from "./position/store/PuppetStore.sol";
 import {PuppetLogic} from "./position/PuppetLogic.sol";
 
@@ -18,10 +20,12 @@ contract PuppetRouter is Router, Multicall, ReentrancyGuard {
     struct PuppetRouterParams {
         PuppetStore puppetStore;
         Router router;
+        SubaccountStore subaccountStore;
     }
 
     struct PuppetRouterConfig {
         PuppetLogic puppetLogic;
+        SubaccountLogic subaccountLogic;
         address dao;
         uint minExpiryDuration;
         uint minAllowanceRate;
@@ -34,6 +38,10 @@ contract PuppetRouter is Router, Multicall, ReentrancyGuard {
     constructor(Dictator dictator, PuppetRouterConfig memory _config, PuppetRouterParams memory _params) Router(dictator) {
         _setConfig(_config);
         params = _params;
+    }
+
+    function createSubaccount(address account) external nonReentrant {
+        config.subaccountLogic.createSubaccount(params.subaccountStore, account);
     }
 
     function setRule(PuppetStore.Rule calldata ruleParams) external nonReentrant {

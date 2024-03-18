@@ -20,10 +20,8 @@ contract PositionStore is StoreController {
     }
 
     struct MirrorPosition {
-        uint collateral;
         uint size;
-        uint leverage;
-        uint latestUpdateTimestamp;
+        uint collateral;
         uint[] puppetDepositList;
         address[] puppetList;
     }

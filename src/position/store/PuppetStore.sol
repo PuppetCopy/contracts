@@ -57,6 +57,17 @@ contract PuppetStore is StoreController {
         return traderActivityMap[_key];
     }
 
+    function getTraderActivityList(address _trader, address[] calldata _addressList) external view returns (Activity[] memory) {
+        uint length = _addressList.length;
+        Activity[] memory _activity = new Activity[](length);
+
+        for (uint i = 0; i < length; i++) {
+            bytes32 puppetTraderKey = PuppetUtils.getPuppetTraderKey(_addressList[i], _trader);
+            _activity[i] = traderActivityMap[puppetTraderKey];
+        }
+        return _activity;
+    }
+
     function setTraderActivityList(address _trader, address[] calldata _addressList, Activity[] calldata _activity) external isSetter {
         uint length = _addressList.length;
         if (length != _activity.length) revert PuppetStore__AddressListLengthMismatch();

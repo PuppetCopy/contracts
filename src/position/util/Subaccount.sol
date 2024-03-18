@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {Router} from "./../../utils/Router.sol";
 import {SubaccountStore} from "./../store/SubaccountStore.sol";
@@ -10,7 +11,7 @@ contract Subaccount {
     SubaccountStore store;
 
     address public account;
-    uint public balance;
+    // uint public balance;
 
     constructor(SubaccountStore _store, address _account) {
         store = _store;
@@ -22,34 +23,37 @@ contract Subaccount {
         _;
     }
 
-    function deposit() public payable onlyLogicOperator {
-        balance += msg.value;
-    }
+    // function deposit() public payable onlyLogicOperator {
+    //     balance += msg.value;
+    // }
 
-    function withdraw(uint _amount) external onlyLogicOperator {
-        if (_amount > balance) revert Subaccount__TransferFailed(msg.sender, _amount);
+    // function withdraw(uint _amount) external onlyLogicOperator {
+    //     if (_amount > balance) revert Subaccount__TransferFailed(msg.sender, _amount);
 
-        balance -= _amount;
+    //     balance -= _amount;
 
-        (bool _success,) = msg.sender.call{value: _amount}("");
-        if (!_success) {
-            revert Subaccount__TransferFailed(msg.sender, _amount);
-        }
-    }
+    //     (bool _success,) = msg.sender.call{value: _amount}("");
+    //     if (!_success) {
+    //         revert Subaccount__TransferFailed(msg.sender, _amount);
+    //     }
+    // }
 
-    function execute(address _from, bytes calldata _data) external payable onlyLogicOperator returns (bool _success, bytes memory _returnData) {
-        uint _startLimit = gasleft();
+    function execute(address _ctr, bytes calldata _data) external payable onlyLogicOperator returns (bool _success, bytes memory _returnData) {
+        uint _gasLimit = gasleft();
 
-        if (_startLimit > balance) revert Subaccount__NotEnoughGas(account, _startLimit);
-        if (_from != account) revert Subaccount__NotAccountOwner();
+        // if (_startLimit > balance) revert Subaccount__NotEnoughGas(account, _startLimit);
 
-        (_success, _returnData) = account.call{gas: _startLimit}(_data);
+        (_success, _returnData) = _ctr.call{gas: _gasLimit}(_data);
 
-        uint _gasCost = (_startLimit - gasleft()) * tx.gasprice;
+        // uint _gasCost = (_startLimit - gasleft()) * tx.gasprice;
 
-        balance -= _gasCost;
+        // balance -= _gasCost;
 
         return (_success, _returnData);
+    }
+
+    function approveToken(address _spender, IERC20 _token, uint _amount) external {
+        SafeERC20.forceApprove(_token, _spender, _amount);
     }
 
     function depositToken(Router _router, IERC20 _token, uint _amount) external {

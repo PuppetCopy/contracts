@@ -8,19 +8,18 @@ import {WNT} from "./utils/WNT.sol";
 import {Router} from "./utils/Router.sol";
 import {Dictator} from "./utils/Dictator.sol";
 
+import {IGmxDatastore} from "./position/interface/IGmxDatastore.sol";
+import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
 import {IGmxExchangeRouter} from "./position/interface/IGmxExchangeRouter.sol";
 import {IncreasePosition} from "./position/logic/IncreasePosition.sol";
 
 import {PositionUtils} from "./position/util/PositionUtils.sol";
-import {PositionLogic} from "./position/PositionLogic.sol";
 
 import {PositionStore} from "./position/store/PositionStore.sol";
 import {SubaccountStore} from "./position/store/SubaccountStore.sol";
 import {PuppetStore} from "./position/store/PuppetStore.sol";
-
-import {IGmxDatastore} from "./position/interface/IGmxDatastore.sol";
-
-import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
+import {PositionLogic} from "./position/PositionLogic.sol";
+import {SubaccountLogic} from "./position/util/SubaccountLogic.sol";
 
 contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
     event PositionRouter__SetConfig(uint timestamp, PositionRouterConfig config);
@@ -30,16 +29,17 @@ contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
         WNT wnt;
         Router router;
         PositionStore positionStore;
+        SubaccountStore subaccountStore;
+        PuppetStore puppetStore;
     }
 
     struct PositionRouterConfig {
         Router router;
         PositionLogic positionLogic;
-        SubaccountStore subaccountStore;
-        PositionStore positionStore;
-        PuppetStore puppetStore;
+        SubaccountLogic subaccountLogic;
         IGmxExchangeRouter gmxExchangeRouter;
         IGmxDatastore gmxDatastore;
+        address gmxRouter;
         IERC20 depositCollateralToken;
         address dao;
         address feeReceiver;
@@ -64,15 +64,20 @@ contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
         config.gmxCallbackOperator = address(this);
     }
 
+    function createSubaccount(address account) external nonReentrant {
+        config.subaccountLogic.createSubaccount(params.subaccountStore, account);
+    }
+
     function requestIncreasePosition(IncreasePosition.CallParams calldata callParams) external nonReentrant {
         IncreasePosition.CallConfig memory callConfig = IncreasePosition.CallConfig({
             router: params.router,
-            subaccountStore: config.subaccountStore,
-            positionStore: config.positionStore,
-            puppetStore: config.puppetStore,
+            subaccountStore: params.subaccountStore,
+            positionStore: params.positionStore,
+            puppetStore: params.puppetStore,
             gmxExchangeRouter: config.gmxExchangeRouter,
             gmxDatastore: config.gmxDatastore,
             depositCollateralToken: config.depositCollateralToken,
+            gmxRouter: config.gmxRouter,
             gmxCallbackOperator: config.gmxCallbackOperator,
             feeReceiver: config.feeReceiver,
             trader: msg.sender,
@@ -108,9 +113,9 @@ contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
         if (config.gmxCallbackOperator != msg.sender) revert PositionLogic__UnauthorizedCaller();
 
         try config.positionLogic.handlOperatorCallback(
-            IncreasePosition.CallbackConfig({
-                positionStore: config.positionStore,
-                puppetStore: config.puppetStore,
+            PositionUtils.CallbackConfig({
+                positionStore: params.positionStore,
+                puppetStore: params.puppetStore,
                 gmxCallbackOperator: config.gmxCallbackOperator,
                 caller: msg.sender
             }),
@@ -120,7 +125,7 @@ contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
         ) {} catch {
             // store callback data, the rest of the logic will attempt to execute the callback data
             // in case of failure we can recovery the callback data and attempt to execute it again
-            config.positionStore.setUnhandledCallbackMap(key, order, eventData);
+            params.positionStore.setUnhandledCallbackMap(key, order, eventData);
         }
     }
 
