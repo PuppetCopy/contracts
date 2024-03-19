@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {PuppetStore} from "./../store/PuppetStore.sol";
-import {PositionStore} from "./../store/PositionStore.sol";
-
 import {IGmxDatastore} from "../interface/IGmxDatastore.sol";
 
-library PositionUtils {
+library GmxPositionUtils {
     enum OrderType {
         MarketSwap,
         LimitSwap,
@@ -49,8 +46,8 @@ library PositionUtils {
     struct Numbers {
         OrderType orderType;
         DecreasePositionSwapType decreasePositionSwapType;
-        uint sizeDeltaUsd;
         uint initialCollateralDeltaAmount;
+        uint sizeDeltaUsd;
         uint triggerPrice;
         uint acceptablePrice;
         uint executionFee;
@@ -87,8 +84,8 @@ library PositionUtils {
     }
 
     struct CreateOrderParamsNumbers {
-        uint sizeDeltaUsd;
         uint initialCollateralDeltaAmount;
+        uint sizeDeltaUsd;
         uint triggerPrice;
         uint acceptablePrice;
         uint executionFee;
@@ -116,14 +113,15 @@ library PositionUtils {
         return dataStore.getUint(keccak256(abi.encode("NONCE")));
     }
 
-    function getNextRequestKey(IGmxDatastore dataStore) internal view returns (bytes32) {
-        return keccak256(abi.encode(address(dataStore), getCurrentNonce(dataStore) + 1));
+    function getRequestKey(IGmxDatastore dataStore, uint nonce) internal pure returns (bytes32) {
+        return keccak256(abi.encode(address(dataStore), nonce));
     }
 
-    struct CallbackConfig {
-        PositionStore positionStore;
-        PuppetStore puppetStore;
-        address gmxCallbackOperator;
-        address caller;
+    function getNextRequestKey(IGmxDatastore dataStore) internal view returns (bytes32) {
+        return getRequestKey(dataStore, getCurrentNonce(dataStore) + 1);
+    }
+
+    function getCurrentRequestKey(IGmxDatastore dataStore) internal view returns (bytes32) {
+        return getRequestKey(dataStore, getCurrentNonce(dataStore));
     }
 }

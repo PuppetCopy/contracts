@@ -24,7 +24,7 @@ import {VotingEscrow} from "src/tokenomics/VotingEscrow.sol";
 import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
 import {VeRevenueDistributor} from "src/tokenomics/VeRevenueDistributor.sol";
 
-import {DeployerEnv} from "script/Env.s.sol";
+import {Const} from "script/Const.s.sol";
 
 contract DeployTokenomics is PRBTest {
     uint8 constant TOKEN_ROUTER_ROLE = 0;

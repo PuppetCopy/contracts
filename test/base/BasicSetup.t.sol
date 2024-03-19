@@ -24,6 +24,9 @@ contract BasicSetup is PRBTest, StdCheats, StdUtils {
     uint8 constant PUPPET_MINTER_ROLE = 1;
 
     uint internal constant BASIS_POINTS_DIVISOR = 10_000;
+
+    address payable owner = payable(makeAddr("Owner"));
+
     Users users;
     WNT wnt;
     Dictator dictator;
@@ -31,19 +34,17 @@ contract BasicSetup is PRBTest, StdCheats, StdUtils {
     Router router;
 
     function setUp() public virtual {
-        address payable owner = payable(makeAddr("Owner"));
         vm.deal(owner, 100 ether);
 
         dictator = new Dictator(owner);
+        puppetToken = new PuppetToken(dictator);
+        router = new Router(dictator);
 
         vm.startPrank(owner);
 
         users = Users({owner: owner, alice: _createUser("Alice", 2), bob: _createUser("Bob", 2), yossi: _createUser("Yossi", 2)});
 
-        puppetToken = new PuppetToken(dictator);
         dictator.setRoleCapability(PUPPET_MINTER_ROLE, address(puppetToken), puppetToken.mint.selector, true);
-
-        router = new Router(dictator);
         dictator.setRoleCapability(TOKEN_ROUTER_ROLE, address(router), router.pluginTransfer.selector, true);
     }
 

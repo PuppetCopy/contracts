@@ -7,11 +7,10 @@ import {PuppetUtils} from "./../util/PuppetUtils.sol";
 
 contract PuppetStore is StoreController {
     struct Rule {
-        bytes32 positionKey;
-        address trader;
-        address puppet;
-        uint stopLoss;
+        // address trader;
+        // address collateralToken;
         uint throttleActivity;
+        uint allowance;
         uint allowanceRate;
         uint expiry;
     }
@@ -34,19 +33,24 @@ contract PuppetStore is StoreController {
         ruleMap[_key] = _rule;
     }
 
-    function removeRule(bytes32 _key) external isSetter {
-        delete ruleMap[_key];
-    }
-
-    function getRuleList(address _trader, address[] calldata _addressList) external view returns (Rule[] memory) {
+    function getRuleList(bytes32 routeKey, address[] calldata _addressList) external view returns (Rule[] memory) {
         uint _length = _addressList.length;
         Rule[] memory _rules = new Rule[](_addressList.length);
         for (uint i = 0; i < _length; i++) {
-            bytes32 _key = PuppetUtils.getPuppetTraderKey(_addressList[i], _trader);
+            bytes32 _key = PuppetUtils.getPuppetRouteKey(_addressList[i], routeKey);
 
             _rules[i] = ruleMap[_key];
         }
         return _rules;
+    }
+
+    function setRuleList(Rule[] calldata _rules, bytes32[] calldata _routeKeyList, address[] calldata _addressList) external isSetter {
+        uint _length = _addressList.length;
+        for (uint i = 0; i < _length; i++) {
+            bytes32 _key = PuppetUtils.getPuppetRouteKey(_addressList[i], _routeKeyList[i]);
+
+            ruleMap[_key] = _rules[i];
+        }
     }
 
     function setTraderActivity(bytes32 _key, Activity calldata _activity) external isSetter {
@@ -57,28 +61,27 @@ contract PuppetStore is StoreController {
         return traderActivityMap[_key];
     }
 
-    function getTraderActivityList(address _trader, address[] calldata _addressList) external view returns (Activity[] memory) {
+    function getTraderActivityList(bytes32 _routeKey, address[] calldata _addressList) external view returns (Activity[] memory) {
         uint length = _addressList.length;
         Activity[] memory _activity = new Activity[](length);
 
         for (uint i = 0; i < length; i++) {
-            bytes32 puppetTraderKey = PuppetUtils.getPuppetTraderKey(_addressList[i], _trader);
+            bytes32 puppetTraderKey = PuppetUtils.getPuppetRouteKey(_addressList[i], _routeKey);
             _activity[i] = traderActivityMap[puppetTraderKey];
         }
         return _activity;
     }
 
-    function setTraderActivityList(address _trader, address[] calldata _addressList, Activity[] calldata _activity) external isSetter {
+    function setRouteActivityList(bytes32 _routeKey, address[] calldata _addressList, Activity[] calldata _activityList) external isSetter {
         uint length = _addressList.length;
-        if (length != _activity.length) revert PuppetStore__AddressListLengthMismatch();
 
         for (uint i = 0; i < length; i++) {
-            bytes32 puppetTraderKey = PuppetUtils.getPuppetTraderKey(_addressList[i], _trader);
-            traderActivityMap[puppetTraderKey] = _activity[i];
+            bytes32 puppetTraderKey = PuppetUtils.getPuppetRouteKey(_addressList[i], _routeKey);
+            traderActivityMap[puppetTraderKey] = _activityList[i];
         }
     }
 
-    function getTraderRuleAndActivityList(address _trader, address[] calldata _addressList)
+    function getTraderRuleAndActivityList(bytes32 _routeKey, address[] calldata _addressList)
         external
         view
         returns (Rule[] memory, Activity[] memory)
@@ -89,12 +92,10 @@ contract PuppetStore is StoreController {
         Activity[] memory _activity = new Activity[](length);
 
         for (uint i = 0; i < length; i++) {
-            bytes32 puppetTraderKey = PuppetUtils.getPuppetTraderKey(_addressList[i], _trader);
+            bytes32 puppetTraderKey = PuppetUtils.getPuppetRouteKey(_addressList[i], _routeKey);
             _rules[i] = ruleMap[puppetTraderKey];
             _activity[i] = traderActivityMap[puppetTraderKey];
         }
         return (_rules, _activity);
     }
-
-    error PuppetStore__AddressListLengthMismatch();
 }

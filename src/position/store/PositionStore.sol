@@ -2,21 +2,25 @@
 pragma solidity 0.8.24;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {StoreController} from "../../utils/StoreController.sol";
-import {PositionUtils} from "./../util/PositionUtils.sol";
+import {GmxPositionUtils} from "./../util/GmxPositionUtils.sol";
 import {Subaccount} from "./../util/Subaccount.sol";
 
 contract PositionStore is StoreController {
     struct RequestIncrease {
         bytes32 requestKey;
-        int sizeDelta;
+        bytes32 routeKey;
         uint collateralDelta;
+        int sizeDelta;
         uint targetLeverage;
         uint[] puppetCollateralDeltaList;
         bytes32 positionKey;
+        IERC20 collateralToken;
         Subaccount subaccount;
         address subaccountAddress;
+        MirrorPosition mirrorPosition;
     }
 
     struct MirrorPosition {
@@ -27,7 +31,7 @@ contract PositionStore is StoreController {
     }
 
     struct UnhandledCallbackMap {
-        PositionUtils.Props order;
+        GmxPositionUtils.Props order;
         bytes eventData;
     }
 
@@ -61,7 +65,7 @@ contract PositionStore is StoreController {
         delete positionMap[_key];
     }
 
-    function setUnhandledCallbackMap(bytes32 _key, PositionUtils.Props calldata _order, bytes calldata _eventData) external isSetter {
+    function setUnhandledCallbackMap(bytes32 _key, GmxPositionUtils.Props calldata _order, bytes calldata _eventData) external isSetter {
         PositionStore.UnhandledCallbackMap memory callbackResponse = PositionStore.UnhandledCallbackMap({order: _order, eventData: _eventData});
 
         unhandledCallbackMap[_key] = callbackResponse;

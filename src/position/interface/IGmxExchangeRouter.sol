@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {PositionUtils} from "./../util/PositionUtils.sol";
+import {GmxPositionUtils} from "./../util/GmxPositionUtils.sol";
 
 interface IGmxExchangeRouter {
     /// @dev Creates a new order with the given amount, order parameters. The order is
     ///      created by transferring the specified amount of collateral tokens from the caller's account to the
     ///      order store, and then calling the `createOrder()` function on the order handler contract. The
     ///      referral code is also set on the caller's account using the referral storage contract.
-    function createOrder(PositionUtils.CreateOrderParams calldata params) external payable returns (bytes32);
+    function createOrder(GmxPositionUtils.CreateOrderParams calldata params) external payable returns (bytes32);
 
     /// @dev Sends the given amount of tokens to the given address
     function sendTokens(address token, address receiver, uint amount) external payable;

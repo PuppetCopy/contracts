@@ -8,7 +8,7 @@ import {IVault, IAsset} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {WeightedPoolUserData} from "@balancer-labs/v2-interfaces/pool-weighted/WeightedPoolUserData.sol";
 import {IBasePool} from "@balancer-labs/v2-interfaces/vault/IBasePool.sol";
 
-import {DeployerEnv} from "script/Env.s.sol";
+import {Const} from "script/Const.s.sol";
 
 import {Dictator} from "src/utils/Dictator.sol";
 import {WNT} from "src/utils/WNT.sol";
@@ -19,13 +19,13 @@ contract DeployToken is PRBTest {
     uint internal DEPLOYER_KEY = vm.envUint("GBC_DEPLOYER_PRIVATE_KEY");
 
     WNT wnt;
-    Dictator dictator = Dictator(DeployerEnv.Dictator);
-    PuppetToken puppetToken = PuppetToken(DeployerEnv.PuppetToken);
-    IERC20 weth = IERC20(DeployerEnv.wnt);
+    Dictator dictator = Dictator(Const.Dictator);
+    PuppetToken puppetToken = PuppetToken(Const.PuppetToken);
+    IERC20 weth = IERC20(Const.wnt);
 
     IVault vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
     IWeightedPoolFactory poolFactory = IWeightedPoolFactory(0xc7E5ED1054A24Ef31D827E6F86caA58B3Bc168d7);
-    IBasePoolErc20 pool = IBasePoolErc20(DeployerEnv.BasePool);
+    IBasePoolErc20 pool = IBasePoolErc20(Const.BasePool);
     // IBasePoolErc20 pool = IBasePoolErc20(
     //     poolFactory.create("PUPPET-WETH", "PUPPET-WETH", tokens, normalizedWeights, rateProviders, 0.01e18, dictator.owner(), bytes32(0))
     // );

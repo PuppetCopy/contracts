@@ -1,19 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
-import {PuppetUtils} from "./util/PuppetUtils.sol";
 import {PuppetStore} from "./store/PuppetStore.sol";
 
 contract PuppetLogic is Auth {
-    event PuppetLogic__UpdateDeposit(address from, address to, bool isIncrease, IERC20 token, uint amount);
-    event PuppetLogic__UpdateRule(bytes32 ruleKey, address puppet, address trader, uint allowanceRate, uint throttle, uint expiry);
+    event PuppetLogic__UpdateRule(bytes32 ruleKey, PuppetStore.Rule rule);
 
     struct CallSetRuleParams {
         PuppetStore store;
-        address puppet;
         uint minExpiryDuration;
         uint minAllowanceRate;
         uint maxAllowanceRate;
@@ -21,37 +17,40 @@ contract PuppetLogic is Auth {
 
     constructor(Authority _authority) Auth(address(0), _authority) {}
 
-    function setRule(CallSetRuleParams calldata callParams, PuppetStore.Rule calldata callRule) external requiresAuth {
+    function setRule(CallSetRuleParams calldata callParams, PuppetStore.Rule calldata callRule, bytes32 routeKey) external requiresAuth {
         if (callRule.expiry < block.timestamp + callParams.minExpiryDuration) {
-            revert PuppetLogic__InvalidExpiry();
+            revert PuppetLogic__ExpiredDate();
         }
 
         if (callRule.allowanceRate < callParams.minAllowanceRate || callRule.allowanceRate > callParams.maxAllowanceRate) {
             revert PuppetLogic__MinAllowanceRate(100);
         }
 
-        bytes32 key = PuppetUtils.getPuppetTraderKey(callParams.puppet, callRule.trader);
-        PuppetStore.Rule memory pts = callParams.store.getRule(key);
+        if (callRule.allowance == 0) revert PuppetLogic__NoAllowance();
 
-        pts.trader = callRule.trader;
-        pts.positionKey = callRule.positionKey;
-        pts.throttleActivity = callRule.throttleActivity;
-        pts.allowanceRate = callRule.allowanceRate;
-        pts.expiry = callRule.expiry;
+        PuppetStore.Rule memory rule = callParams.store.getRule(routeKey);
 
-        callParams.store.setRule(pts, key);
+        rule.throttleActivity = callRule.throttleActivity;
+        rule.allowance = callRule.allowance;
+        rule.allowanceRate = callRule.allowanceRate;
+        rule.expiry = callRule.expiry;
 
-        emit PuppetLogic__UpdateRule(key, callParams.puppet, callRule.trader, callRule.allowanceRate, callRule.throttleActivity, callRule.expiry);
+        callParams.store.setRule(rule, routeKey);
+
+        emit PuppetLogic__UpdateRule(routeKey, rule);
     }
 
-    function removeRule(PuppetStore store, address puppet, address trader) external requiresAuth {
-        bytes32 key = PuppetUtils.getPuppetTraderKey(puppet, trader);
+    function setRouteActivityList(PuppetStore store, bytes32 routeKey, address[] calldata addressList, PuppetStore.Activity[] calldata activity)
+        external
+        requiresAuth
+    {
+        if (addressList.length != activity.length) revert PuppetStore__AddressListLengthMismatch();
 
-        store.removeRule(key);
-
-        emit PuppetLogic__UpdateRule(key, puppet, trader, 0, 0, 0);
+        store.setRouteActivityList(routeKey, addressList, activity);
     }
 
     error PuppetLogic__MinAllowanceRate(uint rate);
-    error PuppetLogic__InvalidExpiry();
+    error PuppetLogic__ExpiredDate();
+    error PuppetLogic__NoAllowance();
+    error PuppetStore__AddressListLengthMismatch();
 }

@@ -8,6 +8,7 @@ import {Router} from "./utils/Router.sol";
 import {Router} from "./utils/Router.sol";
 import {Dictator} from "./utils/Dictator.sol";
 
+import {PuppetUtils} from "./position/util/PuppetUtils.sol";
 import {SubaccountLogic} from "./position/util/SubaccountLogic.sol";
 
 import {SubaccountStore} from "./position/store/SubaccountStore.sol";
@@ -35,29 +36,46 @@ contract PuppetRouter is Router, Multicall, ReentrancyGuard {
     PuppetRouterConfig config;
     PuppetRouterParams params;
 
-    constructor(Dictator dictator, PuppetRouterConfig memory _config, PuppetRouterParams memory _params) Router(dictator) {
-        _setConfig(_config);
+    constructor(Dictator dictator, PuppetRouterParams memory _params, PuppetRouterConfig memory _config) Router(dictator) {
         params = _params;
+        _setConfig(_config);
     }
 
     function createSubaccount(address account) external nonReentrant {
         config.subaccountLogic.createSubaccount(params.subaccountStore, account);
     }
 
-    function setRule(PuppetStore.Rule calldata ruleParams) external nonReentrant {
+    function setRule(PuppetStore.Rule calldata ruleParams, address collateralToken, address trader) external nonReentrant {
+        bytes32 key = PuppetUtils.getRouteKey(trader, collateralToken);
+
+        _setRule(msg.sender, key, ruleParams);
+    }
+
+    function setRule(PuppetStore.Rule calldata ruleParams, bytes32 key) external nonReentrant {
+        _setRule(msg.sender, key, ruleParams);
+    }
+
+    function setRuleList(bytes32[] calldata routeKeyList, PuppetStore.Rule[] calldata ruleParams, address[] calldata traderList)
+        external
+        nonReentrant
+    {
+        uint length = traderList.length;
+        for (uint i = 0; i < length; i++) {
+            _setRule(msg.sender, routeKeyList[i], ruleParams[i]);
+        }
+    }
+
+    // internal
+
+    function _setRule(address puppet, bytes32 routeKey, PuppetStore.Rule calldata ruleParams) internal {
         PuppetLogic.CallSetRuleParams memory callParams = PuppetLogic.CallSetRuleParams({
             store: params.puppetStore,
             minExpiryDuration: config.minExpiryDuration,
             minAllowanceRate: config.minAllowanceRate,
-            maxAllowanceRate: config.maxAllowanceRate,
-            puppet: msg.sender
+            maxAllowanceRate: config.maxAllowanceRate
         });
 
-        config.puppetLogic.setRule(callParams, ruleParams);
-    }
-
-    function removeRule(address trader) external nonReentrant {
-        config.puppetLogic.removeRule(params.puppetStore, msg.sender, trader);
+        config.puppetLogic.setRule(callParams, ruleParams, PuppetUtils.getPuppetRouteKey(puppet, routeKey));
     }
 
     // governance
@@ -73,4 +91,6 @@ contract PuppetRouter is Router, Multicall, ReentrancyGuard {
 
         emit PuppetRouter__SetConfig(block.timestamp, _config);
     }
+
+    error PuppetRouter__InvalidPuppet();
 }

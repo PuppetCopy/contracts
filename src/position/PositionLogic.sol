@@ -4,56 +4,62 @@ pragma solidity 0.8.24;
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {PositionUtils} from "./util/PositionUtils.sol";
+import {GmxPositionUtils} from "./util/GmxPositionUtils.sol";
 import {Subaccount} from "./util/Subaccount.sol";
 
-import {IncreasePosition} from "./logic/IncreasePosition.sol";
-import {DecreasePosition} from "./logic/DecreasePosition.sol";
 import {PositionStore} from "./store/PositionStore.sol";
+
+import {RequestIncreasePosition} from "./logic/RequestIncreasePosition.sol";
+import {RequestDecreasePosition} from "./logic/RequestDecreasePosition.sol";
+import {ExecutePosition} from "./logic/ExecutePosition.sol";
+import {GmxOrder} from "./logic/GmxOrder.sol";
 
 contract PositionLogic is Auth {
     event PositionLogic__CreateTraderSubaccount(address account, address subaccount);
 
     constructor(Authority _authority) Auth(address(0), _authority) {}
 
-    function requestIncreasePosition(IncreasePosition.CallConfig calldata callConfig, IncreasePosition.CallParams calldata callIncreaseParams)
-        external
-        requiresAuth
-    {
-        IncreasePosition.requestIncreasePosition(callConfig, callIncreaseParams);
+    function requestIncreasePosition(
+        GmxOrder.CallConfig calldata gmxCallConfig,
+        RequestIncreasePosition.RequestConfig calldata callConfig,
+        GmxOrder.CallParams calldata callParams
+    ) external requiresAuth {
+        if (callConfig.subaccountAddress != callConfig.trader) revert PositionLogic__InvalidSubaccountTrader();
+
+        RequestIncreasePosition.call(gmxCallConfig, callConfig, callParams);
     }
 
     function handlOperatorCallback(
-        PositionUtils.CallbackConfig calldata callConfig,
+        ExecutePosition.CallConfig calldata callConfig,
         bytes32 key,
-        PositionUtils.Props calldata order,
+        GmxPositionUtils.Props calldata order,
         bytes calldata eventData
     ) external requiresAuth {
-        if (PositionUtils.isIncreaseOrder(order.numbers.orderType)) {
-            return IncreasePosition.executeIncreasePosition(callConfig, key, order, eventData);
+        if (GmxPositionUtils.isIncreaseOrder(order.numbers.orderType)) {
+            return ExecutePosition.increase(callConfig, key, order, eventData);
         } else {
-            return DecreasePosition.executeDecreasePosition(callConfig, key, order, eventData);
+            return ExecutePosition.decrease(callConfig, key, order, eventData);
         }
     }
 
     function handlCancelledCallback(
-        PositionUtils.CallbackConfig calldata callConfig,
+        ExecutePosition.CallConfig calldata callConfig,
         bytes32 key,
-        PositionUtils.Props calldata order,
+        GmxPositionUtils.Props calldata order,
         bytes calldata eventData
     ) external requiresAuth {
         // the rest can fail
-        if (PositionUtils.isIncreaseOrder(order.numbers.orderType)) {
-            return IncreasePosition.executeIncreasePosition(callConfig, key, order, eventData);
-        } else if (PositionUtils.isDecreaseOrder(order.numbers.orderType)) {
+        if (GmxPositionUtils.isIncreaseOrder(order.numbers.orderType)) {
+            return ExecutePosition.increase(callConfig, key, order, eventData);
+        } else if (GmxPositionUtils.isDecreaseOrder(order.numbers.orderType)) {
             // return executeDecreasePosition(callConfig, callbackResponse);
         }
     }
 
     function handlFrozenCallback(
-        PositionUtils.CallbackConfig calldata callConfig,
+        ExecutePosition.CallConfig calldata callConfig,
         bytes32 key,
-        PositionUtils.Props calldata order,
+        GmxPositionUtils.Props calldata order,
         bytes calldata eventData
     ) external requiresAuth {
         // try executeIncreasePosition(callConfig, callbackResponse) {
@@ -65,4 +71,5 @@ contract PositionLogic is Auth {
 
     error PositionLogic__TraderProxyAlreadyExists();
     error PositionLogic__UnauthorizedCaller();
+    error PositionLogic__InvalidSubaccountTrader();
 }

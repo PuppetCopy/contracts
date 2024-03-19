@@ -2,31 +2,35 @@
 pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import {MulticallRouter} from "./utils/MulticallRouter.sol";
-import {WNT} from "./utils/WNT.sol";
 import {Router} from "./utils/Router.sol";
 import {Dictator} from "./utils/Dictator.sol";
 
 import {IGmxDatastore} from "./position/interface/IGmxDatastore.sol";
 import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
 import {IGmxExchangeRouter} from "./position/interface/IGmxExchangeRouter.sol";
-import {IncreasePosition} from "./position/logic/IncreasePosition.sol";
+import {RequestIncreasePosition} from "./position/logic/RequestIncreasePosition.sol";
+import {ExecutePosition} from "./position/logic/ExecutePosition.sol";
 
-import {PositionUtils} from "./position/util/PositionUtils.sol";
+import {GmxPositionUtils} from "./position/util/GmxPositionUtils.sol";
 
 import {PositionStore} from "./position/store/PositionStore.sol";
 import {SubaccountStore} from "./position/store/SubaccountStore.sol";
 import {PuppetStore} from "./position/store/PuppetStore.sol";
 import {PositionLogic} from "./position/PositionLogic.sol";
 import {SubaccountLogic} from "./position/util/SubaccountLogic.sol";
+import {GmxOrder} from "./position/logic/GmxOrder.sol";
+import {PuppetLogic} from "./position/PuppetLogic.sol";
 
-contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
+import {Subaccount} from "./position/util/Subaccount.sol";
+
+contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
     event PositionRouter__SetConfig(uint timestamp, PositionRouterConfig config);
 
     struct PositionRouterParams {
         Dictator dictator;
-        WNT wnt;
         Router router;
         PositionStore positionStore;
         SubaccountStore subaccountStore;
@@ -35,18 +39,17 @@ contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
 
     struct PositionRouterConfig {
         Router router;
-        PositionLogic positionLogic;
         SubaccountLogic subaccountLogic;
+        PositionLogic positionLogic;
+        PuppetLogic puppetLogic;
         IGmxExchangeRouter gmxExchangeRouter;
         IGmxDatastore gmxDatastore;
         address gmxRouter;
-        IERC20 depositCollateralToken;
         address dao;
         address feeReceiver;
-        address gmxCallbackOperator;
+        address gmxCallbackCaller;
         uint limitPuppetList;
         uint adjustmentFeeFactor;
-        uint minMatchExpiryDuration;
         uint minExecutionFee;
         uint callbackGasLimit;
         uint minMatchTokenAmount;
@@ -56,67 +59,68 @@ contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
     PositionRouterParams params;
     PositionRouterConfig config;
 
-    constructor(Dictator dictator, WNT wnt, Router router, PositionRouterConfig memory _config, PositionRouterParams memory _params)
-        MulticallRouter(dictator, wnt, router, _config.dao)
-    {
+    constructor(Authority _authority, PositionRouterParams memory _params, PositionRouterConfig memory _config) Auth(address(0), _authority) {
         _setConfig(_config);
         params = _params;
-        config.gmxCallbackOperator = address(this);
     }
 
     function createSubaccount(address account) external nonReentrant {
         config.subaccountLogic.createSubaccount(params.subaccountStore, account);
     }
 
-    function requestIncreasePosition(IncreasePosition.CallParams calldata callParams) external nonReentrant {
-        IncreasePosition.CallConfig memory callConfig = IncreasePosition.CallConfig({
-            router: params.router,
-            subaccountStore: params.subaccountStore,
-            positionStore: params.positionStore,
-            puppetStore: params.puppetStore,
-            gmxExchangeRouter: config.gmxExchangeRouter,
-            gmxDatastore: config.gmxDatastore,
-            depositCollateralToken: config.depositCollateralToken,
-            gmxRouter: config.gmxRouter,
-            gmxCallbackOperator: config.gmxCallbackOperator,
-            feeReceiver: config.feeReceiver,
-            trader: msg.sender,
-            referralCode: config.referralCode,
-            limitPuppetList: config.limitPuppetList,
-            adjustmentFeeFactor: config.adjustmentFeeFactor,
-            callbackGasLimit: config.callbackGasLimit,
-            minMatchTokenAmount: config.minMatchTokenAmount
-        });
+    function request(GmxOrder.CallParams calldata callParams) external nonReentrant {
+        Subaccount subaccount = params.subaccountStore.getSubaccount(msg.sender);
+        address subaccountAddress = address(subaccount);
 
-        config.positionLogic.requestIncreasePosition(callConfig, callParams);
+        config.positionLogic.requestIncreasePosition(
+            GmxOrder.CallConfig({
+                router: config.router,
+                positionStore: params.positionStore,
+                gmxExchangeRouter: config.gmxExchangeRouter,
+                gmxRouter: config.gmxRouter,
+                gmxCallbackOperator: address(this),
+                feeReceiver: config.feeReceiver,
+                referralCode: config.referralCode,
+                callbackGasLimit: config.callbackGasLimit
+            }),
+            RequestIncreasePosition.RequestConfig({
+                puppetLogic: config.puppetLogic,
+                puppetStore: params.puppetStore,
+                gmxDatastore: config.gmxDatastore,
+                trader: msg.sender,
+                limitPuppetList: config.limitPuppetList,
+                adjustmentFeeFactor: config.adjustmentFeeFactor,
+                callbackGasLimit: config.callbackGasLimit,
+                minMatchTokenAmount: config.minMatchTokenAmount,
+                subaccount: subaccount,
+                subaccountAddress: subaccountAddress
+            }),
+            callParams
+        );
     }
 
-    function afterOrderExecution(bytes32 key, PositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant {
+    function afterOrderExecution(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant {
         _handlOperatorCallback(key, order, eventData);
     }
 
-    function afterOrderCancellation(bytes32 key, PositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant {
+    function afterOrderCancellation(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant {
         _handlOperatorCallback(key, order, eventData);
     }
 
-    function afterOrderFrozen(bytes32 key, PositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant {
+    function afterOrderFrozen(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant {
         _handlOperatorCallback(key, order, eventData);
-    }
-
-    function setConfig(PositionRouterConfig memory _config) external requiresAuth {
-        _setConfig(_config);
     }
 
     // internal
 
-    function _handlOperatorCallback(bytes32 key, PositionUtils.Props calldata order, bytes calldata eventData) internal {
-        if (config.gmxCallbackOperator != msg.sender) revert PositionLogic__UnauthorizedCaller();
+    function _handlOperatorCallback(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) internal {
+        if (config.gmxCallbackCaller != msg.sender) revert PositionLogic__UnauthorizedCaller();
 
         try config.positionLogic.handlOperatorCallback(
-            PositionUtils.CallbackConfig({
+            ExecutePosition.CallConfig({
                 positionStore: params.positionStore,
                 puppetStore: params.puppetStore,
-                gmxCallbackOperator: config.gmxCallbackOperator,
+                gmxCallbackOperator: address(this),
                 caller: msg.sender
             }),
             key,
@@ -129,17 +133,17 @@ contract PositionRouter is MulticallRouter, IGmxOrderCallbackReceiver {
         }
     }
 
+    // governance
+
+    function setConfig(PositionRouterConfig memory _config) external requiresAuth {
+        _setConfig(_config);
+    }
+
     function _setConfig(PositionRouterConfig memory _config) internal {
         config = _config;
 
         emit PositionRouter__SetConfig(block.timestamp, _config);
     }
-
-    // governance
-
-    // function setRewardLogic(RewardLogic rewardLogic) external requiresAuth {
-    //     config.rewardLogic = rewardLogic;
-    // }
 
     error PositionLogic__UnauthorizedCaller();
 }

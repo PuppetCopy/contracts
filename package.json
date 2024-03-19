@@ -19,11 +19,11 @@
     "!artifacts/contracts/test/**/*"
   ],
   "scripts": {
-    "test": "forge test -vvvvv",
+    "test": "FOUNDRY_PROFILE=dev forge test --match-contract PositionRouterTest -vvvvv",
     "build:dev": "FOUNDRY_PROFILE=dev forge build --sizes",
     "build": "forge build --sizes",
     "deploy": "forge script script/DeployTokenomics.s.sol:DeployTokenomics --rpc-url $ARBITRUM_RPC_URL --broadcast --verify -vvvv",
-    "gas-report": "forge test --gas-report",
+    "gas-report": "FOUNDRY_PROFILE=dev forge test --gas-report",
     "size-contracts": "bun hardhat size-contracts",
     "lint": "bun run lint:sol",
     "lint:sol": "forge fmt --check && bun solhint \"{script,src,test}/**/*.sol\""
