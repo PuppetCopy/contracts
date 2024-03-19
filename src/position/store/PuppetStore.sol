@@ -7,6 +7,8 @@ import {PuppetUtils} from "./../util/PuppetUtils.sol";
 
 contract PuppetStore is StoreController {
     struct Rule {
+        address trader;
+        address collateralToken;
         uint throttleActivity;
         uint allowance;
         uint allowanceRate;

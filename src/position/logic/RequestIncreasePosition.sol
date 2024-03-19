@@ -82,8 +82,6 @@ library RequestIncreasePosition {
         IGmxDatastore gmxDatastore;
         address trader;
         uint limitPuppetList;
-        uint adjustmentFeeFactor;
-        uint callbackGasLimit;
         uint minMatchTokenAmount;
         Subaccount subaccount;
         address subaccountAddress;
@@ -130,7 +128,7 @@ library RequestIncreasePosition {
                 if (
                     rule.expiry < block.timestamp // rule expired or about to expire
                         || activity.latestFunding + rule.throttleActivity < block.timestamp // throttle in case of frequent matching
-                        // || activity.pnl < rule.stopLoss // stop loss. accounted every reduce adjustment
+                        || activity.pnl < int(rule.allowance) // stop loss. accounted every reduce adjustment
                 ) {
                     continue;
                 }
@@ -207,11 +205,11 @@ library RequestIncreasePosition {
         if (request.sizeDelta < 0) {
             gmxCallConfig.positionStore.setPendingRequestIncreaseAdjustmentMap(request.positionKey, request);
 
-            requestKey = _createOrder(gmxCallConfig, callParams, request);
+            requestKey = _createOrder(gmxCallConfig, callParams, request, callConfig.trader);
 
             _adjustToTargetLeverage(gmxCallConfig, callParams, request);
         } else {}
-        requestKey = _createOrder(gmxCallConfig, callParams, request);
+        requestKey = _createOrder(gmxCallConfig, callParams, request, callConfig.trader);
 
         emit RequestIncreasePosition__RequestIncreasePosition(
             callConfig.trader, request.subaccountAddress, requestKey, request.puppetCollateralDeltaList, request.sizeDelta, request.collateralDelta
@@ -228,20 +226,11 @@ library RequestIncreasePosition {
         return 0;
     }
 
-    // function _transferTokenFrom(Router router, IERC20 token, address from, address to, uint amount) internal returns (uint) {
-    //     (bool success, bytes memory returndata) = address(token).call(abi.encodeCall(token.transferFrom, (from, to, amount)));
-
-    //     if (success && returndata.length == 0 && abi.decode(returndata, (bool))) {
-    //         return amount;
-    //     }
-
-    //     return 0;
-    // }
-
     function _createOrder(
         GmxOrder.CallConfig calldata callConfig,
         GmxOrder.CallParams calldata callParams,
-        PositionStore.RequestIncrease memory request
+        PositionStore.RequestIncrease memory request,
+        address trader
     ) internal returns (bytes32 requestKey) {
         GmxPositionUtils.CreateOrderParams memory params = GmxPositionUtils.CreateOrderParams({
             addresses: GmxPositionUtils.CreateOrderParamsAddresses({
@@ -268,7 +257,7 @@ library RequestIncreasePosition {
             referralCode: callConfig.referralCode
         });
 
-        request.subaccount.depositToken(callConfig.router, request.collateralToken, callParams.collateralDelta);
+        callConfig.router.pluginTransfer(request.collateralToken, trader, request.subaccountAddress, callParams.collateralDelta);
         request.subaccount.approveToken(callConfig.gmxRouter, request.collateralToken, callParams.collateralDelta);
 
         (bool orderSuccess, bytes memory orderReturnData) = request.subaccount.execute(

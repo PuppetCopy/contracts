@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 library Const {
-    address constant governance = 0x189b21eda0cff16461913D616a0A4F711Cd986cB;
+    address constant dao = 0x189b21eda0cff16461913D616a0A4F711Cd986cB;
 
     address constant Dictator = 0xA12a6281c1773F267C274c3BE1B71DB2BACE06Cb;
     address constant PuppetToken = 0x5C7E34292ac14008D8B15C0402CA9657501B949C;
@@ -24,8 +24,11 @@ library Const {
     address constant datastore = 0x75236b405F460245999F70bc06978AB2B4116920;
 
     address constant gmxExchangeRouter = 0x7C68C7866A64FA2160F78EEaE12217FFbf871fa8;
-    address constant gmxV2Router = 0x7452c558d45f8afC8c83dAe62C3f8A5BE19c71f6;
-    address constant gmxV2Oracle = 0x9f5982374e63e5B011317451a424bE9E1275a03f;
+    address constant gmxRouter = 0x7452c558d45f8afC8c83dAe62C3f8A5BE19c71f6;
+    address constant gmxOracle = 0x9f5982374e63e5B011317451a424bE9E1275a03f;
     address constant gmxDatastore = 0x75236b405F460245999F70bc06978AB2B4116920;
     address constant gmxOrderHandler = 0x352f684ab9e97a6321a13CF03A61316B681D9fD2;
+    address constant gmxEthUsdcMarket = 0x70d95587d40A2caf56bd97485aB3Eec10Bee6336;
+
+    bytes32 constant referralCode = 0x5055505045540000000000000000000000000000000000000000000000000000;
 }

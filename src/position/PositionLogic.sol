@@ -24,8 +24,6 @@ contract PositionLogic is Auth {
         RequestIncreasePosition.RequestConfig calldata callConfig,
         GmxOrder.CallParams calldata callParams
     ) external requiresAuth {
-        if (callConfig.subaccountAddress != callConfig.trader) revert PositionLogic__InvalidSubaccountTrader();
-
         RequestIncreasePosition.call(gmxCallConfig, callConfig, callParams);
     }
 

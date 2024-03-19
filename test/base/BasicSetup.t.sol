@@ -59,7 +59,7 @@ contract BasicSetup is PRBTest, StdCheats, StdUtils {
     }
 
     function _dealERC20(address _token, address _user, uint _amount) internal {
-        _amount = IERC20(_token).balanceOf(_user) + (_amount * 10 ** 18);
+        _amount = IERC20(_token).balanceOf(_user) + _amount;
         deal({token: _token, to: _user, give: _amount});
     }
 }

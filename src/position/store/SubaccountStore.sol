@@ -12,12 +12,11 @@ contract SubaccountStore is StoreController {
 
     uint public nativeTokenGasLimit = 50_000;
     uint public tokenGasLimit = 200_000;
-    address public holdingAddress;
 
     address public logicOperator;
 
-    constructor(Authority _authority, address _holdingAddress, address _initSetter) StoreController(_authority, _initSetter) {
-        holdingAddress = _holdingAddress;
+    constructor(Authority _authority, address _logicOperator, address _initSetter) StoreController(_authority, _initSetter) {
+        logicOperator = _logicOperator;
     }
 
     function getSubaccount(address _address) external view returns (Subaccount) {
@@ -38,10 +37,6 @@ contract SubaccountStore is StoreController {
 
     function setTokenGasLimit(uint _value) external isSetter {
         tokenGasLimit = _value;
-    }
-
-    function setHoldingAddress(address _address) external isSetter {
-        holdingAddress = _address;
     }
 
     function setLogicOperator(address _address) external isSetter {

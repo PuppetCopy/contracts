@@ -14,10 +14,10 @@ contract SubaccountLogic is Auth {
 
     constructor(Authority _authority) Auth(address(0), _authority) {}
 
-    function createSubaccount(SubaccountStore store, address account) external requiresAuth {
+    function createSubaccount(SubaccountStore store, address account) external requiresAuth returns (Subaccount subaccount) {
         if (address(store.getSubaccount(account)) == account) revert SubaccountLogic__AlreadyExists();
 
-        Subaccount subaccount = new Subaccount(store, account);
+        subaccount = new Subaccount(store, account);
         store.setSubaccount(account, subaccount);
 
         emit PositionLogic__CreateSubaccount(account, address(subaccount));

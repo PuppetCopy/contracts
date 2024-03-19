@@ -47,11 +47,10 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
         address gmxRouter;
         address dao;
         address feeReceiver;
-        address gmxCallbackCaller;
+        address gmxOrderHandler;
         uint limitPuppetList;
-        uint adjustmentFeeFactor;
-        uint minExecutionFee;
-        uint callbackGasLimit;
+        uint increaseCallbackGasLimit;
+        uint decreaseCallbackGasLimit;
         uint minMatchTokenAmount;
         bytes32 referralCode;
     }
@@ -64,13 +63,20 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
         params = _params;
     }
 
-    function createSubaccount(address account) external nonReentrant {
-        config.subaccountLogic.createSubaccount(params.subaccountStore, account);
-    }
+    // function createSubaccount(address account) external nonReentrant {
+    //     config.subaccountLogic.createSubaccount(params.subaccountStore, account);
+    // }
 
     function request(GmxOrder.CallParams calldata callParams) external nonReentrant {
         Subaccount subaccount = params.subaccountStore.getSubaccount(msg.sender);
         address subaccountAddress = address(subaccount);
+
+        if (subaccountAddress == address(0)) {
+            subaccount = config.subaccountLogic.createSubaccount(params.subaccountStore, msg.sender);
+            subaccountAddress = address(subaccount);
+        }
+
+        if (msg.sender != subaccount.account()) revert PositionLogic__UnauthorizedCaller();
 
         config.positionLogic.requestIncreasePosition(
             GmxOrder.CallConfig({
@@ -81,7 +87,7 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
                 gmxCallbackOperator: address(this),
                 feeReceiver: config.feeReceiver,
                 referralCode: config.referralCode,
-                callbackGasLimit: config.callbackGasLimit
+                callbackGasLimit: config.increaseCallbackGasLimit
             }),
             RequestIncreasePosition.RequestConfig({
                 puppetLogic: config.puppetLogic,
@@ -89,8 +95,6 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
                 gmxDatastore: config.gmxDatastore,
                 trader: msg.sender,
                 limitPuppetList: config.limitPuppetList,
-                adjustmentFeeFactor: config.adjustmentFeeFactor,
-                callbackGasLimit: config.callbackGasLimit,
                 minMatchTokenAmount: config.minMatchTokenAmount,
                 subaccount: subaccount,
                 subaccountAddress: subaccountAddress
@@ -114,7 +118,7 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
     // internal
 
     function _handlOperatorCallback(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) internal {
-        if (config.gmxCallbackCaller != msg.sender) revert PositionLogic__UnauthorizedCaller();
+        if (config.gmxOrderHandler != msg.sender) revert PositionLogic__UnauthorizedCaller();
 
         try config.positionLogic.handlOperatorCallback(
             ExecutePosition.CallConfig({

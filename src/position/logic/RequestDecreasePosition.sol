@@ -36,7 +36,6 @@ library RequestDecreasePosition {
         address trader;
         bytes32 referralCode;
         uint limitPuppetList;
-        uint adjustmentFeeFactor;
         uint callbackGasLimit;
         uint minMatchTokenAmount;
     }
