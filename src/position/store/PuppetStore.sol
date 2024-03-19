@@ -7,8 +7,6 @@ import {PuppetUtils} from "./../util/PuppetUtils.sol";
 
 contract PuppetStore is StoreController {
     struct Rule {
-        // address trader;
-        // address collateralToken;
         uint throttleActivity;
         uint allowance;
         uint allowanceRate;
@@ -20,8 +18,8 @@ contract PuppetStore is StoreController {
         int pnl;
     }
 
-    mapping(bytes32 puppetTraderKey => Rule) public ruleMap;
-    mapping(bytes32 puppetTraderKey => Activity) public traderActivityMap;
+    mapping(bytes32 ruleKey => Rule) public ruleMap;
+    mapping(bytes32 ruleKey => Activity) public activityMap;
 
     constructor(Authority _authority, address _initSetter) StoreController(_authority, _initSetter) {}
 
@@ -37,7 +35,7 @@ contract PuppetStore is StoreController {
         uint _length = _addressList.length;
         Rule[] memory _rules = new Rule[](_addressList.length);
         for (uint i = 0; i < _length; i++) {
-            bytes32 _key = PuppetUtils.getPuppetRouteKey(_addressList[i], routeKey);
+            bytes32 _key = PuppetUtils.getRuleKey(_addressList[i], routeKey);
 
             _rules[i] = ruleMap[_key];
         }
@@ -47,54 +45,50 @@ contract PuppetStore is StoreController {
     function setRuleList(Rule[] calldata _rules, bytes32[] calldata _routeKeyList, address[] calldata _addressList) external isSetter {
         uint _length = _addressList.length;
         for (uint i = 0; i < _length; i++) {
-            bytes32 _key = PuppetUtils.getPuppetRouteKey(_addressList[i], _routeKeyList[i]);
+            bytes32 _key = PuppetUtils.getRuleKey(_addressList[i], _routeKeyList[i]);
 
             ruleMap[_key] = _rules[i];
         }
     }
 
-    function setTraderActivity(bytes32 _key, Activity calldata _activity) external isSetter {
-        traderActivityMap[_key] = _activity;
+    function setActivity(bytes32 _key, Activity calldata _activity) external isSetter {
+        activityMap[_key] = _activity;
     }
 
-    function getTraderActivity(bytes32 _key) external view returns (Activity memory) {
-        return traderActivityMap[_key];
+    function getActivity(bytes32 _key) external view returns (Activity memory) {
+        return activityMap[_key];
     }
 
-    function getTraderActivityList(bytes32 _routeKey, address[] calldata _addressList) external view returns (Activity[] memory) {
+    function getActivityList(bytes32 _routeKey, address[] calldata _addressList) external view returns (Activity[] memory) {
         uint length = _addressList.length;
         Activity[] memory _activity = new Activity[](length);
 
         for (uint i = 0; i < length; i++) {
-            bytes32 puppetTraderKey = PuppetUtils.getPuppetRouteKey(_addressList[i], _routeKey);
-            _activity[i] = traderActivityMap[puppetTraderKey];
+            bytes32 puppetTraderKey = PuppetUtils.getRuleKey(_addressList[i], _routeKey);
+            _activity[i] = activityMap[puppetTraderKey];
         }
         return _activity;
     }
 
-    function setRouteActivityList(bytes32 _routeKey, address[] calldata _addressList, Activity[] calldata _activityList) external isSetter {
+    function setRuleActivityList(bytes32 _routeKey, address[] calldata _addressList, Activity[] calldata _activityList) external isSetter {
         uint length = _addressList.length;
 
         for (uint i = 0; i < length; i++) {
-            bytes32 puppetTraderKey = PuppetUtils.getPuppetRouteKey(_addressList[i], _routeKey);
-            traderActivityMap[puppetTraderKey] = _activityList[i];
+            bytes32 puppetTraderKey = PuppetUtils.getRuleKey(_addressList[i], _routeKey);
+            activityMap[puppetTraderKey] = _activityList[i];
         }
     }
 
-    function getTraderRuleAndActivityList(bytes32 _routeKey, address[] calldata _addressList)
-        external
-        view
-        returns (Rule[] memory, Activity[] memory)
-    {
+    function getRuleAndActivityList(bytes32 _routeKey, address[] calldata _addressList) external view returns (Rule[] memory, Activity[] memory) {
         uint length = _addressList.length;
 
         Rule[] memory _rules = new Rule[](length);
         Activity[] memory _activity = new Activity[](length);
 
         for (uint i = 0; i < length; i++) {
-            bytes32 puppetTraderKey = PuppetUtils.getPuppetRouteKey(_addressList[i], _routeKey);
-            _rules[i] = ruleMap[puppetTraderKey];
-            _activity[i] = traderActivityMap[puppetTraderKey];
+            bytes32 rk = PuppetUtils.getRuleKey(_addressList[i], _routeKey);
+            _rules[i] = ruleMap[rk];
+            _activity[i] = activityMap[rk];
         }
         return (_rules, _activity);
     }

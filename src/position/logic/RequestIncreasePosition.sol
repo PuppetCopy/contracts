@@ -114,7 +114,7 @@ library RequestIncreasePosition {
         }
 
         (PuppetStore.Rule[] memory ruleList, PuppetStore.Activity[] memory activityList) =
-            callConfig.puppetStore.getTraderRuleAndActivityList(request.routeKey, callParams.puppetList);
+            callConfig.puppetStore.getRuleAndActivityList(request.routeKey, callParams.puppetList);
 
         if (request.mirrorPosition.size == 0) {
             if (callParams.puppetList.length > callConfig.limitPuppetList) revert RequestIncreasePosition__PuppetListLimitExceeded();

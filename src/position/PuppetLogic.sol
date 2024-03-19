@@ -46,7 +46,7 @@ contract PuppetLogic is Auth {
     {
         if (addressList.length != activity.length) revert PuppetStore__AddressListLengthMismatch();
 
-        store.setRouteActivityList(routeKey, addressList, activity);
+        store.setRuleActivityList(routeKey, addressList, activity);
     }
 
     error PuppetLogic__MinAllowanceRate(uint rate);

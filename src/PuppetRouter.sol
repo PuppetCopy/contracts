@@ -75,7 +75,7 @@ contract PuppetRouter is Router, Multicall, ReentrancyGuard {
             maxAllowanceRate: config.maxAllowanceRate
         });
 
-        config.puppetLogic.setRule(callParams, ruleParams, PuppetUtils.getPuppetRouteKey(puppet, routeKey));
+        config.puppetLogic.setRule(callParams, ruleParams, PuppetUtils.getRuleKey(puppet, routeKey));
     }
 
     // governance
