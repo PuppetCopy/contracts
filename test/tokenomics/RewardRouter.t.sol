@@ -77,30 +77,39 @@ contract RewardRouterTest is BasicSetup {
         dictator.setRoleCapability(REWARD_DISTRIBUTOR_ROLE, address(revenueDistributor), revenueDistributor.depositToken.selector, true);
 
         rewardRouter = new RewardRouter(
-            RewardRouter.RewardRouterParams({
-                dictator: dictator,
-                puppetToken: puppetToken,
-                lp: vault,
-                router: router,
-                oracleStore: oracleStore,
-                votingEscrow: votingEscrow,
-                wnt: wnt
-            }),
-            RewardRouter.RewardRouterConfig({
-                revenueDistributor: revenueDistributor,
+            dictator,
+            wnt,
+            router,
+            rewardLogic,
+            RewardLogic.CallStorePriceConfig({
                 wntUsdPoolList: wntUsdPoolList,
-                wntUsdTwapInterval: 0,
-                rewardStore: rewardStore,
-                rewardLogic: rewardLogic,
+                oracleStore: oracleStore,
                 oracleLogic: oracleLogic,
-                dao: dictator.owner(),
-                revenueToken: revenueToken,
+                vault: vault,
+                wntUsdTwapInterval: 0,
                 poolId: keccak256(abi.encode("POOL", "DEFAULT")),
-                lockRate: lockRate,
-                exitRate: exitRate,
-                treasuryLockRate: treasuryLockRate,
-                treasuryExitRate: treasuryExitRate
-            })
+                maxAcceptableTokenPriceInUsdc: 10e6
+            }),
+            RewardLogic.CallLockConfig({
+                router: router,
+                votingEscrow: votingEscrow,
+                rewardStore: rewardStore,
+                puppetToken: puppetToken,
+                revenueToken: revenueToken,
+                rate: lockRate,
+                daoRate: treasuryLockRate,
+                dao: dictator.owner()
+            }),
+            RewardLogic.CallExitConfig({
+                rewardStore: rewardStore,
+                puppetToken: puppetToken,
+                revenueToken: revenueToken,
+                rate: exitRate,
+                daoRate: treasuryExitRate,
+                dao: dictator.owner()
+            }),
+            RewardLogic.CallClaimConfig({revenueDistributor: revenueDistributor, revenueToken: revenueToken}),
+            RewardLogic.CallVeConfig({votingEscrow: votingEscrow})
         );
 
         dictator.setUserRole(address(votingEscrow), TOKEN_ROUTER_ROLE, true);
@@ -125,24 +134,24 @@ contract RewardRouterTest is BasicSetup {
 
         puppetToken.transfer(address(0x123), puppetToken.balanceOf(users.owner));
         vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
-        rewardRouter.lock(getMaxTime(), 100e6);
+        rewardRouter.lock(100e6, getMaxTime());
 
         vm.expectRevert(RewardLogic.RewardLogic__UnacceptableTokenPrice.selector);
-        rewardRouter.lock(getMaxTime(), 9e5);
+        rewardRouter.lock(9e5, getMaxTime());
 
         generateUserRevenue(users.alice, 100e6);
         vm.expectRevert(VotingEscrow.VotingEscrow__InvalidLockValue.selector);
-        rewardRouter.lock(0, 1e6);
+        rewardRouter.lock(1e6, 0);
 
         assertEq(rewardLogic.getAccountGeneratedRevenue(rewardStore, users.alice).amountInUsd, 100e6);
 
-        rewardRouter.lock(getMaxTime(), 1e6);
+        rewardRouter.lock(1e6, getMaxTime());
         uint daoClaimableAmount1 = rewardLogic.getClaimableAmount(treasuryLockRate, 100e18);
         assertEq(puppetToken.balanceOf(dictator.owner()), daoClaimableAmount1);
         assertAlmostEq(votingEscrow.balanceOf(users.alice), rewardLogic.getClaimableAmount(lockRate, 100e18), 10e17);
 
         vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
-        rewardRouter.lock(getMaxTime(), 1e6);
+        rewardRouter.lock(1e6, getMaxTime());
 
         assertEq(rewardLogic.getAccountGeneratedRevenue(rewardStore, users.alice).amountInUsd, 0);
 
@@ -156,17 +165,17 @@ contract RewardRouterTest is BasicSetup {
 
         generateUserRevenue(users.alice, 100e6);
         assertEq(rewardLogic.getAccountGeneratedRevenue(rewardStore, users.alice).amountInUsd, 100e6);
-        rewardRouter.lock(0, 1e6);
+        rewardRouter.lock(1e6, 0);
         assertAlmostEq(votingEscrow.balanceOf(users.alice), rewardLogic.getClaimableAmount(lockRate, 200e18), 10e17);
 
         generateUserRevenue(users.bob, 100e6);
         assertEq(rewardLogic.getAccountGeneratedRevenue(rewardStore, users.bob).amountInUsd, 100e6);
-        rewardRouter.lock(getMaxTime(), 1e6);
+        rewardRouter.lock(1e6, getMaxTime());
         assertAlmostEq(votingEscrow.balanceOf(users.bob), rewardLogic.getClaimableAmount(lockRate, 100e18), 10e17);
 
         generateUserRevenue(users.yossi, 100e6);
         assertEq(rewardLogic.getAccountGeneratedRevenue(rewardStore, users.yossi).amountInUsd, 100e6);
-        rewardRouter.lock(getMaxTime() / 2, 1e6);
+        rewardRouter.lock(1e6, getMaxTime() / 2);
         assertAlmostEq(votingEscrow.balanceOf(users.yossi), rewardLogic.getClaimableAmount(lockRate, 100e18 / 2) / 2, 10e17);
         assertEq(votingEscrow.lockedAmount(users.yossi), rewardLogic.getClaimableAmount(lockRate, 100e18) / 2);
         assertEq(rewardLogic.getRewardTimeMultiplier(votingEscrow, users.yossi, getMaxTime() / 2), 5000);

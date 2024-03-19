@@ -22,9 +22,15 @@ contract PositionLogic is Auth {
     function requestIncreasePosition(
         GmxOrder.CallConfig calldata gmxCallConfig,
         RequestIncreasePosition.RequestConfig calldata callConfig,
-        GmxOrder.CallParams calldata callParams
+        GmxOrder.CallParams calldata callParams,
+        address from
     ) external requiresAuth {
-        RequestIncreasePosition.call(gmxCallConfig, callConfig, callParams);
+        Subaccount subaccount = gmxCallConfig.subaccountStore.getSubaccount(from);
+        if (address(subaccount) == address(0)) {
+            subaccount = gmxCallConfig.subaccountLogic.createSubaccount(gmxCallConfig.subaccountStore, from);
+        }
+
+        RequestIncreasePosition.call(gmxCallConfig, callConfig, callParams, subaccount);
     }
 
     function handlOperatorCallback(

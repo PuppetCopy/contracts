@@ -2,20 +2,15 @@
 pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IGmxExchangeRouter} from "../interface/IGmxExchangeRouter.sol";
-import {IGmxDatastore} from "../interface/IGmxDatastore.sol";
 
 import {Router} from "src/utils/Router.sol";
+import {SubaccountLogic} from "./../util/SubaccountLogic.sol";
 
-import {ErrorUtils} from "./../../utils/ErrorUtils.sol";
-import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
-import {Subaccount} from "../util/Subaccount.sol";
-
-import {PuppetStore} from "../store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
 import {SubaccountStore} from "./../store/SubaccountStore.sol";
+import {PositionLogic} from "./../PositionLogic.sol";
 
 /*
 
@@ -71,9 +66,11 @@ library GmxOrder {
     struct CallConfig {
         Router router;
         PositionStore positionStore;
+        SubaccountStore subaccountStore;
+        SubaccountLogic subaccountLogic;
         IGmxExchangeRouter gmxExchangeRouter;
+        PositionLogic positionLogic;
         address gmxRouter;
-        address gmxCallbackOperator;
         address feeReceiver;
         bytes32 referralCode;
         uint callbackGasLimit;
@@ -90,6 +87,4 @@ library GmxOrder {
         uint triggerPrice;
         address[] puppetList;
     }
-
-
 }

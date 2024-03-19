@@ -12,6 +12,7 @@ import {Subaccount} from "../util/Subaccount.sol";
 
 import {PuppetStore} from "../store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
+import {PositionLogic} from "./../PositionLogic.sol";
 
 import {GmxOrder} from "./GmxOrder.sol";
 
@@ -19,8 +20,7 @@ library ExecutePosition {
     struct CallConfig {
         PositionStore positionStore;
         PuppetStore puppetStore;
-        address gmxCallbackOperator;
-        address caller;
+        address gmxOrderHandler;
     }
 
     function increase(CallConfig calldata callConfig, bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external {
@@ -38,8 +38,6 @@ library ExecutePosition {
         callConfig.positionStore.removePendingRequestIncreaseAdjustmentMap(positionKey);
 
         if (request.sizeDelta < 0) {
-
-
             // GmxOrder.call(gmxCallConfig, callParams, request);
             // RequestDecreasePosition.request(callConfig, callIncreaseParams);
         }

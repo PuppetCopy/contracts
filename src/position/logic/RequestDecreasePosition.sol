@@ -31,7 +31,6 @@ library RequestDecreasePosition {
         IGmxExchangeRouter gmxExchangeRouter;
         IGmxDatastore gmxDatastore;
         address gmxRouter;
-        address gmxCallbackOperator;
         address feeReceiver;
         address trader;
         bytes32 referralCode;
@@ -69,7 +68,7 @@ library RequestDecreasePosition {
         GmxPositionUtils.CreateOrderParams memory params = GmxPositionUtils.CreateOrderParams({
             addresses: GmxPositionUtils.CreateOrderParamsAddresses({
                 receiver: address(callConfig.positionStore),
-                callbackContract: callConfig.gmxCallbackOperator,
+                callbackContract: msg.sender,
                 uiFeeReceiver: callConfig.feeReceiver,
                 market: callParams.market,
                 initialCollateralToken: callParams.collateralToken,

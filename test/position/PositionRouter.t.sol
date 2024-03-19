@@ -2,22 +2,20 @@
 pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
 import {PositionLogic} from "src/position/PositionLogic.sol";
-import {
-    SubaccountLogic,
-    PositionRouter,
-    IGmxExchangeRouter,
-    IGmxDatastore,
-    IERC20,
-    Router,
-    PositionStore,
-    SubaccountStore,
-    Subaccount,
-    GmxOrder
-} from "src/PositionRouter.sol";
+import {PositionRouter} from "src/PositionRouter.sol";
+import {SubaccountLogic} from "src/position/util/SubaccountLogic.sol";
+import {SubaccountStore} from "src/position/store/SubaccountStore.sol";
+import {PositionStore} from "src/position/store/PositionStore.sol";
+import {IGmxExchangeRouter} from "./../../src/position/interface/IGmxExchangeRouter.sol";
+import {IGmxDatastore} from "./../../src/position/interface/IGmxDatastore.sol";
+import {GmxOrder} from "./../../src/position/logic/GmxOrder.sol";
+import {RequestIncreasePosition} from "./../../src/position/logic/RequestIncreasePosition.sol";
+import {ExecutePosition} from "./../../src/position/logic/ExecutePosition.sol";
 
 import {PuppetRouter, PuppetLogic, PuppetStore} from "src/PuppetRouter.sol";
 
@@ -75,37 +73,39 @@ contract PositionRouterTest is BasicSetup {
 
         positionRouter = new PositionRouter(
             dictator,
-            PositionRouter.PositionRouterParams({
-                dictator: dictator,
+            positionLogic,
+            GmxOrder.CallConfig({
                 router: router,
                 positionStore: positionStore,
                 subaccountStore: subaccountStore,
-                puppetStore: puppetStore
-            }),
-            PositionRouter.PositionRouterConfig({
-                router: router,
                 subaccountLogic: subaccountLogic,
+                gmxExchangeRouter: IGmxExchangeRouter(Const.gmxExchangeRouter),
+                positionLogic: positionLogic,
+                gmxRouter: Const.gmxRouter,
+                feeReceiver: Const.dao,
+                referralCode: Const.referralCode,
+                callbackGasLimit: 0
+            }),
+            RequestIncreasePosition.RequestConfig({
                 positionLogic: positionLogic,
                 puppetLogic: puppetLogic,
-                gmxExchangeRouter: IGmxExchangeRouter(Const.gmxExchangeRouter),
+                puppetStore: puppetStore,
                 gmxDatastore: IGmxDatastore(Const.gmxDatastore),
-                gmxRouter: Const.gmxRouter,
-                dao: Const.dao,
-                gmxOrderHandler: Const.gmxOrderHandler,
-                feeReceiver: Const.dao,
                 limitPuppetList: 100,
-                increaseCallbackGasLimit: 0,
-                decreaseCallbackGasLimit: 0,
-                minMatchTokenAmount: 1e6,
-                referralCode: Const.referralCode
+                minMatchTokenAmount: 1e6
+            }),
+            ExecutePosition.CallConfig({
+                positionStore: positionStore,
+                puppetStore: puppetStore,
+                gmxOrderHandler: Const.gmxOrderHandler
             })
         );
 
         dictator.setUserRole(address(puppetRouter), PUPPET_LOGIC, true);
-        dictator.setUserRole(address(positionRouter), SUBACCOUNT_LOGIC, true);
         dictator.setUserRole(address(positionRouter), POSITION_LOGIC, true);
         dictator.setUserRole(address(positionLogic), TOKEN_ROUTER_ROLE, true);
         dictator.setUserRole(address(positionLogic), PUPPET_LOGIC, true);
+        dictator.setUserRole(address(positionLogic), SUBACCOUNT_LOGIC, true);
     }
 
     function testIncreaseRequest() public {
@@ -117,23 +117,22 @@ contract PositionRouterTest is BasicSetup {
 
         vm.startPrank(puppet);
 
-
         IERC20(collateralToken).approve(address(router), 100e6);
 
-        PuppetStore.Rule memory rule = PuppetStore.Rule({
-            trader: trader,
-            collateralToken: collateralToken,
-            throttleActivity: 0,
-            allowance: 100,
-            allowanceRate: 100,
-            expiry: block.timestamp + 100
-        });
-
-        puppetRouter.setRule(rule);
+        puppetRouter.setRule(
+            PuppetStore.Rule({
+                trader: trader,
+                collateralToken: collateralToken,
+                throttleActivity: 0,
+                allowance: 100,
+                allowanceRate: 100,
+                expiry: block.timestamp + 100
+            })
+        );
 
         vm.startPrank(trader);
 
-        _dealERC20(collateralToken, users.bob, 100e6);
+        _dealERC20(collateralToken, trader, 100e6);
         IERC20(collateralToken).approve(address(router), 100e6);
 
         positionRouter.request(

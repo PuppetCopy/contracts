@@ -12,14 +12,14 @@ contract PositionStore is StoreController {
     struct RequestIncrease {
         bytes32 requestKey;
         bytes32 routeKey;
+        bytes32 positionKey;
         uint collateralDelta;
         int sizeDelta;
         uint targetLeverage;
         uint[] puppetCollateralDeltaList;
-        bytes32 positionKey;
         IERC20 collateralToken;
-        Subaccount subaccount;
-        address subaccountAddress;
+        address subaccount;
+        address trader;
         MirrorPosition mirrorPosition;
     }
 
