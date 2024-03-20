@@ -17,7 +17,7 @@ contract PuppetStore is StoreController {
 
     struct Activity {
         uint latestFunding;
-        int pnl;
+        int allowance;
     }
 
     mapping(bytes32 ruleKey => Rule) public ruleMap;

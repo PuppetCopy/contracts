@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {WNT} from "./WNT.sol";
+import {IWNT} from "./interfaces/IWNT.sol";
 import {ErrorUtils} from "./ErrorUtils.sol";
 
 /**
@@ -22,7 +22,7 @@ library TransferUtils {
      * @param receiver the address of the recipient of the wrapped native token transfer
      * @param amount the amount of native token to deposit and the amount of wrapped native token to send
      */
-    function sendNativeToken(WNT wnt, address holdingAddress, uint256 gasLimit, address receiver, uint256 amount) internal {
+    function sendNativeToken(IWNT wnt, address holdingAddress, uint gasLimit, address receiver, uint amount) internal {
         if (amount == 0) return;
         validateDestination(receiver);
 
@@ -46,7 +46,7 @@ library TransferUtils {
         if (success) return;
 
         // if the transfer failed, re-wrap the token and send it to the receiver
-        depositAndSendWrappedNativeToken(wnt, holdingAddress, gasLimit, receiver, amount);
+        sendWnt(wnt, holdingAddress, gasLimit, receiver, amount);
     }
 
     /**
@@ -59,7 +59,7 @@ library TransferUtils {
      * @param receiver the address of the recipient of the wrapped native token transfer
      * @param amount the amount of native token to deposit and the amount of wrapped native token to send
      */
-    function depositAndSendWrappedNativeToken(WNT wnt, address holdingAddress, uint256 gasLimit, address receiver, uint256 amount) internal {
+    function sendWnt(IWNT wnt, address holdingAddress, uint gasLimit, address receiver, uint amount) internal {
         if (amount == 0) return;
         validateDestination(receiver);
 
@@ -82,7 +82,7 @@ library TransferUtils {
      * @param receiver the address of the recipient of the native token transfer
      * @param amount the amount of wrapped native token to withdraw and the amount of native token to send
      */
-    function withdrawAndSendNativeToken(WNT wnt, address holdingAddress, uint256 gasLimit, address receiver, uint256 amount) internal {
+    function withdrawWnt(IWNT wnt, address holdingAddress, uint gasLimit, address receiver, uint amount) internal {
         if (amount == 0) return;
         validateDestination(receiver);
 
@@ -108,7 +108,7 @@ library TransferUtils {
         if (success) return;
 
         // if the transfer failed, re-wrap the token and send it to the receiver
-        depositAndSendWrappedNativeToken(wnt, holdingAddress, gasLimit, receiver, amount);
+        sendWnt(wnt, holdingAddress, gasLimit, receiver, amount);
     }
 
     /**
@@ -123,7 +123,7 @@ library TransferUtils {
      * @param receiver The address of the recipient of the `token` transfer.
      * @param amount The amount of `token` to transfer.
      */
-    function transfer(uint256 gasLimit, address holdingAddress, IERC20 token, address receiver, uint256 amount) internal {
+    function transfer(uint gasLimit, address holdingAddress, IERC20 token, address receiver, uint amount) internal {
         if (amount == 0) return;
         validateDestination(receiver);
 
@@ -168,7 +168,7 @@ library TransferUtils {
      * @return a tuple containing a boolean indicating the success or failure of the
      * token transfer, and a bytes value containing the return data from the token transfer
      */
-    function nonRevertingTransferWithGasLimit(IERC20 token, address to, uint256 amount, uint256 gasLimit) internal returns (bool, bytes memory) {
+    function nonRevertingTransferWithGasLimit(IERC20 token, address to, uint amount, uint gasLimit) internal returns (bool, bytes memory) {
         bytes memory data = abi.encodeWithSelector(token.transfer.selector, to, amount);
         (bool success, bytes memory returndata) = address(token).call{gas: gasLimit}(data);
 
@@ -204,7 +204,7 @@ library TransferUtils {
     function isContract(address account) internal view returns (bool) {
         // According to EIP-1052, 0x0 is the value returned for not-yet created accounts
         // and 0xc5d246... is returned for accounts without code, i.e., `keccak256('')`
-        uint256 size;
+        uint size;
         // inline assembly is used to access the EVM's `extcodesize` operation
         assembly {
             size := extcodesize(account)
@@ -225,12 +225,12 @@ library TransferUtils {
 
     error EmptyReceiver();
     error EmptyTokenTranferGasLimit(address token);
-    error TokenTransferError(address token, address receiver, uint256 amount);
+    error TokenTransferError(address token, address receiver, uint amount);
     error EmptyHoldingAddress();
 
     event TokenTransferReverted(string reason, bytes returndata);
 
     error InvalidNativeTokenSender(address msgSender);
-    error TransferFailed(address sender, uint256 amount);
+    error TransferFailed(address sender, uint amount);
     error SelfTransferNotSupported(address receiver);
 }

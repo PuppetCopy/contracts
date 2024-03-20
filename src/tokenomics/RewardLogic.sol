@@ -205,12 +205,6 @@ contract RewardLogic is Auth {
         if (tokenPrice > maxAcceptableTokenPriceInUsdc) revert RewardLogic__UnacceptableTokenPrice();
     }
 
-    // internal
-
-    function resetUserGeneratedRevenue(RewardStore rewardStore, address account) internal {
-        rewardStore.removeUserGeneratedRevenue(getUserGeneratedRevenueKey(account));
-    }
-
     // governance
 
     // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/mock/ReferralStorage.sol#L127
@@ -224,6 +218,10 @@ contract RewardLogic is Auth {
     }
 
     // internal view
+
+    function resetUserGeneratedRevenue(RewardStore rewardStore, address account) internal {
+        rewardStore.removeUserGeneratedRevenue(getUserGeneratedRevenueKey(account));
+    }
 
     function getUserGeneratedRevenueKey(address account) internal pure returns (bytes32) {
         return keccak256(abi.encode("USER_REVENUE", account));

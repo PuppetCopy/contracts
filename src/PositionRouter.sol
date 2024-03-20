@@ -14,29 +14,25 @@ import {PositionLogic} from "./position/PositionLogic.sol";
 import {GmxOrder} from "./position/logic/GmxOrder.sol";
 
 contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
-    event PositionRouter__SetConfig(
-        uint timestamp, GmxOrder.CallConfig gmxCallConfig, RequestIncreasePosition.RequestConfig callConfig, ExecutePosition.CallConfig executeConfig
-    );
+    event PositionRouter__SetConfig(uint timestamp, RequestIncreasePosition.CallConfig callIncreaseConfig, ExecutePosition.CallConfig executeConfig);
 
     PositionLogic positionLogic;
 
-    GmxOrder.CallConfig gmxCallConfig;
-    RequestIncreasePosition.RequestConfig callRequestConfig;
+    RequestIncreasePosition.CallConfig callIncreaseConfig;
     ExecutePosition.CallConfig callExecuteConfig;
 
     constructor(
         Authority _authority,
         PositionLogic _positionLogic,
-        GmxOrder.CallConfig memory _gmxCallConfig,
-        RequestIncreasePosition.RequestConfig memory _callConfig,
+        RequestIncreasePosition.CallConfig memory _callIncreaseConfig,
         ExecutePosition.CallConfig memory _executeConfig
     ) Auth(address(0), _authority) {
         positionLogic = _positionLogic;
-        _setConfig(_gmxCallConfig, _callConfig, _executeConfig);
+        _setConfig(_callIncreaseConfig, _executeConfig);
     }
 
     function request(GmxOrder.CallParams calldata callParams) external nonReentrant {
-        positionLogic.requestIncreasePosition(gmxCallConfig, callRequestConfig, callParams, msg.sender);
+        positionLogic.requestIncreasePosition(callIncreaseConfig, callParams, msg.sender);
     }
 
     function afterOrderExecution(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant {
@@ -66,24 +62,18 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
 
     // governance
 
-    function setConfig(
-        GmxOrder.CallConfig calldata _gmxCallConfig,
-        RequestIncreasePosition.RequestConfig calldata _callConfig,
-        ExecutePosition.CallConfig calldata _executeConfig
-    ) external requiresAuth {
-        _setConfig(_gmxCallConfig, _callConfig, _executeConfig);
+    function setConfig(RequestIncreasePosition.CallConfig calldata _callIncreaseConfig, ExecutePosition.CallConfig calldata _executeConfig)
+        external
+        requiresAuth
+    {
+        _setConfig(_callIncreaseConfig, _executeConfig);
     }
 
-    function _setConfig(
-        GmxOrder.CallConfig memory _gmxCallConfig,
-        RequestIncreasePosition.RequestConfig memory _callConfig,
-        ExecutePosition.CallConfig memory _executeConfig
-    ) internal {
-        gmxCallConfig = _gmxCallConfig;
-        callRequestConfig = _callConfig;
+    function _setConfig(RequestIncreasePosition.CallConfig memory _callIncreaseConfig, ExecutePosition.CallConfig memory _executeConfig) internal {
+        callIncreaseConfig = _callIncreaseConfig;
         callExecuteConfig = _executeConfig;
 
-        emit PositionRouter__SetConfig(block.timestamp, _gmxCallConfig, _callConfig, _executeConfig);
+        emit PositionRouter__SetConfig(block.timestamp, _callIncreaseConfig, _executeConfig);
     }
 
     error PositionLogic__UnauthorizedCaller();

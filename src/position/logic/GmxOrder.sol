@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IGmxExchangeRouter} from "../interface/IGmxExchangeRouter.sol";
+import {IWNT} from "./../../utils/interfaces/IWNT.sol";
 
 import {Router} from "src/utils/Router.sol";
 import {SubaccountLogic} from "./../util/SubaccountLogic.sol";
@@ -63,19 +64,6 @@ import {PositionLogic} from "./../PositionLogic.sol";
 
     */
 library GmxOrder {
-    struct CallConfig {
-        Router router;
-        PositionStore positionStore;
-        SubaccountStore subaccountStore;
-        SubaccountLogic subaccountLogic;
-        IGmxExchangeRouter gmxExchangeRouter;
-        PositionLogic positionLogic;
-        address gmxRouter;
-        address feeReceiver;
-        bytes32 referralCode;
-        uint callbackGasLimit;
-    }
-
     struct CallParams {
         address market;
         address collateralToken;

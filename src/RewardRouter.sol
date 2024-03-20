@@ -2,14 +2,13 @@
 pragma solidity 0.8.24;
 
 import {MulticallRouter} from "./utils/MulticallRouter.sol";
-import {WNT} from "./utils/WNT.sol";
+import {IWNT} from "./utils/interfaces/IWNT.sol";
 import {Router} from "./utils/Router.sol";
 import {Dictator} from "./utils/Dictator.sol";
 import {Calc} from "./utils/Calc.sol";
 
 import {RewardLogic} from "./tokenomics/RewardLogic.sol";
 import {OracleLogic} from "./tokenomics/OracleLogic.sol";
-import {VotingEscrow} from "./tokenomics/VotingEscrow.sol";
 
 contract RewardRouter is MulticallRouter {
     event RewardRouter__SetConfig(
@@ -17,7 +16,8 @@ contract RewardRouter is MulticallRouter {
         RewardLogic.CallStorePriceConfig callStorePriceConfig,
         RewardLogic.CallLockConfig callLockConfig,
         RewardLogic.CallExitConfig callExitConfig,
-        RewardLogic.CallClaimConfig callClaimConfig
+        RewardLogic.CallClaimConfig callClaimConfig,
+        RewardLogic.CallVeConfig callVeLockConfig
     );
 
     RewardLogic rewardLogic;
@@ -28,13 +28,9 @@ contract RewardRouter is MulticallRouter {
     RewardLogic.CallClaimConfig public callClaimConfig;
     RewardLogic.CallVeConfig public callVeLockConfig;
 
-    struct Params {
-        VotingEscrow votingEscrow;
-    }
-
     constructor(
         Dictator _dictator,
-        WNT _wnt,
+        IWNT _wnt,
         Router _router,
         RewardLogic _rewardLogic,
         RewardLogic.CallStorePriceConfig memory _callStorePriceConfig,
@@ -108,10 +104,9 @@ contract RewardRouter is MulticallRouter {
         callClaimConfig = _callClaimConfig;
         callVeLockConfig = _callVeLockConfig;
 
-        emit RewardRouter__SetConfig(block.timestamp, _callStorePriceConfig, _callLockConfig, _callExitConfig, callClaimConfig);
+        emit RewardRouter__SetConfig(block.timestamp, _callStorePriceConfig, _callLockConfig, _callExitConfig, _callClaimConfig, _callVeLockConfig);
     }
 
-    error RewardRouter__AdjustOtherLock();
     error RewardRouter__InvalidWeightFactors();
     error RewardRouter__SourceCountNotOdd();
     error RewardRouter__NotEnoughSources();

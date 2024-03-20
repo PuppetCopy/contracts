@@ -13,7 +13,7 @@ import {PositionStore} from "./../src/position/store/PositionStore.sol";
 
 import {Dictator} from "src/utils/Dictator.sol";
 import {Router} from "src/utils/Router.sol";
-import {WNT} from "src/utils/WNT.sol";
+import {IWNT} from "./../src/utils/interfaces/IWNT.sol";
 
 import {OracleLogic} from "src/tokenomics/OracleLogic.sol";
 import {OracleStore} from "src/tokenomics/store/OracleStore.sol";

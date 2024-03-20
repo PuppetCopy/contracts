@@ -20,17 +20,16 @@ contract PositionLogic is Auth {
     constructor(Authority _authority) Auth(address(0), _authority) {}
 
     function requestIncreasePosition(
-        GmxOrder.CallConfig calldata gmxCallConfig,
-        RequestIncreasePosition.RequestConfig calldata callConfig,
+        RequestIncreasePosition.CallConfig calldata callConfig,
         GmxOrder.CallParams calldata callParams,
         address from
     ) external requiresAuth {
-        Subaccount subaccount = gmxCallConfig.subaccountStore.getSubaccount(from);
+        Subaccount subaccount = callConfig.subaccountStore.getSubaccount(from);
         if (address(subaccount) == address(0)) {
-            subaccount = gmxCallConfig.subaccountLogic.createSubaccount(gmxCallConfig.subaccountStore, from);
+            subaccount = callConfig.subaccountLogic.createSubaccount(callConfig.subaccountStore, from);
         }
 
-        RequestIncreasePosition.call(gmxCallConfig, callConfig, callParams, subaccount);
+        RequestIncreasePosition.call(callConfig, callParams, subaccount);
     }
 
     function handlOperatorCallback(

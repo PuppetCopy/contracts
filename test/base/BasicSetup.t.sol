@@ -10,7 +10,7 @@ import {PRBTest} from "@prb/test/src/PRBTest.sol";
 import {Dictator} from "src/utils/Dictator.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {Router} from "src/utils/Router.sol";
-import {WNT} from "src/utils/WNT.sol";
+import {IWNT} from "./../../src/utils/interfaces/IWNT.sol";
 
 contract BasicSetup is PRBTest, StdCheats, StdUtils {
     struct Users {
@@ -28,7 +28,7 @@ contract BasicSetup is PRBTest, StdCheats, StdUtils {
     address payable owner = payable(makeAddr("Owner"));
 
     Users users;
-    WNT wnt;
+    IWNT wnt;
     Dictator dictator;
     PuppetToken puppetToken;
     Router router;

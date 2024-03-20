@@ -7,19 +7,19 @@ import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 
-import {WNT} from "./WNT.sol";
+import {IWNT} from "./interfaces/IWNT.sol";
 import {TransferUtils} from "./TransferUtils.sol";
 import {Router} from "./Router.sol";
 
 abstract contract MulticallRouter is ReentrancyGuard, Router, Multicall {
-    WNT public immutable wnt;
+    IWNT public immutable wnt;
     Router public immutable router;
 
     uint nativeTokenGasLimit = 50_000;
     uint tokenGasLimit = 200_000;
     address holdingAddress;
 
-    constructor(Authority _authority, WNT _wnt, Router _router, address _holdingAddress) Router(_authority) {
+    constructor(Authority _authority, IWNT _wnt, Router _router, address _holdingAddress) Router(_authority) {
         wnt = _wnt;
         router = _router;
         holdingAddress = _holdingAddress;
@@ -35,7 +35,7 @@ abstract contract MulticallRouter is ReentrancyGuard, Router, Multicall {
 
     // @dev Wraps the specified amount of native tokens into WNT then sends the WNT to the specified address
     function sendWnt(address receiver, uint amount) external payable nonReentrant {
-        TransferUtils.depositAndSendWrappedNativeToken(wnt, holdingAddress, tokenGasLimit, receiver, amount);
+        TransferUtils.sendWnt(wnt, holdingAddress, tokenGasLimit, receiver, amount);
     }
 
     // @dev Sends native token given amount and address

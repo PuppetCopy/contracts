@@ -4,14 +4,20 @@ pragma solidity 0.8.24;
 import {GmxPositionUtils} from "./../util/GmxPositionUtils.sol";
 
 interface IGmxExchangeRouter {
+    /// @dev Executes multiple calls in a single transaction, and returns the results of each call.
+    function multicall(bytes[] calldata data) external payable returns (bytes[] memory results);
+
+    function sendWnt(address receiver, uint amount) external payable;
+    function sendNativeToken(address receiver, uint amount) external payable;
+    /// @dev Sends the given amount of tokens to the given address
+    function sendTokens(address token, address receiver, uint amount) external payable;
+
     /// @dev Creates a new order with the given amount, order parameters. The order is
     ///      created by transferring the specified amount of collateral tokens from the caller's account to the
     ///      order store, and then calling the `createOrder()` function on the order handler contract. The
     ///      referral code is also set on the caller's account using the referral storage contract.
     function createOrder(GmxPositionUtils.CreateOrderParams calldata params) external payable returns (bytes32);
 
-    /// @dev Sends the given amount of tokens to the given address
-    function sendTokens(address token, address receiver, uint amount) external payable;
 
     /**
      * @dev Cancels the given order. The `cancelOrder()` feature must be enabled for the given order

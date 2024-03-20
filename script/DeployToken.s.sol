@@ -11,14 +11,14 @@ import {IBasePool} from "@balancer-labs/v2-interfaces/vault/IBasePool.sol";
 import {Const} from "script/Const.s.sol";
 
 import {Dictator} from "src/utils/Dictator.sol";
-import {WNT} from "src/utils/WNT.sol";
+import {IWNT} from "./../src/utils/interfaces/IWNT.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 
 contract DeployToken is PRBTest {
     address internal DEPLOYER_ADDRESS = vm.envAddress("GBC_DEPLOYER_ADDRESS");
     uint internal DEPLOYER_KEY = vm.envUint("GBC_DEPLOYER_PRIVATE_KEY");
 
-    WNT wnt;
+    IWNT wnt;
     Dictator dictator = Dictator(Const.Dictator);
     PuppetToken puppetToken = PuppetToken(Const.PuppetToken);
     IERC20 weth = IERC20(Const.wnt);
