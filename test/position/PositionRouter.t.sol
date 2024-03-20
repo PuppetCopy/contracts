@@ -20,7 +20,13 @@ import {ExecutePosition} from "src/position/logic/ExecutePosition.sol";
 
 import {PuppetRouter, PuppetLogic, PuppetStore} from "src/PuppetRouter.sol";
 
+import {TransferUtils} from "./../../src/utils/TransferUtils.sol";
+
 import {Const} from "script/Const.s.sol";
+
+import {Subaccount} from "./../../src/position/util/Subaccount.sol";
+
+import {ErrorUtils} from "./../../src/utils/ErrorUtils.sol";
 
 // v3-periphery/contracts/libraries/OracleLibrary.sol
 
@@ -62,17 +68,12 @@ contract PositionRouterTest is BasicSetup {
 
         puppetRouter = new PuppetRouter(
             dictator,
-            PuppetRouter.PuppetRouterParams({puppetStore: puppetStore, router: router, subaccountStore: subaccountStore}),
-            PuppetRouter.PuppetRouterConfig({
-                puppetLogic: puppetLogic,
-                subaccountLogic: subaccountLogic,
-                minExpiryDuration: 0,
-                minAllowanceRate: 100,
-                maxAllowanceRate: 5000
-            })
+            puppetLogic,
+            PuppetLogic.CallSetRuleConfig({router: router, store: puppetStore, minExpiryDuration: 0, minAllowanceRate: 100, maxAllowanceRate: 5000})
         );
 
         IGmxDatastore gmxDatastore = IGmxDatastore(Const.gmxDatastore);
+        IGmxExchangeRouter gmxExchangeRouter = IGmxExchangeRouter(Const.gmxExchangeRouter);
 
         positionRouter = new PositionRouter(
             dictator,
@@ -82,7 +83,7 @@ contract PositionRouterTest is BasicSetup {
                 positionStore: positionStore,
                 subaccountStore: subaccountStore,
                 subaccountLogic: subaccountLogic,
-                gmxExchangeRouter: IGmxExchangeRouter(Const.gmxExchangeRouter),
+                gmxExchangeRouter: gmxExchangeRouter,
                 wnt: IWNT(Const.wnt),
                 dao: Const.dao,
                 gmxRouter: Const.gmxRouter,
@@ -92,11 +93,22 @@ contract PositionRouterTest is BasicSetup {
                 callbackGasLimit: 0,
                 puppetLogic: puppetLogic,
                 puppetStore: puppetStore,
-                gmxDatastore: IGmxDatastore(Const.gmxDatastore),
                 limitPuppetList: 100,
                 minMatchTokenAmount: 1e6
             }),
-            ExecutePosition.CallConfig({positionStore: positionStore, puppetStore: puppetStore, gmxOrderHandler: Const.gmxOrderHandler})
+            ExecutePosition.CallbackIncreaseConfig({
+                positionStore: positionStore,
+                puppetStore: puppetStore,
+                gmxOrderHandler: Const.gmxOrderHandler,
+                puppetLogic: puppetLogic
+            }),
+            ExecutePosition.CallbackDecreaseConfig({
+                positionStore: positionStore,
+                puppetStore: puppetStore,
+                puppetLogic: puppetLogic,
+                router: router,
+                gmxOrderHandler: Const.gmxOrderHandler
+            })
         );
 
         dictator.setUserRole(address(puppetRouter), PUPPET_LOGIC, true);
@@ -111,10 +123,25 @@ contract PositionRouterTest is BasicSetup {
         address puppet = users.alice;
         address collateralToken = Const.usdc;
 
-        _dealERC20(collateralToken, users.alice, 100e6);
+        IERC20 usdc = IERC20(Const.usdc);
+        _dealERC20(Const.usdc, msg.sender, 1_000e6);
+        // usdc.approve(Const.gmxOrderVault, type(uint).max);
+        // usdc.approve(Const.gmxExchangeRouter, type(uint).max);
+        // IGmxExchangeRouter(Const.gmxExchangeRouter).sendWnt{value: tx.gasprice}(Const.gmxOrderVault, tx.gasprice);
+        // IGmxExchangeRouter(Const.gmxExchangeRouter).sendTokens(collateralToken, Const.gmxOrderVault, 1e6);
+
+        // _dealERC20(Const.usdc, msg.sender, 100e6);
+        // Subaccount subaccount = new Subaccount(subaccountStore, msg.sender);
+
+        // vm.deal(address(subaccount), 100 ether);
+
+        // (bool _success, bytes memory _returnData) = subaccount.execute{value: tx.gasprice}(
+        //     address(Const.gmxExchangeRouter),
+        //     abi.encodeWithSelector(IGmxExchangeRouter(Const.gmxExchangeRouter).sendWnt.selector, Const.gmxOrderVault, 1e6)
+        // );
 
         vm.startPrank(puppet);
-
+        _dealERC20(collateralToken, puppet, 100e6);
         IERC20(collateralToken).approve(address(router), 100e6);
 
         puppetRouter.setRule(
@@ -129,20 +156,22 @@ contract PositionRouterTest is BasicSetup {
         );
 
         vm.startPrank(trader);
-
         _dealERC20(collateralToken, trader, 100e6);
         IERC20(collateralToken).approve(address(router), 100e6);
 
-        positionRouter.request(
+        uint estimatedGasLimit = 5_000_000;
+        uint executionFee = tx.gasprice * estimatedGasLimit;
+
+        positionRouter.request{value: executionFee}(
             GmxOrder.CallParams({
                 market: Const.gmxEthUsdcMarket,
                 collateralToken: collateralToken,
                 isLong: true,
-                executionFee: 0.0000108e18,
+                executionFee: executionFee,
                 collateralDelta: 100e6,
-                sizeDelta: 1000e6,
-                acceptablePrice: 0,
-                triggerPrice: 0,
+                sizeDelta: 1000e30,
+                acceptablePrice: 3320e30,
+                triggerPrice: 3420e30,
                 puppetList: new address[](0)
             })
         );

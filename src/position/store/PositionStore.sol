@@ -9,18 +9,16 @@ import {GmxPositionUtils} from "./../util/GmxPositionUtils.sol";
 import {Subaccount} from "./../util/Subaccount.sol";
 
 contract PositionStore is StoreController {
-    struct RequestIncrease {
-        bytes32 requestKey;
+    struct RequestAdjustment {
         bytes32 routeKey;
         bytes32 positionKey;
+        IERC20 collateralToken;
+        Subaccount subaccount;
+        address trader;
+        uint[] puppetCollateralDeltaList;
+        uint targetLeverage;
         uint collateralDelta;
         int sizeDelta;
-        uint targetLeverage;
-        uint[] puppetCollateralDeltaList;
-        IERC20 collateralToken;
-        address subaccount;
-        address trader;
-        MirrorPosition mirrorPosition;
     }
 
     struct MirrorPosition {
@@ -35,22 +33,22 @@ contract PositionStore is StoreController {
         bytes eventData;
     }
 
-    mapping(bytes32 positionKey => RequestIncrease) public pendingRequestIncreaseAdjustmentMap;
+    mapping(bytes32 requestKey => RequestAdjustment) public pendingRequestMap;
     mapping(bytes32 positionKey => MirrorPosition) public positionMap;
     mapping(bytes32 positionKey => UnhandledCallbackMap) public unhandledCallbackMap;
 
     constructor(Authority _authority, address _initSetter) StoreController(_authority, _initSetter) {}
 
-    function getPendingRequestIncreaseAdjustmentMap(bytes32 _key) external view returns (RequestIncrease memory) {
-        return pendingRequestIncreaseAdjustmentMap[_key];
+    function getPendingRequestMap(bytes32 _key) external view returns (RequestAdjustment memory) {
+        return pendingRequestMap[_key];
     }
 
-    function setPendingRequestIncreaseAdjustmentMap(bytes32 _key, RequestIncrease memory _req) external isSetter {
-        pendingRequestIncreaseAdjustmentMap[_key] = _req;
+    function setPendingRequestMap(bytes32 _key, RequestAdjustment memory _req) external isSetter {
+        pendingRequestMap[_key] = _req;
     }
 
-    function removePendingRequestIncreaseAdjustmentMap(bytes32 _key) external isSetter {
-        delete pendingRequestIncreaseAdjustmentMap[_key];
+    function removePendingRequestMap(bytes32 _key) external isSetter {
+        delete pendingRequestMap[_key];
     }
 
     function getMirrorPosition(bytes32 _key) external view returns (MirrorPosition memory) {

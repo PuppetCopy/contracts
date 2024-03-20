@@ -3,69 +3,52 @@ pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {IGmxExchangeRouter} from "../interface/IGmxExchangeRouter.sol";
-import {IGmxDatastore} from "../interface/IGmxDatastore.sol";
+import {IGmxExchangeRouter} from "./../interface/IGmxExchangeRouter.sol";
+import {Router} from "./../../utils/Router.sol";
 
-import {Router} from "src/utils/Router.sol";
+import {IWNT} from "./../../utils/interfaces/IWNT.sol";
 
-import {ErrorUtils} from "./../../utils/ErrorUtils.sol";
 import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
 import {Subaccount} from "../util/Subaccount.sol";
+import {SubaccountLogic} from "./../util/SubaccountLogic.sol";
 
-import {PuppetStore} from "../store/PuppetStore.sol";
+import {PuppetLogic} from "./../PuppetLogic.sol";
+import {PuppetStore} from "./../store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
 import {SubaccountStore} from "./../store/SubaccountStore.sol";
 
 import {GmxOrder} from "./GmxOrder.sol";
+import {ErrorUtils} from "./../../utils/ErrorUtils.sol";
 
 library RequestDecreasePosition {
-    event RequestDecreasePosition__RequestIncreasePosition(
-        address trader, address subaccount, bytes32 requestKey, uint[] puppetCollateralDeltaList, uint sizeDelta, uint collateralDelta
+    event RequestDecreasePosition__Request(
+        address trader, address subAccount, bytes32 requestKey, uint[] puppetCollateralDeltaList, int sizeDelta, uint collateralDelta
     );
 
     struct CallConfig {
+        IWNT wnt;
+        IGmxExchangeRouter gmxExchangeRouter;
         Router router;
         SubaccountStore subaccountStore;
+        SubaccountLogic subaccountLogic;
         PositionStore positionStore;
+        PuppetLogic puppetLogic;
         PuppetStore puppetStore;
-        IGmxExchangeRouter gmxExchangeRouter;
-        IGmxDatastore gmxDatastore;
+        address dao;
         address gmxRouter;
+        address gmxOrderVault;
         address feeReceiver;
-        address trader;
         bytes32 referralCode;
-        uint limitPuppetList;
         uint callbackGasLimit;
-        uint minMatchTokenAmount;
     }
 
-    function request(CallConfig calldata callConfig, GmxOrder.CallParams calldata callParams) internal {
-        Subaccount subaccount = callConfig.subaccountStore.getSubaccount(callConfig.trader);
-        address subaccountAddress = address(subaccount);
-
-        bytes32 positionKey = GmxPositionUtils.getPositionKey(subaccountAddress, callParams.market, callParams.collateralToken, callParams.isLong);
-
-        PositionStore.MirrorPosition memory matchMp = callConfig.positionStore.getMirrorPosition(positionKey);
-
-        if (matchMp.size == 0) revert RequestDecreasePosition__PositionNotFound();
-
-        if (callConfig.positionStore.getPendingRequestIncreaseAdjustmentMap(positionKey).requestKey != 0) {
-            revert RequestDecreasePosition__PendingRequestExists();
-        }
-
-        uint collateralDelta = callParams.collateralDelta;
-        uint sizeDelta = callParams.sizeDelta;
-        uint[] memory puppetCollateralDeltaList = new uint[](callParams.puppetList.length);
-
-        uint puppetListLength = matchMp.puppetList.length;
-
-        for (uint i = 0; i < puppetListLength; i++) {
-            puppetCollateralDeltaList[i] = callParams.collateralDelta * matchMp.puppetDepositList[i] / matchMp.collateral;
-            collateralDelta -= matchMp.puppetDepositList[i] * callParams.collateralDelta / matchMp.size;
-            sizeDelta -= matchMp.puppetDepositList[i] * callParams.sizeDelta / matchMp.size;
-        }
-
-        GmxPositionUtils.CreateOrderParams memory params = GmxPositionUtils.CreateOrderParams({
+    function reduce(
+        CallConfig calldata callConfig,
+        GmxOrder.CallParams calldata callParams,
+        PositionStore.MirrorPosition calldata mirrorPosition,
+        PositionStore.RequestAdjustment memory request
+    ) external {
+        GmxPositionUtils.CreateOrderParams memory orderParams = GmxPositionUtils.CreateOrderParams({
             addresses: GmxPositionUtils.CreateOrderParamsAddresses({
                 receiver: address(callConfig.positionStore),
                 callbackContract: msg.sender,
@@ -75,33 +58,38 @@ library RequestDecreasePosition {
                 swapPath: new address[](0) // swapPath
             }),
             numbers: GmxPositionUtils.CreateOrderParamsNumbers({
-                initialCollateralDeltaAmount: collateralDelta,
-                sizeDeltaUsd: sizeDelta,
+                initialCollateralDeltaAmount: request.collateralDelta,
+                sizeDeltaUsd: uint(request.sizeDelta),
                 triggerPrice: callParams.triggerPrice,
                 acceptablePrice: callParams.acceptablePrice,
                 executionFee: callParams.executionFee,
                 callbackGasLimit: callConfig.callbackGasLimit,
                 minOutputAmount: 0
             }),
-            orderType: GmxPositionUtils.OrderType.MarketIncrease,
+            orderType: GmxPositionUtils.OrderType.MarketDecrease,
             decreasePositionSwapType: GmxPositionUtils.DecreasePositionSwapType.NoSwap,
             isLong: callParams.isLong,
             shouldUnwrapNativeToken: false,
             referralCode: callConfig.referralCode
         });
 
-        (bool orderSuccess, bytes memory orderReturnData) = subaccount.execute(
-            address(callConfig.gmxExchangeRouter), abi.encodeWithSelector(callConfig.gmxExchangeRouter.createOrder.selector, params)
+        bool orderSuccess;
+        bytes memory orderReturnData;
+
+        uint totalValue = callParams.executionFee + callParams.collateralDelta;
+
+        bytes[] memory callList = new bytes[](2);
+        callList[0] = abi.encodeWithSelector(callConfig.gmxExchangeRouter.sendWnt.selector, callConfig.gmxOrderVault, totalValue);
+        callList[1] = abi.encodeWithSelector(callConfig.gmxExchangeRouter.createOrder.selector, orderParams);
+
+        (orderSuccess, orderReturnData) = request.subaccount.execute{value: msg.value}(
+            address(callConfig.gmxExchangeRouter), abi.encodeWithSelector(callConfig.gmxExchangeRouter.multicall.selector, callList)
         );
+
         if (!orderSuccess) ErrorUtils.revertWithParsedMessage(orderReturnData);
 
         bytes32 requestKey = abi.decode(orderReturnData, (bytes32));
 
-        emit RequestDecreasePosition__RequestIncreasePosition(
-            callConfig.trader, subaccountAddress, requestKey, puppetCollateralDeltaList, sizeDelta, collateralDelta
-        );
+        callConfig.positionStore.setPendingRequestMap(requestKey, request);
     }
-
-    error RequestDecreasePosition__PendingRequestExists();
-    error RequestDecreasePosition__PositionNotFound();
 }

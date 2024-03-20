@@ -4,18 +4,16 @@ pragma solidity 0.8.24;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {IGmxDatastore} from "../interface/IGmxDatastore.sol";
 import {IGmxExchangeRouter} from "./../interface/IGmxExchangeRouter.sol";
+
 import {Router} from "./../../utils/Router.sol";
-
-import {Calc} from "src/utils/Calc.sol";
+import {Calc} from "./../../utils/Calc.sol";
 import {IWNT} from "./../../utils/interfaces/IWNT.sol";
-
-import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
+import {ErrorUtils} from "./../../utils/ErrorUtils.sol";
 import {Subaccount} from "../util/Subaccount.sol";
+import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
 import {SubaccountLogic} from "./../util/SubaccountLogic.sol";
-
-import {PuppetUtils} from "./../util/PuppetUtils.sol";
+import {TransferUtils} from "./../../utils/TransferUtils.sol";
 
 import {PuppetLogic} from "./../PuppetLogic.sol";
 import {PuppetStore} from "./../store/PuppetStore.sol";
@@ -23,9 +21,6 @@ import {PositionStore} from "../store/PositionStore.sol";
 import {SubaccountStore} from "./../store/SubaccountStore.sol";
 
 import {GmxOrder} from "./GmxOrder.sol";
-import {ErrorUtils} from "./../../utils/ErrorUtils.sol";
-
-import {TransferUtils} from "./../../utils/TransferUtils.sol";
 
 /*
     increase adjustment case study
@@ -76,15 +71,15 @@ import {TransferUtils} from "./../../utils/TransferUtils.sol";
     MP 5.5x               -450*   / +110       1760  / 320
 
     */
+
 library RequestIncreasePosition {
-    event RequestIncreasePosition__RequestMatchPosition(address trader, address subAccount, bytes32 requestKey, address[] puppetList);
-    event RequestIncreasePosition__RequestIncreasePosition(
+    event RequestIncreasePosition__Match(address trader, address subAccount, bytes32 requestKey, address[] puppetList);
+    event RequestIncreasePosition__Request(
         address trader, address subAccount, bytes32 requestKey, uint[] puppetCollateralDeltaList, int sizeDelta, uint collateralDelta
     );
 
     struct CallConfig {
         IWNT wnt;
-        IGmxDatastore gmxDatastore;
         IGmxExchangeRouter gmxExchangeRouter;
         Router router;
         SubaccountStore subaccountStore;
@@ -102,149 +97,130 @@ library RequestIncreasePosition {
         uint minMatchTokenAmount;
     }
 
-    function call(CallConfig calldata callConfig, GmxOrder.CallParams calldata callParams, Subaccount subaccount)
-        external
-        returns (PositionStore.RequestIncrease memory request)
-    {
-        request = PositionStore.RequestIncrease({
-            requestKey: GmxPositionUtils.getNextRequestKey(callConfig.gmxDatastore),
-            routeKey: PuppetUtils.getRouteKey(subaccount.account(), callParams.collateralToken),
-            sizeDelta: int(callParams.sizeDelta),
-            collateralDelta: callParams.collateralDelta,
-            targetLeverage: 0,
-            puppetCollateralDeltaList: new uint[](callParams.puppetList.length),
-            positionKey: GmxPositionUtils.getPositionKey(address(subaccount), callParams.market, callParams.collateralToken, callParams.isLong),
-            collateralToken: IERC20(callParams.collateralToken),
-            subaccount: address(subaccount),
-            trader: subaccount.account(),
-            mirrorPosition: callConfig.positionStore.getMirrorPosition(request.positionKey)
-        });
-
-        if (callConfig.positionStore.getPendingRequestIncreaseAdjustmentMap(request.positionKey).targetLeverage != 0) {
-            revert RequestIncreasePosition__PendingIncreaseRequestExists();
-        }
-
+    function open(
+        CallConfig calldata callConfig,
+        GmxOrder.CallParams calldata callParams,
+        PositionStore.RequestAdjustment memory request,
+        address subaccountAddress
+    ) external returns (bytes32 requestKey) {
         (PuppetStore.Rule[] memory ruleList, PuppetStore.Activity[] memory activityList) =
             callConfig.puppetStore.getRuleAndActivityList(request.routeKey, callParams.puppetList);
 
-        if (request.mirrorPosition.size == 0) {
-            if (callParams.puppetList.length > callConfig.limitPuppetList) revert RequestIncreasePosition__PuppetListLimitExceeded();
+        if (callParams.puppetList.length > callConfig.limitPuppetList) revert RequestIncreasePosition__PuppetListLimitExceeded();
 
-            callConfig.positionStore.setPendingRequestIncreaseAdjustmentMap(request.positionKey, request);
+        request.targetLeverage = callParams.sizeDelta * Calc.BASIS_POINT_DIVISOR / callParams.collateralDelta;
 
-            request.targetLeverage = callParams.sizeDelta * Calc.BASIS_POINT_DIVISOR / callParams.collateralDelta;
+        for (uint i = 0; i < callParams.puppetList.length; i++) {
+            PuppetStore.Rule memory rule = ruleList[i];
+            PuppetStore.Activity memory activity = activityList[i];
 
-            for (uint i = 0; i < callParams.puppetList.length; i++) {
-                PuppetStore.Rule memory rule = ruleList[i];
-                PuppetStore.Activity memory activity = activityList[i];
-
-                if (
-                    rule.expiry < block.timestamp // rule expired or about to expire
-                        || activity.latestFunding + rule.throttleActivity < block.timestamp // throttle in case of frequent matching
-                        || activity.allowance < int(rule.allowance) // loss mitigation
-                ) {
-                    continue;
-                }
-
-                uint amountIn = _transferTokenFrom(
-                    callConfig.router,
-                    request.collateralToken,
-                    callParams.puppetList[i],
-                    request.subaccount,
-                    Math.min( // the lowest of either the allowance or the trader's deposit
-                        rule.allowance * rule.allowanceRate / Calc.BASIS_POINT_DIVISOR, // amount allowed by the rule
-                        callParams.collateralDelta // trader own deposit
-                    )
-                );
-
-                if (amountIn < callConfig.minMatchTokenAmount) {
-                    continue;
-                }
-
-                request.puppetCollateralDeltaList[i] = amountIn;
-                request.collateralDelta += amountIn;
-                request.sizeDelta += int(amountIn * request.targetLeverage / Calc.BASIS_POINT_DIVISOR);
-
-                activity.latestFunding = block.timestamp;
-                activity.allowance -= int(amountIn); // reduce allowance by the amount matched
-                activityList[i] = activity;
+            if (
+                rule.expiry < block.timestamp // rule expired or about to expire
+                    || activity.latestFunding + rule.throttleActivity < block.timestamp // throttle in case of frequent matching
+                    || activity.allowance <= rule.allowance // loss mitigation
+            ) {
+                continue;
             }
 
-            emit RequestIncreasePosition__RequestMatchPosition(request.trader, request.subaccount, request.requestKey, callParams.puppetList);
-        } else {
-            request.targetLeverage = (request.mirrorPosition.size + callParams.sizeDelta) * Calc.BASIS_POINT_DIVISOR
-                / (request.mirrorPosition.collateral + callParams.collateralDelta);
+            uint minAmount = Math.min( // the lowest of either the allowance or the trader's deposit
+                rule.allowance * rule.allowanceRate / Calc.BASIS_POINT_DIVISOR, // amount allowed by the rule
+                callParams.collateralDelta // trader own deposit
+            );
 
-            for (uint i = 0; i < request.mirrorPosition.puppetList.length; i++) {
-                PuppetStore.Rule memory rule = ruleList[i];
-                PuppetStore.Activity memory activity = activityList[i];
+            uint amountIn = sendToken(callConfig.router, request.collateralToken, callParams.puppetList[i], subaccountAddress, minAmount);
 
-                // puppet's rule and activtiy applied per trader
-                uint amountInTarget = rule.expiry < block.timestamp // filter out frequent deposit activity. defined during rule setup
-                    || activity.latestFunding + rule.throttleActivity < block.timestamp // expired rule. acounted every increase deposit
-                    || activity.allowance < int(rule.allowance) // stop loss. accounted every reduce adjustment
-                    || request.mirrorPosition.puppetDepositList[i] == 0 // did not match initial deposit
-                    ? 0
-                    : _transferTokenFrom(
-                        callConfig.router,
-                        request.collateralToken,
-                        request.mirrorPosition.puppetList[i],
-                        request.subaccount,
-                        callParams.sizeDelta / request.mirrorPosition.puppetDepositList[i]
-                    );
+            if (amountIn < callConfig.minMatchTokenAmount) {
+                continue;
+            }
 
-                if (amountInTarget > 0) {
-                    request.puppetCollateralDeltaList[i] += amountInTarget;
-                    request.collateralDelta += amountInTarget;
-                    request.sizeDelta += int(request.mirrorPosition.puppetDepositList[i] * callParams.sizeDelta / request.mirrorPosition.size);
+            request.puppetCollateralDeltaList[i] = amountIn;
+            request.collateralDelta += amountIn;
+            request.sizeDelta += int(amountIn * request.targetLeverage / Calc.BASIS_POINT_DIVISOR);
 
-                    activity.latestFunding = block.timestamp;
-                    activityList[i] = activity;
+            activity.latestFunding = block.timestamp;
+            activity.allowance -= amountIn; // reduce allowance by the amount matched
+            activityList[i] = activity;
+        }
+
+        callConfig.puppetLogic.setRouteActivityList(callConfig.puppetStore, request.routeKey, callParams.puppetList, activityList);
+        requestKey = createOrder(callConfig, callParams, request);
+        callConfig.positionStore.setPendingRequestMap(request.positionKey, request);
+
+        emit RequestIncreasePosition__Match(request.trader, subaccountAddress, requestKey, callParams.puppetList);
+        emit RequestIncreasePosition__Request(
+            request.trader, subaccountAddress, requestKey, request.puppetCollateralDeltaList, request.sizeDelta, request.collateralDelta
+        );
+    }
+
+    function adjust(
+        CallConfig calldata callConfig,
+        GmxOrder.CallParams calldata callParams,
+        PositionStore.MirrorPosition memory mirrorPosition,
+        PositionStore.RequestAdjustment memory request
+    ) external returns (bytes32 requestKey) {
+        (PuppetStore.Rule[] memory ruleList, PuppetStore.Activity[] memory activityList) =
+            callConfig.puppetStore.getRuleAndActivityList(request.routeKey, callParams.puppetList);
+
+        if (callParams.puppetList.length > callConfig.limitPuppetList) revert RequestIncreasePosition__PuppetListLimitExceeded();
+
+        request.targetLeverage =
+            (mirrorPosition.size + callParams.sizeDelta) * Calc.BASIS_POINT_DIVISOR / (mirrorPosition.collateral + callParams.collateralDelta);
+
+        for (uint i = 0; i < mirrorPosition.puppetList.length; i++) {
+            PuppetStore.Rule memory rule = ruleList[i];
+            PuppetStore.Activity memory activity = activityList[i];
+
+            // puppet's rule and activtiy applied per trader
+            uint amountInTarget = rule.expiry < block.timestamp // filter out frequent deposit activity. defined during rule setup
+                || activity.latestFunding + rule.throttleActivity < block.timestamp // expired rule. acounted every increase deposit
+                || activity.allowance <= rule.allowance // stop loss. accounted every reduce adjustment
+                || mirrorPosition.puppetDepositList[i] == 0 // did not match initial deposit
+                ? 0
+                : sendToken(
+                    callConfig.router,
+                    request.collateralToken,
+                    mirrorPosition.puppetList[i],
+                    address(request.subaccount),
+                    callParams.sizeDelta / mirrorPosition.puppetDepositList[i]
+                );
+
+            if (amountInTarget > 0) {
+                request.puppetCollateralDeltaList[i] += amountInTarget;
+                request.collateralDelta += amountInTarget;
+                request.sizeDelta += int(mirrorPosition.puppetDepositList[i] * callParams.sizeDelta / mirrorPosition.size);
+
+                activity.latestFunding = block.timestamp;
+                activityList[i] = activity;
+            } else {
+                uint leverage = mirrorPosition.collateral * Calc.BASIS_POINT_DIVISOR / mirrorPosition.size;
+                if (leverage > request.targetLeverage) {
+                    request.sizeDelta += int(amountInTarget * request.targetLeverage * (leverage - request.targetLeverage) / leverage);
                 } else {
-                    uint leverage = request.mirrorPosition.collateral * Calc.BASIS_POINT_DIVISOR / request.mirrorPosition.size;
-                    if (leverage > request.targetLeverage) {
-                        request.sizeDelta += int(amountInTarget * request.targetLeverage * (leverage - request.targetLeverage) / leverage);
-                    } else {
-                        request.sizeDelta -= int(amountInTarget * request.targetLeverage * (leverage - request.targetLeverage) / leverage);
-                    }
+                    request.sizeDelta -= int(amountInTarget * request.targetLeverage * (leverage - request.targetLeverage) / leverage);
                 }
             }
         }
 
         callConfig.puppetLogic.setRouteActivityList(callConfig.puppetStore, request.routeKey, callParams.puppetList, activityList);
+        requestKey = createOrder(callConfig, callParams, request);
+        callConfig.positionStore.setPendingRequestMap(request.positionKey, request);
 
-        bytes32 requestKey = _createOrder(callConfig, callParams, request, request.trader);
-
-        emit RequestIncreasePosition__RequestIncreasePosition(
-            request.trader, request.subaccount, requestKey, request.puppetCollateralDeltaList, request.sizeDelta, request.collateralDelta
+        emit RequestIncreasePosition__Request(
+            request.trader, address(request.subaccount), requestKey, request.puppetCollateralDeltaList, request.sizeDelta, request.collateralDelta
         );
     }
 
-    function _transferTokenFrom(Router router, IERC20 token, address from, address to, uint amount) internal returns (uint) {
-        (bool success, bytes memory returndata) = address(token).call(abi.encodeCall(router.pluginTransfer, (token, from, to, amount)));
-
-        if (success && returndata.length == 0 && abi.decode(returndata, (bool))) {
-            return amount;
-        }
-
-        return 0;
-    }
-
-    function _createOrder(
-        CallConfig calldata callConfig,
-        GmxOrder.CallParams calldata callParams,
-        PositionStore.RequestIncrease memory request,
-        address trader
-    ) internal returns (bytes32 requestKey) {
-        Subaccount subaccount = Subaccount(request.subaccount);
-
+    function createOrder(CallConfig calldata callConfig, GmxOrder.CallParams calldata callParams, PositionStore.RequestAdjustment memory request)
+        internal
+        returns (bytes32 requestKey)
+    {
         GmxPositionUtils.CreateOrderParams memory orderParams = GmxPositionUtils.CreateOrderParams({
             addresses: GmxPositionUtils.CreateOrderParamsAddresses({
                 receiver: address(callConfig.positionStore),
                 callbackContract: msg.sender,
                 uiFeeReceiver: callConfig.feeReceiver,
                 market: callParams.market,
-                initialCollateralToken: callParams.collateralToken,
+                initialCollateralToken: callParams.collateralToken == address(0) ? address(callConfig.wnt) : callParams.collateralToken,
                 swapPath: new address[](0) // swapPath
             }),
             numbers: GmxPositionUtils.CreateOrderParamsNumbers({
@@ -263,32 +239,52 @@ library RequestIncreasePosition {
             referralCode: callConfig.referralCode
         });
 
-        // subaccount.approveToken(callConfig.gmxRouter, request.collateralToken, callParams.collateralDelta);
+        request.subaccount.approveToken(callConfig.gmxRouter, request.collateralToken, callParams.collateralDelta);
+        callConfig.router.pluginTransfer(request.collateralToken, request.trader, address(request.subaccount), callParams.collateralDelta);
 
-        uint totalWntAmount = callParams.executionFee + (callParams.collateralToken == address(0) ? callParams.collateralDelta : 0);
+        bool orderSuccess;
+        bytes memory orderReturnData;
 
-        TransferUtils.sendWnt(callConfig.wnt, callConfig.dao, 0, callConfig.gmxOrderVault, totalWntAmount);
-        callConfig.router.pluginTransfer(request.collateralToken, trader, callConfig.gmxOrderVault, callParams.collateralDelta);
+        if (callParams.collateralToken == address(0)) {
+            uint totalValue = callParams.executionFee + callParams.collateralDelta;
 
-        (bool orderSuccess, bytes memory orderReturnData) = subaccount.execute(
-            address(callConfig.gmxExchangeRouter), abi.encodeWithSelector(callConfig.gmxExchangeRouter.createOrder.selector, orderParams)
-        );
+            bytes[] memory callList = new bytes[](2);
+            callList[0] = abi.encodeWithSelector(callConfig.gmxExchangeRouter.sendWnt.selector, callConfig.gmxOrderVault, totalValue);
+            callList[1] = abi.encodeWithSelector(callConfig.gmxExchangeRouter.createOrder.selector, orderParams);
+
+            (orderSuccess, orderReturnData) = request.subaccount.execute{value: msg.value}(
+                address(callConfig.gmxExchangeRouter), abi.encodeWithSelector(callConfig.gmxExchangeRouter.multicall.selector, callList)
+            );
+        } else {
+            bytes[] memory callList = new bytes[](3);
+            callList[0] = abi.encodeWithSelector(callConfig.gmxExchangeRouter.sendWnt.selector, callConfig.gmxOrderVault, callParams.executionFee);
+            callList[1] = abi.encodeWithSelector(
+                callConfig.gmxExchangeRouter.sendTokens.selector, callParams.collateralToken, callConfig.gmxOrderVault, callParams.collateralDelta
+            );
+            callList[2] = abi.encodeWithSelector(callConfig.gmxExchangeRouter.createOrder.selector, orderParams);
+
+            (orderSuccess, orderReturnData) = request.subaccount.execute{value: msg.value}(
+                address(callConfig.gmxExchangeRouter), abi.encodeWithSelector(callConfig.gmxExchangeRouter.multicall.selector, callList)
+            );
+        }
 
         if (!orderSuccess) ErrorUtils.revertWithParsedMessage(orderReturnData);
 
         requestKey = abi.decode(orderReturnData, (bytes32));
 
         if (request.sizeDelta < 0) {
-            callConfig.positionStore.setPendingRequestIncreaseAdjustmentMap(request.positionKey, request);
-
             _adjustToTargetLeverage(callConfig, callParams, request);
         }
+
+        emit RequestIncreasePosition__Request(
+            request.trader, request.subaccount.account(), requestKey, request.puppetCollateralDeltaList, request.sizeDelta, request.collateralDelta
+        );
     }
 
     function _adjustToTargetLeverage(
         CallConfig calldata gmxCallConfig,
         GmxOrder.CallParams calldata callParams,
-        PositionStore.RequestIncrease memory request
+        PositionStore.RequestAdjustment memory request
     ) internal returns (bytes32 requestKey) {
         GmxPositionUtils.CreateOrderParams memory params = GmxPositionUtils.CreateOrderParams({
             addresses: GmxPositionUtils.CreateOrderParamsAddresses({
@@ -323,6 +319,13 @@ library RequestIncreasePosition {
         requestKey = abi.decode(orderReturnData, (bytes32));
     }
 
+    function sendToken(Router router, IERC20 token, address from, address to, uint amount) internal returns (uint) {
+        (bool success, bytes memory returndata) = address(token).call(abi.encodeCall(router.pluginTransfer, (token, from, to, amount)));
+
+        if (success && returndata.length == 0 && abi.decode(returndata, (bool))) return amount;
+
+        return 0;
+    }
+
     error RequestIncreasePosition__PuppetListLimitExceeded();
-    error RequestIncreasePosition__PendingIncreaseRequestExists();
 }

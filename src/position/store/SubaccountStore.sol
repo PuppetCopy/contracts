@@ -4,14 +4,11 @@ pragma solidity 0.8.24;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
-import {StoreController} from "src/utils/StoreController.sol";
+import {StoreController} from "./../../utils/StoreController.sol";
 import {Subaccount} from "./../util/Subaccount.sol";
 
 contract SubaccountStore is StoreController {
     mapping(address => Subaccount) public subaccountMap;
-
-    uint public nativeTokenGasLimit = 50_000;
-    uint public tokenGasLimit = 200_000;
 
     address public logicOperator;
 
@@ -29,14 +26,6 @@ contract SubaccountStore is StoreController {
 
     function removeSubaccount(address _address) external isSetter {
         delete subaccountMap[_address];
-    }
-
-    function setNativeTokenGasLimit(uint _value) external isSetter {
-        nativeTokenGasLimit = _value;
-    }
-
-    function setTokenGasLimit(uint _value) external isSetter {
-        tokenGasLimit = _value;
     }
 
     function setLogicOperator(address _address) external isSetter {

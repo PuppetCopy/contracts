@@ -20,13 +20,13 @@ contract RewardRouter is MulticallRouter {
         RewardLogic.CallVeConfig callVeLockConfig
     );
 
-    RewardLogic rewardLogic;
-
     RewardLogic.CallStorePriceConfig public callStorePriceConfig;
     RewardLogic.CallLockConfig public callLockConfig;
     RewardLogic.CallExitConfig public callExitConfig;
     RewardLogic.CallClaimConfig public callClaimConfig;
     RewardLogic.CallVeConfig public callVeLockConfig;
+
+    RewardLogic rewardLogic;
 
     constructor(
         Dictator _dictator,
@@ -68,6 +68,10 @@ contract RewardRouter is MulticallRouter {
     }
 
     // governance
+
+    function setRewardLogic(RewardLogic _rewardLogic) external requiresAuth {
+        rewardLogic = _rewardLogic;
+    }
 
     function setConfig(
         RewardLogic.CallStorePriceConfig memory _callStorePriceConfig,

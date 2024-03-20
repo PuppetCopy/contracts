@@ -10,14 +10,12 @@ import {Dictator} from "./utils/Dictator.sol";
 
 import {Calc} from "./utils/Calc.sol";
 
-import {SubaccountLogic} from "./position/util/SubaccountLogic.sol";
-
 import {SubaccountStore} from "./position/store/SubaccountStore.sol";
 import {PuppetStore} from "./position/store/PuppetStore.sol";
 import {PuppetLogic} from "./position/PuppetLogic.sol";
 
 contract PuppetRouter is Router, Multicall, ReentrancyGuard {
-    event PuppetRouter__SetConfig(uint timestamp, PuppetRouterConfig config);
+    event PuppetRouter__SetConfig(uint timestamp, PuppetLogic.CallSetRuleConfig callSetRuleConfig);
 
     struct PuppetRouterParams {
         PuppetStore puppetStore;
@@ -25,24 +23,12 @@ contract PuppetRouter is Router, Multicall, ReentrancyGuard {
         SubaccountStore subaccountStore;
     }
 
-    struct PuppetRouterConfig {
-        PuppetLogic puppetLogic;
-        SubaccountLogic subaccountLogic;
-        uint minExpiryDuration;
-        uint minAllowanceRate;
-        uint maxAllowanceRate;
-    }
+    PuppetLogic.CallSetRuleConfig callSetRuleConfig;
+    PuppetLogic puppetLogic;
 
-    PuppetRouterConfig config;
-    PuppetRouterParams params;
-
-    constructor(Dictator dictator, PuppetRouterParams memory _params, PuppetRouterConfig memory _config) Router(dictator) {
-        params = _params;
-        _setConfig(_config);
-    }
-
-    function createSubaccount(address account) external nonReentrant {
-        config.subaccountLogic.createSubaccount(params.subaccountStore, account);
+    constructor(Dictator dictator, PuppetLogic _puppetLogic, PuppetLogic.CallSetRuleConfig memory _callSetRuleConfig) Router(dictator) {
+        puppetLogic = _puppetLogic;
+        _setConfig(_callSetRuleConfig);
     }
 
     function setRule(PuppetStore.Rule calldata ruleParams) external nonReentrant {
@@ -59,33 +45,29 @@ contract PuppetRouter is Router, Multicall, ReentrancyGuard {
     // internal
 
     function _setRule(address puppet, PuppetStore.Rule calldata ruleParams) internal {
-        PuppetLogic.CallSetRuleConfig memory callParams = PuppetLogic.CallSetRuleConfig({
-            router: params.router,
-            store: params.puppetStore,
-            minExpiryDuration: config.minExpiryDuration,
-            minAllowanceRate: config.minAllowanceRate,
-            maxAllowanceRate: config.maxAllowanceRate
-        });
-
-        config.puppetLogic.setRule(callParams, ruleParams, puppet);
+        puppetLogic.setRule(callSetRuleConfig, ruleParams, puppet);
     }
 
     // governance
 
-    function setConfig(PuppetRouterConfig memory _config) external requiresAuth {
-        _setConfig(_config);
+    function setPuppetLogic(PuppetLogic _puppetLogic) external requiresAuth {
+        puppetLogic = _puppetLogic;
+    }
+
+    function setConfig(PuppetLogic.CallSetRuleConfig calldata _callSetRuleConfig) external requiresAuth {
+        _setConfig(_callSetRuleConfig);
     }
 
     // internal
 
-    function _setConfig(PuppetRouterConfig memory _config) internal {
-        config = _config;
+    function _setConfig(PuppetLogic.CallSetRuleConfig memory _callSetRuleConfig) internal {
+        callSetRuleConfig = _callSetRuleConfig;
 
-        if (config.minAllowanceRate == 0 || config.maxAllowanceRate > Calc.BASIS_POINT_DIVISOR) {
+        if (callSetRuleConfig.minAllowanceRate == 0 || callSetRuleConfig.maxAllowanceRate > Calc.BASIS_POINT_DIVISOR) {
             revert PuppetRouter__InvalidAllowance();
         }
 
-        emit PuppetRouter__SetConfig(block.timestamp, _config);
+        emit PuppetRouter__SetConfig(block.timestamp, callSetRuleConfig);
     }
 
     error PuppetRouter__InvalidPuppet();
