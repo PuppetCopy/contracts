@@ -33,8 +33,12 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
         _setConfig(_callIncreaseConfig, _callDecreaseConfig, _callbackConfig);
     }
 
-    function request(GmxOrder.CallParams calldata callParams) external payable nonReentrant {
-        positionLogic.requestIncreasePosition{value: msg.value}(callIncreaseConfig, callParams, msg.sender);
+    function requestIncrease(GmxOrder.CallParams calldata traderCallParams) external payable nonReentrant {
+        positionLogic.requestIncreasePosition{value: msg.value}(callIncreaseConfig, traderCallParams, msg.sender);
+    }
+
+    function requestDecrease(GmxOrder.CallParams calldata traderCallParams) external payable nonReentrant {
+        positionLogic.requestDecreasePosition(callDecreaseConfig, traderCallParams, msg.sender);
     }
 
     function afterOrderExecution(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant {

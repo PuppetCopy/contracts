@@ -12,6 +12,7 @@ import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
 import {PuppetStore} from "../store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
 import {PuppetLogic} from "./../PuppetLogic.sol";
+import {PuppetUtils} from "./../util/PuppetUtils.sol";
 
 library ExecutePosition {
     struct CallConfig {
@@ -22,22 +23,38 @@ library ExecutePosition {
         address gmxOrderHandler;
     }
 
-    function increase(CallConfig calldata callConfig, bytes32 key, GmxPositionUtils.Props calldata order) external {
+    struct CallParams {
+        PositionStore.MirrorPosition mirrorPosition;
+        IGmxEventUtils.EventLogData eventLogData;
+        bytes32 positionKey;
+        bytes32 requestKey;
+        bytes32 routeKey;
+        address outputTokenAddress;
+        address puppetStoreAddress;
+        IERC20 outputToken;
+        uint totalAmountOut;
+    }
+
+    function increase(CallConfig calldata callConfig, bytes32 key, GmxPositionUtils.Props calldata order) internal {
         bytes32 positionKey = GmxPositionUtils.getPositionKey(
             order.addresses.account, order.addresses.market, order.addresses.initialCollateralToken, order.flags.isLong
         );
 
-        PositionStore.RequestAdjustment memory request = callConfig.positionStore.getPendingRequestMap(key);
+        PositionStore.RequestIncrease memory request = callConfig.positionStore.getRequestIncreaseMap(key);
         PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
 
         mirrorPosition.collateral += request.collateralDelta;
+        mirrorPosition.totalCollateral += order.numbers.initialCollateralDeltaAmount;
         mirrorPosition.size += request.sizeDelta;
+        mirrorPosition.totalSize += order.numbers.sizeDeltaUsd;
 
-        callConfig.positionStore.removePendingRequestMap(key);
         callConfig.positionStore.setMirrorPosition(key, mirrorPosition);
+        callConfig.positionStore.removeRequestIncreaseMap(key);
     }
 
-    function decrease(CallConfig calldata callConfig, bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external {
+    function decrease(ExecutePosition.CallConfig calldata callConfig, bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData)
+        external
+    {
         (IGmxEventUtils.EventLogData memory eventLogData) = abi.decode(eventData, (IGmxEventUtils.EventLogData));
 
         // Check if there is at least one uint item available
@@ -48,64 +65,80 @@ library ExecutePosition {
         bytes32 positionKey = GmxPositionUtils.getPositionKey(
             order.addresses.account, order.addresses.market, order.addresses.initialCollateralToken, order.flags.isLong
         );
-        PositionStore.RequestAdjustment memory request = callConfig.positionStore.getPendingRequestMap(key);
-        PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
+        bytes32 routeKey = PuppetUtils.getRouteKey(order.addresses.account, order.addresses.initialCollateralToken);
 
-        if (request.targetLeverage == 0 || mirrorPosition.size == 0) revert ExecutePosition__InvalidRequest(positionKey, key);
-
-        mirrorPosition.collateral -= order.numbers.initialCollateralDeltaAmount;
-        mirrorPosition.size -= order.numbers.sizeDeltaUsd;
-
-        IERC20 outputToken = IERC20(eventLogData.addressItems.items[0].value);
+        address outputTokenAddress = eventLogData.addressItems.items[0].value;
         uint totalAmountOut = eventLogData.uintItems.items[0].value;
 
-        processPuppetList(callConfig, request, mirrorPosition, outputToken, totalAmountOut);
+        PositionStore.RequestDecrease memory request = callConfig.positionStore.getRequestDecreaseMap(key);
+        PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
 
-        callConfig.positionStore.removePendingRequestMap(positionKey);
+        if (mirrorPosition.size == 0) {
+            revert ExecutePosition__InvalidRequest(positionKey, key);
+        }
 
-        callConfig.router.pluginTransfer(
-            outputToken, address(callConfig.positionStore), request.trader, mirrorPosition.collateral * request.collateralDelta / totalAmountOut
-        );
+        ExecutePosition.CallParams memory callParams = ExecutePosition.CallParams({
+            mirrorPosition: mirrorPosition,
+            eventLogData: eventLogData,
+            positionKey: positionKey,
+            requestKey: key,
+            routeKey: routeKey,
+            outputTokenAddress: outputTokenAddress,
+            puppetStoreAddress: address(callConfig.puppetStore),
+            outputToken: IERC20(outputTokenAddress),
+            totalAmountOut: totalAmountOut
+        });
+
+        _decrease(callConfig, order, callParams, request);
     }
 
-    // Extracted function to process puppet activities
-    function processPuppetList(
-        CallConfig memory callConfig,
-        PositionStore.RequestAdjustment memory request,
-        PositionStore.MirrorPosition memory mirrorPosition,
-        IERC20 outputToken,
-        uint totalAmountOut
+    function _decrease(
+        CallConfig calldata callConfig,
+        GmxPositionUtils.Props calldata order,
+        CallParams memory callParams,
+        PositionStore.RequestDecrease memory request
     ) internal {
-        PuppetStore.Activity[] memory activityList = callConfig.puppetStore.getActivityList(request.routeKey, mirrorPosition.puppetList);
+        callParams.mirrorPosition.collateral -= order.numbers.initialCollateralDeltaAmount;
+        callParams.mirrorPosition.size -= order.numbers.sizeDeltaUsd;
 
-        for (uint i = 0; i < mirrorPosition.puppetList.length; i++) {
+        PuppetStore.Activity[] memory activityList = callConfig.puppetStore.getActivityList(callParams.routeKey, callParams.mirrorPosition.puppetList);
+
+        for (uint i = 0; i < callParams.mirrorPosition.puppetList.length; i++) {
             PuppetStore.Activity memory activity = activityList[i];
 
             uint collateralDelta = request.puppetCollateralDeltaList[i];
-            uint amountOut = mirrorPosition.collateral * mirrorPosition.puppetDepositList[i] / totalAmountOut;
+            uint amountOut = callParams.mirrorPosition.totalCollateral * collateralDelta / callParams.totalAmountOut;
 
-            request.puppetCollateralDeltaList[i] -= collateralDelta;
-            request.collateralDelta -= collateralDelta;
-            request.sizeDelta -= request.sizeDelta * collateralDelta / mirrorPosition.size;
+            callParams.mirrorPosition.puppetDepositList[i] -= collateralDelta;
 
             activity.allowance += amountOut;
             activityList[i] = activity;
 
-            sendTokenOptim(callConfig.router, outputToken, address(callConfig.positionStore), mirrorPosition.puppetList[i], amountOut);
+            sendTokenOptim(
+                callConfig.router, callParams.outputToken, callParams.puppetStoreAddress, callParams.mirrorPosition.puppetList[i], amountOut
+            );
         }
 
-        callConfig.puppetLogic.setRouteActivityList(callConfig.puppetStore, request.routeKey, mirrorPosition.puppetList, activityList);
+        callConfig.positionStore.removeRequestIncreaseMap(callParams.requestKey);
+        callConfig.positionStore.setMirrorPosition(callParams.positionKey, callParams.mirrorPosition);
+
+        callConfig.puppetLogic.setRouteActivityList(callConfig.puppetStore, callParams.routeKey, callParams.mirrorPosition.puppetList, activityList);
+
+        callConfig.router.pluginTransfer(
+            callParams.outputToken,
+            callParams.puppetStoreAddress,
+            request.trader,
+            callParams.mirrorPosition.collateral * request.collateralDelta / callParams.totalAmountOut
+        );
     }
 
     // optimistically send token, 0 allocated if failed
-    function sendTokenOptim(Router router, IERC20 token, address from, address to, uint amount) internal returns (uint) {
+    function sendTokenOptim(Router router, IERC20 token, address from, address to, uint amount) internal returns (bool) {
         (bool success, bytes memory returndata) = address(token).call(abi.encodeCall(router.pluginTransfer, (token, from, to, amount)));
 
-        if (success && returndata.length == 0 && abi.decode(returndata, (bool))) return amount;
-
-        return 0;
+        return success && returndata.length == 0 && abi.decode(returndata, (bool));
     }
 
-    error ExecutePosition__UnexpectedEventData();
     error ExecutePosition__InvalidRequest(bytes32 positionKey, bytes32 key);
+    error ExecutePosition__UnexpectedEventData();
 }

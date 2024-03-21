@@ -93,7 +93,6 @@ contract PositionRouterTest is BasicSetup {
                 minMatchTokenAmount: 1e6
             }),
             RequestDecreasePosition.CallConfig({
-                wnt: IWNT(Const.wnt),
                 gmxExchangeRouter: gmxExchangeRouter,
                 positionStore: positionStore,
                 subaccountStore: subaccountStore,
@@ -119,12 +118,13 @@ contract PositionRouterTest is BasicSetup {
     }
 
     function testIncreaseRequest() public {
-        address trader = users.bob;
         address puppet = users.alice;
+        address trader = users.bob;
+
         address collateralToken = Const.usdc;
 
         IERC20 usdc = IERC20(Const.usdc);
-        _dealERC20(Const.usdc, msg.sender, 1_000e6);
+        // _dealERC20(Const.usdc, msg.sender, 1_000e6);
         // usdc.approve(Const.gmxOrderVault, type(uint).max);
         // usdc.approve(Const.gmxExchangeRouter, type(uint).max);
         // IGmxExchangeRouter(Const.gmxExchangeRouter).sendWnt{value: tx.gasprice}(Const.gmxOrderVault, tx.gasprice);
@@ -162,7 +162,7 @@ contract PositionRouterTest is BasicSetup {
         uint estimatedGasLimit = 5_000_000;
         uint executionFee = tx.gasprice * estimatedGasLimit;
 
-        positionRouter.request{value: executionFee}(
+        positionRouter.requestIncrease{value: executionFee}(
             GmxOrder.CallParams({
                 market: Const.gmxEthUsdcMarket,
                 collateralToken: collateralToken,
