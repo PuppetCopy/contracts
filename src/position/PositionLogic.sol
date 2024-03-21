@@ -21,13 +21,9 @@ import {SubaccountStore} from "./store/SubaccountStore.sol";
 
 contract PositionLogic is Auth {
     event PositionLogic__CreateTraderSubaccount(address account, address subaccount);
+    event PositionLogic__UnhandledCallback(GmxPositionUtils.OrderExecutionStatus status, bytes32 key, GmxPositionUtils.Props order, bytes eventData);
 
     constructor(Authority _authority) Auth(address(0), _authority) {}
-
-    struct CallCreateSubaccountConfig {
-        SubaccountLogic subaccountLogic;
-        SubaccountStore subaccountStore;
-    }
 
     function requestIncreasePosition(RequestIncreasePosition.CallConfig calldata callConfig, GmxOrder.CallParams calldata callParams, address from)
         external
@@ -50,14 +46,11 @@ contract PositionLogic is Auth {
             puppetCollateralDeltaList: new uint[](callParams.puppetList.length),
             targetLeverage: 0,
             collateralDelta: callParams.collateralDelta,
-            sizeDelta: int(callParams.sizeDelta)
+            sizeDelta: callParams.sizeDelta,
+            reducePuppetSizeDelta: 0
         });
 
         PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(request.positionKey);
-
-        if (callConfig.positionStore.getPendingRequestMap(request.positionKey).targetLeverage != 0) {
-            revert PositionLogic__PendingIncreaseRequestExists();
-        }
 
         if (mirrorPosition.size == 0) {
             RequestIncreasePosition.open(callConfig, callParams, request, subaccountAddress);
@@ -90,27 +83,32 @@ contract PositionLogic is Auth {
             targetLeverage: (mirrorPosition.size - callParams.sizeDelta) * Calc.BASIS_POINT_DIVISOR
                 / (mirrorPosition.collateral - callParams.collateralDelta),
             collateralDelta: callParams.collateralDelta,
-            sizeDelta: int(callParams.sizeDelta)
+            sizeDelta: callParams.sizeDelta,
+            reducePuppetSizeDelta: 0
         });
 
         if (callConfig.positionStore.getPendingRequestMap(request.positionKey).targetLeverage != 0) {
             revert PositionLogic__PendingIncreaseRequestExists();
         }
 
-        RequestDecreasePosition.reduce(callConfig, callParams, mirrorPosition, request);
+        RequestDecreasePosition.reduce(callConfig, callParams, request);
     }
 
-    function handlIncreaseCallback(
-        ExecutePosition.CallbackIncreaseConfig calldata callConfig,
+    function handlExeuctionCallback(
+        ExecutePosition.CallConfig calldata callConfig,
         bytes32 key,
         GmxPositionUtils.Props calldata order,
         bytes calldata eventData
-    ) external requiresAuth {
-        return ExecutePosition.increase(callConfig, key, order, eventData);
+    ) public requiresAuth {
+        if (GmxPositionUtils.isIncreaseOrder(order.numbers.orderType)) {
+            return ExecutePosition.increase(callConfig, key, order);
+        } else {
+            return ExecutePosition.decrease(callConfig, key, order, eventData);
+        }
     }
 
     function handlDecreaseCallback(
-        ExecutePosition.CallbackDecreaseConfig calldata callConfig,
+        ExecutePosition.CallConfig calldata callConfig,
         bytes32 key,
         GmxPositionUtils.Props calldata order,
         bytes calldata eventData
@@ -133,6 +131,25 @@ contract PositionLogic is Auth {
         // } catch {
         //     // if the callback execution fails, we will attempt to execute it again
         // }
+    }
+
+    function storeUnhandledCallbackrCallback(
+        ExecutePosition.CallConfig calldata callConfig,
+        bytes32 key,
+        GmxPositionUtils.Props calldata order,
+        bytes calldata eventData
+    ) external {
+        callConfig.positionStore.setUnhandledCallbackMap(key, order, eventData);
+        emit PositionLogic__UnhandledCallback(GmxPositionUtils.OrderExecutionStatus.Executed, key, order, eventData);
+    }
+
+    function executeUnhandledExecutionCallback(
+        ExecutePosition.CallConfig calldata callConfig,
+        bytes32 key,
+        GmxPositionUtils.Props calldata order,
+        bytes calldata eventData
+    ) external requiresAuth {
+        handlExeuctionCallback(callConfig, key, order, eventData);
     }
 
     error PositionLogic__PendingIncreaseRequestExists();

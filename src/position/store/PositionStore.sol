@@ -18,7 +18,8 @@ contract PositionStore is StoreController {
         uint[] puppetCollateralDeltaList;
         uint targetLeverage;
         uint collateralDelta;
-        int sizeDelta;
+        uint sizeDelta;
+        uint reducePuppetSizeDelta;
     }
 
     struct MirrorPosition {
@@ -34,6 +35,8 @@ contract PositionStore is StoreController {
     }
 
     mapping(bytes32 requestKey => RequestAdjustment) public pendingRequestMap;
+    mapping(bytes32 requestKey => RequestAdjustment) public requestReduceTargetLeverageMap;
+
     mapping(bytes32 positionKey => MirrorPosition) public positionMap;
     mapping(bytes32 positionKey => UnhandledCallbackMap) public unhandledCallbackMap;
 
@@ -49,6 +52,18 @@ contract PositionStore is StoreController {
 
     function removePendingRequestMap(bytes32 _key) external isSetter {
         delete pendingRequestMap[_key];
+    }
+
+    function getRequestReduceTargetLeverageMap(bytes32 _key) external view returns (RequestAdjustment memory) {
+        return requestReduceTargetLeverageMap[_key];
+    }
+
+    function setRequestReduceTargetLeverageMap(bytes32 _key, RequestAdjustment calldata _req) external isSetter {
+        requestReduceTargetLeverageMap[_key] = _req;
+    }
+
+    function removeRequestReduceTargetLeverageMap(bytes32 _key) external isSetter {
+        delete requestReduceTargetLeverageMap[_key];
     }
 
     function getMirrorPosition(bytes32 _key) external view returns (MirrorPosition memory) {

@@ -4,38 +4,26 @@ pragma solidity 0.8.24;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IGmxExchangeRouter} from "./../interface/IGmxExchangeRouter.sol";
-import {Router} from "./../../utils/Router.sol";
 
 import {IWNT} from "./../../utils/interfaces/IWNT.sol";
-
 import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
 import {Subaccount} from "../util/Subaccount.sol";
-import {SubaccountLogic} from "./../util/SubaccountLogic.sol";
-
-import {PuppetLogic} from "./../PuppetLogic.sol";
-import {PuppetStore} from "./../store/PuppetStore.sol";
-import {PositionStore} from "../store/PositionStore.sol";
-import {SubaccountStore} from "./../store/SubaccountStore.sol";
-
-import {GmxOrder} from "./GmxOrder.sol";
 import {ErrorUtils} from "./../../utils/ErrorUtils.sol";
+
+import {PositionStore} from "../store/PositionStore.sol";
+import {SubaccountStore} from "../store/SubaccountStore.sol";
+import {GmxOrder} from "./GmxOrder.sol";
 
 library RequestDecreasePosition {
     event RequestDecreasePosition__Request(
-        address trader, address subAccount, bytes32 requestKey, uint[] puppetCollateralDeltaList, int sizeDelta, uint collateralDelta
+        address trader, address subaccount, bytes32 requestKey, uint[] puppetCollateralDeltaList, int sizeDelta, uint collateralDelta
     );
 
     struct CallConfig {
         IWNT wnt;
         IGmxExchangeRouter gmxExchangeRouter;
-        Router router;
-        SubaccountStore subaccountStore;
-        SubaccountLogic subaccountLogic;
         PositionStore positionStore;
-        PuppetLogic puppetLogic;
-        PuppetStore puppetStore;
-        address dao;
-        address gmxRouter;
+        SubaccountStore subaccountStore;
         address gmxOrderVault;
         address feeReceiver;
         bytes32 referralCode;
@@ -45,7 +33,6 @@ library RequestDecreasePosition {
     function reduce(
         CallConfig calldata callConfig,
         GmxOrder.CallParams calldata callParams,
-        PositionStore.MirrorPosition calldata mirrorPosition,
         PositionStore.RequestAdjustment memory request
     ) external {
         GmxPositionUtils.CreateOrderParams memory orderParams = GmxPositionUtils.CreateOrderParams({

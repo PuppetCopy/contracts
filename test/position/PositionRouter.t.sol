@@ -16,17 +16,13 @@ import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol"
 import {IGmxDatastore} from "src/position/interface/IGmxDatastore.sol";
 import {GmxOrder} from "src/position/logic/GmxOrder.sol";
 import {RequestIncreasePosition} from "src/position/logic/RequestIncreasePosition.sol";
+import {RequestDecreasePosition} from "src/position/logic/RequestDecreasePosition.sol";
 import {ExecutePosition} from "src/position/logic/ExecutePosition.sol";
 
 import {PuppetRouter, PuppetLogic, PuppetStore} from "src/PuppetRouter.sol";
 
-import {TransferUtils} from "./../../src/utils/TransferUtils.sol";
-
 import {Const} from "script/Const.s.sol";
-
 import {Subaccount} from "./../../src/position/util/Subaccount.sol";
-
-import {ErrorUtils} from "./../../src/utils/ErrorUtils.sol";
 
 // v3-periphery/contracts/libraries/OracleLibrary.sol
 
@@ -96,17 +92,21 @@ contract PositionRouterTest is BasicSetup {
                 limitPuppetList: 100,
                 minMatchTokenAmount: 1e6
             }),
-            ExecutePosition.CallbackIncreaseConfig({
+            RequestDecreasePosition.CallConfig({
+                wnt: IWNT(Const.wnt),
+                gmxExchangeRouter: gmxExchangeRouter,
                 positionStore: positionStore,
-                puppetStore: puppetStore,
-                gmxOrderHandler: Const.gmxOrderHandler,
-                puppetLogic: puppetLogic
+                subaccountStore: subaccountStore,
+                gmxOrderVault: Const.gmxOrderVault,
+                feeReceiver: Const.dao,
+                referralCode: Const.referralCode,
+                callbackGasLimit: 0
             }),
-            ExecutePosition.CallbackDecreaseConfig({
+            ExecutePosition.CallConfig({
+                router: router,
                 positionStore: positionStore,
                 puppetStore: puppetStore,
                 puppetLogic: puppetLogic,
-                router: router,
                 gmxOrderHandler: Const.gmxOrderHandler
             })
         );

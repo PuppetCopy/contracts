@@ -73,9 +73,18 @@ import {GmxOrder} from "./GmxOrder.sol";
     */
 
 library RequestIncreasePosition {
-    event RequestIncreasePosition__Match(address trader, address subAccount, bytes32 requestKey, address[] puppetList);
+    event RequestIncreasePosition__Match(address trader, address subaccount, bytes32 requestKey, address[] puppetList);
     event RequestIncreasePosition__Request(
-        address trader, address subAccount, bytes32 requestKey, uint[] puppetCollateralDeltaList, int sizeDelta, uint collateralDelta
+        address trader,
+        address subaccount,
+        bytes32 requestKey,
+        uint[] puppetCollateralDeltaList,
+        uint sizeDelta,
+        uint reducePuppetSizeDelta,
+        uint collateralDelta
+    );
+    event RequestIncreasePosition__RequestReduceTargetLeverage(
+        address trader, address subaccount, bytes32 requestKey, bytes32 reduceRequestKey, uint sizeDelta
     );
 
     struct CallConfig {
@@ -127,7 +136,7 @@ library RequestIncreasePosition {
                 callParams.collateralDelta // trader own deposit
             );
 
-            uint amountIn = sendToken(callConfig.router, request.collateralToken, callParams.puppetList[i], subaccountAddress, minAmount);
+            uint amountIn = sendTokenOptim(callConfig.router, request.collateralToken, callParams.puppetList[i], subaccountAddress, minAmount);
 
             if (amountIn < callConfig.minMatchTokenAmount) {
                 continue;
@@ -135,7 +144,7 @@ library RequestIncreasePosition {
 
             request.puppetCollateralDeltaList[i] = amountIn;
             request.collateralDelta += amountIn;
-            request.sizeDelta += int(amountIn * request.targetLeverage / Calc.BASIS_POINT_DIVISOR);
+            request.sizeDelta += amountIn * request.targetLeverage / Calc.BASIS_POINT_DIVISOR;
 
             activity.latestFunding = block.timestamp;
             activity.allowance -= amountIn; // reduce allowance by the amount matched
@@ -143,12 +152,19 @@ library RequestIncreasePosition {
         }
 
         callConfig.puppetLogic.setRouteActivityList(callConfig.puppetStore, request.routeKey, callParams.puppetList, activityList);
-        requestKey = createOrder(callConfig, callParams, request);
         callConfig.positionStore.setPendingRequestMap(request.positionKey, request);
+
+        requestKey = _createOrder(callConfig, callParams, request);
 
         emit RequestIncreasePosition__Match(request.trader, subaccountAddress, requestKey, callParams.puppetList);
         emit RequestIncreasePosition__Request(
-            request.trader, subaccountAddress, requestKey, request.puppetCollateralDeltaList, request.sizeDelta, request.collateralDelta
+            request.trader,
+            subaccountAddress,
+            requestKey,
+            request.puppetCollateralDeltaList,
+            request.sizeDelta,
+            request.reducePuppetSizeDelta,
+            request.collateralDelta
         );
     }
 
@@ -176,7 +192,7 @@ library RequestIncreasePosition {
                 || activity.allowance <= rule.allowance // stop loss. accounted every reduce adjustment
                 || mirrorPosition.puppetDepositList[i] == 0 // did not match initial deposit
                 ? 0
-                : sendToken(
+                : sendTokenOptim(
                     callConfig.router,
                     request.collateralToken,
                     mirrorPosition.puppetList[i],
@@ -187,30 +203,50 @@ library RequestIncreasePosition {
             if (amountInTarget > 0) {
                 request.puppetCollateralDeltaList[i] += amountInTarget;
                 request.collateralDelta += amountInTarget;
-                request.sizeDelta += int(mirrorPosition.puppetDepositList[i] * callParams.sizeDelta / mirrorPosition.size);
+                request.sizeDelta += mirrorPosition.puppetDepositList[i] * callParams.sizeDelta / mirrorPosition.size;
 
                 activity.latestFunding = block.timestamp;
                 activityList[i] = activity;
             } else {
                 uint leverage = mirrorPosition.collateral * Calc.BASIS_POINT_DIVISOR / mirrorPosition.size;
                 if (leverage > request.targetLeverage) {
-                    request.sizeDelta += int(amountInTarget * request.targetLeverage * (leverage - request.targetLeverage) / leverage);
+                    request.sizeDelta += amountInTarget * request.targetLeverage * (leverage - request.targetLeverage) / leverage;
                 } else {
-                    request.sizeDelta -= int(amountInTarget * request.targetLeverage * (leverage - request.targetLeverage) / leverage);
+                    request.reducePuppetSizeDelta += amountInTarget * request.targetLeverage * (leverage - request.targetLeverage) / leverage;
                 }
             }
         }
 
+        if (request.reducePuppetSizeDelta > request.sizeDelta) {
+            request.sizeDelta = 0;
+            request.reducePuppetSizeDelta = request.reducePuppetSizeDelta - request.sizeDelta;
+        }
+
         callConfig.puppetLogic.setRouteActivityList(callConfig.puppetStore, request.routeKey, callParams.puppetList, activityList);
-        requestKey = createOrder(callConfig, callParams, request);
         callConfig.positionStore.setPendingRequestMap(request.positionKey, request);
 
+        requestKey = _createOrder(callConfig, callParams, request);
+
+        if (request.reducePuppetSizeDelta > 0) {
+            callConfig.positionStore.setRequestReduceTargetLeverageMap(request.positionKey, request);
+            bytes32 reduceRequestKey = _adjustToTargetLeverage(callConfig, callParams, request);
+            emit RequestIncreasePosition__RequestReduceTargetLeverage(
+                request.trader, address(request.subaccount), requestKey, reduceRequestKey, request.reducePuppetSizeDelta
+            );
+        }
+
         emit RequestIncreasePosition__Request(
-            request.trader, address(request.subaccount), requestKey, request.puppetCollateralDeltaList, request.sizeDelta, request.collateralDelta
+            request.trader,
+            address(request.subaccount),
+            requestKey,
+            request.puppetCollateralDeltaList,
+            request.sizeDelta,
+            request.reducePuppetSizeDelta,
+            request.collateralDelta
         );
     }
 
-    function createOrder(CallConfig calldata callConfig, GmxOrder.CallParams calldata callParams, PositionStore.RequestAdjustment memory request)
+    function _createOrder(CallConfig calldata callConfig, GmxOrder.CallParams calldata callParams, PositionStore.RequestAdjustment memory request)
         internal
         returns (bytes32 requestKey)
     {
@@ -220,12 +256,12 @@ library RequestIncreasePosition {
                 callbackContract: msg.sender,
                 uiFeeReceiver: callConfig.feeReceiver,
                 market: callParams.market,
-                initialCollateralToken: callParams.collateralToken == address(0) ? address(callConfig.wnt) : callParams.collateralToken,
+                initialCollateralToken: callParams.collateralToken,
                 swapPath: new address[](0) // swapPath
             }),
             numbers: GmxPositionUtils.CreateOrderParamsNumbers({
                 initialCollateralDeltaAmount: request.collateralDelta,
-                sizeDeltaUsd: request.sizeDelta > 0 ? uint(request.sizeDelta) : 0,
+                sizeDeltaUsd: request.reducePuppetSizeDelta,
                 triggerPrice: callParams.triggerPrice,
                 acceptablePrice: callParams.acceptablePrice,
                 executionFee: callParams.executionFee,
@@ -271,14 +307,6 @@ library RequestIncreasePosition {
         if (!orderSuccess) ErrorUtils.revertWithParsedMessage(orderReturnData);
 
         requestKey = abi.decode(orderReturnData, (bytes32));
-
-        if (request.sizeDelta < 0) {
-            _adjustToTargetLeverage(callConfig, callParams, request);
-        }
-
-        emit RequestIncreasePosition__Request(
-            request.trader, request.subaccount.account(), requestKey, request.puppetCollateralDeltaList, request.sizeDelta, request.collateralDelta
-        );
     }
 
     function _adjustToTargetLeverage(
@@ -297,7 +325,7 @@ library RequestIncreasePosition {
             }),
             numbers: GmxPositionUtils.CreateOrderParamsNumbers({
                 initialCollateralDeltaAmount: 0,
-                sizeDeltaUsd: uint(-request.sizeDelta),
+                sizeDeltaUsd: request.sizeDelta,
                 triggerPrice: callParams.triggerPrice,
                 acceptablePrice: callParams.acceptablePrice,
                 executionFee: callParams.executionFee,
@@ -319,7 +347,8 @@ library RequestIncreasePosition {
         requestKey = abi.decode(orderReturnData, (bytes32));
     }
 
-    function sendToken(Router router, IERC20 token, address from, address to, uint amount) internal returns (uint) {
+    // optimistically send token, 0 allocated if failed
+    function sendTokenOptim(Router router, IERC20 token, address from, address to, uint amount) internal returns (uint) {
         (bool success, bytes memory returndata) = address(token).call(abi.encodeCall(router.pluginTransfer, (token, from, to, amount)));
 
         if (success && returndata.length == 0 && abi.decode(returndata, (bool))) return amount;
