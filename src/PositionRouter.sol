@@ -5,91 +5,113 @@ import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
+import {GmxPositionUtils} from "./position/util/GmxPositionUtils.sol";
+
+import {PositionStore} from "./position/store/PositionStore.sol";
 import {RequestIncreasePosition} from "./position/logic/RequestIncreasePosition.sol";
 import {RequestDecreasePosition} from "./position/logic/RequestDecreasePosition.sol";
-import {ExecutePosition} from "./position/logic/ExecutePosition.sol";
-import {GmxPositionUtils} from "./position/util/GmxPositionUtils.sol";
-import {PositionLogic} from "./position/PositionLogic.sol";
-import {GmxOrder} from "./position/logic/GmxOrder.sol";
-import {PositionStore} from "./position/store/PositionStore.sol";
+import {ExecuteIncreasePosition} from "./position/logic/ExecuteIncreasePosition.sol";
+import {ExecuteDecreasePosition} from "./position/logic/ExecuteDecreasePosition.sol";
+import {ExecuteRejectedAdjustment} from "./position/logic/ExecuteRejectedAdjustment.sol";
 
 contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
-    event PositionRouter__SetConfig(uint timestamp, RequestIncreasePosition.CallConfig callIncreaseConfig, ExecutePosition.CallConfig callbackConfig);
-
-    PositionLogic positionLogic;
-
-    RequestIncreasePosition.CallConfig callIncreaseConfig;
-    RequestDecreasePosition.CallConfig callDecreaseConfig;
-    ExecutePosition.CallConfig callbackConfig;
-
-    constructor(
-        Authority _authority,
-        PositionLogic _positionLogic,
-        RequestIncreasePosition.CallConfig memory _callIncreaseConfig,
-        RequestDecreasePosition.CallConfig memory _callDecreaseConfig,
-        ExecutePosition.CallConfig memory _callbackConfig
-    ) Auth(address(0), _authority) {
-        positionLogic = _positionLogic;
-        _setConfig(_callIncreaseConfig, _callDecreaseConfig, _callbackConfig);
+    struct CallConfig {
+        RequestIncreasePosition.CallConfig increase;
+        RequestDecreasePosition.CallConfig decrease;
+        ExecuteIncreasePosition.CallConfig executeIncrease;
+        ExecuteDecreasePosition.CallConfig executeDecrease;
     }
 
-    function requestIncrease(GmxOrder.CallParams calldata traderCallParams) external payable nonReentrant {
-        positionLogic.requestIncreasePosition{value: msg.value}(callIncreaseConfig, traderCallParams, msg.sender);
+    event PositionRouter__SetConfig(uint timestamp, CallConfig callConfig);
+
+    event PositionRouter__CreateTraderSubaccount(address account, address subaccount);
+    event PositionRouter__UnhandledCallback(GmxPositionUtils.OrderExecutionStatus status, bytes32 key, GmxPositionUtils.Props order, bytes eventData);
+
+    CallConfig callConfig;
+
+    constructor(Authority _authority, CallConfig memory _callConfig) Auth(address(0), _authority) {
+        _setConfig(_callConfig);
     }
 
-    function requestDecrease(GmxOrder.CallParams calldata traderCallParams) external payable nonReentrant {
-        positionLogic.requestDecreasePosition(callDecreaseConfig, traderCallParams, msg.sender);
+    function requestIncrease(RequestIncreasePosition.TraderCallParams calldata traderCallParams) external payable nonReentrant {
+        RequestIncreasePosition.increase(callConfig.increase, traderCallParams, msg.sender);
     }
 
-    function afterOrderExecution(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant {
-        try positionLogic.handlExeuctionCallback(callbackConfig, key, order, eventData) {}
-        catch {
-            // store callback data, the rest of the logic will attempt to execute the callback data
-            // in case of failure we can recovery the callback data and attempt to execute it again
-            positionLogic.storeUnhandledCallbackrCallback(callbackConfig, key, order, eventData);
+    function requestDecrease(RequestDecreasePosition.TraderCallParams calldata traderCallParams) external payable nonReentrant {
+        RequestDecreasePosition.decrease(callConfig.decrease, traderCallParams, msg.sender);
+    }
+
+    // attempt to execute the callback, if
+    // in case of failure we can recover the callback to later attempt to execute it again
+    function afterOrderExecution(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant requiresAuth {
+        if (GmxPositionUtils.isIncreaseOrder(order.numbers.orderType)) {
+            try ExecuteIncreasePosition.increase(callConfig.executeIncrease, key, order) {}
+            catch {
+                storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.ExecutedIncrease, order, key, eventData);
+            }
+        } else if (GmxPositionUtils.isDecreaseOrder(order.numbers.orderType)) {
+            try ExecuteDecreasePosition.decrease(callConfig.executeDecrease, key, order, eventData) {}
+            catch {
+                storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.ExecutedDecrease, order, key, eventData);
+            }
+        } else {
+            revert PositionRouter__InvalidOrderType(order.numbers.orderType);
         }
     }
 
     function afterOrderCancellation(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant {
-        // _handlOperatorCallback(key, order, eventData);
+        try ExecuteRejectedAdjustment.handleCancelled(key, order) {}
+        catch {
+            storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.Cancelled, order, key, eventData);
+        }
     }
 
     function afterOrderFrozen(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant {
-        // _handlOperatorCallback(key, order, eventData);
+        try ExecuteRejectedAdjustment.handleFrozen(key, order) {}
+        catch {
+            storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.Cancelled, order, key, eventData);
+        }
+    }
+
+    // integration
+
+    function executeUnhandledExecutionCallback(bytes32 key) external nonReentrant requiresAuth {
+        PositionStore.UnhandledCallbackMap memory callbackData = callConfig.executeIncrease.positionStore.getUnhandledCallbackMap(key);
+
+        if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.ExecutedIncrease) {
+            ExecuteIncreasePosition.increase(callConfig.executeIncrease, key, callbackData.order);
+        } else if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.ExecutedDecrease) {
+            ExecuteDecreasePosition.decrease(callConfig.executeDecrease, key, callbackData.order, callbackData.eventData);
+        } else if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.Cancelled) {
+            ExecuteRejectedAdjustment.handleCancelled(key, callbackData.order);
+        } else if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.Frozen) {
+            ExecuteRejectedAdjustment.handleFrozen(key, callbackData.order);
+        }
     }
 
     // governance
-    function executeUnhandledExecutionCallback(bytes32 key) external nonReentrant {
-        if (callbackConfig.gmxOrderHandler != msg.sender) revert PositionLogic__UnauthorizedCaller();
 
-        PositionStore.UnhandledCallbackMap memory cbState = callbackConfig.positionStore.getUnhandledCallbackMap(key);
-
-        positionLogic.executeUnhandledExecutionCallback(callbackConfig, key, cbState.order, cbState.eventData);
+    function setConfig(CallConfig memory _callConfig) external requiresAuth {
+        _setConfig(_callConfig);
     }
 
-    function setPositionLogic(PositionLogic _positionLogic) external requiresAuth {
-        positionLogic = _positionLogic;
+    // internal
+
+    function storeUnhandledCallback(
+        GmxPositionUtils.OrderExecutionStatus status,
+        GmxPositionUtils.Props calldata order,
+        bytes32 key,
+        bytes calldata eventData
+    ) internal requiresAuth {
+        callConfig.executeIncrease.positionStore.setUnhandledCallbackMap(status, order, key, eventData);
+        emit PositionRouter__UnhandledCallback(status, key, order, eventData);
     }
 
-    function setConfig(
-        RequestIncreasePosition.CallConfig memory _callIncreaseConfig,
-        RequestDecreasePosition.CallConfig memory _callDecreaseConfig,
-        ExecutePosition.CallConfig memory _callbackConfig
-    ) external requiresAuth {
-        _setConfig(_callIncreaseConfig, _callDecreaseConfig, _callbackConfig);
+    function _setConfig(CallConfig memory _callConfig) internal {
+        callConfig = _callConfig;
+
+        emit PositionRouter__SetConfig(block.timestamp, callConfig);
     }
 
-    function _setConfig(
-        RequestIncreasePosition.CallConfig memory _callIncreaseConfig,
-        RequestDecreasePosition.CallConfig memory _callDecreaseConfig,
-        ExecutePosition.CallConfig memory _callbackConfig
-    ) internal {
-        callIncreaseConfig = _callIncreaseConfig;
-        callDecreaseConfig = _callDecreaseConfig;
-        callbackConfig = _callbackConfig;
-
-        emit PositionRouter__SetConfig(block.timestamp, _callIncreaseConfig, _callbackConfig);
-    }
-
-    error PositionLogic__UnauthorizedCaller();
+    error PositionRouter__InvalidOrderType(GmxPositionUtils.OrderType orderType);
 }

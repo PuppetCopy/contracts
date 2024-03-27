@@ -1,20 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
+import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {Router} from "./utils/Router.sol";
 import {Router} from "./utils/Router.sol";
-import {Dictator} from "./utils/Dictator.sol";
 
 import {Calc} from "./utils/Calc.sol";
 
-import {SubaccountStore} from "./position/store/SubaccountStore.sol";
+import {SubaccountStore} from "./shared/store/SubaccountStore.sol";
 import {PuppetStore} from "./position/store/PuppetStore.sol";
-import {PuppetLogic} from "./position/PuppetLogic.sol";
+import {PuppetLogic} from "./position/logic/PuppetLogic.sol";
 
-contract PuppetRouter is Router, Multicall, ReentrancyGuard {
+contract PuppetRouter is Auth, ReentrancyGuard {
     event PuppetRouter__SetConfig(uint timestamp, PuppetLogic.CallSetRuleConfig callSetRuleConfig);
 
     struct PuppetRouterParams {
@@ -24,35 +23,20 @@ contract PuppetRouter is Router, Multicall, ReentrancyGuard {
     }
 
     PuppetLogic.CallSetRuleConfig callSetRuleConfig;
-    PuppetLogic puppetLogic;
 
-    constructor(Dictator dictator, PuppetLogic _puppetLogic, PuppetLogic.CallSetRuleConfig memory _callSetRuleConfig) Router(dictator) {
-        puppetLogic = _puppetLogic;
+    constructor(Authority _authority, PuppetLogic.CallSetRuleConfig memory _callSetRuleConfig) Auth(address(0), _authority) {
         _setConfig(_callSetRuleConfig);
     }
 
     function setRule(PuppetStore.Rule calldata ruleParams) external nonReentrant {
-        _setRule(msg.sender, ruleParams);
+        PuppetLogic.setRule(callSetRuleConfig, ruleParams, msg.sender);
     }
 
     function setRuleList(PuppetStore.Rule[] calldata ruleParams, address[] calldata traderList) external nonReentrant {
-        uint length = traderList.length;
-        for (uint i = 0; i < length; i++) {
-            _setRule(msg.sender, ruleParams[i]);
-        }
-    }
-
-    // internal
-
-    function _setRule(address puppet, PuppetStore.Rule calldata ruleParams) internal {
-        puppetLogic.setRule(callSetRuleConfig, ruleParams, puppet);
+        PuppetLogic.setRuleList(callSetRuleConfig, ruleParams, traderList, msg.sender);
     }
 
     // governance
-
-    function setPuppetLogic(PuppetLogic _puppetLogic) external requiresAuth {
-        puppetLogic = _puppetLogic;
-    }
 
     function setConfig(PuppetLogic.CallSetRuleConfig calldata _callSetRuleConfig) external requiresAuth {
         _setConfig(_callSetRuleConfig);

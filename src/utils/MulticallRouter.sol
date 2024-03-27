@@ -35,7 +35,7 @@ abstract contract MulticallRouter is ReentrancyGuard, Router, Multicall {
 
     // @dev Wraps the specified amount of native tokens into WNT then sends the WNT to the specified address
     function sendWnt(address receiver, uint amount) external payable nonReentrant {
-        TransferUtils.sendWnt(wnt, holdingAddress, tokenGasLimit, receiver, amount);
+        TransferUtils.depositAndSendWnt(wnt, holdingAddress, tokenGasLimit, receiver, amount);
     }
 
     // @dev Sends native token given amount and address
@@ -45,7 +45,7 @@ abstract contract MulticallRouter is ReentrancyGuard, Router, Multicall {
 
     // @dev Sends the given amount of tokens to the given address
     function sendTokens(IERC20 token, address receiver, uint amount) external payable nonReentrant {
-        router.pluginTransfer(token, msg.sender, receiver, amount);
+        router.transfer(token, msg.sender, receiver, amount);
     }
 
     function setNativeTokenGasLimit(uint _nativeTokenGasLimit) external requiresAuth {

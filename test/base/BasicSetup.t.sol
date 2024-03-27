@@ -45,7 +45,7 @@ contract BasicSetup is PRBTest, StdCheats, StdUtils {
         users = Users({owner: owner, alice: _createUser("Alice", 2), bob: _createUser("Bob", 2), yossi: _createUser("Yossi", 2)});
 
         dictator.setRoleCapability(PUPPET_MINTER_ROLE, address(puppetToken), puppetToken.mint.selector, true);
-        dictator.setRoleCapability(TOKEN_ROUTER_ROLE, address(router), router.pluginTransfer.selector, true);
+        dictator.setRoleCapability(TOKEN_ROUTER_ROLE, address(router), router.transfer.selector, true);
     }
 
     /// @dev Generates a user, labels its address, and funds it with test assets

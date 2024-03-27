@@ -19,6 +19,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
@@ -34,7 +35,7 @@ import {IVeRevenueDistributor} from "../utils/interfaces/IVeRevenueDistributor.s
  * holders simply transfer the tokens to the `FeeDistributor` contract and then call `checkpointToken`.
  * slightly modified from https://github.com/ZeframLou/fee-distributor/blob/main/src/FeeDistributor.sol
  */
-contract VeRevenueDistributor is Auth, EIP712, IVeRevenueDistributor {
+contract VeRevenueDistributor is Auth, EIP712, IVeRevenueDistributor, ReentrancyGuard {
     uint private immutable _startTime;
     VotingEscrow public immutable _votingEscrow;
     Router public immutable router;
@@ -143,13 +144,13 @@ contract VeRevenueDistributor is Auth, EIP712, IVeRevenueDistributor {
 
     // Depositing
 
-    function depositToken(IERC20 token, uint amount) external requiresAuth {
+    function depositToken(IERC20 token, uint amount) external {
         _checkpointToken(token, false);
-        router.pluginTransfer(token, msg.sender, address(this), amount);
+        SafeERC20.safeTransferFrom(token, msg.sender, address(this), amount);
         _checkpointToken(token, true);
     }
 
-    function depositTokens(IERC20[] calldata tokens, uint[] calldata amounts) external requiresAuth {
+    function depositTokens(IERC20[] calldata tokens, uint[] calldata amounts) external {
         if (tokens.length != amounts.length) {
             revert VeRevenueDistributor__InputLengthMismatch();
         }
@@ -168,19 +169,42 @@ contract VeRevenueDistributor is Auth, EIP712, IVeRevenueDistributor {
 
     // Checkpointing
 
-    function checkpoint() external requiresAuth {
+    /**
+     * @notice Caches the total supply of vetoken at the beginning of each week.
+     * This function will be called automatically before claiming tokens to ensure the contract is properly updated.
+     */
+    function checkpoint() external override nonReentrant {
         _checkpointTotalSupply();
     }
 
-    function checkpointUser(address user) external requiresAuth {
+    /**
+     * @notice Caches the user's balance of vetoken at the beginning of each week.
+     * This function will be called automatically before claiming tokens to ensure the contract is properly updated.
+     * @param user - The address of the user to be checkpointed.
+     */
+    function checkpointUser(address user) external override nonReentrant {
         _checkpointUserBalance(user);
     }
 
-    function checkpointToken(IERC20 token) external requiresAuth {
+    /**
+     * @notice Assigns any newly-received tokens held by the FeeDistributor to weekly distributions.
+     * @dev Any `token` balance held by the FeeDistributor above that which is returned by `getTokenLastBalance`
+     * will be distributed evenly across the time period since `token` was last checkpointed.
+     *
+     * This function will be called automatically before claiming tokens to ensure the contract is properly updated.
+     * @param token - The ERC20 token address to be checkpointed.
+     */
+    function checkpointToken(IERC20 token) external override nonReentrant {
         _checkpointToken(token, true);
     }
 
-    function checkpointTokens(IERC20[] calldata tokens) external requiresAuth {
+    /**
+     * @notice Assigns any newly-received tokens held by the FeeDistributor to weekly distributions.
+     * @dev A version of `checkpointToken` which supports checkpointing multiple tokens.
+     * See `checkpointToken` for more details.
+     * @param tokens - An array of ERC20 token addresses to be checkpointed.
+     */
+    function checkpointTokens(IERC20[] calldata tokens) external override nonReentrant {
         uint tokensLength = tokens.length;
         for (uint i = 0; i < tokensLength;) {
             _checkpointToken(tokens[i], true);
@@ -200,7 +224,7 @@ contract VeRevenueDistributor is Auth, EIP712, IVeRevenueDistributor {
         return amount;
     }
 
-    function claimMany(IERC20[] calldata tokenList, address from, address to) external requiresAuth returns (uint[] memory) {
+    function claimList(IERC20[] calldata tokenList, address from, address to) external requiresAuth returns (uint[] memory) {
         _checkpointTotalSupply();
         _checkpointUserBalance(from);
 

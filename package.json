@@ -19,7 +19,7 @@
     "!artifacts/contracts/test/**/*"
   ],
   "scripts": {
-    "test": "FOUNDRY_PROFILE=dev forge test --match-contract PositionRouterTest -vvvvv",
+    "test": "FOUNDRY_PROFILE=dev forge test --match-contract RewardRouterTest -vvvvv",
     "test:fork": "FOUNDRY_PROFILE=dev forge test --match-contract PositionRouterTest -vvvvv --fork-url https://arb-mainnet.g.alchemy.com/v2/RBsflxWv6IhITsLxAWcQlhCqSuxV7Low --fork-block-number 192315592",
     "build:dev": "FOUNDRY_PROFILE=dev forge build --sizes",
     "build": "forge build --sizes",

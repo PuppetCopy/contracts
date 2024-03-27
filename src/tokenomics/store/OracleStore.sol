@@ -11,7 +11,6 @@ contract OracleStore is StoreController {
         uint price;
         uint blockNumber;
         uint timestamp;
-        uint updateInterval;
     }
 
     SlotSeed public seedUpdate;
@@ -24,12 +23,10 @@ contract OracleStore is StoreController {
     uint[SLOT_COUNT] public slotMax;
     uint public medianMax;
 
-    constructor(Authority _authority, address _initSetter, uint _seedPrice, uint _updateInterval) StoreController(_authority, _initSetter) {
+    constructor(Authority _authority, address _initSetter, uint _seedPrice) StoreController(_authority, _initSetter) {
         require(_seedPrice > 0, "Seed price cannot be 0");
 
-        seedUpdate = SlotSeed({price: _seedPrice, blockNumber: block.number, timestamp: block.timestamp, updateInterval: _updateInterval});
-
-        slot = (seedUpdate.timestamp / _updateInterval) % SLOT_COUNT;
+        seedUpdate = SlotSeed({price: _seedPrice, blockNumber: block.number, timestamp: block.timestamp});
 
         /// seed all the OHLC data with the initial high price
         for (uint i = 0; i < SLOT_COUNT; i++) {
@@ -55,17 +52,6 @@ contract OracleStore is StoreController {
 
     function setLatestUpdate(SlotSeed memory _seedUpdate) external isSetter {
         seedUpdate = _seedUpdate;
-    }
-
-    function setSeedUpdateInterval(uint _updateInterval) external isSetter {
-        SlotSeed memory nextSeed = SlotSeed({
-            price: seedUpdate.price,
-            blockNumber: seedUpdate.blockNumber,
-            timestamp: seedUpdate.timestamp,
-            updateInterval: _updateInterval
-        });
-
-        seedUpdate = nextSeed;
     }
 
     function setSlot(uint8 _slot) external isSetter {

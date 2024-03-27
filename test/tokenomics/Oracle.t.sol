@@ -11,14 +11,14 @@ import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockUniswapV3Pool} from "test/mocks/MockUniswapV3Pool.sol";
 
-// v3-periphery/contracts/libraries/OracleLibrary.sol
-
 contract OracleTest is BasicSetup {
-    OracleLogic oracleLogic;
-    OracleStore oracleStore;
+    OracleStore usdPerWntStore;
+    OracleStore puppetPerWntStore;
 
-    MockWeightedPoolVault vault;
+    MockWeightedPoolVault puppetWntPoolVault;
     IUniswapV3Pool[] wntUsdPoolList;
+
+    OracleLogic.CallConfig callOracleConfig;
 
     function setUp() public override {
         super.setUp();
@@ -30,26 +30,33 @@ contract OracleTest is BasicSetup {
         wntUsdPoolList[1] = new MockUniswapV3Pool(fromPriceToSqrt(100));
         wntUsdPoolList[2] = new MockUniswapV3Pool(fromPriceToSqrt(100));
 
-        vault = new MockWeightedPoolVault();
-        vault.initPool(address(puppetToken), address(address(0x0b)), 20e18, 80e18);
+        puppetWntPoolVault = new MockWeightedPoolVault();
+        puppetWntPoolVault.initPool(address(puppetToken), address(0x0b), 20e18, 80e18);
 
-        oracleLogic = new OracleLogic(dictator);
+        // usdPerWntStore = new OracleStore(dictator, owner, 100e30);
+        puppetPerWntStore = new OracleStore(dictator, owner, 1e18);
 
-        assertEq(oracleLogic.getMedianWntPriceInUsd(wntUsdPoolList, 0), 100e6, "wnt at $100");
-        uint seedPuppetUsd = getPuppetExchangeRateInUsdc();
-        assertAlmostEq(seedPuppetUsd, 100e6, 1e4, "pool $100 as 20 PUPPET/WETH 80");
+        callOracleConfig = OracleLogic.CallConfig({
+            wntUsdSourceList: wntUsdPoolList,
+            vault: puppetWntPoolVault,
+            tokenPerWntStore: puppetPerWntStore,
+            // usdPerWntStore: usdPerWntStore,
+            poolId: 0,
+            twapInterval: 0,
+            updateInterval: 1 days
+        });
 
-        oracleStore = new OracleStore(dictator, address(oracleLogic), seedPuppetUsd, 1 days);
+        (uint usdPerWnt, uint tokenPerWnt, uint usdPerToken) = OracleLogic.syncPrices(callOracleConfig);
 
-        assertAlmostEq(oracleLogic.getMaxPrice(oracleStore, oracleStore.getLatestSeed().price), 100e6, 1e4, "initial $100");
+        assertEq(usdPerWnt, 100e30, "100 usd per wnt");
+        assertEq(tokenPerWnt, 1e30, "1 puppet per wnt");
+        assertEq(usdPerToken, 100e30, "100 usd per puppet");
 
-        dictator.setRoleCapability(1, address(oracleLogic), oracleLogic.syncTokenPrice.selector, true);
-        dictator.setUserRole(users.owner, 1, true);
+        assertEq(OracleLogic.getUsdPerWntUsingTwapMedian(callOracleConfig.wntUsdSourceList, callOracleConfig.twapInterval), 100e30, "100 usd per wnt");
+        assertEq(OracleLogic.getTokenPerWnt(callOracleConfig.vault, callOracleConfig.poolId), 1e30, "100 usd per wnt");
     }
 
     function testMedianWntPriceInUsd() public {
-        assertAlmostEq(oracleLogic.getMedianWntPriceInUsd(wntUsdPoolList, 0), 100e6, 1e4, "3 sources, with prices 100, 100, 1");
-
         IUniswapV3Pool[] memory mockedPools = new IUniswapV3Pool[](5);
 
         mockedPools[0] = new MockUniswapV3Pool(4557304554737852013346413); // https://www.geckoterminal.com/arbitrum/pools/0xc6962004f452be9203591991d15f6b388e09e8d0
@@ -58,78 +65,96 @@ contract OracleTest is BasicSetup {
         mockedPools[3] = new MockUniswapV3Pool(fromPriceToSqrt(1));
         mockedPools[4] = new MockUniswapV3Pool(fromPriceToSqrt(1));
 
-        assertAlmostEq(oracleLogic.getMedianWntPriceInUsd(mockedPools, 0), 3307e6, 1e6, "5 sources, 2 anomalies");
+        assertAlmostEq(
+            OracleLogic.getUsdPerWntUsingTwapMedian(mockedPools, 0),
+            3307.76e30,
+            0.05e30,
+            "5 sources, 2 anomalies"
+        );
     }
 
     function testStoreAndGetPrice() public {
-        vault.setPoolBalances(40e18, 80e18);
-        assertAlmostEq(getPuppetExchangeRateInUsdc(), 50e6, 1e4, "$50 as 40 PUPPET / 80 WETH");
-        vault.setPoolBalances(4000e18, 80e18);
-        assertAlmostEq(getPuppetExchangeRateInUsdc(), 5e5, 1e3, "$.5 as 4000 PUPPET / 80 WETH");
-        vault.setPoolBalances(40_000e18, 80e18);
-        assertAlmostEq(getPuppetExchangeRateInUsdc(), 5e4, 1e3, "$.005 as 40,000 PUPPET / 80 WETH");
-        vault.setPoolBalances(2e18, 80e18);
-        assertAlmostEq(getPuppetExchangeRateInUsdc(), 1_000e6, 1e3, "$1000 as 2 PUPPET / 80 WETH");
-        vault.setPoolBalances(20e18, 80_000_000e18);
-        assertAlmostEq(getPuppetExchangeRateInUsdc(), 100_000_000e6, 1e6, "$100,000,000 as 20 PUPPET / 80,000,000 WETH");
-        vault.setPoolBalances(20_000_000e18, 80e18);
-        assertAlmostEq(getPuppetExchangeRateInUsdc(), 100, 1e1, "$0000.1 as 20,000,000 PUPPET / 80 WETH");
+        puppetWntPoolVault.setPoolBalances(40e18, 80e18);
+        assertAlmostEq(OracleLogic.getTokenPerUsd(callOracleConfig), 50e30, 0.1e30, "$50 as 40 PUPPET / 80 WETH");
+        puppetWntPoolVault.setPoolBalances(4000e18, 80e18);
+        assertAlmostEq(OracleLogic.getTokenPerUsd(callOracleConfig), 0.5e30, 0.5e30, "$.5 as 4000 PUPPET / 80 WETH");
+        puppetWntPoolVault.setPoolBalances(40_000e18, 80e18);
+        assertAlmostEq(OracleLogic.getTokenPerUsd(callOracleConfig), 0.05e30, 0.5e30, "$.005 as 40,000 PUPPET / 80 WETH");
+        puppetWntPoolVault.setPoolBalances(2e18, 80e18);
+        assertAlmostEq(OracleLogic.getTokenPerUsd(callOracleConfig), 1_000e30, 0.5e30, "$1000 as 2 PUPPET / 80 WETH");
+        puppetWntPoolVault.setPoolBalances(20e18, 80_000_000e18);
+        assertAlmostEq(OracleLogic.getTokenPerUsd(callOracleConfig), 100_000_000e30, 0.5e30, "$100,000,000 as 20 PUPPET / 80,000,000 WETH");
+        puppetWntPoolVault.setPoolBalances(20_000_000e18, 80e18);
+        assertAlmostEq(OracleLogic.getTokenPerUsd(callOracleConfig), 0.0001e30, 0.1e30, "$0000.1 as 20,000,000 PUPPET / 80 WETH");
 
-        vault.setPoolBalances(2_000e18, 0);
+        puppetWntPoolVault.setPoolBalances(2_000e18, 0);
         vm.expectRevert();
-        getPuppetExchangeRateInUsdc();
-        vault.setPoolBalances(0, 2_000e18);
+        OracleLogic.getTokenPerUsd(callOracleConfig);
+        puppetWntPoolVault.setPoolBalances(0, 2_000e18);
         vm.expectRevert();
-        getPuppetExchangeRateInUsdc();
+        OracleLogic.getTokenPerUsd(callOracleConfig);
     }
 
     function testSlotMinMaxPrice() public {
         _stepSlot();
-        _storeStepSlot(80_000_000e18);
-        _storePrice(80e18);
-        _storeStepSlot(80_000_000e18);
-        _storePrice(80e18);
-        _storeStepSlot(80_000_000e18);
-        _storePrice(80e18);
+        _storePrice(90e18);
+        _storePrice(60e18);
 
-        assertAlmostEq(_storeStepSlot(80e18), 100_000_000e6, 1e6, "set inital $2");
-        assertAlmostEq(oracleLogic.getMinPrice(oracleStore, _storeStepSlot(80_000_000e18)), 100e6, 1e2, "set inital $2");
+        assertEq(_storeStepInUsd(160e18), 200e30, "200 usd per puppet");
+        assertEq(_storeStepInUsd(40e18), 50e30, "50 usd per puppet");
     }
 
     function testMedianHigh() public {
-        _storeStepSlot(40e18);
-        _storeStepSlot(70e18);
-        _storeStepSlot(20e18);
-        _storeStepSlot(60e18);
-        _storeStepSlot(30e18);
-        _storeStepSlot(50e18);
+        _storeStepInWnt(1e18);
+        _storeStepInWnt(2e18);
+        _storeStepInWnt(4e18);
+        _storeStepInWnt(8e18);
+        _storeStepInWnt(16e18);
+        _storeStepInWnt(32e18);
+        _storeStepInWnt(64e18);
 
-        assertAlmostEq(_storeStepSlot(10e18), 50e6, 1e4);
-        assertAlmostEq(_storeStepSlot(10e18), 37e6, 1e6);
-        assertAlmostEq(_storeStepSlot(10e18), 25e6, 1e2);
+        // [1250000000000000000000000000000 [1.25e30], 80000000000000000000000000000000 [8e31], 40000000000000000000000000000000 [4e31],
+        // 20000000000000000000000000000000 [2e31], 10000000000000000000000000000000 [1e31], 5000000000000000000000000000000 [5e30],
+        // 2500000000000000000000000000000 [2.5e30]]
+        // 1.25e30, 8e31, 4e31, 2e31, 1e31, 5e30, 2.5e30
+
+        assertAlmostEq(puppetPerWntStore.medianMax(), 1e31, 1e30);
+
+        _storeStepInWnt(64e18);
+        assertAlmostEq(puppetPerWntStore.medianMax(), 5e30, 1e30);
+        _storeStepInWnt(64e18);
+        assertAlmostEq(puppetPerWntStore.medianMax(), 2.5e30, 1e30);
     }
 
-    function _storeStepSlot(uint priceInWnt) internal returns (uint) {
-        _stepSlot();
-        uint price = _storePrice(priceInWnt);
+    function _storeStepInUsd(uint balanceInWnt) internal returns (uint) {
+        _storeStep(balanceInWnt);
 
-        return price;
+        (uint usdPerWnt, uint puppetPerWnt, uint usdPerPuppet) = OracleLogic.syncPrices(callOracleConfig);
+
+        return usdPerPuppet;
+    }
+
+    function _storeStepInWnt(uint balanceInWnt) internal returns (uint) {
+        _storeStep(balanceInWnt);
+
+        (uint usdPerWnt, uint puppetPerWnt, uint usdPerToken) = OracleLogic.syncPrices(callOracleConfig);
+
+        return puppetPerWnt;
+    }
+
+    function _storeStep(uint balanceInWnt) internal {
+        _stepSlot();
+        _storePrice(balanceInWnt);
     }
 
     function _stepSlot() internal {
-        OracleStore.SlotSeed memory update = oracleStore.getLatestSeed();
-        skip(update.updateInterval);
+        skip(callOracleConfig.updateInterval);
     }
 
-    function _storePrice(uint balanceInWnt) internal returns (uint) {
-        OracleStore.SlotSeed memory update = oracleStore.getLatestSeed();
-        vm.roll(update.blockNumber + 1);
-        vault.setPoolBalances(20e18, balanceInWnt);
-        return oracleLogic.syncTokenPrice(wntUsdPoolList, vault, oracleStore, 0, 0);
-    }
-
-    function getPuppetExchangeRateInUsdc() public view returns (uint) {
-        return oracleLogic.getTokenPriceInUsd(wntUsdPoolList, vault, 0, 0);
+    function _storePrice(uint balanceInWnt) internal {
+        OracleStore.SlotSeed memory seed = puppetPerWntStore.getLatestSeed();
+        vm.roll(seed.blockNumber + 1);
+        puppetWntPoolVault.setPoolBalances(20e18, balanceInWnt);
     }
 
     function fromPriceToSqrt(uint usdcPerWeth) public pure returns (uint160) {

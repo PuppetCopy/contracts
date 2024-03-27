@@ -383,7 +383,7 @@ contract VotingEscrow is Auth {
         // _locked.end > block.timestamp (always)
         _checkpoint(_to, _oldLocked, _lock);
 
-        if (_value > 0) router.pluginTransfer(token, _from, address(this), _value);
+        if (_value > 0) router.transfer(token, _from, address(this), _value);
 
         emit VotingEscrow__Deposit(_from, _to, _value, _lock.end, block.timestamp);
         emit VotingEscrow__Supply(_supplyBefore, _supplyBefore + _value);

@@ -4,16 +4,15 @@ pragma solidity 0.8.24;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IGmxExchangeRouter} from "./../interface/IGmxExchangeRouter.sol";
+import {IWNT} from "./../../utils/interfaces/IWNT.sol";
 
 import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
-import {Subaccount} from "../util/Subaccount.sol";
+import {Subaccount} from "../../shared/Subaccount.sol";
 import {ErrorUtils} from "./../../utils/ErrorUtils.sol";
-import {Calc} from "./../../utils/Calc.sol";
+import {TransferUtils} from "./../../utils/TransferUtils.sol";
 
-import {SubaccountStore} from "./../store/SubaccountStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
-import {SubaccountStore} from "../store/SubaccountStore.sol";
-import {GmxOrder} from "./GmxOrder.sol";
+import {SubaccountStore} from "../../shared/store/SubaccountStore.sol";
 
 library RequestDecreasePosition {
     event RequestIncreasePosition__Request(
@@ -28,13 +27,26 @@ library RequestDecreasePosition {
     );
 
     struct CallConfig {
+        IWNT wnt;
         IGmxExchangeRouter gmxExchangeRouter;
         PositionStore positionStore;
         SubaccountStore subaccountStore;
+        address positionRouterAddress;
         address gmxOrderVault;
-        address feeReceiver;
         bytes32 referralCode;
         uint callbackGasLimit;
+        uint tokenTransferGasLimit;
+    }
+
+    struct TraderCallParams {
+        address market;
+        address collateralToken;
+        bool isLong;
+        uint executionFee;
+        uint collateralDelta;
+        uint sizeDelta;
+        uint acceptablePrice;
+        uint triggerPrice;
     }
 
     struct CallParams {
@@ -44,7 +56,7 @@ library RequestDecreasePosition {
         uint totalSizeDelta;
     }
 
-    function decrease(RequestDecreasePosition.CallConfig calldata callConfig, GmxOrder.CallParams calldata traderCallparams, address from) internal {
+    function decrease(CallConfig memory callConfig, TraderCallParams calldata traderCallparams, address from) internal {
         Subaccount subaccount = callConfig.subaccountStore.getSubaccount(from);
         address subaccountAddress = address(subaccount);
 
@@ -90,46 +102,45 @@ library RequestDecreasePosition {
         );
     }
 
-    function _decrease(CallConfig calldata callConfig, GmxOrder.CallParams calldata traderCallparams, CallParams memory callParams)
+    function _decrease(CallConfig memory callConfig, TraderCallParams calldata traderCallParams, CallParams memory callParams)
         internal
         returns (bytes32 requestKey)
     {
         GmxPositionUtils.CreateOrderParams memory orderParams = GmxPositionUtils.CreateOrderParams({
             addresses: GmxPositionUtils.CreateOrderParamsAddresses({
                 receiver: address(callConfig.positionStore),
-                callbackContract: msg.sender,
-                uiFeeReceiver: callConfig.feeReceiver,
-                market: traderCallparams.market,
-                initialCollateralToken: traderCallparams.collateralToken,
+                callbackContract: address(this),
+                uiFeeReceiver: address(0),
+                market: traderCallParams.market,
+                initialCollateralToken: traderCallParams.collateralToken,
                 swapPath: new address[](0) // swapPath
             }),
             numbers: GmxPositionUtils.CreateOrderParamsNumbers({
                 initialCollateralDeltaAmount: callParams.totalCollateralDelta,
                 sizeDeltaUsd: callParams.totalSizeDelta,
-                triggerPrice: traderCallparams.triggerPrice,
-                acceptablePrice: traderCallparams.acceptablePrice,
-                executionFee: traderCallparams.executionFee,
+                triggerPrice: traderCallParams.triggerPrice,
+                acceptablePrice: traderCallParams.acceptablePrice,
+                executionFee: traderCallParams.executionFee,
                 callbackGasLimit: callConfig.callbackGasLimit,
                 minOutputAmount: 0
             }),
             orderType: GmxPositionUtils.OrderType.MarketDecrease,
             decreasePositionSwapType: GmxPositionUtils.DecreasePositionSwapType.NoSwap,
-            isLong: traderCallparams.isLong,
+            isLong: traderCallParams.isLong,
             shouldUnwrapNativeToken: false,
             referralCode: callConfig.referralCode
         });
 
-        bool orderSuccess;
-        bytes memory orderReturnData;
+        TransferUtils.depositAndSendWnt(
+            callConfig.wnt,
+            address(callConfig.positionStore),
+            callConfig.tokenTransferGasLimit,
+            callConfig.gmxOrderVault,
+            traderCallParams.executionFee + traderCallParams.collateralDelta
+        );
 
-        uint totalValue = traderCallparams.executionFee + traderCallparams.collateralDelta;
-
-        bytes[] memory callList = new bytes[](2);
-        callList[0] = abi.encodeWithSelector(callConfig.gmxExchangeRouter.sendWnt.selector, callConfig.gmxOrderVault, totalValue);
-        callList[1] = abi.encodeWithSelector(callConfig.gmxExchangeRouter.createOrder.selector, orderParams);
-
-        (orderSuccess, orderReturnData) = callParams.subaccount.execute{value: msg.value}(
-            address(callConfig.gmxExchangeRouter), abi.encodeWithSelector(callConfig.gmxExchangeRouter.multicall.selector, callList)
+        (bool orderSuccess, bytes memory orderReturnData) = callParams.subaccount.execute(
+            address(callConfig.gmxExchangeRouter), abi.encodeWithSelector(callConfig.gmxExchangeRouter.createOrder.selector, orderParams)
         );
 
         if (!orderSuccess) ErrorUtils.revertWithParsedMessage(orderReturnData);

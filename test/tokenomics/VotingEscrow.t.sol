@@ -24,7 +24,7 @@ contract VotingEscrowTests is BasicSetup {
         puppetToken.mint(users.bob, 100 * 1e18);
         puppetToken.mint(users.yossi, 100 * 1e18);
 
-        dictator.setRoleCapability(0, address(router), router.pluginTransfer.selector, true);
+        dictator.setRoleCapability(0, address(router), router.transfer.selector, true);
         dictator.setUserRole(address(votingEscrow), 0, true);
 
         dictator.setPublicCapability(address(votingEscrow), votingEscrow.lock.selector, true);

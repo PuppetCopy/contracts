@@ -5,12 +5,12 @@ import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
 import {StoreController} from "../../utils/StoreController.sol";
 import {GmxPositionUtils} from "./../util/GmxPositionUtils.sol";
+import {PositionUtils} from "./../util/PositionUtils.sol";
 
 contract PositionStore is StoreController {
     struct RequestIncrease {
         address trader;
         uint[] puppetCollateralDeltaList;
-        uint leverage;
         uint leverageTarget;
         uint sizeDelta;
         uint collateralDelta;
@@ -28,21 +28,29 @@ contract PositionStore is StoreController {
         uint collateral;
         uint totalSize;
         uint totalCollateral;
+        uint leverage;
         uint[] puppetDepositList;
         address[] puppetList;
     }
 
     struct UnhandledCallbackMap {
+        GmxPositionUtils.OrderExecutionStatus status;
         GmxPositionUtils.Props order;
         bytes eventData;
     }
 
+    struct Activity {
+        uint latestFunding;
+        uint allowance;
+    }
+
     mapping(bytes32 requestKey => RequestIncrease) public requestIncreaseMap;
-    // mapping(bytes32 requestKey => RequestIncrease) public requestReduceTargetLeverageMap;
     mapping(bytes32 requestKey => RequestDecrease) public requestDecreaseMap;
 
     mapping(bytes32 positionKey => MirrorPosition) public positionMap;
     mapping(bytes32 positionKey => UnhandledCallbackMap) public unhandledCallbackMap;
+
+    mapping(bytes32 ruleKey => Activity) public activityMap;
 
     constructor(Authority _authority, address _initSetter) StoreController(_authority, _initSetter) {}
 
@@ -57,18 +65,6 @@ contract PositionStore is StoreController {
     function removeRequestIncreaseMap(bytes32 _key) external isSetter {
         delete requestIncreaseMap[_key];
     }
-
-    // function getRequestReduceTargetLeverageMap(bytes32 _key) external view returns (RequestIncrease memory) {
-    //     return requestReduceTargetLeverageMap[_key];
-    // }
-
-    // function setRequestReduceTargetLeverageMap(bytes32 _key, RequestIncrease calldata _req) external isSetter {
-    //     requestReduceTargetLeverageMap[_key] = _req;
-    // }
-
-    // function removeRequestReduceTargetLeverageMap(bytes32 _key) external isSetter {
-    //     delete requestReduceTargetLeverageMap[_key];
-    // }
 
     function getRequestDecreaseMap(bytes32 _key) external view returns (RequestDecrease memory) {
         return requestDecreaseMap[_key];
@@ -94,13 +90,47 @@ contract PositionStore is StoreController {
         delete positionMap[_key];
     }
 
-    function setUnhandledCallbackMap(bytes32 _key, GmxPositionUtils.Props calldata _order, bytes calldata _eventData) external isSetter {
-        PositionStore.UnhandledCallbackMap memory callbackResponse = PositionStore.UnhandledCallbackMap({order: _order, eventData: _eventData});
+    function setUnhandledCallbackMap(
+        GmxPositionUtils.OrderExecutionStatus _status,
+        GmxPositionUtils.Props calldata _order,
+        bytes32 _key,
+        bytes calldata _eventData
+    ) external isSetter {
+        PositionStore.UnhandledCallbackMap memory callbackResponse =
+            PositionStore.UnhandledCallbackMap({status: _status, order: _order, eventData: _eventData});
 
         unhandledCallbackMap[_key] = callbackResponse;
     }
 
     function getUnhandledCallbackMap(bytes32 _key) external view returns (UnhandledCallbackMap memory) {
         return unhandledCallbackMap[_key];
+    }
+
+    function setActivity(bytes32 _key, Activity calldata _activity) external isSetter {
+        activityMap[_key] = _activity;
+    }
+
+    function getActivity(bytes32 _key) external view returns (Activity memory) {
+        return activityMap[_key];
+    }
+
+    function getActivityList(bytes32 _routeKey, address[] calldata _addressList) external view returns (Activity[] memory) {
+        uint length = _addressList.length;
+        Activity[] memory _activity = new Activity[](length);
+
+        for (uint i = 0; i < length; i++) {
+            bytes32 puppetTraderKey = PositionUtils.getRuleKey(_addressList[i], _routeKey);
+            _activity[i] = activityMap[puppetTraderKey];
+        }
+        return _activity;
+    }
+
+    function setRuleActivityList(bytes32 _routeKey, address[] calldata _addressList, Activity[] calldata _activityList) external isSetter {
+        uint length = _addressList.length;
+
+        for (uint i = 0; i < length; i++) {
+            bytes32 puppetTraderKey = PositionUtils.getRuleKey(_addressList[i], _routeKey);
+            activityMap[puppetTraderKey] = _activityList[i];
+        }
     }
 }

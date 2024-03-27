@@ -16,7 +16,8 @@ library GmxPositionUtils {
     }
 
     enum OrderExecutionStatus {
-        Executed,
+        ExecutedIncrease,
+        ExecutedDecrease,
         Cancelled,
         Frozen
     }
@@ -101,9 +102,10 @@ library GmxPositionUtils {
         return orderType == OrderType.MarketDecrease || orderType == OrderType.Liquidation;
     }
 
-    function isLiquidationOrder(OrderType orderType) internal pure returns (bool) {
+    function isLiquidateOrder(OrderType orderType) internal pure returns (bool) {
         return orderType == OrderType.Liquidation;
     }
+
 
     function getPositionKey(address account, address market, address collateralToken, bool isLong) internal pure returns (bytes32) {
         return keccak256(abi.encode(account, market, collateralToken, isLong));

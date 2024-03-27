@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
 import {StoreController} from "./../../utils/StoreController.sol";
-import {Subaccount} from "./../util/Subaccount.sol";
+import {Subaccount} from "../Subaccount.sol";
 
 contract SubaccountStore is StoreController {
     mapping(address => Subaccount) public subaccountMap;

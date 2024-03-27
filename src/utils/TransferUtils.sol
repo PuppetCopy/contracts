@@ -5,7 +5,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IWNT} from "./interfaces/IWNT.sol";
 import {ErrorUtils} from "./ErrorUtils.sol";
-import {Router} from "./Router.sol";
 
 /**
  * @title TokenUtils
@@ -47,7 +46,7 @@ library TransferUtils {
         if (success) return;
 
         // if the transfer failed, re-wrap the token and send it to the receiver
-        sendWnt(wnt, holdingAddress, gasLimit, receiver, amount);
+        depositAndSendWnt(wnt, holdingAddress, gasLimit, receiver, amount);
     }
 
     /**
@@ -55,12 +54,13 @@ library TransferUtils {
      * amount of wrapped native token to the specified receiver address.
      *
      * @param wnt the address of the wrapped native token contract
-     * @param holdingAddress the address of the holding account where the native token is held
+     * @param holdingAddress in case transfers to the receiver fail due to blacklisting or other reasons
+     *  send the tokens to a holding address to avoid possible gaming through reverting
      * @param gasLimit the maximum amount of gas that the native token transfer can consume
      * @param receiver the address of the recipient of the wrapped native token transfer
      * @param amount the amount of native token to deposit and the amount of wrapped native token to send
      */
-    function sendWnt(IWNT wnt, address holdingAddress, uint gasLimit, address receiver, uint amount) internal {
+    function depositAndSendWnt(IWNT wnt, address holdingAddress, uint gasLimit, address receiver, uint amount) internal {
         if (amount == 0) return;
         validateDestination(receiver);
 
@@ -78,7 +78,8 @@ library TransferUtils {
      * actions like request cancellation from being executed
      *
      * @param wnt the address of the WNT contract to withdraw the wrapped native token from
-     * @param holdingAddress the address of the holding account where the native token is held
+     * @param holdingAddress in case transfers to the receiver fail due to blacklisting or other reasons
+     *  send the tokens to a holding address to avoid possible gaming through reverting
      * @param gasLimit the maximum amount of gas that the native token transfer can consume
      * @param receiver the address of the recipient of the native token transfer
      * @param amount the amount of wrapped native token to withdraw and the amount of native token to send
@@ -109,7 +110,7 @@ library TransferUtils {
         if (success) return;
 
         // if the transfer failed, re-wrap the token and send it to the receiver
-        sendWnt(wnt, holdingAddress, gasLimit, receiver, amount);
+        depositAndSendWnt(wnt, holdingAddress, gasLimit, receiver, amount);
     }
 
     /**
@@ -119,7 +120,8 @@ library TransferUtils {
      * actions like request cancellation from being executed
      *
      * @param gasLimit The maximum amount of gas that the token transfer can consume.
-     * @param holdingAddress The address of the holding account where the token is held.
+     * @param holdingAddress in case transfers to the receiver fail due to blacklisting or other reasons
+     *  send the tokens to a holding address to avoid possible gaming through reverting
      * @param token The address of the ERC20 token that is being transferred.
      * @param receiver The address of the recipient of the `token` transfer.
      * @param amount The amount of `token` to transfer.

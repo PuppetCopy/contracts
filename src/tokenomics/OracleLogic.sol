@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -10,44 +9,65 @@ import {OracleStore, SLOT_COUNT} from "./store/OracleStore.sol";
 import {UniV3Prelude} from "./../utils/UniV3Prelude.sol";
 
 /**
- * @title OracleStore
+ * @title OracleLogic
  * @dev This contract mitigates price manipulation by:
  *
  * 1. Storing prices in seven different time slots to record the highest and lowest prices.
  * 2. Using the median of the highest slot prices as a reference to filter out outliers of of extreme values.
  * 3. Comparing the latest price with the median slot high and using the greater of the two to safeguard against undervaluation.
  * 4. Checking for price updates within the same block to protect against flash loan attacks that could temporarily distort prices.
+ *
+ * -- Flashloan
+ * assuming attacker tries to flashloan a low price to affect the price
+ * low price settlment manipulation would be mitigated by taking previous higher settled price within the same block
+ * - DDOS
+ * settlment has to be below Acceptable Price check can an attacker prevent other tx's from being settled?
+ * there doesn't seem to have an ecnonomical sense but it could be a case
+ *
  */
-contract OracleLogic is Auth {
+library OracleLogic {
     event OracleLogic__PriceUpdate(uint timestamp, uint price);
     event OracleLogic__SlotSettled(uint updateInterval, uint timestamp, uint minPrice, uint maxPrice);
     event OracleLogic__SyncDelayedSlot(uint updateInterval, uint seedTimestamp, uint blockTimestamp, uint delayCount, uint price);
 
-    constructor(Authority _authority) Auth(address(0), _authority) {}
-
-    function getMaxPrice(OracleStore store, uint exchangeRate) public view returns (uint) {
-        return Math.max(store.medianMax(), exchangeRate);
+    struct CallConfig {
+        IUniswapV3Pool[] wntUsdSourceList;
+        IVault vault;
+        OracleStore tokenPerWntStore;
+        // OracleStore usdPerWntStore;
+        bytes32 poolId;
+        uint32 twapInterval;
+        uint updateInterval;
     }
 
-    function getMinPrice(OracleStore store, uint exchangeRate) public view returns (uint) {
-        return Math.min(store.medianMin(), exchangeRate);
+    function getMaxPrice(OracleStore store, uint latestPrice) public view returns (uint) {
+        return Math.max(store.medianMax(), latestPrice);
     }
 
-    function getTokenPriceInWnt(IVault vault, bytes32 poolId) public view returns (uint price) {
-        return _getTokenExchangeRate(vault, poolId);
+    function getMinPrice(OracleStore store, uint latestPrice) public view returns (uint) {
+        return Math.min(store.medianMin(), latestPrice);
     }
 
-    function getTokenPriceInUsd(IUniswapV3Pool[] calldata wntUsdSourceList, IVault vault, bytes32 poolId, uint32 twapInterval)
-        public
-        view
-        returns (uint)
-    {
-        uint usdPerWnt = getMedianWntPriceInUsd(wntUsdSourceList, twapInterval);
-        uint tokenPerWnt = getTokenPriceInWnt(vault, poolId);
-        return usdPerWnt * 1e30 / tokenPerWnt;
+    function getTokenPerUsd(CallConfig calldata callConfig) public view returns (uint usdPerToken) {
+        uint usdPerWnt = getUsdPerWntUsingTwapMedian(callConfig.wntUsdSourceList, callConfig.twapInterval);
+        uint tokenPerWnt = getTokenPerWnt(callConfig.vault, callConfig.poolId);
+        usdPerToken = usdPerWnt * 1e30 / tokenPerWnt;
     }
 
-    function getMedianWntPriceInUsd(IUniswapV3Pool[] calldata wntUsdSourceList, uint32 twapInterval) public view returns (uint medianPrice) {
+    function getTokenPerWnt(IVault vault, bytes32 poolId) public view returns (uint price) {
+        (, uint[] memory balances,) = vault.getPoolTokens(poolId);
+
+        uint tokenBalance = balances[0];
+        uint nSlotBalance = balances[1];
+        uint precision = 10 ** 30;
+
+        uint balanceRatio = (tokenBalance * 80 * precision) / (nSlotBalance * 20);
+        price = balanceRatio;
+
+        if (price == 0) revert OracleLogic__NonZeroPrice();
+    }
+
+    function getUsdPerWntUsingTwapMedian(IUniswapV3Pool[] memory wntUsdSourceList, uint32 twapInterval) public view returns (uint medianPrice) {
         uint sourceListLength = wntUsdSourceList.length;
         if (sourceListLength < 3) revert OracleLogic__NotEnoughSources();
 
@@ -68,50 +88,40 @@ contract OracleLogic is Auth {
             priceList[j] = currentPrice;
         }
 
-        medianPrice = priceList[medianIndex];
+        medianPrice = priceList[medianIndex] * 1e24;
     }
 
     // state
-
-    function syncTokenPrice(IUniswapV3Pool[] calldata wntUsdSourceList, IVault vault, OracleStore store, bytes32 poolId, uint32 twapInterval)
-        external
-        requiresAuth
-        returns (uint)
-    {
-        uint price = getTokenPriceInUsd(wntUsdSourceList, vault, poolId, twapInterval);
-        OracleStore.SlotSeed memory seed = store.getLatestSeed();
-
-        uint settledPrice = storeMinMax(store, seed, price);
-
-        // the following tries to mitigate flashloan and DDOS attacks
-        // -- Flashloan
-        // assuming attacker tries to flashloan a low price to affect the price
-        // low price settlment manipulation would be mitigated by taking previous higher settled price within the same block
-        // - DDOS
-        // settlment has to be below Acceptable Price check can an attacker prevent other tx's from being settled?
-        // there doesn't seem to have an ecnonomical sense but it could be a case
-        if (seed.blockNumber == block.number) {
-            uint prevLatest = seed.price;
-
-            if (prevLatest > price) {
-                return prevLatest;
-            }
-        }
-
-        return getMaxPrice(store, settledPrice);
+    function syncPrices(CallConfig memory callConfig) internal returns (uint usdPerWnt, uint tokenPerWnt, uint usdPerToken) {
+        usdPerWnt = getUsdPerWntUsingTwapMedian(callConfig.wntUsdSourceList, callConfig.twapInterval);
+        uint exchangeTokenPerWnt = getTokenPerWnt(callConfig.vault, callConfig.poolId);
+        tokenPerWnt = _storeAndGetMax(callConfig.tokenPerWntStore, callConfig.updateInterval, exchangeTokenPerWnt);
+        usdPerToken = usdPerWnt * 1e30 / tokenPerWnt;
     }
 
     // Internal
 
-    function storeMinMax(OracleStore store, OracleStore.SlotSeed memory seed, uint price) internal returns (uint) {
+    function _storeAndGetMax(OracleStore store, uint updateInterval, uint price) internal returns (uint) {
+        OracleStore.SlotSeed memory seed = store.getLatestSeed();
+
+        if (seed.blockNumber == block.number && seed.price > price) {
+            return getMaxPrice(store, seed.price);
+        }
+
+        _storeMinMax(store, updateInterval, price);
+
+        return getMaxPrice(store, price);
+    }
+
+    function _storeMinMax(OracleStore store, uint updateInterval, uint price) internal {
+        OracleStore.SlotSeed memory seed = store.getLatestSeed();
+
         if (price == 0) revert OracleLogic__NonZeroPrice();
 
-        uint8 slot = uint8(block.timestamp / seed.updateInterval % SLOT_COUNT);
+        uint8 slot = uint8(block.timestamp / updateInterval % SLOT_COUNT);
         uint storedSlot = store.slot();
 
-        store.setLatestUpdate(
-            OracleStore.SlotSeed({price: price, blockNumber: block.number, timestamp: block.timestamp, updateInterval: seed.updateInterval})
-        );
+        store.setLatestUpdate(OracleStore.SlotSeed({price: price, blockNumber: block.number, timestamp: block.timestamp}));
 
         uint max = store.slotMax(slot);
 
@@ -122,7 +132,6 @@ contract OracleLogic is Auth {
                 store.setSlotMin(slot, price);
             }
         } else {
-            uint prevMin = store.slotMin(slot);
             store.setSlot(slot);
 
             store.setSlotMin(slot, price);
@@ -133,7 +142,7 @@ contract OracleLogic is Auth {
 
             // in case previous slots are outdated, we need to update them with the current price
             uint timeDelta = block.timestamp - seed.timestamp;
-            uint delayedUpdateCount = timeDelta > seed.updateInterval ? Math.min(timeDelta / seed.updateInterval, 6) : 0;
+            uint delayedUpdateCount = timeDelta > updateInterval ? Math.min(timeDelta / updateInterval, 6) : 0;
 
             if (delayedUpdateCount > 0) {
                 for (uint8 i = 0; i <= delayedUpdateCount; i++) {
@@ -146,15 +155,13 @@ contract OracleLogic is Auth {
                     }
                 }
 
-                emit OracleLogic__SyncDelayedSlot(seed.updateInterval, seed.timestamp, block.timestamp, delayedUpdateCount, price);
+                emit OracleLogic__SyncDelayedSlot(updateInterval, seed.timestamp, block.timestamp, delayedUpdateCount, price);
             }
 
-            emit OracleLogic__SlotSettled(seed.updateInterval, seed.timestamp, prevMin, max);
+            emit OracleLogic__SlotSettled(updateInterval, seed.timestamp, seed.price, max);
         }
 
         emit OracleLogic__PriceUpdate(block.timestamp, price);
-
-        return price;
     }
 
     function _getMedian(uint[7] memory arr) internal pure returns (uint) {
@@ -169,30 +176,6 @@ contract OracleLogic is Auth {
         }
 
         return arr[3]; // The median is at index 3 in 7 fixed size array
-    }
-
-    // returns token price in wnt with 30d precision
-    function _getTokenExchangeRate(IVault vault, bytes32 poolId) internal view returns (uint) {
-        (, uint[] memory balances,) = vault.getPoolTokens(poolId);
-
-        uint tokenBalance = balances[0];
-        uint nSlotBalance = balances[1];
-        uint precision = 10 ** 30;
-
-        uint balanceRatio = (tokenBalance * 80 * precision) / (nSlotBalance * 20);
-        uint price = balanceRatio;
-
-        if (price == 0) revert OracleLogic__NonZeroPrice();
-
-        return price;
-    }
-
-    // governance
-
-    function setUpdateInterval(OracleStore store, uint updateInterval) external requiresAuth {
-        require(updateInterval > 0, "update interval must be greater than 0");
-
-        store.setSeedUpdateInterval(updateInterval);
     }
 
     error OracleLogic__NotEnoughSources();

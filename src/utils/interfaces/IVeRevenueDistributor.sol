@@ -157,7 +157,7 @@ interface IVeRevenueDistributor {
      * @param tokenList - An array of ERC20 token addresses to claim.
      * @return An array of the amounts of each token in `tokens` sent to `user` as a result of claiming.
      */
-    function claimMany(IERC20[] calldata tokenList, address from, address to) external returns (uint[] memory);
+    function claimList(IERC20[] calldata tokenList, address from, address to) external returns (uint[] memory);
 
     error VeRevenueDistributor__InputLengthMismatch();
     error VeRevenueDistributor__VotingEscrowZeroTotalSupply();
