@@ -66,7 +66,22 @@ contract PositionRouterTest is BasicSetup {
 
         puppetRouter = new PuppetRouter(
             dictator,
-            PuppetLogic.CallSetRuleConfig({router: router, store: puppetStore, minExpiryDuration: 0, minAllowanceRate: 100, maxAllowanceRate: 5000})
+            PuppetRouter.CallConfig({
+                setRule: PuppetLogic.CallSetRuleConfig({
+                    router: router,
+                    store: puppetStore,
+                    minExpiryDuration: 0,
+                    minAllowanceRate: 100,
+                    maxAllowanceRate: 5000
+                }),
+                createSubaccount: PuppetLogic.CallCreateSubaccountConfig({factory: subaccountFactory, store: subaccountStore}),
+                setWnt: PuppetLogic.CallSetDepositWntConfig({
+                    wnt: IWNT(Const.wnt),
+                    store: puppetStore,
+                    holdingAddress: Const.gmxOrderVault,
+                    gasLimit: 50_000
+                })
+            })
         );
 
         positionRouter = new PositionRouter(
@@ -87,7 +102,7 @@ contract PositionRouterTest is BasicSetup {
                     callbackGasLimit: 0,
                     puppetStore: puppetStore,
                     limitPuppetList: 100,
-                    minSizeMatch: 100e30,
+                    minimumMatchAmount: 100e30,
                     tokenTransferGasLimit: 200_000
                 }),
                 decrease: RequestDecreasePosition.CallConfig({
@@ -147,14 +162,9 @@ contract PositionRouterTest is BasicSetup {
         IERC20(collateralToken).approve(address(router), 100e6);
 
         puppetRouter.setRule(
-            PuppetStore.Rule({
-                trader: trader,
-                collateralToken: collateralToken,
-                throttleActivity: 0,
-                allowance: 100,
-                allowanceRate: 100,
-                expiry: block.timestamp + 100
-            })
+            collateralToken, //
+            trader,
+            PuppetStore.Rule({throttleActivity: 0, allowanceRate: 100, expiry: 0})
         );
 
         vm.startPrank(trader);

@@ -6,6 +6,7 @@ import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {StoreController} from "../../utils/StoreController.sol";
 import {GmxPositionUtils} from "./../util/GmxPositionUtils.sol";
 import {PositionUtils} from "./../util/PositionUtils.sol";
+import {TransferUtils} from "./../../utils/TransferUtils.sol";
 
 contract PositionStore is StoreController {
     struct RequestIncrease {
@@ -39,18 +40,11 @@ contract PositionStore is StoreController {
         bytes eventData;
     }
 
-    struct Activity {
-        uint latestFunding;
-        uint allowance;
-    }
-
     mapping(bytes32 requestKey => RequestIncrease) public requestIncreaseMap;
     mapping(bytes32 requestKey => RequestDecrease) public requestDecreaseMap;
 
     mapping(bytes32 positionKey => MirrorPosition) public positionMap;
     mapping(bytes32 positionKey => UnhandledCallbackMap) public unhandledCallbackMap;
-
-    mapping(bytes32 ruleKey => Activity) public activityMap;
 
     constructor(Authority _authority, address _initSetter) StoreController(_authority, _initSetter) {}
 
@@ -104,33 +98,5 @@ contract PositionStore is StoreController {
 
     function getUnhandledCallbackMap(bytes32 _key) external view returns (UnhandledCallbackMap memory) {
         return unhandledCallbackMap[_key];
-    }
-
-    function setActivity(bytes32 _key, Activity calldata _activity) external isSetter {
-        activityMap[_key] = _activity;
-    }
-
-    function getActivity(bytes32 _key) external view returns (Activity memory) {
-        return activityMap[_key];
-    }
-
-    function getActivityList(bytes32 _routeKey, address[] calldata _addressList) external view returns (Activity[] memory) {
-        uint length = _addressList.length;
-        Activity[] memory _activity = new Activity[](length);
-
-        for (uint i = 0; i < length; i++) {
-            bytes32 puppetTraderKey = PositionUtils.getRuleKey(_addressList[i], _routeKey);
-            _activity[i] = activityMap[puppetTraderKey];
-        }
-        return _activity;
-    }
-
-    function setRuleActivityList(bytes32 _routeKey, address[] calldata _addressList, Activity[] calldata _activityList) external isSetter {
-        uint length = _addressList.length;
-
-        for (uint i = 0; i < length; i++) {
-            bytes32 puppetTraderKey = PositionUtils.getRuleKey(_addressList[i], _routeKey);
-            activityMap[puppetTraderKey] = _activityList[i];
-        }
     }
 }

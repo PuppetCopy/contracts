@@ -78,13 +78,13 @@ library TransferUtils {
      * actions like request cancellation from being executed
      *
      * @param wnt the address of the WNT contract to withdraw the wrapped native token from
+     * * @param gasLimit the maximum amount of gas that the native token transfer can consume
      * @param holdingAddress in case transfers to the receiver fail due to blacklisting or other reasons
      *  send the tokens to a holding address to avoid possible gaming through reverting
-     * @param gasLimit the maximum amount of gas that the native token transfer can consume
      * @param receiver the address of the recipient of the native token transfer
      * @param amount the amount of wrapped native token to withdraw and the amount of native token to send
      */
-    function withdrawWnt(IWNT wnt, address holdingAddress, uint gasLimit, address receiver, uint amount) internal {
+    function withdrawAndSendNativeToken(IWNT wnt, uint gasLimit, address holdingAddress, address receiver, uint amount) internal {
         if (amount == 0) return;
         validateDestination(receiver);
 

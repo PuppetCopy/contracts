@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {Calc} from "./../utils/Calc.sol";
+import {Precision} from "./../utils/Precision.sol";
 
 import {RewardLogic} from "./../tokenomics/RewardLogic.sol";
 import {RewardRouter} from "./../RewardRouter.sol";
@@ -15,11 +15,11 @@ contract RewardReader {
     }
 
     function getExitClaimableAmount(RewardLogic.CallLockConfig calldata config, uint tokenAmount) public pure returns (uint) {
-        return tokenAmount * config.rate / Calc.BASIS_POINT_DIVISOR;
+        return Precision.applyBasisPoints(tokenAmount, config.rate);
     }
 
     function getLockClaimableAmount(RewardLogic.CallExitConfig calldata config, uint tokenAmount) public pure returns (uint) {
-        return tokenAmount * config.rate / Calc.BASIS_POINT_DIVISOR;
+        return Precision.applyBasisPoints(tokenAmount, config.rate);
     }
 
     function getUserGeneratedRevenue(UserGeneratedRevenueStore rewardStore, address account)

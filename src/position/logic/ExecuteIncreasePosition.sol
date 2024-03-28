@@ -19,7 +19,6 @@ library ExecuteIncreasePosition {
         IGmxEventUtils.EventLogData eventLogData;
         bytes32 positionKey;
         bytes32 requestKey;
-        bytes32 routeKey;
         address outputTokenAddress;
         address puppetStoreAddress;
         IERC20 outputToken;

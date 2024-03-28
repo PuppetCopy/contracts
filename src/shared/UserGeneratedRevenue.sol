@@ -4,14 +4,13 @@ pragma solidity 0.8.24;
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Calc} from "./../utils/Calc.sol";
+import {Precision} from "./../utils/Precision.sol";
 import {UserGeneratedRevenueStore} from "./store/UserGeneratedRevenueStore.sol";
 import {IVeRevenueDistributor} from "./../utils/interfaces/IVeRevenueDistributor.sol";
 
 contract UserGeneratedRevenue is Auth {
     function getClaimableAmount(uint distributionRatio, uint tokenAmount) public pure returns (uint) {
-        uint claimableAmount = tokenAmount * distributionRatio / Calc.BASIS_POINT_DIVISOR;
-        return claimableAmount;
+        return Precision.applyBasisPoints(tokenAmount, distributionRatio);
     }
 
     function getUserGeneratedRevenue(UserGeneratedRevenueStore ugrStore, bytes32 key)

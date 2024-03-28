@@ -5,7 +5,7 @@ import {Auth} from "@solmate/contracts/auth/Auth.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Calc} from "./../utils/Calc.sol";
+import {Precision} from "./../utils/Precision.sol";
 import {Dictator} from "./../utils/Dictator.sol";
 
 /**
@@ -24,12 +24,12 @@ contract PuppetToken is Auth, ERC20 {
     string private constant _SYMBOL = "MUPPET";
 
     uint private constant CORE_RELEASE_DURATION = 31540000 * 2; // 2 years
-    uint private constant CORE_RELEASE_RATE = 3500; // 35%
+    uint private constant CORE_RELEASE_RATE = 0.35e30; // 35%
     uint private constant GENESIS_MINT_AMOUNT = 100_000e18;
     uint private constant GENESIS_START_TIME = 1710253930; // Tue Mar 12 2024
 
     // Rate limit for minting new tokens in basis points
-    uint public limitRate;
+    uint public limitFactor;
     // Time window for minting new tokens
     uint public durationWindow;
     // Amount minted in the current window
@@ -41,12 +41,13 @@ contract PuppetToken is Auth, ERC20 {
     uint public coreReleasedAmount;
 
     constructor(Dictator _authority) Auth(address(0), _authority) ERC20(_NAME, _SYMBOL) {
-        _setMintLimitRate(100, 1 hours);
+        // _setMintLimitRate(100, 1 hours);
+        _setMintLimitRate(0.01e30, 1 hours);
         _mint(_authority.owner(), GENESIS_MINT_AMOUNT);
     }
 
     function getLimitAmount() public view returns (uint) {
-        return totalSupply() * limitRate / Calc.BASIS_POINT_DIVISOR;
+        return Precision.applyFactor(totalSupply(), limitFactor);
     }
 
     function getMarginAmount() public view returns (uint) {
@@ -73,7 +74,7 @@ contract PuppetToken is Auth, ERC20 {
 
         // Enforce the mint rate limit based on total emitted tokens
         if (mintWindowCount > getLimitAmount()) {
-            revert PuppetToken__ExceededRateLimit(durationWindow, limitRate, getLimitAmount());
+            revert PuppetToken__ExceededRateLimit(durationWindow, limitFactor, getLimitAmount());
         }
 
         _mint(_for, _amount);
@@ -93,9 +94,9 @@ contract PuppetToken is Auth, ERC20 {
 
         uint timeElapsed = block.timestamp - GENESIS_START_TIME;
         uint totalTime = endTime - GENESIS_START_TIME;
-        uint timeMultiplier = Math.min((timeElapsed * Calc.BASIS_POINT_DIVISOR) / totalTime, Calc.BASIS_POINT_DIVISOR);
-        uint maxMintableAmount = totalSupply() * CORE_RELEASE_RATE / Calc.BASIS_POINT_DIVISOR;
-        uint maxMintableAmountForPeriod = maxMintableAmount * timeMultiplier / Calc.BASIS_POINT_DIVISOR;
+        uint timeMultiplier = Math.min(Precision.toFactor(timeElapsed, totalTime), Precision.FLOAT_PRECISION);
+        uint maxMintableAmount = Precision.applyFactor(totalSupply(), CORE_RELEASE_RATE);
+        uint maxMintableAmountForPeriod = Precision.applyFactor(maxMintableAmount, timeMultiplier);
         uint mintableAmount = maxMintableAmountForPeriod - coreReleasedAmount;
 
         _mint(_to, mintableAmount);
@@ -117,7 +118,7 @@ contract PuppetToken is Auth, ERC20 {
     }
 
     function _setMintLimitRate(uint _rateLimitFactor, uint _timeframeLimit) internal {
-        limitRate = _rateLimitFactor;
+        limitFactor = _rateLimitFactor;
         durationWindow = _timeframeLimit;
         mintWindowCount = 0; // Reset the mint count window on rate limit change
 

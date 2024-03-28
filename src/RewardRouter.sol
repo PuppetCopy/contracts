@@ -7,7 +7,7 @@ import {MulticallRouter} from "./utils/MulticallRouter.sol";
 import {IWNT} from "./utils/interfaces/IWNT.sol";
 import {Router} from "./utils/Router.sol";
 import {Dictator} from "./utils/Dictator.sol";
-import {Calc} from "./utils/Calc.sol";
+import {Precision} from "./utils/Precision.sol";
 
 import {OracleLogic} from "./tokenomics/OracleLogic.sol";
 import {RewardLogic} from "./tokenomics/RewardLogic.sol";
@@ -100,7 +100,7 @@ contract RewardRouter is MulticallRouter {
         if (_callOracleConfig.wntUsdSourceList.length % 2 == 0) revert RewardRouter__SourceCountNotOdd();
         if (_callOracleConfig.wntUsdSourceList.length < 3) revert RewardRouter__NotEnoughSources();
         if (_callOracleConfig.poolId == bytes32(0)) revert RewardRouter__InvalidPoolId();
-        if (_callLockConfig.rate + _callExitConfig.rate > Calc.BASIS_POINT_DIVISOR) revert RewardRouter__InvalidWeightFactors();
+        if (_callLockConfig.rate + _callExitConfig.rate > Precision.BASIS_POINT_DIVISOR) revert RewardRouter__InvalidWeightFactors();
 
         callOracleConfig = _callOracleConfig;
         callLockConfig = _callLockConfig;

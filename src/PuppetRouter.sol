@@ -7,51 +7,56 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Router} from "./utils/Router.sol";
 import {Router} from "./utils/Router.sol";
 
-import {Calc} from "./utils/Calc.sol";
-
-import {SubaccountStore} from "./shared/store/SubaccountStore.sol";
 import {PuppetStore} from "./position/store/PuppetStore.sol";
 import {PuppetLogic} from "./position/logic/PuppetLogic.sol";
 
 contract PuppetRouter is Auth, ReentrancyGuard {
-    event PuppetRouter__SetConfig(uint timestamp, PuppetLogic.CallSetRuleConfig callSetRuleConfig);
+    event PuppetRouter__SetConfig(uint timestamp, CallConfig callConfig);
 
-    struct PuppetRouterParams {
-        PuppetStore puppetStore;
-        Router router;
-        SubaccountStore subaccountStore;
+    struct CallConfig {
+        PuppetLogic.CallSetRuleConfig setRule;
+        PuppetLogic.CallCreateSubaccountConfig createSubaccount;
+        PuppetLogic.CallSetDepositWntConfig setWnt;
     }
 
-    PuppetLogic.CallSetRuleConfig callSetRuleConfig;
+    CallConfig callConfig;
 
-    constructor(Authority _authority, PuppetLogic.CallSetRuleConfig memory _callSetRuleConfig) Auth(address(0), _authority) {
-        _setConfig(_callSetRuleConfig);
+    constructor(Authority _authority, CallConfig memory _callConfig) Auth(address(0), _authority) {
+        _setConfig(_callConfig);
     }
 
-    function setRule(PuppetStore.Rule calldata ruleParams) external nonReentrant {
-        PuppetLogic.setRule(callSetRuleConfig, ruleParams, msg.sender);
+    function setRule(
+        address collateralToken,
+        address trader,
+        PuppetStore.Rule calldata ruleParams //
+    ) external nonReentrant {
+        PuppetLogic.setRule(callConfig.setRule, trader, collateralToken, msg.sender, ruleParams);
     }
 
-    function setRuleList(PuppetStore.Rule[] calldata ruleParams, address[] calldata traderList) external nonReentrant {
-        PuppetLogic.setRuleList(callSetRuleConfig, ruleParams, traderList, msg.sender);
+    function setRuleList(
+        PuppetStore.Rule[] calldata ruleParams, //
+        address[] calldata traderList,
+        address[] calldata collateralTokenList
+    ) external nonReentrant {
+        PuppetLogic.setRuleList(callConfig.setRule, traderList, collateralTokenList, ruleParams, msg.sender);
+    }
+
+    function createSubaccount(address account) external nonReentrant {
+        PuppetLogic.createSubaccount(callConfig.createSubaccount, account);
     }
 
     // governance
 
-    function setConfig(PuppetLogic.CallSetRuleConfig calldata _callSetRuleConfig) external requiresAuth {
-        _setConfig(_callSetRuleConfig);
+    function setConfig(CallConfig memory _callConfig) external requiresAuth {
+        _setConfig(_callConfig);
     }
 
     // internal
 
-    function _setConfig(PuppetLogic.CallSetRuleConfig memory _callSetRuleConfig) internal {
-        callSetRuleConfig = _callSetRuleConfig;
+    function _setConfig(CallConfig memory _callConfig) internal {
+        callConfig = _callConfig;
 
-        if (callSetRuleConfig.minAllowanceRate == 0 || callSetRuleConfig.maxAllowanceRate > Calc.BASIS_POINT_DIVISOR) {
-            revert PuppetRouter__InvalidAllowance();
-        }
-
-        emit PuppetRouter__SetConfig(block.timestamp, callSetRuleConfig);
+        emit PuppetRouter__SetConfig(block.timestamp, _callConfig);
     }
 
     error PuppetRouter__InvalidPuppet();

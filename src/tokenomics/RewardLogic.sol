@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {Calc} from "./../utils/Calc.sol";
+import {Precision} from "./../utils/Precision.sol";
 import {Router} from "../utils/Router.sol";
 import {IVeRevenueDistributor} from "./../utils/interfaces/IVeRevenueDistributor.sol";
 
@@ -46,8 +46,7 @@ library RewardLogic {
     }
 
     function getClaimableAmount(uint distributionRatio, uint tokenAmount) public pure returns (uint) {
-        uint claimableAmount = tokenAmount * distributionRatio / Calc.BASIS_POINT_DIVISOR;
-        return claimableAmount;
+        return Precision.applyBasisPoints(tokenAmount, distributionRatio);
     }
 
     function getRewardTimeMultiplier(VotingEscrow votingEscrow, address account, uint unlockTime) public view returns (uint) {
@@ -57,9 +56,9 @@ library RewardLogic {
 
         uint maxTime = block.timestamp + MAXTIME;
 
-        if (unlockTime >= maxTime) return Calc.BASIS_POINT_DIVISOR;
+        if (unlockTime >= maxTime) return Precision.BASIS_POINT_DIVISOR;
 
-        return unlockTime * Calc.BASIS_POINT_DIVISOR / maxTime;
+        return Precision.toBasisPoints(unlockTime, maxTime);
     }
 
     // state
@@ -78,8 +77,9 @@ library RewardLogic {
 
         if (totalClaimedInUsd == 0 || maxRewardTokenAmount == 0) revert RewardLogic__NoClaimableAmount();
 
-        uint amount = getClaimableAmount(callLockConfig.rate, maxRewardTokenAmount)
-            * getRewardTimeMultiplier(callLockConfig.votingEscrow, from, unlockTime) / Calc.BASIS_POINT_DIVISOR;
+        uint amount = Precision.applyBasisPoints(
+            getClaimableAmount(callLockConfig.rate, maxRewardTokenAmount), getRewardTimeMultiplier(callLockConfig.votingEscrow, from, unlockTime)
+        );
         callLockConfig.puppetToken.mint(address(this), amount);
         SafeERC20.forceApprove(callLockConfig.puppetToken, address(callLockConfig.router), amount);
         callLockConfig.votingEscrow.lock(address(this), from, amount, unlockTime);

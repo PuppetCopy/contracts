@@ -1,22 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {Calc} from "./../../utils/Calc.sol";
+import {Precision} from "./../../utils/Precision.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 library PositionUtils {
     function getPlatformMatchingFee(uint matchingFee, uint sizeDelta) internal pure returns (uint) {
-        uint feeAmount = sizeDelta * matchingFee / Calc.BASIS_POINT_DIVISOR;
-
-        return feeAmount;
+        return Precision.applyBasisPoints(sizeDelta, matchingFee);
     }
 
     function getPlatformProfitFee(uint feeRate, uint profit) internal pure returns (uint) {
-        return profit * feeRate / Calc.BASIS_POINT_DIVISOR;
+        return Precision.applyBasisPoints(profit, feeRate);
     }
 
     function getPlatformTraderProfitFeeCutoff(uint cutoffRate, uint profit) internal pure returns (uint) {
-        return profit * cutoffRate / Calc.BASIS_POINT_DIVISOR;
+        return Precision.applyBasisPoints(profit, cutoffRate);
     }
 
     function getPlatformProfitDistribution(uint feeRate, uint traderCutoff, uint collateralDeltaAmount, uint totalAmountOut)
@@ -36,15 +34,15 @@ library PositionUtils {
         return keccak256(abi.encodePacked(token, from, account));
     }
 
-    function getRuleKey(address puppet, bytes32 routeKey) internal pure returns (bytes32) {
-        return keccak256(abi.encode(puppet, routeKey));
+    function getRuleKey(address collateralToken, address puppet, address trader) internal pure returns (bytes32) {
+        return keccak256(abi.encode(collateralToken, puppet, trader));
     }
 
-    function getRuleKey(address puppet, address trader, address collateralToken) internal pure returns (bytes32) {
-        return keccak256(abi.encode(puppet, getRouteKey(trader, collateralToken)));
+    function getAllownaceKey(address collateralToken, address puppet) internal pure returns (bytes32) {
+        return keccak256(abi.encode(collateralToken, puppet));
     }
 
-    function getRouteKey(address trader, address collateralToken) internal pure returns (bytes32) {
-        return keccak256(abi.encode(trader, collateralToken));
+    function getFundingActivityKey(address puppet, address trader) internal pure returns (bytes32) {
+        return keccak256(abi.encode(puppet, trader));
     }
 }

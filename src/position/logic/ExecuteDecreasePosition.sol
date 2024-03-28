@@ -5,14 +5,13 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IGmxEventUtils} from "./../interface/IGmxEventUtils.sol";
-import {Calc} from "./../../utils/Calc.sol";
+import {Precision} from "./../../utils/Precision.sol";
 
 import {Router} from "src/utils/Router.sol";
 import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
 
 import {PuppetStore} from "../store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
-import {PuppetLogic} from "./PuppetLogic.sol";
 import {PositionUtils} from "./../util/PositionUtils.sol";
 import {UserGeneratedRevenue} from "../../shared/UserGeneratedRevenue.sol";
 
@@ -32,7 +31,6 @@ library ExecuteDecreasePosition {
         IGmxEventUtils.EventLogData eventLogData;
         bytes32 positionKey;
         bytes32 requestKey;
-        bytes32 routeKey;
         address outputTokenAddress;
         address puppetStoreAddress;
         IERC20 outputToken;
@@ -50,7 +48,6 @@ library ExecuteDecreasePosition {
         bytes32 positionKey = GmxPositionUtils.getPositionKey(
             order.addresses.account, order.addresses.market, order.addresses.initialCollateralToken, order.flags.isLong
         );
-        bytes32 routeKey = PositionUtils.getRouteKey(order.addresses.account, order.addresses.initialCollateralToken);
 
         address outputTokenAddress = eventLogData.addressItems.items[0].value;
         uint totalAmountOut = eventLogData.uintItems.items[0].value;
@@ -67,7 +64,6 @@ library ExecuteDecreasePosition {
             eventLogData: eventLogData,
             positionKey: positionKey,
             requestKey: key,
-            routeKey: routeKey,
             outputTokenAddress: outputTokenAddress,
             puppetStoreAddress: address(callConfig.puppetStore),
             outputToken: IERC20(outputTokenAddress),
@@ -84,23 +80,24 @@ library ExecuteDecreasePosition {
         PositionStore.RequestDecrease memory request
     ) internal {
         if (callParams.totalAmountOut > 0) {
-            // callParams.totalAmountOut > order.numbers.initialCollateralDeltaAmount
-            PositionStore.Activity[] memory activityList =
-                callConfig.positionStore.getActivityList(callParams.routeKey, callParams.mirrorPosition.puppetList);
+            bytes32[] memory keyList = new bytes32[](callParams.mirrorPosition.puppetList.length);
+
+            for (uint i = 0; i < callParams.mirrorPosition.puppetList.length; i++) {
+                keyList[i] = PositionUtils.getRuleKey(callParams.outputTokenAddress, callParams.mirrorPosition.puppetList[i], request.trader);
+            }
+
+            uint[] memory activityList = callConfig.puppetStore.getActivityList(keyList);
 
             (uint traderFeeCutoff, uint puppetFee) = PositionUtils.getPlatformProfitDistribution(
                 callConfig.profitFeeRate, callConfig.traderProfitFeeCutoffRate, order.numbers.initialCollateralDeltaAmount, callParams.totalAmountOut
             );
 
             for (uint i = 0; i < callParams.mirrorPosition.puppetList.length; i++) {
-                PositionStore.Activity memory activity = activityList[i];
-
                 uint collateralDelta = request.puppetCollateralDeltaList[i];
                 uint amountOut = callParams.mirrorPosition.totalCollateral * collateralDelta / callParams.totalAmountOut;
                 uint amountOutAfterFee = amountOut - (puppetFee * amountOut / callParams.totalAmountOut);
 
-                activity.allowance += amountOutAfterFee;
-                activityList[i] = activity;
+                activityList[i] = activityList[i];
 
                 callParams.mirrorPosition.puppetDepositList[i] -= collateralDelta;
 
@@ -113,7 +110,7 @@ library ExecuteDecreasePosition {
                 );
             }
 
-            callConfig.positionStore.setRuleActivityList(callParams.routeKey, callParams.mirrorPosition.puppetList, activityList);
+            callConfig.puppetStore.setActivityList(keyList, activityList);
 
             callConfig.router.transfer(
                 callParams.outputToken,
@@ -138,7 +135,7 @@ library ExecuteDecreasePosition {
             callParams.mirrorPosition.totalSize -= order.numbers.sizeDeltaUsd;
             callParams.mirrorPosition.totalCollateral -= order.numbers.initialCollateralDeltaAmount;
             callParams.mirrorPosition.leverage =
-                callParams.mirrorPosition.totalSize * Calc.BASIS_POINT_DIVISOR / callParams.mirrorPosition.totalCollateral;
+                Precision.applyBasisPoints(callParams.mirrorPosition.totalSize, callParams.mirrorPosition.totalCollateral);
 
             callConfig.positionStore.setMirrorPosition(callParams.positionKey, callParams.mirrorPosition);
         }
