@@ -96,7 +96,7 @@ library RequestIncreasePosition {
         });
 
         PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(
-            GmxPositionUtils.getPositionKey(trader, traderCallParams.market, traderCallParams.collateralToken, traderCallParams.isLong)
+            GmxPositionUtils.getPositionKey(address(subaccount), traderCallParams.market, traderCallParams.collateralToken, traderCallParams.isLong)
         );
 
         if (mirrorPosition.size == 0) {

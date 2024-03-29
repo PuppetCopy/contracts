@@ -6,7 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {Precision} from "./../utils/Precision.sol";
 import {Router} from "../utils/Router.sol";
-import {IVeRevenueDistributor} from "./../utils/interfaces/IVeRevenueDistributor.sol";
+import {VeRevenueDistributor} from "./VeRevenueDistributor.sol";
 
 import {UserGeneratedRevenueStore} from "../shared/store/UserGeneratedRevenueStore.sol";
 import {UserGeneratedRevenue} from "../shared/UserGeneratedRevenue.sol";
@@ -32,7 +32,7 @@ library RewardLogic {
         Router router;
         UserGeneratedRevenueStore userGeneratedRevenueStore;
         UserGeneratedRevenue userGeneratedRevenue;
-        IVeRevenueDistributor revenueDistributor;
+        VeRevenueDistributor revenueDistributor;
         PuppetToken puppetToken;
         uint rate;
     }
@@ -40,7 +40,7 @@ library RewardLogic {
     struct CallExitConfig {
         UserGeneratedRevenueStore userGeneratedRevenueStore;
         UserGeneratedRevenue userGeneratedRevenue;
-        IVeRevenueDistributor revenueDistributor;
+        VeRevenueDistributor revenueDistributor;
         PuppetToken puppetToken;
         uint rate;
     }
@@ -78,7 +78,8 @@ library RewardLogic {
         if (totalClaimedInUsd == 0 || maxRewardTokenAmount == 0) revert RewardLogic__NoClaimableAmount();
 
         uint amount = Precision.applyBasisPoints(
-            getClaimableAmount(callLockConfig.rate, maxRewardTokenAmount), getRewardTimeMultiplier(callLockConfig.votingEscrow, from, unlockTime)
+            getClaimableAmount(callLockConfig.rate, maxRewardTokenAmount), //
+            getRewardTimeMultiplier(callLockConfig.votingEscrow, from, unlockTime)
         );
         callLockConfig.puppetToken.mint(address(this), amount);
         SafeERC20.forceApprove(callLockConfig.puppetToken, address(callLockConfig.router), amount);
@@ -108,11 +109,11 @@ library RewardLogic {
         emit RewardLogic__ClaimOption(Choice.EXIT, from, revenueList, maxRewardTokenAmount, amount);
     }
 
-    function claim(IVeRevenueDistributor revenueDistributor, IERC20 token, address from, address to) internal {
+    function claim(VeRevenueDistributor revenueDistributor, IERC20 token, address from, address to) internal {
         revenueDistributor.claim(token, from, to);
     }
 
-    function claimList(IVeRevenueDistributor revenueDistributor, IERC20[] calldata tokenList, address from, address to) internal {
+    function claimList(VeRevenueDistributor revenueDistributor, IERC20[] calldata tokenList, address from, address to) internal {
         revenueDistributor.claimList(tokenList, from, to);
     }
 

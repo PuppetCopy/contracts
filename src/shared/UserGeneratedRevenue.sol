@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Precision} from "./../utils/Precision.sol";
 import {UserGeneratedRevenueStore} from "./store/UserGeneratedRevenueStore.sol";
-import {IVeRevenueDistributor} from "./../utils/interfaces/IVeRevenueDistributor.sol";
+import {VeRevenueDistributor} from "./../tokenomics/VeRevenueDistributor.sol";
 
 contract UserGeneratedRevenue is Auth {
     function getClaimableAmount(uint distributionRatio, uint tokenAmount) public pure returns (uint) {
@@ -33,7 +33,7 @@ contract UserGeneratedRevenue is Auth {
 
     function increaseUserGeneratedRevenue(
         UserGeneratedRevenueStore ugrStore,
-        IVeRevenueDistributor distributor,
+        VeRevenueDistributor distributor,
         bytes32 key,
         UserGeneratedRevenueStore.Revenue memory increase
     ) external requiresAuth {
@@ -67,7 +67,7 @@ contract UserGeneratedRevenue is Auth {
         uint[] calldata amounts,
         address[] calldata user,
         UserGeneratedRevenueStore ugrStore,
-        IVeRevenueDistributor distributor
+        VeRevenueDistributor distributor
     ) external requiresAuth {
         if (amounts.length != user.length) revert UserGeneratedRevenue__InvalidInputLength();
 

@@ -51,6 +51,10 @@ contract PuppetRouter is Auth, ReentrancyGuard {
         _setConfig(_callConfig);
     }
 
+    function setTokenAllowanceCap(address token, uint amount) external requiresAuth {
+        callConfig.setRule.store.setTokenAllowanceCap(token, amount);
+    }
+
     // internal
 
     function _setConfig(CallConfig memory _callConfig) internal {

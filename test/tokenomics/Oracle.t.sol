@@ -33,8 +33,7 @@ contract OracleTest is BasicSetup {
         puppetWntPoolVault = new MockWeightedPoolVault();
         puppetWntPoolVault.initPool(address(puppetToken), address(0x0b), 20e18, 80e18);
 
-        // usdPerWntStore = new OracleStore(dictator, owner, 100e30);
-        puppetPerWntStore = new OracleStore(dictator, owner, 1e18);
+        puppetPerWntStore = new OracleStore(dictator, users.owner, 1e18);
 
         callOracleConfig = OracleLogic.CallConfig({
             wntUsdSourceList: wntUsdPoolList,
@@ -65,12 +64,7 @@ contract OracleTest is BasicSetup {
         mockedPools[3] = new MockUniswapV3Pool(fromPriceToSqrt(1));
         mockedPools[4] = new MockUniswapV3Pool(fromPriceToSqrt(1));
 
-        assertAlmostEq(
-            OracleLogic.getUsdPerWntUsingTwapMedian(mockedPools, 0),
-            3307.76e30,
-            0.05e30,
-            "5 sources, 2 anomalies"
-        );
+        assertAlmostEq(OracleLogic.getUsdPerWntUsingTwapMedian(mockedPools, 0), 3307.76e30, 0.05e30, "5 sources, 2 anomalies");
     }
 
     function testStoreAndGetPrice() public {

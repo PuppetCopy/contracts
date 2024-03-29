@@ -15,7 +15,7 @@ contract VotingEscrowTests is BasicSetup {
     function setUp() public override {
         BasicSetup.setUp();
 
-        dictator.setUserRole(users.owner, PUPPET_MINTER_ROLE, true);
+        dictator.setUserRole(users.owner, MINT_PUPPET_ROLE, true);
 
         router = new Router(dictator);
         votingEscrow = new VotingEscrow(dictator, router, puppetToken);

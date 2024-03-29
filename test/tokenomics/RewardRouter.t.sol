@@ -57,7 +57,7 @@ contract RewardRouterTest is BasicSetup {
         wntUsdPoolList[2] = new MockUniswapV3Pool(fromPriceToSqrt(100));
 
         usdcTokenRevenue = IERC20(address(deployMockERC20("St4bl3", "sMPT", 6)));
-        address rewardRouterAddress = computeCreateAddress(owner, vm.getNonce(owner) + 7);
+        address rewardRouterAddress = computeCreateAddress(users.owner, vm.getNonce(users.owner) + 7);
 
         vault = new MockWeightedPoolVault();
         vault.initPool(address(puppetToken), address(address(0x0b)), 20e18, 80e18);
@@ -114,16 +114,16 @@ contract RewardRouterTest is BasicSetup {
             })
         );
 
-        dictator.setUserRole(address(votingEscrow), TOKEN_ROUTER_ROLE, true);
-        dictator.setUserRole(address(revenueDistributor), TOKEN_ROUTER_ROLE, true);
+        dictator.setUserRole(address(votingEscrow), TRANSFER_TOKEN_ROLE, true);
+        dictator.setUserRole(address(revenueDistributor), TRANSFER_TOKEN_ROLE, true);
 
-        dictator.setUserRole(address(rewardRouter), PUPPET_MINTER_ROLE, true);
+        dictator.setUserRole(address(rewardRouter), MINT_PUPPET_ROLE, true);
         dictator.setUserRole(address(rewardRouter), REWARD_LOGIC_ROLE, true);
         dictator.setUserRole(address(rewardRouter), VESTING_ROLE, true);
         dictator.setUserRole(address(userGeneratedRevenue), REVENUE_OPERATOR, true);
 
         dictator.setUserRole(address(rewardRouter), REVENUE_OPERATOR, true);
-        dictator.setUserRole(owner, REVENUE_OPERATOR, true);
+        dictator.setUserRole(users.owner, REVENUE_OPERATOR, true);
     }
 
     function testOption() public {
@@ -131,11 +131,11 @@ contract RewardRouterTest is BasicSetup {
 
         vm.warp(2 weeks);
 
-        // puppetToken.transfer(address(0x123), puppetToken.balanceOf(users.owner));
-        // vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
-        // rewardRouter.lock(100.1e30, getMaxTime());
+        puppetToken.transfer(address(0x123), puppetToken.balanceOf(users.owner));
+        vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
+        // rewardRouter.lock([], 100.1e30, getMaxTime());
 
-        // vm.expectRevert();
+        vm.expectRevert();
         // rewardRouter.lock(0.8e30, getMaxTime());
 
         // generateUserRevenueInUsdc(users.alice, 100e30);
@@ -152,24 +152,24 @@ contract RewardRouterTest is BasicSetup {
 
         // assertEq(userGeneratedRevenue.getUserGeneratedRevenue(userGeneratedRevenueStore, users.alice).amountInUsd, 0);
 
-        // generateUserRevenue(users.alice, 100e30);
+        // generateUserRevenueInUsdc(users.alice, 100e30);
         // rewardRouter.exit(1e30);
         // assertEq(puppetToken.balanceOf(users.alice), 30e18);
 
         // vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
         // rewardRouter.exit(1e30);
 
-        // generateUserRevenue(users.alice, 100e30);
+        // generateUserRevenueInUsdc(users.alice, 100e30);
         // assertEq(userGeneratedRevenue.getUserGeneratedRevenue(userGeneratedRevenueStore, users.alice).amountInUsd, 100e30);
         // rewardRouter.lock(1e30, 0);
         // assertAlmostEq(votingEscrow.balanceOf(users.alice), RewardLogic.getClaimableAmount(lockRate, 200e18), 10e17);
 
-        // generateUserRevenue(users.bob, 100e30);
+        // generateUserRevenueInUsdc(users.bob, 100e30);
         // assertEq(userGeneratedRevenue.getUserGeneratedRevenue(userGeneratedRevenueStore, users.bob).amountInUsd, 100e30);
         // rewardRouter.lock(1e30, getMaxTime());
         // assertAlmostEq(votingEscrow.balanceOf(users.bob), RewardLogic.getClaimableAmount(lockRate, 100e18), 10e17);
 
-        // generateUserRevenue(users.yossi, 100e30);
+        // generateUserRevenueInUsdc(users.yossi, 100e30);
         // assertEq(userGeneratedRevenue.getUserGeneratedRevenue(userGeneratedRevenueStore, users.yossi).amountInUsd, 100e30);
         // rewardRouter.lock(1e30, getMaxTime() / 2);
         // assertAlmostEq(votingEscrow.balanceOf(users.yossi), RewardLogic.getClaimableAmount(lockRate, 100e18 / 2) / 2, 10e17);

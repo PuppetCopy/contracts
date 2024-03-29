@@ -12,7 +12,7 @@ import {Precision} from "./utils/Precision.sol";
 import {OracleLogic} from "./tokenomics/OracleLogic.sol";
 import {RewardLogic} from "./tokenomics/RewardLogic.sol";
 import {VotingEscrow} from "./tokenomics/VotingEscrow.sol";
-import {IVeRevenueDistributor} from "./utils/interfaces/IVeRevenueDistributor.sol";
+import {VeRevenueDistributor} from "./tokenomics/VeRevenueDistributor.sol";
 
 contract RewardRouter is MulticallRouter {
     event RewardRouter__SetConfig(
@@ -24,14 +24,14 @@ contract RewardRouter is MulticallRouter {
     RewardLogic.CallExitConfig public callExitConfig;
 
     VotingEscrow votingEscrow;
-    IVeRevenueDistributor revenueDistributor;
+    VeRevenueDistributor revenueDistributor;
 
     constructor(
         Dictator _dictator,
         IWNT _wnt,
         Router _router,
         VotingEscrow _votingEscrow,
-        IVeRevenueDistributor _revenueDistributor,
+        VeRevenueDistributor _revenueDistributor,
         OracleLogic.CallConfig memory _callOracleConfig,
         RewardLogic.CallLockConfig memory _callLockConfig,
         RewardLogic.CallExitConfig memory _callExitConfig

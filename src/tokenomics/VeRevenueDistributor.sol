@@ -25,7 +25,7 @@ import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
 import {VotingEscrow} from "./VotingEscrow.sol";
 import {Router} from "../utils/Router.sol";
-import {IVeRevenueDistributor} from "../utils/interfaces/IVeRevenueDistributor.sol";
+import {VeRevenueDistributor} from "./VeRevenueDistributor.sol";
 
 /**
  * @title Fee Distributor
@@ -35,7 +35,10 @@ import {IVeRevenueDistributor} from "../utils/interfaces/IVeRevenueDistributor.s
  * holders simply transfer the tokens to the `FeeDistributor` contract and then call `checkpointToken`.
  * slightly modified from https://github.com/ZeframLou/fee-distributor/blob/main/src/FeeDistributor.sol
  */
-contract VeRevenueDistributor is Auth, EIP712, IVeRevenueDistributor, ReentrancyGuard {
+contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
+    event VeRevenueDistributor__TokenCheckpoint(IERC20 token, uint amount, uint lastCheckpointTimestamp);
+    event VeRevenueDistributor__TokensClaim(address from, address to, IERC20 token, uint amount, uint userTokenTimeCursor);
+
     uint private immutable _startTime;
     VotingEscrow public immutable _votingEscrow;
     Router public immutable router;
@@ -173,7 +176,7 @@ contract VeRevenueDistributor is Auth, EIP712, IVeRevenueDistributor, Reentrancy
      * @notice Caches the total supply of vetoken at the beginning of each week.
      * This function will be called automatically before claiming tokens to ensure the contract is properly updated.
      */
-    function checkpoint() external override nonReentrant {
+    function checkpoint() external nonReentrant {
         _checkpointTotalSupply();
     }
 
@@ -182,7 +185,7 @@ contract VeRevenueDistributor is Auth, EIP712, IVeRevenueDistributor, Reentrancy
      * This function will be called automatically before claiming tokens to ensure the contract is properly updated.
      * @param user - The address of the user to be checkpointed.
      */
-    function checkpointUser(address user) external override nonReentrant {
+    function checkpointUser(address user) external nonReentrant {
         _checkpointUserBalance(user);
     }
 
@@ -194,7 +197,7 @@ contract VeRevenueDistributor is Auth, EIP712, IVeRevenueDistributor, Reentrancy
      * This function will be called automatically before claiming tokens to ensure the contract is properly updated.
      * @param token - The ERC20 token address to be checkpointed.
      */
-    function checkpointToken(IERC20 token) external override nonReentrant {
+    function checkpointToken(IERC20 token) external nonReentrant {
         _checkpointToken(token, true);
     }
 
@@ -204,7 +207,7 @@ contract VeRevenueDistributor is Auth, EIP712, IVeRevenueDistributor, Reentrancy
      * See `checkpointToken` for more details.
      * @param tokens - An array of ERC20 token addresses to be checkpointed.
      */
-    function checkpointTokens(IERC20[] calldata tokens) external override nonReentrant {
+    function checkpointTokens(IERC20[] calldata tokens) external nonReentrant {
         uint tokensLength = tokens.length;
         for (uint i = 0; i < tokensLength;) {
             _checkpointToken(tokens[i], true);
@@ -584,4 +587,8 @@ contract VeRevenueDistributor is Auth, EIP712, IVeRevenueDistributor, Reentrancy
             return _roundEpochTime(timestamp + 1 weeks - 1);
         }
     }
+
+    error VeRevenueDistributor__InputLengthMismatch();
+    error VeRevenueDistributor__VotingEscrowZeroTotalSupply();
+    error VeRevenueDistributor__CannotStartBeforeCurrentWeek();
 }

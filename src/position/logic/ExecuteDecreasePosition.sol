@@ -35,6 +35,7 @@ library ExecuteDecreasePosition {
         address puppetStoreAddress;
         IERC20 outputToken;
         uint totalAmountOut;
+        uint profit;
     }
 
     function decrease(CallConfig calldata callConfig, bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external {
@@ -59,6 +60,12 @@ library ExecuteDecreasePosition {
             revert ExecutePosition__InvalidRequest(positionKey, key);
         }
 
+        uint profit;
+
+        if (totalAmountOut > order.numbers.initialCollateralDeltaAmount) {
+            profit = totalAmountOut - order.numbers.initialCollateralDeltaAmount;
+        }
+
         CallParams memory callParams = CallParams({
             mirrorPosition: mirrorPosition,
             eventLogData: eventLogData,
@@ -67,10 +74,24 @@ library ExecuteDecreasePosition {
             outputTokenAddress: outputTokenAddress,
             puppetStoreAddress: address(callConfig.puppetStore),
             outputToken: IERC20(outputTokenAddress),
-            totalAmountOut: totalAmountOut
+            totalAmountOut: totalAmountOut,
+            profit: profit
         });
 
         _decrease(callConfig, order, callParams, request);
+
+        // emit ExecutePosition__DecreasePosition(
+        //     positionKey,
+        //     key,
+        //     order.addresses.account,
+        //     order.addresses.market,
+        //     order.addresses.initialCollateralToken,
+        //     order.flags.isLong,
+        //     order.numbers.sizeDeltaUsd,
+        //     order.numbers.initialCollateralDeltaAmount,
+        //     totalAmountOut,
+        //     profit
+        // );
     }
 
     function _decrease(
@@ -94,10 +115,14 @@ library ExecuteDecreasePosition {
 
             for (uint i = 0; i < callParams.mirrorPosition.puppetList.length; i++) {
                 uint collateralDelta = request.puppetCollateralDeltaList[i];
-                uint amountOut = callParams.mirrorPosition.collateral * collateralDelta / callParams.totalAmountOut;
+                uint amountOut = collateralDelta * callParams.mirrorPosition.collateral / callParams.totalAmountOut;
                 uint amountOutAfterFee = amountOut - (puppetFee * amountOut / callParams.totalAmountOut);
 
                 activityList[i] = activityList[i];
+
+                if (callParams.profit > 0) {
+                    uint profitShare = callParams.profit * amountOut / callParams.totalAmountOut;
+                }
 
                 callParams.mirrorPosition.puppetDepositList[i] -= collateralDelta;
 

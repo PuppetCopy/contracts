@@ -89,14 +89,14 @@ contract DeployTokenomics is PRBTest {
         // dictator.setRoleCapability(ROUTER_ROLE, address(rewardLogic), rewardLogic.claim.selector, true);
 
         // VotingEscrow votingEscrow = new VotingEscrow(dictator, router, puppetToken);
-        // dictator.setUserRole(address(votingEscrow), TOKEN_ROUTER_ROLE, true);
+        // dictator.setUserRole(address(votingEscrow), TRANSFER_TOKEN, true);
         // dictator.setRoleCapability(ROUTER_ROLE, address(votingEscrow), votingEscrow.lock.selector, true);
         // dictator.setRoleCapability(ROUTER_ROLE, address(votingEscrow), votingEscrow.depositFor.selector, true);
         // dictator.setRoleCapability(ROUTER_ROLE, address(votingEscrow), votingEscrow.withdraw.selector, true);
         // dictator.setRoleCapability(REWARD_LOGIC_ROLE, address(votingEscrow), votingEscrow.lock.selector, true);
 
         // VeRevenueDistributor revenueDistributor = new VeRevenueDistributor(dictator, votingEscrow, router, block.timestamp + 1 weeks);
-        // dictator.setUserRole(address(revenueDistributor), TOKEN_ROUTER_ROLE, true);
+        // dictator.setUserRole(address(revenueDistributor), TRANSFER_TOKEN, true);
         // dictator.setRoleCapability(REWARD_LOGIC_ROLE, address(revenueDistributor), revenueDistributor.claim.selector, true);
         // dictator.setRoleCapability(REWARD_DISTRIBUTOR_ROLE, address(revenueDistributor), revenueDistributor.depositToken.selector, true);
 

@@ -56,8 +56,8 @@ contract PositionRouterTest is BasicSetup {
         subaccountFactory = new SubaccountFactory(dictator);
         dictator.setRoleCapability(SUBACCOUNT_LOGIC, address(subaccountFactory), subaccountFactory.createSubaccount.selector, true);
 
-        address positionRouterAddress = computeCreateAddress(owner, vm.getNonce(owner) + 5);
-        address puppetRouterAddress = computeCreateAddress(owner, vm.getNonce(owner) + 4);
+        address positionRouterAddress = computeCreateAddress(users.owner, vm.getNonce(users.owner) + 5);
+        address puppetRouterAddress = computeCreateAddress(users.owner, vm.getNonce(users.owner) + 4);
 
         subaccountStore = new SubaccountStore(dictator, positionRouterAddress, address(subaccountFactory));
         puppetStore = new PuppetStore(dictator, puppetRouterAddress);
@@ -83,6 +83,7 @@ contract PositionRouterTest is BasicSetup {
                 })
             })
         );
+        dictator.setRoleCapability(ADMIN_ROLE, address(puppetRouter), puppetRouter.setTokenAllowanceCap.selector, true);
 
         positionRouter = new PositionRouter(
             dictator,
@@ -129,9 +130,12 @@ contract PositionRouterTest is BasicSetup {
             })
         );
 
-        dictator.setUserRole(address(puppetRouter), PUPPET_LOGIC, true);
-        dictator.setUserRole(address(positionRouter), TOKEN_ROUTER_ROLE, true);
+        // dictator.setUserRole(address(puppetRouter), PUPPET_LOGIC, true);
+        dictator.setUserRole(address(positionRouter), TRANSFER_TOKEN_ROLE, true);
         dictator.setUserRole(address(positionRouter), SUBACCOUNT_LOGIC, true);
+
+        puppetRouter.setTokenAllowanceCap(Const.wnt, 100e30);
+        puppetRouter.setTokenAllowanceCap(Const.usdc, 100e30);
     }
 
     function testIncreaseRequest() public {
