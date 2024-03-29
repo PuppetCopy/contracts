@@ -18,8 +18,6 @@ import {UserGeneratedRevenue} from "src/shared/UserGeneratedRevenue.sol";
 
 import {PositionUtils} from "src/position/util/PositionUtils.sol";
 
-import {IWNT} from "src/utils/interfaces/IWNT.sol";
-
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 import {MockUniswapV3Pool} from "test/mocks/MockUniswapV3Pool.sol";
@@ -33,9 +31,8 @@ contract RewardRouterTest is BasicSetup {
     UserGeneratedRevenueStore userGeneratedRevenueStore;
     VotingEscrow votingEscrow;
     VeRevenueDistributor revenueDistributor;
-    IERC20 usdcTokenRevenue;
-    IWNT wntTokenRevenue;
     IUniswapV3Pool[] wntUsdPoolList;
+    IERC20[] revTokenList;
 
     OracleLogic.CallConfig callOracleConfig;
 
@@ -50,13 +47,16 @@ contract RewardRouterTest is BasicSetup {
     function setUp() public override {
         super.setUp();
 
+        revTokenList = new IERC20[](2);
+        revTokenList[0] = usdc;
+        revTokenList[1] = wnt;
+
         wntUsdPoolList = new MockUniswapV3Pool[](3);
 
         wntUsdPoolList[0] = new MockUniswapV3Pool(fromPriceToSqrt(100));
         wntUsdPoolList[1] = new MockUniswapV3Pool(fromPriceToSqrt(100));
         wntUsdPoolList[2] = new MockUniswapV3Pool(fromPriceToSqrt(100));
 
-        usdcTokenRevenue = IERC20(address(deployMockERC20("St4bl3", "sMPT", 6)));
         address rewardRouterAddress = computeCreateAddress(users.owner, vm.getNonce(users.owner) + 7);
 
         vault = new MockWeightedPoolVault();
@@ -64,16 +64,6 @@ contract RewardRouterTest is BasicSetup {
 
         usdPerWntStore = new OracleStore(dictator, rewardRouterAddress, 100e30);
         puppetPerWntStore = new OracleStore(dictator, rewardRouterAddress, 1e18);
-
-        callOracleConfig = OracleLogic.CallConfig({
-            wntUsdSourceList: wntUsdPoolList,
-            vault: vault,
-            // usdPerWntStore: usdPerWntStore,
-            tokenPerWntStore: puppetPerWntStore,
-            poolId: keccak256("TEST_POOL_ID"),
-            twapInterval: 0,
-            updateInterval: 1 days
-        });
 
         userGeneratedRevenue = new UserGeneratedRevenue(dictator);
         userGeneratedRevenueStore = new UserGeneratedRevenueStore(dictator, address(userGeneratedRevenue));
@@ -95,22 +85,31 @@ contract RewardRouterTest is BasicSetup {
             router,
             votingEscrow,
             revenueDistributor,
-            callOracleConfig,
-            RewardLogic.CallLockConfig({
-                router: router,
-                votingEscrow: votingEscrow,
-                userGeneratedRevenueStore: userGeneratedRevenueStore,
-                userGeneratedRevenue: userGeneratedRevenue,
-                revenueDistributor: revenueDistributor,
-                puppetToken: puppetToken,
-                rate: 6000
-            }),
-            RewardLogic.CallExitConfig({
-                userGeneratedRevenueStore: userGeneratedRevenueStore,
-                userGeneratedRevenue: userGeneratedRevenue,
-                revenueDistributor: revenueDistributor,
-                puppetToken: puppetToken,
-                rate: 3000
+            RewardRouter.CallConfig({
+                oracle: OracleLogic.CallConfig({
+                    wntUsdSourceList: wntUsdPoolList,
+                    vault: vault,
+                    tokenPerWntStore: puppetPerWntStore,
+                    poolId: keccak256("TEST_POOL_ID"),
+                    twapInterval: 0,
+                    updateInterval: 1 days
+                }),
+                lock: RewardLogic.CallLockConfig({
+                    router: router,
+                    votingEscrow: votingEscrow,
+                    userGeneratedRevenueStore: userGeneratedRevenueStore,
+                    userGeneratedRevenue: userGeneratedRevenue,
+                    revenueDistributor: revenueDistributor,
+                    puppetToken: puppetToken,
+                    rate: 6000
+                }),
+                exit: RewardLogic.CallExitConfig({
+                    userGeneratedRevenueStore: userGeneratedRevenueStore,
+                    userGeneratedRevenue: userGeneratedRevenue,
+                    revenueDistributor: revenueDistributor,
+                    puppetToken: puppetToken,
+                    rate: 3000
+                })
             })
         );
 
@@ -132,17 +131,17 @@ contract RewardRouterTest is BasicSetup {
         vm.warp(2 weeks);
 
         puppetToken.transfer(address(0x123), puppetToken.balanceOf(users.owner));
+        vm.expectRevert(abi.encodeWithSelector(RewardRouter.RewardRouter__UnacceptableTokenPrice.selector, 100e30));
+        rewardRouter.lock(revTokenList, 99e30, getMaxTime());
+
         vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
-        // rewardRouter.lock([], 100.1e30, getMaxTime());
+        rewardRouter.lock(revTokenList, 100e30, getMaxTime());
 
-        vm.expectRevert();
-        // rewardRouter.lock(0.8e30, getMaxTime());
+        generateUserRevenueInUsdc(users.alice, 100e30);
+        vm.expectRevert(VotingEscrow.VotingEscrow__InvalidLockValue.selector);
+        rewardRouter.lock(revTokenList, 100e30, 0);
 
-        // generateUserRevenueInUsdc(users.alice, 100e30);
-        // vm.expectRevert(VotingEscrow.VotingEscrow__InvalidLockValue.selector);
-        // rewardRouter.lock(100e30, 0);
-
-        // assertEq(userGeneratedRevenue.getUserGeneratedRevenue(userGeneratedRevenueStore, users.alice).amountInUsd, 100e30);
+        // assertEq(getUserGeneratedRevenueInUsdc(users.alice).amountInUsd, 100e30);
 
         // rewardRouter.lock(100.1e30, getMaxTime());
         // assertAlmostEq(votingEscrow.balanceOf(users.alice), RewardLogic.getClaimableAmount(lockRate, 100e18), 10e17);
@@ -221,28 +220,53 @@ contract RewardRouterTest is BasicSetup {
         // assertEq(aliceRevenueAfter - aliceRevenueBefore, bobRevenueAfter - bobRevenueBefore, "Revenue distribution proportion is incorrect");
     }
 
-    function depositRevenue(uint amount) public {
-        vm.startPrank(users.owner);
-        usdcTokenRevenue.approve(address(router), amount);
-        revenueDistributor.depositToken(usdcTokenRevenue, amount);
-        usdcTokenRevenue.balanceOf(address(revenueDistributor));
+    // function depositRevenue(IERC20 token, uint amount) public {
+    //     vm.startPrank(users.owner);
+    //     token.approve(address(router), amount);
+    //     revenueDistributor.depositToken(token, amount);
+    //     token.balanceOf(address(revenueDistributor));
+    // }
+
+    function generateUserRevenueInUsdc(address user, uint amount) public returns (uint) {
+        return generateUserRevenue(usdc, user, amount);
     }
 
-    function generateUserRevenueInUsdc(IERC20 token, address user, uint amount) public returns (uint) {
+    function generateUserRevenueInWnt(address user, uint amount) public returns (uint) {
+        return generateUserRevenue(wnt, user, amount);
+    }
+
+    function generateUserRevenue(IERC20 token, address user, uint amount) public returns (uint) {
         vm.startPrank(users.owner);
 
-        _dealERC20(address(usdcTokenRevenue), users.owner, amount);
-        // userGeneratedRevenue.setUserGeneratedRevenue(
-        //     userGeneratedRevenueStore,
-        //     PositionUtils.getUserGeneratedRevenueKey(token, user),
-        //     UserGeneratedRevenueStore.Revenue({from: users.owner, amountInToken: amount, amountInUsd: amount, token: token})
-        // );
+        _dealERC20(address(token), users.owner, amount);
+        userGeneratedRevenue.increaseUserGeneratedRevenue(
+            userGeneratedRevenueStore,
+            revenueDistributor,
+            PositionUtils.getUserGeneratedRevenueKey(token, users.owner, user),
+            UserGeneratedRevenueStore.Revenue({amountInToken: amount, amountInUsd: amount})
+        );
 
         // skip block
         vm.roll(block.number + 1);
         vm.startPrank(user);
 
         return amount;
+    }
+
+    function getUserGeneratedRevenue(IERC20 token, address user) public view returns (UserGeneratedRevenueStore.Revenue memory) {
+        return userGeneratedRevenue.getUserGeneratedRevenue(
+            userGeneratedRevenueStore, PositionUtils.getUserGeneratedRevenueKey(token, users.owner, user)
+        );
+    }
+
+    function getUserGeneratedRevenueInUsdc(address user) public view returns (UserGeneratedRevenueStore.Revenue memory) {
+        return
+            userGeneratedRevenue.getUserGeneratedRevenue(userGeneratedRevenueStore, PositionUtils.getUserGeneratedRevenueKey(usdc, users.owner, user));
+    }
+
+    function getUserGeneratedRevenueInWnt(address user) public view returns (UserGeneratedRevenueStore.Revenue memory) {
+        return
+            userGeneratedRevenue.getUserGeneratedRevenue(userGeneratedRevenueStore, PositionUtils.getUserGeneratedRevenueKey(wnt, users.owner, user));
     }
 
     function getMaxTime() public view returns (uint) {

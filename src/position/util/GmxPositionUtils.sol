@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {IGmxDatastore} from "../interface/IGmxDatastore.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 library GmxPositionUtils {
     enum OrderType {
@@ -40,7 +41,7 @@ library GmxPositionUtils {
         address callbackContract;
         address uiFeeReceiver;
         address market;
-        address initialCollateralToken;
+        IERC20 initialCollateralToken;
         address[] swapPath;
     }
 
@@ -80,7 +81,7 @@ library GmxPositionUtils {
         address callbackContract;
         address uiFeeReceiver;
         address market;
-        address initialCollateralToken;
+        IERC20 initialCollateralToken;
         address[] swapPath;
     }
 
@@ -106,8 +107,7 @@ library GmxPositionUtils {
         return orderType == OrderType.Liquidation;
     }
 
-
-    function getPositionKey(address account, address market, address collateralToken, bool isLong) internal pure returns (bytes32) {
+    function getPositionKey(address account, address market, IERC20 collateralToken, bool isLong) internal pure returns (bytes32) {
         return keccak256(abi.encode(account, market, collateralToken, isLong));
     }
 

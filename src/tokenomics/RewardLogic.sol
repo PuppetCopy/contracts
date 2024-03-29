@@ -63,11 +63,11 @@ library RewardLogic {
 
     // state
 
-    function lock(CallLockConfig memory callLockConfig, IERC20[] calldata tokenList, uint tokenPrice, address from, uint unlockTime) internal {
-        bytes32[] memory keyList = new bytes32[](tokenList.length);
+    function lock(CallLockConfig memory callLockConfig, IERC20[] calldata revTokenList, uint tokenPrice, address from, uint unlockTime) internal {
+        bytes32[] memory keyList = new bytes32[](revTokenList.length);
 
-        for (uint i = 0; i < tokenList.length; i++) {
-            keyList[i] = PositionUtils.getUserGeneratedRevenueKey(tokenList[i], from, msg.sender);
+        for (uint i = 0; i < revTokenList.length; i++) {
+            keyList[i] = PositionUtils.getUserGeneratedRevenueKey(revTokenList[i], from, from);
         }
 
         (UserGeneratedRevenueStore.Revenue[] memory revenueList, uint totalClaimedInUsd) =
@@ -92,7 +92,7 @@ library RewardLogic {
         bytes32[] memory keyList = new bytes32[](tokenList.length);
 
         for (uint i = 0; i < tokenList.length; i++) {
-            keyList[i] = PositionUtils.getUserGeneratedRevenueKey(tokenList[i], from, msg.sender);
+            keyList[i] = PositionUtils.getUserGeneratedRevenueKey(tokenList[i], from, from);
         }
 
         (UserGeneratedRevenueStore.Revenue[] memory revenueList, uint totalClaimedInUsd) =
@@ -120,7 +120,7 @@ library RewardLogic {
     // governance
 
     // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/mock/ReferralStorage.sol#L127
-    function transferReferralOwnership(address _referralStorage, bytes32 _code, address _newOwner) external {
+    function transferReferralOwnership(address _referralStorage, bytes32 _code, address _newOwner) internal {
         bytes memory data = abi.encodeWithSignature("setCodeOwner(bytes32,address)", _code, _newOwner);
         (bool success,) = _referralStorage.call(data);
 

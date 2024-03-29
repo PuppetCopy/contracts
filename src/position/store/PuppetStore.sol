@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {StoreController} from "./../../utils/StoreController.sol";
 import {PositionUtils} from "./../util/PositionUtils.sol";
@@ -13,7 +14,7 @@ contract PuppetStore is StoreController {
         uint expiry;
     }
 
-    mapping(address token => uint) public tokenAllowanceCapMap;
+    mapping(IERC20 token => uint) public tokenAllowanceCapMap;
 
     mapping(bytes32 ruleKey => Rule) public ruleMap; // ruleKey = keccak256(collateralToken, puppet, trader)
     mapping(bytes32 fundingActivityKey => uint) public tradeFundingActivityMap; // fundingActivityKey = keccak256(puppet, trader)
@@ -77,7 +78,7 @@ contract PuppetStore is StoreController {
         return tradeFundingActivityMap[_key];
     }
 
-    function getMatchingActivity(address collateralToken, address trader, address[] calldata _puppetList)
+    function getMatchingActivity(IERC20 collateralToken, address trader, address[] calldata _puppetList)
         external
         view
         returns (Rule[] memory _ruleList, uint[] memory _activityList, uint[] memory _allowanceOptimList)
@@ -97,7 +98,7 @@ contract PuppetStore is StoreController {
     }
 
     function setMatchingActivity(
-        address collateralToken,
+        IERC20 collateralToken,
         address trader,
         address[] calldata _puppetList,
         uint[] calldata _activityList,
@@ -111,11 +112,11 @@ contract PuppetStore is StoreController {
         }
     }
 
-    function getTokenAllowanceCap(address _token) external view returns (uint) {
+    function getTokenAllowanceCap(IERC20 _token) external view returns (uint) {
         return tokenAllowanceCapMap[_token];
     }
 
-    function setTokenAllowanceCap(address _token, uint _amount) external isSetter {
+    function setTokenAllowanceCap(IERC20 _token, uint _amount) external isSetter {
         tokenAllowanceCapMap[_token] = _amount;
     }
 

@@ -34,11 +34,11 @@ library PositionUtils {
         return keccak256(abi.encodePacked(token, from, account));
     }
 
-    function getRuleKey(address collateralToken, address puppet, address trader) internal pure returns (bytes32) {
+    function getRuleKey(IERC20 collateralToken, address puppet, address trader) internal pure returns (bytes32) {
         return keccak256(abi.encode(collateralToken, puppet, trader));
     }
 
-    function getAllownaceKey(address collateralToken, address puppet) internal pure returns (bytes32) {
+    function getAllownaceKey(IERC20 collateralToken, address puppet) internal pure returns (bytes32) {
         return keccak256(abi.encode(collateralToken, puppet));
     }
 

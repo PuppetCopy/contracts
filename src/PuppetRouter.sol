@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Router} from "./utils/Router.sol";
 import {Router} from "./utils/Router.sol";
@@ -26,7 +27,7 @@ contract PuppetRouter is Auth, ReentrancyGuard {
     }
 
     function setRule(
-        address collateralToken,
+        IERC20 collateralToken,
         address trader,
         PuppetStore.Rule calldata ruleParams //
     ) external nonReentrant {
@@ -36,13 +37,13 @@ contract PuppetRouter is Auth, ReentrancyGuard {
     function setRuleList(
         PuppetStore.Rule[] calldata ruleParams, //
         address[] calldata traderList,
-        address[] calldata collateralTokenList
+        IERC20[] calldata collateralTokenList
     ) external nonReentrant {
         PuppetLogic.setRuleList(callConfig.setRule, traderList, collateralTokenList, ruleParams, msg.sender);
     }
 
-    function createSubaccount(address account) external nonReentrant {
-        PuppetLogic.createSubaccount(callConfig.createSubaccount, account);
+    function createSubaccount() external nonReentrant {
+        PuppetLogic.createSubaccount(callConfig.createSubaccount, msg.sender);
     }
 
     // governance
@@ -51,14 +52,14 @@ contract PuppetRouter is Auth, ReentrancyGuard {
         _setConfig(_callConfig);
     }
 
-    function setTokenAllowanceCap(address token, uint amount) external requiresAuth {
+    function setTokenAllowanceCap(IERC20 token, uint amount) external requiresAuth {
         callConfig.setRule.store.setTokenAllowanceCap(token, amount);
     }
 
     // integration
 
     function setMatchingActivity(
-        address collateralToken,
+        IERC20 collateralToken,
         address trader,
         address[] calldata _puppetList,
         uint[] calldata _activityList,

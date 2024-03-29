@@ -31,7 +31,7 @@ library ExecuteDecreasePosition {
         IGmxEventUtils.EventLogData eventLogData;
         bytes32 positionKey;
         bytes32 requestKey;
-        address outputTokenAddress;
+        IERC20 outputTokenAddress;
         address puppetStoreAddress;
         IERC20 outputToken;
         uint totalAmountOut;
@@ -50,7 +50,7 @@ library ExecuteDecreasePosition {
             order.addresses.account, order.addresses.market, order.addresses.initialCollateralToken, order.flags.isLong
         );
 
-        address outputTokenAddress = eventLogData.addressItems.items[0].value;
+        IERC20 outputTokenAddress = IERC20(eventLogData.addressItems.items[0].value);
         uint totalAmountOut = eventLogData.uintItems.items[0].value;
 
         PositionStore.RequestDecrease memory request = callConfig.positionStore.getRequestDecrease(key);
@@ -80,7 +80,7 @@ library ExecuteDecreasePosition {
 
         _decrease(callConfig, order, callParams, request);
 
-        // emit ExecutePosition__DecreasePosition(
+        // emit ExecuteDecreasePosition__DecreasePosition(
         //     positionKey,
         //     key,
         //     order.addresses.account,

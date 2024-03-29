@@ -15,13 +15,15 @@ import {VotingEscrow} from "./tokenomics/VotingEscrow.sol";
 import {VeRevenueDistributor} from "./tokenomics/VeRevenueDistributor.sol";
 
 contract RewardRouter is MulticallRouter {
-    event RewardRouter__SetConfig(
-        uint timestmap, OracleLogic.CallConfig callOracleConfig, RewardLogic.CallLockConfig callLockConfig, RewardLogic.CallExitConfig callExitConfig
-    );
+    event RewardRouter__SetConfig(uint timestmap, CallConfig callConfig);
 
-    OracleLogic.CallConfig public callOracleConfig;
-    RewardLogic.CallLockConfig public callLockConfig;
-    RewardLogic.CallExitConfig public callExitConfig;
+    struct CallConfig {
+        OracleLogic.CallConfig oracle;
+        RewardLogic.CallLockConfig lock;
+        RewardLogic.CallExitConfig exit;
+    }
+
+    CallConfig callConfig;
 
     VotingEscrow votingEscrow;
     VeRevenueDistributor revenueDistributor;
@@ -32,34 +34,28 @@ contract RewardRouter is MulticallRouter {
         Router _router,
         VotingEscrow _votingEscrow,
         VeRevenueDistributor _revenueDistributor,
-        OracleLogic.CallConfig memory _callOracleConfig,
-        RewardLogic.CallLockConfig memory _callLockConfig,
-        RewardLogic.CallExitConfig memory _callExitConfig
+        CallConfig memory _callConfig
     ) MulticallRouter(_dictator, _wnt, _router, _dictator.owner()) {
         votingEscrow = _votingEscrow;
         revenueDistributor = _revenueDistributor;
 
-        _setConfig(_callOracleConfig, _callLockConfig, _callExitConfig);
+        _setConfig(_callConfig);
     }
 
     function lock(IERC20[] calldata revenueTokenList, uint maxAcceptableTokenPriceInUsdc, uint unlockTime) public nonReentrant {
-        (,, uint tokenPrice) = OracleLogic.syncPrices(callOracleConfig);
+        (,, uint tokenPrice) = OracleLogic.syncPrices(callConfig.oracle);
 
-        if (tokenPrice > maxAcceptableTokenPriceInUsdc) revert RewardRouter__UnacceptableTokenPrice(tokenPrice, maxAcceptableTokenPriceInUsdc);
+        if (tokenPrice > maxAcceptableTokenPriceInUsdc) revert RewardRouter__UnacceptableTokenPrice(tokenPrice);
 
-        RewardLogic.lock(callLockConfig, revenueTokenList, tokenPrice, msg.sender, unlockTime);
+        RewardLogic.lock(callConfig.lock, revenueTokenList, tokenPrice, msg.sender, unlockTime);
     }
 
     function exit(IERC20[] calldata revenueTokenList, uint maxAcceptableTokenPriceInUsdc) public nonReentrant {
-        (,, uint tokenPrice) = OracleLogic.syncPrices(callOracleConfig);
+        (,, uint usdPerToken) = OracleLogic.syncPrices(callConfig.oracle);
 
-        if (tokenPrice > maxAcceptableTokenPriceInUsdc) revert RewardRouter__UnacceptableTokenPrice(tokenPrice, maxAcceptableTokenPriceInUsdc);
+        if (usdPerToken > maxAcceptableTokenPriceInUsdc) revert RewardRouter__UnacceptableTokenPrice(usdPerToken);
 
-        RewardLogic.exit(callExitConfig, revenueTokenList, tokenPrice, msg.sender);
-    }
-
-    function claim(IERC20 token, address to) external nonReentrant {
-        RewardLogic.claim(revenueDistributor, token, msg.sender, to);
+        RewardLogic.exit(callConfig.exit, revenueTokenList, usdPerToken, msg.sender);
     }
 
     function veLock(uint _tokenAmount, uint unlockTime) external nonReentrant {
@@ -74,39 +70,41 @@ contract RewardRouter is MulticallRouter {
         votingEscrow.withdraw(msg.sender, to);
     }
 
+    function claim(IERC20 token, address to) internal {
+        revenueDistributor.claim(token, msg.sender, to);
+    }
+
+    function claimList(IERC20[] calldata tokenList, address to) internal {
+        revenueDistributor.claimList(tokenList, msg.sender, to);
+    }
+
     // integration
 
     function syncPrices() public nonReentrant {
-        OracleLogic.syncPrices(callOracleConfig);
+        OracleLogic.syncPrices(callConfig.oracle);
     }
 
     // governance
 
-    function setConfig(
-        OracleLogic.CallConfig memory _callOracleConfig,
-        RewardLogic.CallLockConfig memory _callLockConfig,
-        RewardLogic.CallExitConfig memory _callExitConfig
-    ) external requiresAuth {
-        _setConfig(_callOracleConfig, _callLockConfig, _callExitConfig);
+    function setConfig(CallConfig memory _callConfig) external requiresAuth {
+        _setConfig(_callConfig);
+    }
+
+    function transferReferralOwnership(address _referralStorage, bytes32 _code, address _newOwner) external requiresAuth {
+        RewardLogic.transferReferralOwnership(_referralStorage, _code, _newOwner);
     }
 
     // internal
 
-    function _setConfig(
-        OracleLogic.CallConfig memory _callOracleConfig,
-        RewardLogic.CallLockConfig memory _callLockConfig,
-        RewardLogic.CallExitConfig memory _callExitConfig
-    ) internal {
-        if (_callOracleConfig.wntUsdSourceList.length % 2 == 0) revert RewardRouter__SourceCountNotOdd();
-        if (_callOracleConfig.wntUsdSourceList.length < 3) revert RewardRouter__NotEnoughSources();
-        if (_callOracleConfig.poolId == bytes32(0)) revert RewardRouter__InvalidPoolId();
-        if (_callLockConfig.rate + _callExitConfig.rate > Precision.BASIS_POINT_DIVISOR) revert RewardRouter__InvalidWeightFactors();
+    function _setConfig(CallConfig memory _callConfig) internal {
+        if (_callConfig.oracle.wntUsdSourceList.length % 2 == 0) revert RewardRouter__SourceCountNotOdd();
+        if (_callConfig.oracle.wntUsdSourceList.length < 3) revert RewardRouter__NotEnoughSources();
+        if (_callConfig.oracle.poolId == bytes32(0)) revert RewardRouter__InvalidPoolId();
+        if (_callConfig.lock.rate + callConfig.exit.rate > Precision.BASIS_POINT_DIVISOR) revert RewardRouter__InvalidWeightFactors();
 
-        callOracleConfig = _callOracleConfig;
-        callLockConfig = _callLockConfig;
-        callExitConfig = _callExitConfig;
+        callConfig = _callConfig;
 
-        emit RewardRouter__SetConfig(block.timestamp, _callOracleConfig, _callLockConfig, _callExitConfig);
+        emit RewardRouter__SetConfig(block.timestamp, callConfig);
     }
 
     error RewardRouter__InvalidWeightFactors();
@@ -114,5 +112,5 @@ contract RewardRouter is MulticallRouter {
     error RewardRouter__NotEnoughSources();
     error RewardRouter__InvalidPoolId();
     error RewardRouter__InvalidAddress();
-    error RewardRouter__UnacceptableTokenPrice(uint curentPrice, uint acceptablePrice);
+    error RewardRouter__UnacceptableTokenPrice(uint curentPrice);
 }

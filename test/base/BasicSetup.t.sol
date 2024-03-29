@@ -12,6 +12,9 @@ import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {Router} from "src/utils/Router.sol";
 import {IWNT} from "./../../src/utils/interfaces/IWNT.sol";
 
+import {Const} from "script/Const.s.sol";
+
+
 contract BasicSetup is PRBTest, StdCheats, StdUtils {
     struct Users {
         address payable owner;
@@ -27,7 +30,10 @@ contract BasicSetup is PRBTest, StdCheats, StdUtils {
     uint internal constant BASIS_POINTS_DIVISOR = 10_000;
 
     Users users;
-    IWNT wnt;
+
+    IWNT wnt = IWNT(Const.wnt);
+    IERC20 usdc = IERC20(Const.usdc);
+
     Dictator dictator;
     PuppetToken puppetToken;
     Router router;

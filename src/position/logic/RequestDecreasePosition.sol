@@ -2,12 +2,13 @@
 pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IGmxExchangeRouter} from "./../interface/IGmxExchangeRouter.sol";
 import {IWNT} from "./../../utils/interfaces/IWNT.sol";
+import {Subaccount} from "./../../shared/Subaccount.sol";
 
 import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
-import {Subaccount} from "../../shared/Subaccount.sol";
 import {ErrorUtils} from "./../../utils/ErrorUtils.sol";
 import {TransferUtils} from "./../../utils/TransferUtils.sol";
 
@@ -38,7 +39,7 @@ library RequestDecreasePosition {
 
     struct TraderCallParams {
         address market;
-        address collateralToken;
+        IERC20 collateralToken;
         bool isLong;
         uint executionFee;
         uint collateralDelta;
@@ -49,18 +50,17 @@ library RequestDecreasePosition {
 
     struct CallParams {
         PositionStore.RequestDecrease request;
-        Subaccount subaccount;
+        address subaccount;
         uint transactionCost;
     }
 
     function decrease(CallConfig memory callConfig, TraderCallParams calldata traderCallParams, address from) internal {
-        Subaccount subaccount = callConfig.subaccountStore.getSubaccount(from);
-        address subaccountAddress = address(subaccount);
+        address subaccount = address(callConfig.subaccountStore.getSubaccount(from));
 
-        if (subaccountAddress == address(0)) revert RequestDecreasePosition__SubaccountNotFound(from);
+        if (subaccount == address(0)) revert RequestDecreasePosition__SubaccountNotFound(from);
 
         bytes32 positionKey =
-            GmxPositionUtils.getPositionKey(subaccountAddress, traderCallParams.market, traderCallParams.collateralToken, traderCallParams.isLong);
+            GmxPositionUtils.getPositionKey(subaccount, traderCallParams.market, traderCallParams.collateralToken, traderCallParams.isLong);
 
         PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
 
@@ -87,12 +87,7 @@ library RequestDecreasePosition {
         callConfig.positionStore.setRequestDecrease(requestKey, request);
 
         emit RequestDecreasePosition__Request(
-            request,
-            subaccountAddress,
-            requestKey,
-            traderCallParams.sizeDelta,
-            traderCallParams.collateralDelta,
-            callParams.transactionCost
+            request, subaccount, requestKey, traderCallParams.sizeDelta, traderCallParams.collateralDelta, callParams.transactionCost
         );
     }
 
@@ -135,7 +130,7 @@ library RequestDecreasePosition {
             traderCallParams.executionFee + traderCallParams.collateralDelta
         );
 
-        (bool orderSuccess, bytes memory orderReturnData) = callParams.subaccount.execute(
+        (bool orderSuccess, bytes memory orderReturnData) = Subaccount(callParams.subaccount).execute(
             address(callConfig.gmxExchangeRouter), abi.encodeWithSelector(callConfig.gmxExchangeRouter.createOrder.selector, orderParams)
         );
 

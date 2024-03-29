@@ -76,12 +76,7 @@ contract PositionRouterTest is BasicSetup {
                     maxAllowanceRate: 5000
                 }),
                 createSubaccount: PuppetLogic.CallCreateSubaccountConfig({factory: subaccountFactory, store: subaccountStore}),
-                setWnt: PuppetLogic.CallSetDepositWntConfig({
-                    wnt: IWNT(Const.wnt),
-                    store: puppetStore,
-                    holdingAddress: Const.gmxOrderVault,
-                    gasLimit: 50_000
-                })
+                setWnt: PuppetLogic.CallSetDepositWntConfig({wnt: wnt, store: puppetStore, holdingAddress: Const.gmxOrderVault, gasLimit: 50_000})
             })
         );
         dictator.setRoleCapability(ADMIN_ROLE, address(puppetRouter), puppetRouter.setTokenAllowanceCap.selector, true);
@@ -91,7 +86,7 @@ contract PositionRouterTest is BasicSetup {
             dictator,
             PositionRouter.CallConfig({
                 increase: RequestIncreasePosition.CallConfig({
-                    wnt: IWNT(Const.wnt),
+                    wnt: wnt,
                     router: router,
                     positionStore: positionStore,
                     gmxExchangeRouter: IGmxExchangeRouter(Const.gmxExchangeRouter),
@@ -137,17 +132,15 @@ contract PositionRouterTest is BasicSetup {
         dictator.setUserRole(address(positionRouter), SUBACCOUNT_LOGIC, true);
         dictator.setUserRole(address(positionRouter), SET_MATCHING_ACTIVITY, true);
 
-        puppetRouter.setTokenAllowanceCap(Const.wnt, 100e30);
-        puppetRouter.setTokenAllowanceCap(Const.usdc, 100e30);
+        puppetRouter.setTokenAllowanceCap(wnt, 100e30);
+        puppetRouter.setTokenAllowanceCap(usdc, 100e30);
     }
 
     function testIncreaseRequest() public {
         address puppet = users.alice;
         address trader = users.bob;
 
-        address collateralToken = Const.usdc;
-
-        IERC20 usdc = IERC20(Const.usdc);
+        IERC20 collateralToken = usdc;
         // _dealERC20(Const.usdc, msg.sender, 1_000e6);
         // usdc.approve(Const.gmxOrderVault, type(uint).max);
         // usdc.approve(Const.gmxExchangeRouter, type(uint).max);
@@ -165,7 +158,7 @@ contract PositionRouterTest is BasicSetup {
         // );
 
         vm.startPrank(puppet);
-        _dealERC20(collateralToken, puppet, 100e6);
+        _dealERC20(address(collateralToken), puppet, 100e6);
         IERC20(collateralToken).approve(address(router), 100e6);
 
         puppetRouter.setRule(
@@ -175,7 +168,7 @@ contract PositionRouterTest is BasicSetup {
         );
 
         vm.startPrank(trader);
-        _dealERC20(collateralToken, trader, 100e6);
+        _dealERC20(address(collateralToken), trader, 100e6);
         IERC20(collateralToken).approve(address(router), 100e6);
         // IERC20(collateralToken).approve(address(gmxExchangeRouter), 100e6);
         // IERC20(collateralToken).approve(address(requestIncreasePositionConfig.gmxExchangeRouter), 100e6);

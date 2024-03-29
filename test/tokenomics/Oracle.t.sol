@@ -123,7 +123,7 @@ contract OracleTest is BasicSetup {
     function _storeStepInUsd(uint balanceInWnt) internal returns (uint) {
         _storeStep(balanceInWnt);
 
-        (uint usdPerWnt, uint puppetPerWnt, uint usdPerPuppet) = OracleLogic.syncPrices(callOracleConfig);
+        (,, uint usdPerPuppet) = OracleLogic.syncPrices(callOracleConfig);
 
         return usdPerPuppet;
     }
@@ -131,7 +131,7 @@ contract OracleTest is BasicSetup {
     function _storeStepInWnt(uint balanceInWnt) internal returns (uint) {
         _storeStep(balanceInWnt);
 
-        (uint usdPerWnt, uint puppetPerWnt, uint usdPerToken) = OracleLogic.syncPrices(callOracleConfig);
+        (, uint puppetPerWnt,) = OracleLogic.syncPrices(callOracleConfig);
 
         return puppetPerWnt;
     }

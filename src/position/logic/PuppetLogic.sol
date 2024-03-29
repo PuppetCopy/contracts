@@ -44,7 +44,7 @@ library PuppetLogic {
     function setRule(
         CallSetRuleConfig memory callConfig,
         address trader,
-        address collateralToken,
+        IERC20 collateralToken,
         address puppet,
         PuppetStore.Rule calldata ruleParams
     ) internal {
@@ -53,7 +53,7 @@ library PuppetLogic {
         PuppetStore.Rule memory storedRule = callConfig.store.getRule(ruleKey);
         uint tokenAllowance = _validateTokenAllowance(callConfig, puppet, collateralToken);
 
-        // callConfig.store.setTokenAllowanceActivity(PositionUtils.getAllownaceKey(collateralToken, puppet), tokenAllowance);
+        callConfig.store.setTokenAllowanceActivity(PositionUtils.getAllownaceKey(collateralToken, puppet), tokenAllowance);
 
         PuppetStore.Rule memory rule = _setRule(callConfig, storedRule, ruleParams);
 
@@ -65,12 +65,12 @@ library PuppetLogic {
     function setRuleList(
         CallSetRuleConfig memory callConfig,
         address[] calldata traderList,
-        address[] calldata collateralTokenList,
+        IERC20[] calldata collateralTokenList,
         PuppetStore.Rule[] calldata ruleParams,
         address puppet
     ) internal {
         uint length = traderList.length;
-        address[] memory verifyAllowanceTokenList = new address[](0);
+        IERC20[] memory verifyAllowanceTokenList = new IERC20[](0);
         bytes32[] memory keyList = new bytes32[](length);
 
         for (uint i = 0; i < length; i++) {
@@ -98,7 +98,7 @@ library PuppetLogic {
         for (uint i = 0; i < verifyAllowanceTokenList.length; i++) {
             uint tokenAllowance = _validateTokenAllowance(callConfig, puppet, verifyAllowanceTokenList[i]);
 
-            // callConfig.store.setTokenAllowanceActivity(PositionUtils.getAllownaceKey(collateralTokenList[i], puppet), tokenAllowance);
+            callConfig.store.setTokenAllowanceActivity(PositionUtils.getAllownaceKey(collateralTokenList[i], puppet), tokenAllowance);
         }
     }
 
@@ -130,7 +130,7 @@ library PuppetLogic {
         return storedRule;
     }
 
-    function isArrayContains(address[] memory array, address value) public pure returns (bool) {
+    function isArrayContains(IERC20[] memory array, IERC20 value) public pure returns (bool) {
         for (uint i = 0; i < array.length; i++) {
             if (array[i] == value) {
                 return true;
@@ -143,7 +143,7 @@ library PuppetLogic {
     function _validateTokenAllowance(
         CallSetRuleConfig memory callConfig, //
         address from,
-        address collateralToken
+        IERC20 collateralToken
     ) internal view returns (uint) {
         uint tokenAllowance = IERC20(collateralToken).allowance(from, address(callConfig.router));
 
