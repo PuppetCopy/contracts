@@ -61,11 +61,11 @@ contract PuppetStore is StoreController {
         }
     }
 
-    function getSampledTokenAllowance(bytes32 _key) external view returns (uint) {
+    function getTokenAllowanceActivity(bytes32 _key) external view returns (uint) {
         return tokenAllowanceActivityMap[_key];
     }
 
-    function setSampledTokenAllowance(bytes32 _key, uint _allowance) external isSetter {
+    function setTokenAllowanceActivity(bytes32 _key, uint _allowance) external isSetter {
         tokenAllowanceActivityMap[_key] = _allowance;
     }
 
@@ -77,7 +77,7 @@ contract PuppetStore is StoreController {
         return tradeFundingActivityMap[_key];
     }
 
-    function getRouteMatchingState(address collateralToken, address trader, address[] calldata _puppetList)
+    function getMatchingActivity(address collateralToken, address trader, address[] calldata _puppetList)
         external
         view
         returns (Rule[] memory _ruleList, uint[] memory _activityList, uint[] memory _allowanceOptimList)
@@ -89,26 +89,25 @@ contract PuppetStore is StoreController {
         _allowanceOptimList = new uint[](length);
 
         for (uint i = 0; i < length; i++) {
-            bytes32 key = PositionUtils.getRuleKey(collateralToken, _puppetList[i], trader);
-            _ruleList[i] = ruleMap[key];
+            _ruleList[i] = ruleMap[PositionUtils.getRuleKey(collateralToken, _puppetList[i], trader)];
             _activityList[i] = tradeFundingActivityMap[PositionUtils.getFundingActivityKey(_puppetList[i], trader)];
             _allowanceOptimList[i] = tokenAllowanceActivityMap[PositionUtils.getAllownaceKey(collateralToken, _puppetList[i])];
         }
         return (_ruleList, _activityList, _allowanceOptimList);
     }
 
-    function applyRouteMatchingState(
+    function setMatchingActivity(
         address collateralToken,
         address trader,
         address[] calldata _puppetList,
         uint[] calldata _activityList,
-        uint[] calldata _allowanceOptimList
+        uint[] calldata _sampledAllowanceList
     ) external isSetter {
         uint length = _puppetList.length;
 
         for (uint i = 0; i < length; i++) {
             tradeFundingActivityMap[PositionUtils.getFundingActivityKey(_puppetList[i], trader)] = _activityList[i];
-            tokenAllowanceActivityMap[PositionUtils.getAllownaceKey(collateralToken, _puppetList[i])] = _allowanceOptimList[i];
+            tokenAllowanceActivityMap[PositionUtils.getAllownaceKey(collateralToken, _puppetList[i])] = _sampledAllowanceList[i];
         }
     }
 

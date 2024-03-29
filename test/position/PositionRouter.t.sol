@@ -22,14 +22,15 @@ import {RequestDecreasePosition} from "src/position/logic/RequestDecreasePositio
 import {ExecuteIncreasePosition} from "src/position/logic/ExecuteIncreasePosition.sol";
 import {ExecuteDecreasePosition} from "src/position/logic/ExecuteDecreasePosition.sol";
 
-import {PuppetRouter, PuppetStore} from "src/PuppetRouter.sol";
+import {PuppetStore} from "./../../src/position/store/PuppetStore.sol";
+import {PuppetRouter} from "./../../src/PuppetRouter.sol";
 
 import {Const} from "script/Const.s.sol";
 
 contract PositionRouterTest is BasicSetup {
     uint arbitrumFork;
     uint8 SUBACCOUNT_LOGIC = 2;
-    uint8 PUPPET_LOGIC = 3;
+    uint8 SET_MATCHING_ACTIVITY = 3;
 
     SubaccountFactory subaccountFactory;
 
@@ -84,6 +85,7 @@ contract PositionRouterTest is BasicSetup {
             })
         );
         dictator.setRoleCapability(ADMIN_ROLE, address(puppetRouter), puppetRouter.setTokenAllowanceCap.selector, true);
+        dictator.setRoleCapability(SET_MATCHING_ACTIVITY, address(puppetRouter), puppetRouter.setMatchingActivity.selector, true);
 
         positionRouter = new PositionRouter(
             dictator,
@@ -102,6 +104,7 @@ contract PositionRouterTest is BasicSetup {
                     platformFee: 0.001e30, // 0.001%
                     callbackGasLimit: 0,
                     puppetStore: puppetStore,
+                    puppetRouter: puppetRouter,
                     limitPuppetList: 100,
                     minimumMatchAmount: 100e30,
                     tokenTransferGasLimit: 200_000
@@ -130,9 +133,9 @@ contract PositionRouterTest is BasicSetup {
             })
         );
 
-        // dictator.setUserRole(address(puppetRouter), PUPPET_LOGIC, true);
         dictator.setUserRole(address(positionRouter), TRANSFER_TOKEN_ROLE, true);
         dictator.setUserRole(address(positionRouter), SUBACCOUNT_LOGIC, true);
+        dictator.setUserRole(address(positionRouter), SET_MATCHING_ACTIVITY, true);
 
         puppetRouter.setTokenAllowanceCap(Const.wnt, 100e30);
         puppetRouter.setTokenAllowanceCap(Const.usdc, 100e30);
@@ -168,7 +171,7 @@ contract PositionRouterTest is BasicSetup {
         puppetRouter.setRule(
             collateralToken, //
             trader,
-            PuppetStore.Rule({throttleActivity: 0, allowanceRate: 100, expiry: 0})
+            PuppetStore.Rule({throttleActivity: 0, allowanceRate: 100, expiry: block.timestamp + 28 days})
         );
 
         vm.startPrank(trader);

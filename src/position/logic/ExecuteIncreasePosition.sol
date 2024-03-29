@@ -31,14 +31,14 @@ library ExecuteIncreasePosition {
             order.addresses.account, order.addresses.market, order.addresses.initialCollateralToken, order.flags.isLong
         );
 
-        PositionStore.RequestIncrease memory request = callConfig.positionStore.getRequestIncreaseMap(key);
+        PositionStore.RequestIncrease memory request = callConfig.positionStore.getRequestIncrease(key);
         PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
 
         mirrorPosition.collateral += request.collateralDelta;
         mirrorPosition.size += request.sizeDelta;
 
         callConfig.positionStore.setMirrorPosition(key, mirrorPosition);
-        callConfig.positionStore.removeRequestIncreaseMap(key);
+        callConfig.positionStore.removeRequestIncrease(key);
     }
 
     error ExecuteIncreasePosition__UnauthorizedCaller();

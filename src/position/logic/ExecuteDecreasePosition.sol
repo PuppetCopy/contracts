@@ -53,7 +53,7 @@ library ExecuteDecreasePosition {
         address outputTokenAddress = eventLogData.addressItems.items[0].value;
         uint totalAmountOut = eventLogData.uintItems.items[0].value;
 
-        PositionStore.RequestDecrease memory request = callConfig.positionStore.getRequestDecreaseMap(key);
+        PositionStore.RequestDecrease memory request = callConfig.positionStore.getRequestDecrease(key);
         PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
 
         if (mirrorPosition.size == 0) {
@@ -161,7 +161,7 @@ library ExecuteDecreasePosition {
             callConfig.positionStore.setMirrorPosition(callParams.positionKey, callParams.mirrorPosition);
         }
 
-        callConfig.positionStore.removeRequestDecreaseMap(callParams.requestKey);
+        callConfig.positionStore.removeRequestDecrease(callParams.requestKey);
     }
 
     // optimistically send token

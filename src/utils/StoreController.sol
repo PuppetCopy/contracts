@@ -7,7 +7,7 @@ abstract contract StoreController is Auth {
     address public setter;
 
     modifier isSetter() {
-        if (setter != msg.sender) revert Unauthorized(setter);
+        if (setter != msg.sender) revert Unauthorized(setter, msg.sender);
         _;
     }
 
@@ -26,5 +26,5 @@ abstract contract StoreController is Auth {
 
     event AssignSetter(address from, address to, uint timestamp);
 
-    error Unauthorized(address currentSetter);
+    error Unauthorized(address currentSetter, address sender);
 }

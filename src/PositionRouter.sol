@@ -74,7 +74,7 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
     // integration
 
     function executeUnhandledExecutionCallback(bytes32 key) external nonReentrant requiresAuth {
-        PositionStore.UnhandledCallbackMap memory callbackData = callConfig.executeIncrease.positionStore.getUnhandledCallbackMap(key);
+        PositionStore.UnhandledCallback memory callbackData = callConfig.executeIncrease.positionStore.getUnhandledCallback(key);
 
         if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.ExecutedIncrease) {
             ExecuteIncreasePosition.increase(callConfig.executeIncrease, key, callbackData.order);
@@ -101,7 +101,7 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
         bytes32 key,
         bytes calldata eventData
     ) internal requiresAuth {
-        callConfig.executeIncrease.positionStore.setUnhandledCallbackMap(status, order, key, eventData);
+        callConfig.executeIncrease.positionStore.setUnhandledCallback(status, order, key, eventData);
         emit PositionRouter__UnhandledCallback(status, key, order, eventData);
     }
 

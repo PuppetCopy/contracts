@@ -84,7 +84,7 @@ library RequestDecreasePosition {
 
         bytes32 requestKey = _decrease(callConfig, traderCallParams, callParams, request);
 
-        callConfig.positionStore.setRequestDecreaseMap(requestKey, request);
+        callConfig.positionStore.setRequestDecrease(requestKey, request);
 
         emit RequestDecreasePosition__Request(
             request,

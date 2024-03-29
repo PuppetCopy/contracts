@@ -41,15 +41,19 @@ library PuppetLogic {
         callConfig.factory.createSubaccount(callConfig.store, account);
     }
 
-    function setRule(CallSetRuleConfig memory callConfig, address trader, address collateralToken, address puppet, PuppetStore.Rule calldata ruleParams)
-        internal
-    {
+    function setRule(
+        CallSetRuleConfig memory callConfig,
+        address trader,
+        address collateralToken,
+        address puppet,
+        PuppetStore.Rule calldata ruleParams
+    ) internal {
         bytes32 ruleKey = PositionUtils.getRuleKey(collateralToken, puppet, trader);
 
         PuppetStore.Rule memory storedRule = callConfig.store.getRule(ruleKey);
         uint tokenAllowance = _validateTokenAllowance(callConfig, puppet, collateralToken);
 
-        callConfig.store.setSampledTokenAllowance(PositionUtils.getAllownaceKey(collateralToken, puppet), tokenAllowance);
+        // callConfig.store.setTokenAllowanceActivity(PositionUtils.getAllownaceKey(collateralToken, puppet), tokenAllowance);
 
         PuppetStore.Rule memory rule = _setRule(callConfig, storedRule, ruleParams);
 
@@ -94,7 +98,7 @@ library PuppetLogic {
         for (uint i = 0; i < verifyAllowanceTokenList.length; i++) {
             uint tokenAllowance = _validateTokenAllowance(callConfig, puppet, verifyAllowanceTokenList[i]);
 
-            callConfig.store.setSampledTokenAllowance(PositionUtils.getAllownaceKey(collateralTokenList[i], puppet), tokenAllowance);
+            // callConfig.store.setTokenAllowanceActivity(PositionUtils.getAllownaceKey(collateralTokenList[i], puppet), tokenAllowance);
         }
     }
 

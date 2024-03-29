@@ -55,6 +55,18 @@ contract PuppetRouter is Auth, ReentrancyGuard {
         callConfig.setRule.store.setTokenAllowanceCap(token, amount);
     }
 
+    // integration
+
+    function setMatchingActivity(
+        address collateralToken,
+        address trader,
+        address[] calldata _puppetList,
+        uint[] calldata _activityList,
+        uint[] calldata _allowanceOptimList
+    ) external requiresAuth {
+        callConfig.setRule.store.setMatchingActivity(collateralToken, trader, _puppetList, _activityList, _allowanceOptimList);
+    }
+
     // internal
 
     function _setConfig(CallConfig memory _callConfig) internal {
