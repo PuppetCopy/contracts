@@ -107,7 +107,6 @@ contract PuppetStore is StoreController {
         uint length = _puppetList.length;
 
         for (uint i = 0; i < length; i++) {
-            bytes32 key = PositionUtils.getRuleKey(collateralToken, _puppetList[i], trader);
             tradeFundingActivityMap[PositionUtils.getFundingActivityKey(_puppetList[i], trader)] = _activityList[i];
             tokenAllowanceActivityMap[PositionUtils.getAllownaceKey(collateralToken, _puppetList[i])] = _allowanceOptimList[i];
         }

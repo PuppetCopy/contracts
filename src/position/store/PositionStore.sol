@@ -5,8 +5,6 @@ import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
 import {StoreController} from "../../utils/StoreController.sol";
 import {GmxPositionUtils} from "./../util/GmxPositionUtils.sol";
-import {PositionUtils} from "./../util/PositionUtils.sol";
-import {TransferUtils} from "./../../utils/TransferUtils.sol";
 
 contract PositionStore is StoreController {
     struct RequestIncrease {

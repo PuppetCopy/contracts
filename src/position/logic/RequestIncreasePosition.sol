@@ -127,36 +127,48 @@ library RequestIncreasePosition {
         for (uint i = 0; i < traderCallParams.puppetList.length; i++) {
             PuppetStore.Rule memory rule = callParams.ruleList[i];
 
-            uint amountIn = rule.expiry < block.timestamp // filter out frequent deposit activity. defined during rule setup
-                || callParams.activityList[i] + rule.throttleActivity > block.timestamp // expired rule. acounted every increase deposit
-                || callParams.optimisticAllowanceList[i] < callConfig.minimumMatchAmount // stop loss. accounted every reduce adjustment
-                ? 0
-                : sendTokenOptimistically(
-                    callConfig,
-                    callParams.collateralToken,
-                    traderCallParams.puppetList[i],
-                    callParams.positionStoreAddress,
-                    Math.min( // the lowest of either the allowance or the trader's deposit
-                        traderCallParams.sizeDelta / Precision.applyBasisPoints(callParams.optimisticAllowanceList[i], rule.allowanceRate),
-                        traderCallParams.collateralDelta // trader own deposit
-                    )
-                );
-
-            // avoid matching, update global allowance to avoid future matching
-            if (amountIn == 0) {
+            if (
+                rule.expiry < block.timestamp // filter out frequent deposit activity. defined during rule setup
+                    || callParams.activityList[i] + rule.throttleActivity > block.timestamp // expired rule. acounted every increase deposit
+                    || callParams.optimisticAllowanceList[i] < callConfig.minimumMatchAmount // not enough allowance
+            ) {
                 callParams.optimisticAllowanceList[i] = 0;
                 continue;
             }
 
+            uint amountIn = sendTokenOptimistically(
+                callConfig,
+                callParams.collateralToken,
+                traderCallParams.puppetList[i],
+                callParams.positionStoreAddress,
+                Math.min( // the lowest of either the allowance or the trader's deposit
+                    traderCallParams.sizeDelta / Precision.applyBasisPoints(callParams.optimisticAllowanceList[i], rule.allowanceRate),
+                    traderCallParams.collateralDelta // trader own deposit
+                )
+            );
+
+            if (amountIn == 0) {
+                callParams.optimisticAllowanceList[i] = 0;
+
+                continue;
+            } else {
+                callParams.optimisticAllowanceList[i] -= amountIn;
+            }
+
             request.puppetCollateralDeltaList[i] = amountIn;
-            callParams.optimisticAllowanceList[i] -= amountIn;
 
             callParams.totalCollateralDelta += amountIn;
             callParams.totalSizeDelta += amountIn * request.leverageTarget / Precision.BASIS_POINT_DIVISOR;
             callParams.activityList[i] = block.timestamp;
         }
 
-        // callConfig.puppetStore.setActivityList([callParams.routeKey], callParams.activityList);
+        callConfig.puppetStore.applyRouteMatchingState(
+            address(callParams.collateralToken),
+            request.trader,
+            traderCallParams.puppetList,
+            callParams.activityList,
+            callParams.optimisticAllowanceList
+        );
         callConfig.positionStore.setRequestIncreaseMap(callParams.positionKey, request);
 
         requestKey = _createOrder(callConfig, callParams, request, traderCallParams);
@@ -176,40 +188,47 @@ library RequestIncreasePosition {
         for (uint i = 0; i < mirrorPosition.puppetList.length; i++) {
             PuppetStore.Rule memory rule = callParams.ruleList[i];
 
-            uint amountIn = rule.expiry < block.timestamp // filter out frequent deposit activity. defined during rule setup
-                || callParams.activityList[i] + rule.throttleActivity > block.timestamp // expired rule. acounted every increase deposit
-                || mirrorPosition.puppetDepositList[i] == 0 // did not match initial deposit
-                ? 0
-                : sendTokenOptimistically(
-                    callConfig,
-                    callParams.collateralToken,
-                    mirrorPosition.puppetList[i],
-                    callParams.positionStoreAddress,
-                    traderCallParams.sizeDelta / mirrorPosition.puppetDepositList[i]
-                );
+            uint collateralDelta = mirrorPosition.puppetDepositList[i] * traderCallParams.collateralDelta / mirrorPosition.collateral;
 
-            uint sizeDelta = traderCallParams.sizeDelta * amountIn / mirrorPosition.size;
-            // uint gasFee = amountIn * sizeDelta * Precision.BASIS_POINT_DIVISOR / traderCallParams.sizeDelta / Precision.BASIS_POINT_DIVISOR;
-
-            if (amountIn > 0) {
-                uint amountAfterFee = amountIn - PositionUtils.getPlatformMatchingFee(callConfig.platformFee, sizeDelta);
-
-                request.puppetCollateralDeltaList[i] += amountAfterFee;
-                callParams.totalSizeDelta += sizeDelta;
-                callParams.totalCollateralDelta += amountAfterFee;
-
-                callParams.activityList[i] = block.timestamp;
-            } else {
-                uint adjustedSizeDelta = sizeDelta * Precision.diff(request.leverageTarget, mirrorPosition.leverage) / mirrorPosition.leverage;
+            if (
+                rule.expiry < block.timestamp // filter out frequent deposit activity. defined during rule setup
+                    || callParams.activityList[i] + rule.throttleActivity > block.timestamp // expired rule. acounted every increase deposit
+                    || mirrorPosition.puppetDepositList[i] == 0 // did not match initial deposit
+            ) {
+                uint adjustedSizeDelta = traderCallParams.sizeDelta * collateralDelta / mirrorPosition.size
+                    * Precision.diff(request.leverageTarget, mirrorPosition.leverage) / mirrorPosition.leverage;
                 if (request.leverageTarget > mirrorPosition.leverage) {
                     callParams.totalSizeDelta += adjustedSizeDelta;
                 } else {
                     callParams.reducePuppetSizeDelta += adjustedSizeDelta;
                 }
+            } else {
+                uint amountIn = sendTokenOptimistically(
+                    callConfig, callParams.collateralToken, mirrorPosition.puppetList[i], callParams.positionStoreAddress, collateralDelta
+                );
+
+                // not enough allowance, prevent further matching
+                if (amountIn == 0) {
+                    callParams.optimisticAllowanceList[i] = 0;
+                    continue;
+                } else {
+                    callParams.optimisticAllowanceList[i] -= amountIn;
+                }
+
+                request.puppetCollateralDeltaList[i] += amountIn;
+                callParams.totalSizeDelta += amountIn * traderCallParams.sizeDelta / mirrorPosition.size;
+                callParams.totalCollateralDelta += amountIn;
+                callParams.activityList[i] = block.timestamp;
             }
         }
 
-        // callConfig.puppetStore.setActivityList(callParams.routeKey, mirrorPosition.puppetList, callParams.activityList);
+        callConfig.puppetStore.applyRouteMatchingState(
+            address(callParams.collateralToken),
+            request.trader,
+            traderCallParams.puppetList,
+            callParams.activityList,
+            callParams.optimisticAllowanceList
+        );
         callConfig.positionStore.setRequestIncreaseMap(callParams.positionKey, request);
 
         if (callParams.totalSizeDelta > callParams.reducePuppetSizeDelta) {
@@ -348,8 +367,8 @@ library RequestIncreasePosition {
     }
 
     // non reverting token transfer, return amount transferred
-    function sendTokenOptimistically(CallConfig memory callConfig, IERC20 token, address trader, address to, uint amount) internal returns (uint) {
-        (bool success, bytes memory returndata) = callConfig.router.rawTrasnfer{gas: callConfig.tokenTransferGasLimit}(token, trader, to, amount);
+    function sendTokenOptimistically(CallConfig memory callConfig, IERC20 token, address from, address to, uint amount) internal returns (uint) {
+        (bool success, bytes memory returndata) = callConfig.router.rawTrasnfer{gas: callConfig.tokenTransferGasLimit}(token, from, to, amount);
 
         if (success && returndata.length == 0 && abi.decode(returndata, (bool))) return amount;
 
