@@ -23,8 +23,6 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
     }
 
     event PositionRouter__SetConfig(uint timestamp, CallConfig callConfig);
-
-    event PositionRouter__CreateTraderSubaccount(address account, address subaccount);
     event PositionRouter__UnhandledCallback(GmxPositionUtils.OrderExecutionStatus status, bytes32 key, GmxPositionUtils.Props order, bytes eventData);
 
     CallConfig callConfig;

@@ -94,7 +94,7 @@ library ExecuteDecreasePosition {
 
             for (uint i = 0; i < callParams.mirrorPosition.puppetList.length; i++) {
                 uint collateralDelta = request.puppetCollateralDeltaList[i];
-                uint amountOut = callParams.mirrorPosition.totalCollateral * collateralDelta / callParams.totalAmountOut;
+                uint amountOut = callParams.mirrorPosition.collateral * collateralDelta / callParams.totalAmountOut;
                 uint amountOutAfterFee = amountOut - (puppetFee * amountOut / callParams.totalAmountOut);
 
                 activityList[i] = activityList[i];
@@ -132,10 +132,6 @@ library ExecuteDecreasePosition {
         } else {
             callParams.mirrorPosition.size -= order.numbers.sizeDeltaUsd; // fix
             callParams.mirrorPosition.collateral -= order.numbers.initialCollateralDeltaAmount;
-            callParams.mirrorPosition.totalSize -= order.numbers.sizeDeltaUsd;
-            callParams.mirrorPosition.totalCollateral -= order.numbers.initialCollateralDeltaAmount;
-            callParams.mirrorPosition.leverage =
-                Precision.applyBasisPoints(callParams.mirrorPosition.totalSize, callParams.mirrorPosition.totalCollateral);
 
             callConfig.positionStore.setMirrorPosition(callParams.positionKey, callParams.mirrorPosition);
         }

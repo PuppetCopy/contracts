@@ -10,7 +10,6 @@ contract PositionStore is StoreController {
     struct RequestIncrease {
         address trader;
         uint[] puppetCollateralDeltaList;
-        uint leverageTarget;
         uint sizeDelta;
         uint collateralDelta;
     }
@@ -25,9 +24,6 @@ contract PositionStore is StoreController {
     struct MirrorPosition {
         uint size;
         uint collateral;
-        uint totalSize;
-        uint totalCollateral;
-        uint leverage;
         uint[] puppetDepositList;
         address[] puppetList;
     }

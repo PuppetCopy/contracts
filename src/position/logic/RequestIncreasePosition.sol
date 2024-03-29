@@ -24,16 +24,16 @@ import {PositionStore} from "../store/PositionStore.sol";
 library RequestIncreasePosition {
     event RequestIncreasePosition__Match(address trader, address subaccount, bytes32 requestKey, address[] puppetList);
     event RequestIncreasePosition__Request(
-        address trader,
+        PositionStore.RequestIncrease request,
         address subaccount,
         bytes32 requestKey,
-        uint[] puppetCollateralDeltaList,
-        uint sizeDelta,
-        uint totalSizeDelta,
-        uint collateralDelta,
-        uint totalCollateralDelta,
-        uint reducePuppetSizeDelta
+        uint traderSizeDelta,
+        uint traderCollateralDelta,
+        uint puppetReduceSizeDelta,
+        uint transactionCost,
+        uint matchingFee
     );
+
     event RequestIncreasePosition__RequestReducePuppetSize(
         address trader, address subaccount, bytes32 requestKey, bytes32 reduceRequestKey, uint sizeDelta
     );
@@ -75,13 +75,9 @@ library RequestIncreasePosition {
         uint[] optimisticAllowanceList;
         IERC20 collateralToken;
         Subaccount subaccount;
-        bytes32 positionKey;
-        address subaccountAddress;
         address positionStoreAddress;
-        uint totalTransactionCost;
-        uint reducePuppetSizeDelta;
-        uint totalSizeDelta;
-        uint totalCollateralDelta;
+        uint transactionCost;
+        uint puppetReduceSizeDelta;
     }
 
     function increase(CallConfig memory callConfig, TraderCallParams calldata traderCallParams, address trader) internal {
@@ -95,23 +91,17 @@ library RequestIncreasePosition {
         PositionStore.RequestIncrease memory request = PositionStore.RequestIncrease({
             trader: trader,
             puppetCollateralDeltaList: new uint[](traderCallParams.puppetList.length),
-            leverageTarget: 0,
             collateralDelta: traderCallParams.collateralDelta,
             sizeDelta: traderCallParams.sizeDelta
         });
 
-        PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(callParams.positionKey);
+        PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(
+            GmxPositionUtils.getPositionKey(trader, traderCallParams.market, traderCallParams.collateralToken, traderCallParams.isLong)
+        );
 
         if (mirrorPosition.size == 0) {
-            request.leverageTarget = Precision.toBasisPoints(traderCallParams.sizeDelta, traderCallParams.collateralDelta);
-
             open(callConfig, callParams, request, traderCallParams);
         } else {
-            request.leverageTarget = Precision.toBasisPoints(
-                mirrorPosition.size + traderCallParams.sizeDelta, //
-                mirrorPosition.collateral + traderCallParams.collateralDelta
-            );
-
             adjust(callConfig, mirrorPosition, callParams, request, traderCallParams);
         }
     }
@@ -132,7 +122,6 @@ library RequestIncreasePosition {
                     || callParams.activityList[i] + rule.throttleActivity > block.timestamp // expired rule. acounted every increase deposit
                     || callParams.optimisticAllowanceList[i] < callConfig.minimumMatchAmount // not enough allowance
             ) {
-                callParams.optimisticAllowanceList[i] = 0;
                 continue;
             }
 
@@ -156,9 +145,10 @@ library RequestIncreasePosition {
             }
 
             request.puppetCollateralDeltaList[i] = amountIn;
+            request.collateralDelta += amountIn;
+            request.sizeDelta +=
+                Precision.applyBasisPoints(amountIn, Precision.toBasisPoints(traderCallParams.sizeDelta, traderCallParams.collateralDelta));
 
-            callParams.totalCollateralDelta += amountIn;
-            callParams.totalSizeDelta += amountIn * request.leverageTarget / Precision.BASIS_POINT_DIVISOR;
             callParams.activityList[i] = block.timestamp;
         }
 
@@ -169,11 +159,11 @@ library RequestIncreasePosition {
             callParams.activityList,
             callParams.optimisticAllowanceList
         );
-        callConfig.positionStore.setRequestIncreaseMap(callParams.positionKey, request);
 
         requestKey = _createOrder(callConfig, callParams, request, traderCallParams);
+        callConfig.positionStore.setRequestIncreaseMap(requestKey, request);
 
-        emit RequestIncreasePosition__Match(request.trader, callParams.subaccountAddress, requestKey, traderCallParams.puppetList);
+        emit RequestIncreasePosition__Match(request.trader, address(callParams.subaccount), requestKey, traderCallParams.puppetList);
     }
 
     function adjust(
@@ -195,16 +185,26 @@ library RequestIncreasePosition {
                     || callParams.activityList[i] + rule.throttleActivity > block.timestamp // expired rule. acounted every increase deposit
                     || mirrorPosition.puppetDepositList[i] == 0 // did not match initial deposit
             ) {
+                uint positionLeverage = Precision.toBasisPoints(mirrorPosition.size, mirrorPosition.collateral);
+                uint targetLeverage = Precision.toBasisPoints(
+                    mirrorPosition.size + traderCallParams.sizeDelta, //
+                    mirrorPosition.collateral + traderCallParams.collateralDelta
+                );
+
                 uint adjustedSizeDelta = traderCallParams.sizeDelta * collateralDelta / mirrorPosition.size
-                    * Precision.diff(request.leverageTarget, mirrorPosition.leverage) / mirrorPosition.leverage;
-                if (request.leverageTarget > mirrorPosition.leverage) {
-                    callParams.totalSizeDelta += adjustedSizeDelta;
+                    * Precision.diff(targetLeverage, positionLeverage) / positionLeverage;
+                if (targetLeverage > positionLeverage) {
+                    request.sizeDelta += adjustedSizeDelta;
                 } else {
-                    callParams.reducePuppetSizeDelta += adjustedSizeDelta;
+                    callParams.puppetReduceSizeDelta += adjustedSizeDelta;
                 }
             } else {
                 uint amountIn = sendTokenOptimistically(
-                    callConfig, callParams.collateralToken, mirrorPosition.puppetList[i], callParams.positionStoreAddress, collateralDelta
+                    callConfig, //
+                    callParams.collateralToken,
+                    mirrorPosition.puppetList[i],
+                    callParams.positionStoreAddress,
+                    collateralDelta
                 );
 
                 // not enough allowance, prevent further matching
@@ -216,8 +216,11 @@ library RequestIncreasePosition {
                 }
 
                 request.puppetCollateralDeltaList[i] += amountIn;
-                callParams.totalSizeDelta += amountIn * traderCallParams.sizeDelta / mirrorPosition.size;
-                callParams.totalCollateralDelta += amountIn;
+                request.collateralDelta += amountIn;
+                request.sizeDelta +=
+                    Precision.applyBasisPoints(amountIn, Precision.toBasisPoints(traderCallParams.sizeDelta, traderCallParams.collateralDelta));
+
+                // callParams.puppetSizeDelta += amountIn * traderCallParams.sizeDelta / mirrorPosition.size;
                 callParams.activityList[i] = block.timestamp;
             }
         }
@@ -229,21 +232,35 @@ library RequestIncreasePosition {
             callParams.activityList,
             callParams.optimisticAllowanceList
         );
-        callConfig.positionStore.setRequestIncreaseMap(callParams.positionKey, request);
 
-        if (callParams.totalSizeDelta > callParams.reducePuppetSizeDelta) {
+        uint matchingFee = PositionUtils.getPlatformMatchingFee(callConfig.platformFee, traderCallParams.sizeDelta);
+
+        // if the puppet size delta is greater than the overall required size incer, increase the puppet size delta
+        if (request.sizeDelta > callParams.puppetReduceSizeDelta) {
             requestKey = _createOrder(callConfig, callParams, request, traderCallParams);
         } else {
-            callParams.totalSizeDelta = 0;
-            callParams.reducePuppetSizeDelta = callParams.reducePuppetSizeDelta;
-            // callConfig.positionStore.setRequestReduceTargetLeverageMap(callParams.positionKey, request);
-            bytes32 key = _reducePuppetSizeDelta(callConfig, callParams, traderCallParams);
+            request.sizeDelta = 0;
+            bytes32 reduceKey = _reducePuppetSizeDelta(callConfig, callParams, traderCallParams);
             requestKey = _createOrder(callConfig, callParams, request, traderCallParams);
+            callConfig.positionStore.setRequestIncreaseMap(reduceKey, request);
 
             emit RequestIncreasePosition__RequestReducePuppetSize(
-                request.trader, callParams.subaccountAddress, requestKey, key, callParams.reducePuppetSizeDelta
+                request.trader, address(callParams.subaccount), requestKey, reduceKey, callParams.puppetReduceSizeDelta
             );
         }
+
+        callConfig.positionStore.setRequestIncreaseMap(requestKey, request);
+
+        emit RequestIncreasePosition__Request(
+            request,
+            address(callParams.subaccount),
+            requestKey,
+            traderCallParams.sizeDelta,
+            traderCallParams.collateralDelta,
+            callParams.puppetReduceSizeDelta,
+            callParams.transactionCost,
+            matchingFee
+        );
     }
 
     function _createOrder(
@@ -252,11 +269,6 @@ library RequestIncreasePosition {
         PositionStore.RequestIncrease memory request,
         TraderCallParams calldata traderCallParams
     ) internal returns (bytes32 requestKey) {
-        // TODO: implement fee calculation
-        // split between trader and puppet, take the double amount , later possibly reduced based on other puppets propotional contribution
-        // uint transactionFee = callParams.totalTransactionCost * amountIn / traderCallParams.collateralDelta;
-        // uint amountAfterFee = amountIn - PositionUtils.getPlatformMatchingFee(callConfig.platformFee, sizeDelta);
-
         GmxPositionUtils.CreateOrderParams memory orderParams = GmxPositionUtils.CreateOrderParams({
             addresses: GmxPositionUtils.CreateOrderParamsAddresses({
                 receiver: callParams.positionStoreAddress,
@@ -267,8 +279,8 @@ library RequestIncreasePosition {
                 swapPath: new address[](0) // swapPath
             }),
             numbers: GmxPositionUtils.CreateOrderParamsNumbers({
-                initialCollateralDeltaAmount: callParams.totalCollateralDelta,
-                sizeDeltaUsd: callParams.totalSizeDelta,
+                initialCollateralDeltaAmount: request.collateralDelta,
+                sizeDeltaUsd: request.sizeDelta,
                 triggerPrice: traderCallParams.triggerPrice,
                 acceptablePrice: traderCallParams.acceptablePrice,
                 executionFee: traderCallParams.executionFee,
@@ -314,18 +326,6 @@ library RequestIncreasePosition {
         if (!orderSuccess) ErrorUtils.revertWithParsedMessage(orderReturnData);
 
         requestKey = abi.decode(orderReturnData, (bytes32));
-
-        emit RequestIncreasePosition__Request(
-            request.trader,
-            callParams.subaccountAddress,
-            requestKey,
-            request.puppetCollateralDeltaList,
-            request.sizeDelta,
-            callParams.totalSizeDelta,
-            request.collateralDelta,
-            callParams.totalCollateralDelta,
-            callParams.reducePuppetSizeDelta
-        );
     }
 
     function _reducePuppetSizeDelta(
@@ -344,7 +344,7 @@ library RequestIncreasePosition {
             }),
             numbers: GmxPositionUtils.CreateOrderParamsNumbers({
                 initialCollateralDeltaAmount: 0,
-                sizeDeltaUsd: callParams.reducePuppetSizeDelta,
+                sizeDeltaUsd: callParams.puppetReduceSizeDelta,
                 triggerPrice: traderCallparams.triggerPrice,
                 acceptablePrice: traderCallparams.acceptablePrice,
                 executionFee: traderCallparams.executionFee,
@@ -380,9 +380,6 @@ library RequestIncreasePosition {
         view
         returns (RequestIncreasePosition.CallParams memory)
     {
-        bytes32 positionKey =
-            GmxPositionUtils.getPositionKey(trader, traderCallParams.market, traderCallParams.collateralToken, traderCallParams.isLong);
-
         (PuppetStore.Rule[] memory ruleList, uint[] memory activityList, uint[] memory allowanceList) =
             callConfig.puppetStore.getRouteMatchingState(traderCallParams.collateralToken, trader, traderCallParams.puppetList);
 
@@ -392,13 +389,9 @@ library RequestIncreasePosition {
             optimisticAllowanceList: allowanceList,
             collateralToken: IERC20(traderCallParams.collateralToken),
             subaccount: subaccount,
-            positionKey: positionKey,
-            subaccountAddress: address(subaccount),
             positionStoreAddress: address(callConfig.positionStore),
-            totalTransactionCost: gasleft() * tx.gasprice + traderCallParams.executionFee,
-            reducePuppetSizeDelta: 0,
-            totalCollateralDelta: traderCallParams.collateralDelta,
-            totalSizeDelta: traderCallParams.sizeDelta
+            transactionCost: gasleft() * tx.gasprice + traderCallParams.executionFee,
+            puppetReduceSizeDelta: 0
         });
     }
 

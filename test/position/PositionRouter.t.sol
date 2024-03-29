@@ -98,7 +98,7 @@ contract PositionRouterTest is BasicSetup {
                     gmxOrderVault: Const.gmxOrderVault,
                     gmxRouter: Const.gmxRouter,
                     referralCode: Const.referralCode,
-                    platformFee: 10, // 0.1%
+                    platformFee: 0.001e30, // 0.001%
                     callbackGasLimit: 0,
                     puppetStore: puppetStore,
                     limitPuppetList: 100,

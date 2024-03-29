@@ -35,9 +35,7 @@ library ExecuteIncreasePosition {
         PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
 
         mirrorPosition.collateral += request.collateralDelta;
-        mirrorPosition.totalCollateral += order.numbers.initialCollateralDeltaAmount;
         mirrorPosition.size += request.sizeDelta;
-        mirrorPosition.totalSize += order.numbers.sizeDeltaUsd;
 
         callConfig.positionStore.setMirrorPosition(key, mirrorPosition);
         callConfig.positionStore.removeRequestIncreaseMap(key);
