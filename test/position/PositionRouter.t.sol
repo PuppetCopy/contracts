@@ -96,7 +96,8 @@ contract PositionRouterTest is BasicSetup {
                     gmxOrderVault: Const.gmxOrderVault,
                     gmxRouter: Const.gmxRouter,
                     referralCode: Const.referralCode,
-                    platformFee: 0.001e30, // 0.001%
+                    // matchingFee: 0,
+                    performanceFee: 0.1e30,
                     callbackGasLimit: 0,
                     puppetStore: puppetStore,
                     puppetRouter: puppetRouter,
@@ -185,9 +186,9 @@ contract PositionRouterTest is BasicSetup {
                 collateralDelta: 100e6,
                 sizeDelta: 1000e30,
                 acceptablePrice: 3320e30,
-                triggerPrice: 3420e30,
-                puppetList: new address[](0)
-            })
+                triggerPrice: 3420e30
+            }),
+            new address[](0)
         );
     }
 }

@@ -9,7 +9,7 @@ library PositionUtils {
         return Precision.applyBasisPoints(sizeDelta, matchingFee);
     }
 
-    function getPlatformProfitFee(uint feeRate, uint profit) internal pure returns (uint) {
+    function getPlatformPerformanceFee(uint feeRate, uint profit) internal pure returns (uint) {
         return Precision.applyBasisPoints(profit, feeRate);
     }
 
@@ -22,7 +22,7 @@ library PositionUtils {
         pure
         returns (uint traderFeeCutoff, uint puppetFee)
     {
-        uint totalProfitDelta = getPlatformProfitFee(feeRate, collateralDeltaAmount - totalAmountOut);
+        uint totalProfitDelta = getPlatformPerformanceFee(feeRate, collateralDeltaAmount - totalAmountOut);
         traderFeeCutoff = getPlatformTraderProfitFeeCutoff(traderCutoff, totalProfitDelta);
 
         puppetFee = totalProfitDelta - traderFeeCutoff;

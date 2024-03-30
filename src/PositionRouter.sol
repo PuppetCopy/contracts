@@ -14,6 +14,8 @@ import {ExecuteIncreasePosition} from "./position/logic/ExecuteIncreasePosition.
 import {ExecuteDecreasePosition} from "./position/logic/ExecuteDecreasePosition.sol";
 import {ExecuteRejectedAdjustment} from "./position/logic/ExecuteRejectedAdjustment.sol";
 
+import {TransferUtils} from "./utils/TransferUtils.sol";
+
 contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
     struct CallConfig {
         RequestIncreasePosition.CallConfig increase;
@@ -31,8 +33,42 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
         _setConfig(_callConfig);
     }
 
-    function requestIncrease(RequestIncreasePosition.TraderCallParams calldata traderCallParams) external payable nonReentrant {
-        RequestIncreasePosition.increase(callConfig.increase, traderCallParams, msg.sender);
+    function requestIncrease(RequestIncreasePosition.TraderCallParams calldata traderCallParams, address[] calldata puppetList)
+        external
+        payable
+        nonReentrant
+    {
+        PositionStore.RequestIncrease memory request = PositionStore.RequestIncrease({
+            trader: msg.sender,
+            puppetCollateralDeltaList: new uint[](puppetList.length),
+            collateralDelta: traderCallParams.collateralDelta,
+            sizeDelta: traderCallParams.sizeDelta
+        });
+
+        callConfig.increase.router.transfer(
+            traderCallParams.collateralToken, msg.sender, callConfig.increase.gmxOrderVault, traderCallParams.collateralDelta
+        );
+
+        // native ETH can be identified by depositing more than the execution fee
+        if (address(traderCallParams.collateralToken) == address(callConfig.increase.wnt) && traderCallParams.executionFee > msg.value) {
+            TransferUtils.depositAndSendWnt(
+                callConfig.increase.wnt,
+                address(callConfig.increase.positionStore),
+                callConfig.increase.tokenTransferGasLimit,
+                callConfig.increase.gmxOrderVault,
+                traderCallParams.executionFee + traderCallParams.collateralDelta
+            );
+        } else {
+            TransferUtils.depositAndSendWnt(
+                callConfig.increase.wnt,
+                address(callConfig.increase.positionStore),
+                callConfig.increase.tokenTransferGasLimit,
+                callConfig.increase.gmxOrderVault,
+                traderCallParams.executionFee
+            );
+        }
+
+        RequestIncreasePosition.increase(callConfig.increase, request, traderCallParams, puppetList);
     }
 
     function requestDecrease(RequestDecreasePosition.TraderCallParams calldata traderCallParams) external payable nonReentrant {
@@ -69,6 +105,25 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
         catch {
             storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.Cancelled, order, key, eventData);
         }
+    }
+
+    function proxyRequestIncrease(RequestIncreasePosition.TraderCallParams calldata traderCallParams, address trader, address[] calldata puppetList)
+        external
+        payable
+        requiresAuth
+    {
+        PositionStore.RequestIncrease memory request = PositionStore.RequestIncrease({
+            trader: trader,
+            puppetCollateralDeltaList: new uint[](puppetList.length),
+            collateralDelta: traderCallParams.collateralDelta,
+            sizeDelta: traderCallParams.sizeDelta
+        });
+
+        RequestIncreasePosition.increase(callConfig.increase, request, traderCallParams, puppetList);
+    }
+
+    function proxyRequestDecrease(RequestDecreasePosition.TraderCallParams calldata traderCallParams) external payable requiresAuth {
+        RequestDecreasePosition.decrease(callConfig.decrease, traderCallParams, msg.sender);
     }
 
     // integration

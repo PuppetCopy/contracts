@@ -5,7 +5,6 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IGmxEventUtils} from "./../interface/IGmxEventUtils.sol";
-import {Precision} from "./../../utils/Precision.sol";
 
 import {Router} from "src/utils/Router.sol";
 import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
