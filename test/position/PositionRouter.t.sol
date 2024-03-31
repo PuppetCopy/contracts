@@ -97,8 +97,7 @@ contract PositionRouterTest is BasicSetup {
                     gmxRouter: Const.gmxRouter,
                     referralCode: Const.referralCode,
                     // matchingFee: 0,
-                    performanceFee: 0.1e30,
-                    callbackGasLimit: 0,
+                    callbackGasLimit: 2_000_000,
                     puppetStore: puppetStore,
                     puppetRouter: puppetRouter,
                     limitPuppetList: 100,
@@ -116,15 +115,18 @@ contract PositionRouterTest is BasicSetup {
                     callbackGasLimit: 0,
                     tokenTransferGasLimit: 200_000
                 }),
-                executeIncrease: ExecuteIncreasePosition.CallConfig({positionStore: positionStore, gmxOrderHandler: Const.gmxOrderHandler}),
+                executeIncrease: ExecuteIncreasePosition.CallConfig({
+                    positionStore: positionStore, //
+                    gmxOrderHandler: Const.gmxOrderHandler
+                }),
                 executeDecrease: ExecuteDecreasePosition.CallConfig({
                     router: router,
                     positionStore: positionStore,
                     puppetStore: puppetStore,
                     userGeneratedRevenue: userGeneratedRevenue,
                     gmxOrderHandler: Const.gmxOrderHandler,
-                    profitFeeRate: 1000, // 10%
-                    traderProfitFeeCutoffRate: 3333 // 33.33%
+                    performanceFeeRate: 0.1e30, // 10%
+                    performanceFeeShare: 0.5e30 // shared between trader and platform
                 })
             })
         );
@@ -185,8 +187,8 @@ contract PositionRouterTest is BasicSetup {
                 executionFee: executionFee,
                 collateralDelta: 100e6,
                 sizeDelta: 1000e30,
-                acceptablePrice: 3320e30,
-                triggerPrice: 3420e30
+                acceptablePrice: 3320e12,
+                triggerPrice: 3420e6
             }),
             new address[](0)
         );

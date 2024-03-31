@@ -38,11 +38,13 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
         payable
         nonReentrant
     {
+        uint startGas = gasleft();
         PositionStore.RequestIncrease memory request = PositionStore.RequestIncrease({
             trader: msg.sender,
             puppetCollateralDeltaList: new uint[](puppetList.length),
             collateralDelta: traderCallParams.collateralDelta,
-            sizeDelta: traderCallParams.sizeDelta
+            sizeDelta: traderCallParams.sizeDelta,
+            transactionCost: startGas
         });
 
         callConfig.increase.router.transfer(
@@ -112,11 +114,14 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
         payable
         requiresAuth
     {
+        uint startGas = gasleft();
+
         PositionStore.RequestIncrease memory request = PositionStore.RequestIncrease({
             trader: trader,
             puppetCollateralDeltaList: new uint[](puppetList.length),
             collateralDelta: traderCallParams.collateralDelta,
-            sizeDelta: traderCallParams.sizeDelta
+            sizeDelta: traderCallParams.sizeDelta,
+            transactionCost: startGas
         });
 
         RequestIncreasePosition.increase(callConfig.increase, request, traderCallParams, puppetList);

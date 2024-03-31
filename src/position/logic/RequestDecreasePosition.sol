@@ -17,12 +17,7 @@ import {SubaccountStore} from "../../shared/store/SubaccountStore.sol";
 
 library RequestDecreasePosition {
     event RequestDecreasePosition__Request(
-        PositionStore.RequestDecrease request,
-        address subaccount,
-        bytes32 requestKey,
-        uint traderSizeDelta,
-        uint traderCollateralDelta,
-        uint transactionCost
+        PositionStore.RequestDecrease request, address subaccount, bytes32 requestKey, uint traderSizeDelta, uint traderCollateralDelta
     );
 
     struct CallConfig {
@@ -51,10 +46,10 @@ library RequestDecreasePosition {
     struct CallParams {
         PositionStore.RequestDecrease request;
         address subaccount;
-        uint transactionCost;
     }
 
     function decrease(CallConfig memory callConfig, TraderCallParams calldata traderCallParams, address from) internal {
+        uint startGas = gasleft();
         address subaccount = address(callConfig.subaccountStore.getSubaccount(from));
 
         if (subaccount == address(0)) revert RequestDecreasePosition__SubaccountNotFound(from);
@@ -68,13 +63,13 @@ library RequestDecreasePosition {
             trader: from,
             puppetCollateralDeltaList: new uint[](0),
             collateralDelta: mirrorPosition.collateral * traderCallParams.collateralDelta / mirrorPosition.collateral,
-            sizeDelta: mirrorPosition.size * traderCallParams.sizeDelta / mirrorPosition.size
+            sizeDelta: mirrorPosition.size * traderCallParams.sizeDelta / mirrorPosition.size,
+            transactionCost: startGas
         });
 
         CallParams memory callParams = CallParams({
             request: request, //
-            subaccount: subaccount,
-            transactionCost: gasleft() * tx.gasprice + traderCallParams.executionFee
+            subaccount: subaccount
         });
 
         for (uint i = 0; i < mirrorPosition.puppetList.length; i++) {
@@ -86,9 +81,7 @@ library RequestDecreasePosition {
 
         callConfig.positionStore.setRequestDecrease(requestKey, request);
 
-        emit RequestDecreasePosition__Request(
-            request, subaccount, requestKey, traderCallParams.sizeDelta, traderCallParams.collateralDelta, callParams.transactionCost
-        );
+        emit RequestDecreasePosition__Request(request, subaccount, requestKey, traderCallParams.sizeDelta, traderCallParams.collateralDelta);
     }
 
     function _decrease(
@@ -99,12 +92,12 @@ library RequestDecreasePosition {
     ) internal returns (bytes32 requestKey) {
         GmxPositionUtils.CreateOrderParams memory orderParams = GmxPositionUtils.CreateOrderParams({
             addresses: GmxPositionUtils.CreateOrderParamsAddresses({
-                receiver: address(callConfig.positionStore),
-                callbackContract: address(this),
+                receiver: callConfig.positionRouterAddress,
+                callbackContract: callConfig.positionRouterAddress,
                 uiFeeReceiver: address(0),
                 market: traderCallParams.market,
                 initialCollateralToken: traderCallParams.collateralToken,
-                swapPath: new address[](0) // swapPath
+                swapPath: new address[](0)
             }),
             numbers: GmxPositionUtils.CreateOrderParamsNumbers({
                 initialCollateralDeltaAmount: request.collateralDelta,

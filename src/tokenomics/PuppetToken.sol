@@ -26,8 +26,7 @@ contract PuppetToken is Auth, ERC20 {
     uint private constant CORE_RELEASE_DURATION = 31540000 * 2; // 2 years
     uint private constant CORE_RELEASE_RATE = 0.35e30; // 35%
     uint private constant GENESIS_MINT_AMOUNT = 100_000e18;
-    uint private constant GENESIS_START_TIME = 1710253930; // Tue Mar 12 2024
-
+    uint private constant CORE_RELEASE_END_SCHEDULE = 1822262400; // Thu Sep 30 2027
     // Rate limit for minting new tokens in basis points
     uint public limitFactor;
     // Time window for minting new tokens
@@ -82,19 +81,10 @@ contract PuppetToken is Auth, ERC20 {
     }
 
     function mintCoreRelease(address _to) external requiresAuth returns (uint) {
-        if (GENESIS_START_TIME > block.timestamp) {
-            revert("PuppetToken__CoreRelease: core release not started yet");
-        }
+        if (block.timestamp > CORE_RELEASE_END_SCHEDULE) revert PuppetToken__CoreReleaseEnded();
 
-        uint endTime = GENESIS_START_TIME + CORE_RELEASE_DURATION;
-
-        if (block.timestamp > endTime) {
-            revert("PuppetToken__CoreRelease: core release ended");
-        }
-
-        uint timeElapsed = block.timestamp - GENESIS_START_TIME;
-        uint totalTime = endTime - GENESIS_START_TIME;
-        uint timeMultiplier = Math.min(Precision.toFactor(timeElapsed, totalTime), Precision.FLOAT_PRECISION);
+        uint timeElapsed = CORE_RELEASE_END_SCHEDULE - block.timestamp;
+        uint timeMultiplier = Math.min(Precision.toFactor(timeElapsed, CORE_RELEASE_END_SCHEDULE), Precision.FLOAT_PRECISION);
         uint maxMintableAmount = Precision.applyFactor(totalSupply(), CORE_RELEASE_RATE);
         uint maxMintableAmountForPeriod = Precision.applyFactor(maxMintableAmount, timeMultiplier);
         uint mintableAmount = maxMintableAmountForPeriod - coreReleasedAmount;
@@ -127,4 +117,5 @@ contract PuppetToken is Auth, ERC20 {
 
     error PuppetToken__InvalidRate();
     error PuppetToken__ExceededRateLimit(uint limitWindow, uint rateLimit, uint maxMintAmount);
+    error PuppetToken__CoreReleaseEnded();
 }

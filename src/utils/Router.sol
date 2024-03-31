@@ -34,7 +34,7 @@ contract Router is Auth {
      * @param to the account to transfer to
      * @param amount the amount to transfer
      */
-    function rawTrasnfer(IERC20 token, address from, address to, uint amount) external requiresAuth returns (bool success, bytes memory returndata) {
+    function rawTransfer(IERC20 token, address from, address to, uint amount) external requiresAuth returns (bool success, bytes memory returndata) {
         return address(token).call(abi.encodeCall(token.transferFrom, (from, to, amount)));
     }
 }

@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IGmxEventUtils} from "./../interface/IGmxEventUtils.sol";
 
@@ -15,14 +16,18 @@ import {PositionUtils} from "./../util/PositionUtils.sol";
 import {UserGeneratedRevenue} from "../../shared/UserGeneratedRevenue.sol";
 
 library ExecuteDecreasePosition {
+    // event ExecuteDecreasePosition__FailedTransfer(bytes32 positionKey, bytes32 requestKey, address puppet, uint amount);
+
     struct CallConfig {
         Router router;
         PositionStore positionStore;
         PuppetStore puppetStore;
         UserGeneratedRevenue userGeneratedRevenue;
+        address positionRouterAddress;
         address gmxOrderHandler;
-        uint profitFeeRate;
-        uint traderProfitFeeCutoffRate;
+        uint tokenTransferGasLimit;
+        uint platformPerformanceFeeRate;
+        uint traderPerformanceFeeShare;
     }
 
     struct CallParams {
@@ -78,19 +83,6 @@ library ExecuteDecreasePosition {
         });
 
         _decrease(callConfig, order, callParams, request);
-
-        // emit ExecuteDecreasePosition__DecreasePosition(
-        //     positionKey,
-        //     key,
-        //     order.addresses.account,
-        //     order.addresses.market,
-        //     order.addresses.initialCollateralToken,
-        //     order.flags.isLong,
-        //     order.numbers.sizeDeltaUsd,
-        //     order.numbers.initialCollateralDeltaAmount,
-        //     totalAmountOut,
-        //     profit
-        // );
     }
 
     function _decrease(
@@ -106,18 +98,16 @@ library ExecuteDecreasePosition {
                 keyList[i] = PositionUtils.getRuleKey(callParams.outputTokenAddress, callParams.mirrorPosition.puppetList[i], request.trader);
             }
 
-            uint[] memory activityList = callConfig.puppetStore.getActivityList(keyList);
-
-            (uint traderFeeCutoff, uint puppetFee) = PositionUtils.getPlatformProfitDistribution(
-                callConfig.profitFeeRate, callConfig.traderProfitFeeCutoffRate, order.numbers.initialCollateralDeltaAmount, callParams.totalAmountOut
-            );
+            uint traderPerformanceFee;
 
             for (uint i = 0; i < callParams.mirrorPosition.puppetList.length; i++) {
+                if (request.puppetCollateralDeltaList[i] == 0) {
+                    continue;
+                }
+
                 uint collateralDelta = request.puppetCollateralDeltaList[i];
                 uint amountOut = collateralDelta * callParams.mirrorPosition.collateral / callParams.totalAmountOut;
-                uint amountOutAfterFee = amountOut - (puppetFee * amountOut / callParams.totalAmountOut);
-
-                activityList[i] = activityList[i];
+                uint amountOutAfterFee = amountOut - (callConfig.platformPerformanceFeeRate * amountOut / callParams.totalAmountOut);
 
                 if (callParams.profit > 0) {
                     uint profitShare = callParams.profit * amountOut / callParams.totalAmountOut;
@@ -125,16 +115,8 @@ library ExecuteDecreasePosition {
 
                 callParams.mirrorPosition.puppetDepositList[i] -= collateralDelta;
 
-                sendTokenOptim(
-                    callConfig.router,
-                    callParams.outputToken,
-                    callParams.puppetStoreAddress,
-                    callParams.mirrorPosition.puppetList[i],
-                    amountOutAfterFee
-                );
+                SafeERC20.safeTransferFrom(callParams.outputToken, callParams.puppetStoreAddress, request.trader, amountOutAfterFee);
             }
-
-            callConfig.puppetStore.setActivityList(keyList, activityList);
 
             callConfig.router.transfer(
                 callParams.outputToken,
@@ -161,13 +143,19 @@ library ExecuteDecreasePosition {
         }
 
         callConfig.positionStore.removeRequestDecrease(callParams.requestKey);
-    }
 
-    // optimistically send token
-    function sendTokenOptim(Router router, IERC20 token, address from, address to, uint amount) internal returns (bool) {
-        (bool success, bytes memory returndata) = address(token).call(abi.encodeCall(router.transfer, (token, from, to, amount)));
-
-        return success && returndata.length == 0 && abi.decode(returndata, (bool));
+        // emit ExecuteDecreasePosition__DecreasePosition(
+        //     positionKey,
+        //     key,
+        //     order.addresses.account,
+        //     order.addresses.market,
+        //     order.addresses.initialCollateralToken,
+        //     order.flags.isLong,
+        //     order.numbers.sizeDeltaUsd,
+        //     order.numbers.initialCollateralDeltaAmount,
+        //     totalAmountOut,
+        //     profit
+        // );
     }
 
     error ExecutePosition__InvalidRequest(bytes32 positionKey, bytes32 key);

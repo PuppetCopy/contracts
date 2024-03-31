@@ -5,7 +5,6 @@ import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
 import {StoreController} from "../../utils/StoreController.sol";
 import {GmxPositionUtils} from "./../util/GmxPositionUtils.sol";
-import {PositionUtils} from "./../util/PositionUtils.sol";
 
 contract PositionStore is StoreController {
     struct RequestIncrease {
@@ -13,6 +12,7 @@ contract PositionStore is StoreController {
         uint[] puppetCollateralDeltaList;
         uint sizeDelta;
         uint collateralDelta;
+        uint transactionCost;
     }
 
     struct RequestDecrease {
@@ -20,6 +20,7 @@ contract PositionStore is StoreController {
         uint[] puppetCollateralDeltaList;
         uint sizeDelta;
         uint collateralDelta;
+        uint transactionCost;
     }
 
     struct MirrorPosition {
@@ -95,67 +96,7 @@ contract PositionStore is StoreController {
         return unhandledCallbackMap[_key];
     }
 
-    // function setActivity(bytes32 _key, uint _time) external isSetter {
-    //     tradeFundingActivityMap[_key] = _time;
-    // }
-
-    // function getActivity(bytes32 _key) external view returns (uint) {
-    //     return tradeFundingActivityMap[_key];
-    // }
-
-    // function getActivityList(bytes32[] calldata _keyList) external view returns (uint[] memory) {
-    //     uint _length = _keyList.length;
-    //     uint[] memory _activities = new uint[](_keyList.length);
-    //     for (uint i = 0; i < _length; i++) {
-    //         _activities[i] = tradeFundingActivityMap[_keyList[i]];
-    //     }
-    //     return _activities;
-    // }
-
-    // function setActivityList(bytes32[] memory _keyList, uint[] calldata _amountList) external isSetter {
-    //     uint _length = _keyList.length;
-    //     for (uint i = 0; i < _length; i++) {
-    //         tradeFundingActivityMap[_keyList[i]] = _amountList[i];
-    //     }
-    // }
-
-    // function getTokenAllowanceActivity(bytes32 _key) external view returns (uint) {
-    //     return tokenAllowanceActivityMap[_key];
-    // }
-
-    // function setTokenAllowanceActivity(bytes32 _key, uint _amount) external isSetter {
-    //     tokenAllowanceActivityMap[_key] = _amount;
-    // }
-
-    // function getMatchingActivity(address collateralToken, address trader, address[] calldata _puppetList)
-    //     external
-    //     view
-    //     returns (uint[] memory _activityList, uint[] memory _allowanceOptimList)
-    // {
-    //     uint length = _puppetList.length;
-
-    //     _activityList = new uint[](length);
-    //     _allowanceOptimList = new uint[](length);
-
-    //     for (uint i = 0; i < length; i++) {
-    //         _activityList[i] = tradeFundingActivityMap[PositionUtils.getFundingActivityKey(_puppetList[i], trader)];
-    //         _allowanceOptimList[i] = tokenAllowanceActivityMap[PositionUtils.getAllownaceKey(collateralToken, _puppetList[i])];
-    //     }
-    //     return (_activityList, _allowanceOptimList);
-    // }
-
-    // function setMatchingActivity(
-    //     address collateralToken,
-    //     address trader,
-    //     address[] calldata _puppetList,
-    //     uint[] calldata _activityList,
-    //     uint[] calldata _sampledAllowanceList
-    // ) external isSetter {
-    //     uint length = _puppetList.length;
-
-    //     for (uint i = 0; i < length; i++) {
-    //         tradeFundingActivityMap[PositionUtils.getFundingActivityKey(_puppetList[i], trader)] = _activityList[i];
-    //         tokenAllowanceActivityMap[PositionUtils.getAllownaceKey(collateralToken, _puppetList[i])] = _sampledAllowanceList[i];
-    //     }
-    // }
+    function removeUnhandledCallback(bytes32 _key) external isSetter {
+        delete unhandledCallbackMap[_key];
+    }
 }
