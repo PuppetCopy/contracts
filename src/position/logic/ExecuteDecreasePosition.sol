@@ -9,6 +9,7 @@ import {IGmxEventUtils} from "./../interface/IGmxEventUtils.sol";
 
 import {Router} from "src/utils/Router.sol";
 import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
+import {Precision} from "./../../utils/Precision.sol";
 
 import {PuppetStore} from "../store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
@@ -57,7 +58,7 @@ library ExecuteDecreasePosition {
         IERC20 outputTokenAddress = IERC20(eventLogData.addressItems.items[0].value);
         uint totalAmountOut = eventLogData.uintItems.items[0].value;
 
-        PositionStore.RequestDecrease memory request = callConfig.positionStore.getRequestDecrease(key);
+        PositionStore.RequestAdjustment memory request = callConfig.positionStore.getRequestAdjustment(key);
         PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
 
         if (mirrorPosition.size == 0) {
@@ -89,31 +90,23 @@ library ExecuteDecreasePosition {
         CallConfig calldata callConfig,
         GmxPositionUtils.Props calldata order,
         CallParams memory callParams,
-        PositionStore.RequestDecrease memory request
+        PositionStore.RequestAdjustment memory request
     ) internal {
         if (callParams.totalAmountOut > 0) {
-            bytes32[] memory keyList = new bytes32[](callParams.mirrorPosition.puppetList.length);
-
-            for (uint i = 0; i < callParams.mirrorPosition.puppetList.length; i++) {
-                keyList[i] = PositionUtils.getRuleKey(callParams.outputTokenAddress, callParams.mirrorPosition.puppetList[i], request.trader);
-            }
-
             uint traderPerformanceFee;
 
+            uint amountOutMultiplier = Precision.toFactor(order.numbers.initialCollateralDeltaAmount, callParams.totalAmountOut);
+
             for (uint i = 0; i < callParams.mirrorPosition.puppetList.length; i++) {
-                if (request.puppetCollateralDeltaList[i] == 0) {
-                    continue;
-                }
+                if (request.puppetCollateralDeltaList[i] == 0) continue;
 
                 uint collateralDelta = request.puppetCollateralDeltaList[i];
                 uint amountOut = collateralDelta * callParams.mirrorPosition.collateral / callParams.totalAmountOut;
                 uint amountOutAfterFee = amountOut - (callConfig.platformPerformanceFeeRate * amountOut / callParams.totalAmountOut);
 
-                if (callParams.profit > 0) {
-                    uint profitShare = callParams.profit * amountOut / callParams.totalAmountOut;
-                }
+                uint profitShare = callParams.profit * amountOut / callParams.totalAmountOut;
 
-                callParams.mirrorPosition.puppetDepositList[i] -= collateralDelta;
+                callParams.mirrorPosition.collateralList[i] -= collateralDelta;
 
                 SafeERC20.safeTransferFrom(callParams.outputToken, callParams.puppetStoreAddress, request.trader, amountOutAfterFee);
             }
@@ -128,7 +121,7 @@ library ExecuteDecreasePosition {
             for (uint i = 0; i < callParams.mirrorPosition.puppetList.length; i++) {
                 uint collateralDelta = request.puppetCollateralDeltaList[i];
 
-                callParams.mirrorPosition.puppetDepositList[i] -= collateralDelta;
+                callParams.mirrorPosition.collateralList[i] -= collateralDelta;
             }
         }
 

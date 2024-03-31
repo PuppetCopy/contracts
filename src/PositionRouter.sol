@@ -39,7 +39,7 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
         nonReentrant
     {
         uint startGas = gasleft();
-        PositionStore.RequestIncrease memory request = PositionStore.RequestIncrease({
+        PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
             trader: msg.sender,
             puppetCollateralDeltaList: new uint[](puppetList.length),
             collateralDelta: traderCallParams.collateralDelta,
@@ -116,11 +116,11 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
     {
         uint startGas = gasleft();
 
-        PositionStore.RequestIncrease memory request = PositionStore.RequestIncrease({
+        PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
             trader: trader,
             puppetCollateralDeltaList: new uint[](puppetList.length),
-            collateralDelta: traderCallParams.collateralDelta,
-            sizeDelta: traderCallParams.sizeDelta,
+            collateralDelta: 0,
+            sizeDelta: 0,
             transactionCost: startGas
         });
 

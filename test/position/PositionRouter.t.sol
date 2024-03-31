@@ -124,9 +124,11 @@ contract PositionRouterTest is BasicSetup {
                     positionStore: positionStore,
                     puppetStore: puppetStore,
                     userGeneratedRevenue: userGeneratedRevenue,
+                    positionRouterAddress: positionRouterAddress,
                     gmxOrderHandler: Const.gmxOrderHandler,
-                    performanceFeeRate: 0.1e30, // 10%
-                    performanceFeeShare: 0.5e30 // shared between trader and platform
+                    tokenTransferGasLimit: 200_000,
+                    platformPerformanceFeeRate: 0.1e30, // 10%
+                    traderPerformanceFeeShare: 0.5e30 // shared between trader and platform
                 })
             })
         );

@@ -5,19 +5,20 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IGmxExchangeRouter} from "./../interface/IGmxExchangeRouter.sol";
-import {IWNT} from "./../../utils/interfaces/IWNT.sol";
 import {Subaccount} from "./../../shared/Subaccount.sol";
 
+import {Precision} from "./../../utils/Precision.sol";
 import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
 import {ErrorUtils} from "./../../utils/ErrorUtils.sol";
 import {TransferUtils} from "./../../utils/TransferUtils.sol";
+import {IWNT} from "./../../utils/interfaces/IWNT.sol";
 
 import {PositionStore} from "../store/PositionStore.sol";
 import {SubaccountStore} from "../../shared/store/SubaccountStore.sol";
 
 library RequestDecreasePosition {
     event RequestDecreasePosition__Request(
-        PositionStore.RequestDecrease request, address subaccount, bytes32 requestKey, uint traderSizeDelta, uint traderCollateralDelta
+        PositionStore.RequestAdjustment request, address subaccount, bytes32 requestKey, uint traderSizeDelta, uint traderCollateralDelta
     );
 
     struct CallConfig {
@@ -44,7 +45,7 @@ library RequestDecreasePosition {
     }
 
     struct CallParams {
-        PositionStore.RequestDecrease request;
+        PositionStore.RequestAdjustment request;
         address subaccount;
     }
 
@@ -59,11 +60,11 @@ library RequestDecreasePosition {
 
         PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
 
-        PositionStore.RequestDecrease memory request = PositionStore.RequestDecrease({
+        PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
             trader: from,
-            puppetCollateralDeltaList: new uint[](0),
-            collateralDelta: mirrorPosition.collateral * traderCallParams.collateralDelta / mirrorPosition.collateral,
-            sizeDelta: mirrorPosition.size * traderCallParams.sizeDelta / mirrorPosition.size,
+            puppetCollateralDeltaList: new uint[](mirrorPosition.puppetList.length),
+            collateralDelta: traderCallParams.collateralDelta,
+            sizeDelta: traderCallParams.sizeDelta,
             transactionCost: startGas
         });
 
@@ -72,6 +73,8 @@ library RequestDecreasePosition {
             subaccount: subaccount
         });
 
+        uint reductionMultiplier = Precision.toFactor(traderCallParams.collateralDelta, mirrorPosition.collateral);
+
         for (uint i = 0; i < mirrorPosition.puppetList.length; i++) {
             request.puppetCollateralDeltaList[i] -=
                 request.puppetCollateralDeltaList[i] * traderCallParams.collateralDelta / mirrorPosition.collateral;
@@ -79,7 +82,9 @@ library RequestDecreasePosition {
 
         bytes32 requestKey = _decrease(callConfig, traderCallParams, callParams, request);
 
-        callConfig.positionStore.setRequestDecrease(requestKey, request);
+        request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + traderCallParams.executionFee;
+
+        callConfig.positionStore.setRequestAdjustment(requestKey, request);
 
         emit RequestDecreasePosition__Request(request, subaccount, requestKey, traderCallParams.sizeDelta, traderCallParams.collateralDelta);
     }
@@ -88,7 +93,7 @@ library RequestDecreasePosition {
         CallConfig memory callConfig,
         TraderCallParams calldata traderCallParams,
         CallParams memory callParams,
-        PositionStore.RequestDecrease memory request
+        PositionStore.RequestAdjustment memory request
     ) internal returns (bytes32 requestKey) {
         GmxPositionUtils.CreateOrderParams memory orderParams = GmxPositionUtils.CreateOrderParams({
             addresses: GmxPositionUtils.CreateOrderParamsAddresses({

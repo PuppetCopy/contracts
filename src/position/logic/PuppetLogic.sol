@@ -146,8 +146,9 @@ library PuppetLogic {
         IERC20 collateralToken
     ) internal view returns (uint) {
         uint tokenAllowance = IERC20(collateralToken).allowance(from, address(callConfig.router));
+        uint allowanceCap = callConfig.store.getTokenAllowanceCap(collateralToken);
 
-        if (tokenAllowance > callConfig.store.getTokenAllowanceCap(collateralToken)) {
+        if (allowanceCap == 0 || tokenAllowance > allowanceCap) {
             revert PuppetLogic__NotAllowedCollateralTokenAmount();
         }
 

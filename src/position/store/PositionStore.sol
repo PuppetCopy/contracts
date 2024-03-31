@@ -7,15 +7,12 @@ import {StoreController} from "../../utils/StoreController.sol";
 import {GmxPositionUtils} from "./../util/GmxPositionUtils.sol";
 
 contract PositionStore is StoreController {
-    struct RequestIncrease {
+    struct RequestMatch {
         address trader;
-        uint[] puppetCollateralDeltaList;
-        uint sizeDelta;
-        uint collateralDelta;
-        uint transactionCost;
+        address[] puppetList;
     }
 
-    struct RequestDecrease {
+    struct RequestAdjustment {
         address trader;
         uint[] puppetCollateralDeltaList;
         uint sizeDelta;
@@ -24,10 +21,10 @@ contract PositionStore is StoreController {
     }
 
     struct MirrorPosition {
+        address[] puppetList;
+        uint[] collateralList;
         uint size;
         uint collateral;
-        uint[] puppetDepositList;
-        address[] puppetList;
     }
 
     struct UnhandledCallback {
@@ -36,36 +33,36 @@ contract PositionStore is StoreController {
         bytes eventData;
     }
 
-    mapping(bytes32 requestKey => RequestIncrease) public requestIncreaseMap;
-    mapping(bytes32 requestKey => RequestDecrease) public requestDecreaseMap;
+    mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
 
+    mapping(bytes32 positionKey => RequestMatch) public requestMatchMap;
     mapping(bytes32 positionKey => MirrorPosition) public positionMap;
     mapping(bytes32 positionKey => UnhandledCallback) public unhandledCallbackMap;
 
     constructor(Authority _authority, address _initSetter) StoreController(_authority, _initSetter) {}
 
-    function getRequestIncrease(bytes32 _key) external view returns (RequestIncrease memory) {
-        return requestIncreaseMap[_key];
+    function getRequestAdjustment(bytes32 _key) external view returns (RequestAdjustment memory) {
+        return requestAdjustmentMap[_key];
     }
 
-    function setRequestIncrease(bytes32 _key, RequestIncrease memory _req) external isSetter {
-        requestIncreaseMap[_key] = _req;
+    function setRequestAdjustment(bytes32 _key, RequestAdjustment calldata _ra) external isSetter {
+        requestAdjustmentMap[_key] = _ra;
     }
 
-    function removeRequestIncrease(bytes32 _key) external isSetter {
-        delete requestIncreaseMap[_key];
+    function removeRequestAdjustment(bytes32 _key) external isSetter {
+        delete requestAdjustmentMap[_key];
     }
 
-    function getRequestDecrease(bytes32 _key) external view returns (RequestDecrease memory) {
-        return requestDecreaseMap[_key];
+    function getRequestMatch(bytes32 _key) external view returns (RequestMatch memory) {
+        return requestMatchMap[_key];
     }
 
-    function setRequestDecrease(bytes32 _key, RequestDecrease calldata _req) external isSetter {
-        requestDecreaseMap[_key] = _req;
+    function setRequestMatch(bytes32 _key, RequestMatch calldata _rm) external isSetter {
+        requestMatchMap[_key] = _rm;
     }
 
     function removeRequestDecrease(bytes32 _key) external isSetter {
-        delete requestDecreaseMap[_key];
+        delete requestAdjustmentMap[_key];
     }
 
     function getMirrorPosition(bytes32 _key) external view returns (MirrorPosition memory) {
