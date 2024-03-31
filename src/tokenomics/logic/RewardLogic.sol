@@ -4,16 +4,16 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {Precision} from "./../utils/Precision.sol";
-import {Router} from "../utils/Router.sol";
-import {VeRevenueDistributor} from "./VeRevenueDistributor.sol";
+import {Precision} from "./../../utils/Precision.sol";
+import {Router} from "../../utils/Router.sol";
+import {VeRevenueDistributor} from "../VeRevenueDistributor.sol";
 
-import {UserGeneratedRevenueStore} from "../shared/store/UserGeneratedRevenueStore.sol";
-import {UserGeneratedRevenue} from "../shared/UserGeneratedRevenue.sol";
-import {PuppetToken} from "./PuppetToken.sol";
-import {PositionUtils} from "./../position/util/PositionUtils.sol";
+import {UserGeneratedRevenueStore} from "../../shared/store/UserGeneratedRevenueStore.sol";
+import {UserGeneratedRevenue} from "../../shared/UserGeneratedRevenue.sol";
+import {PuppetToken} from "../PuppetToken.sol";
+import {PositionUtils} from "../../position/util/PositionUtils.sol";
 
-import {VotingEscrow, MAXTIME} from "./VotingEscrow.sol";
+import {VotingEscrow, MAXTIME} from "../VotingEscrow.sol";
 
 library RewardLogic {
     enum Choice {

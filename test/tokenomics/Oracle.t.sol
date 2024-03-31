@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {OracleLogic} from "src/tokenomics/OracleLogic.sol";
+import {OracleLogic} from "./../../src/tokenomics/logic/OracleLogic.sol";
 import {OracleStore} from "src/tokenomics/store/OracleStore.sol";
 
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";

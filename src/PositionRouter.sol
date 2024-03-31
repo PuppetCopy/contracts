@@ -47,10 +47,6 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
             transactionCost: startGas
         });
 
-        callConfig.increase.router.transfer(
-            traderCallParams.collateralToken, msg.sender, callConfig.increase.gmxOrderVault, traderCallParams.collateralDelta
-        );
-
         // native ETH can be identified by depositing more than the execution fee
         if (address(traderCallParams.collateralToken) == address(callConfig.increase.wnt) && traderCallParams.executionFee > msg.value) {
             TransferUtils.depositAndSendWnt(
@@ -67,6 +63,10 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
                 callConfig.increase.tokenTransferGasLimit,
                 callConfig.increase.gmxOrderVault,
                 traderCallParams.executionFee
+            );
+
+            callConfig.increase.router.transfer(
+                traderCallParams.collateralToken, msg.sender, callConfig.increase.gmxOrderVault, traderCallParams.collateralDelta
             );
         }
 

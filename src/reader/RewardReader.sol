@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {Precision} from "./../utils/Precision.sol";
 
-import {RewardLogic} from "./../tokenomics/RewardLogic.sol";
+import {RewardLogic} from "./../tokenomics/logic/RewardLogic.sol";
 import {RewardRouter} from "./../RewardRouter.sol";
 import {UserGeneratedRevenueStore} from "./../shared/store/UserGeneratedRevenueStore.sol";
 

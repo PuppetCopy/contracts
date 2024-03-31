@@ -5,8 +5,8 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {OracleStore, SLOT_COUNT} from "./store/OracleStore.sol";
-import {UniV3Prelude} from "./../utils/UniV3Prelude.sol";
+import {OracleStore, SLOT_COUNT} from "../store/OracleStore.sol";
+import {UniV3Prelude} from "../../utils/UniV3Prelude.sol";
 
 /**
  * @title OracleLogic

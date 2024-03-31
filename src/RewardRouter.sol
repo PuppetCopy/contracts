@@ -9,8 +9,8 @@ import {Router} from "./utils/Router.sol";
 import {Dictator} from "./utils/Dictator.sol";
 import {Precision} from "./utils/Precision.sol";
 
-import {OracleLogic} from "./tokenomics/OracleLogic.sol";
-import {RewardLogic} from "./tokenomics/RewardLogic.sol";
+import {OracleLogic} from "./tokenomics/logic/OracleLogic.sol";
+import {RewardLogic} from "./tokenomics/logic/RewardLogic.sol";
 import {VotingEscrow} from "./tokenomics/VotingEscrow.sol";
 import {VeRevenueDistributor} from "./tokenomics/VeRevenueDistributor.sol";
 

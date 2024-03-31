@@ -6,11 +6,11 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {RewardRouter} from "src/RewardRouter.sol";
-import {OracleLogic} from "src/tokenomics/OracleLogic.sol";
+import {OracleLogic} from "src/tokenomics/logic/OracleLogic.sol";
 import {OracleStore} from "src/tokenomics/store/OracleStore.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {VotingEscrow, MAXTIME} from "src/tokenomics/VotingEscrow.sol";
-import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
+import {RewardLogic} from "src/tokenomics/logic/RewardLogic.sol";
 import {VeRevenueDistributor} from "src/tokenomics/VeRevenueDistributor.sol";
 
 import {UserGeneratedRevenueStore} from "src/shared/store/UserGeneratedRevenueStore.sol";
