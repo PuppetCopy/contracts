@@ -10,11 +10,8 @@ import {Dictator} from "./../utils/Dictator.sol";
 
 /**
  * @title PuppetToken
- * @dev An ERC20 token with a governance-controlled mint rate limit to mitigate possible abuse and ensure stability until it reaches clarity through
- * maturity
- * The mint rate limit is designed to cap the amount of new tokens that can be minted within a specified time window,
- * as a percentage of the total tokens emitted since the initial supply. the mint rate limit can be lifted or adjust through governance once clarity
- * is achieved.
+ * @dev An ERC20 token with a mint rate limit designed to mitigate and provide feedback of a potential critical faults or bugs in the minting process.
+ * The limit restricts the quantity of new tokens that can be minted within a given timeframe, proportional to the existing supply.
  */
 contract PuppetToken is Auth, ERC20 {
     event PuppetToken__SetMintLimitRate(uint rateLimitFactor, uint timeframeLimit);
@@ -25,8 +22,10 @@ contract PuppetToken is Auth, ERC20 {
 
     uint private constant CORE_RELEASE_DURATION = 31540000 * 2; // 2 years
     uint private constant CORE_RELEASE_RATE = 0.35e30; // 35%
-    uint private constant GENESIS_MINT_AMOUNT = 100_000e18;
     uint private constant CORE_RELEASE_END_SCHEDULE = 1822262400; // Thu Sep 30 2027
+
+    uint private constant GENESIS_MINT_AMOUNT = 100_000e18;
+
     // Rate limit for minting new tokens in basis points
     uint public limitFactor;
     // Time window for minting new tokens
@@ -40,8 +39,7 @@ contract PuppetToken is Auth, ERC20 {
     uint public coreReleasedAmount;
 
     constructor(Dictator _authority) Auth(address(0), _authority) ERC20(_NAME, _SYMBOL) {
-        // _setMintLimitRate(100, 1 hours);
-        _setMintLimitRate(0.01e30, 1 hours);
+        _setMintLimitRate(0.01e30, 1 hours); // init at 1% of circulating supply per hour
         _mint(_authority.owner(), GENESIS_MINT_AMOUNT);
     }
 
