@@ -2,12 +2,11 @@
 pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IGmxExchangeRouter} from "./../interface/IGmxExchangeRouter.sol";
 import {Subaccount} from "./../../shared/Subaccount.sol";
 
-import {Precision} from "./../../utils/Precision.sol";
+import {PositionUtils} from "./../util/PositionUtils.sol";
 import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
 import {ErrorUtils} from "./../../utils/ErrorUtils.sol";
 import {TransferUtils} from "./../../utils/TransferUtils.sol";
@@ -33,68 +32,81 @@ library RequestDecreasePosition {
         uint tokenTransferGasLimit;
     }
 
-    struct TraderCallParams {
-        address market;
-        IERC20 collateralToken;
-        bool isLong;
-        uint executionFee;
-        uint collateralDelta;
-        uint sizeDelta;
-        uint acceptablePrice;
-        uint triggerPrice;
-    }
-
-    struct CallParams {
-        PositionStore.RequestAdjustment request;
-        address subaccount;
-    }
-
-    function decrease(CallConfig memory callConfig, TraderCallParams calldata traderCallParams, address from) internal {
+    function traderDecrease(CallConfig memory callConfig, PositionUtils.TraderCallParams calldata traderCallParams) internal {
         uint startGas = gasleft();
-        address subaccount = address(callConfig.subaccountStore.getSubaccount(from));
 
-        if (subaccount == address(0)) revert RequestDecreasePosition__SubaccountNotFound(from);
+        Subaccount subaccount = callConfig.subaccountStore.getSubaccount(traderCallParams.account);
+        address subaccountAddress = address(subaccount);
 
-        bytes32 positionKey =
-            GmxPositionUtils.getPositionKey(subaccount, traderCallParams.market, traderCallParams.collateralToken, traderCallParams.isLong);
+        if (subaccountAddress == address(0)) revert RequestDecreasePosition__SubaccountNotFound(traderCallParams.account);
+
+        TransferUtils.depositAndSendWnt(
+            callConfig.wnt,
+            address(callConfig.positionStore),
+            callConfig.tokenTransferGasLimit,
+            callConfig.gmxOrderVault,
+            traderCallParams.executionFee + traderCallParams.collateralDelta
+        );
+
+        bytes32 positionKey = GmxPositionUtils.getPositionKey(
+            subaccountAddress, //
+            traderCallParams.market,
+            traderCallParams.collateralToken,
+            traderCallParams.isLong
+        );
 
         PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
 
         PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
-            trader: from,
             puppetCollateralDeltaList: new uint[](mirrorPosition.puppetList.length),
             collateralDelta: traderCallParams.collateralDelta,
             sizeDelta: traderCallParams.sizeDelta,
             transactionCost: startGas
         });
 
-        CallParams memory callParams = CallParams({
-            request: request, //
-            subaccount: subaccount
+        decrease(callConfig, request, mirrorPosition, traderCallParams, subaccount, subaccountAddress);
+    }
+
+    function proxyDecrease(CallConfig memory callConfig, PositionUtils.TraderCallParams calldata traderCallParams) internal {
+        uint startGas = gasleft();
+
+        Subaccount subaccount = callConfig.subaccountStore.getSubaccount(traderCallParams.account);
+        address subaccountAddress = address(subaccount);
+
+        if (subaccountAddress == address(0)) revert RequestDecreasePosition__SubaccountNotFound(traderCallParams.account);
+
+        bytes32 positionKey = GmxPositionUtils.getPositionKey(
+            subaccountAddress, //
+            traderCallParams.market,
+            traderCallParams.collateralToken,
+            traderCallParams.isLong
+        );
+
+        PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
+
+        PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
+            puppetCollateralDeltaList: new uint[](mirrorPosition.puppetList.length),
+            collateralDelta: 0,
+            sizeDelta: 0,
+            transactionCost: startGas
         });
 
-        uint reductionMultiplier = Precision.toFactor(traderCallParams.collateralDelta, mirrorPosition.collateral);
+        decrease(callConfig, request, mirrorPosition, traderCallParams, subaccount, subaccountAddress);
+    }
 
+    function decrease(
+        CallConfig memory callConfig,
+        PositionStore.RequestAdjustment memory request,
+        PositionStore.MirrorPosition memory mirrorPosition,
+        PositionUtils.TraderCallParams calldata traderCallParams,
+        Subaccount subaccount,
+        address subaccountAddress
+    ) internal {
         for (uint i = 0; i < mirrorPosition.puppetList.length; i++) {
             request.puppetCollateralDeltaList[i] -=
                 request.puppetCollateralDeltaList[i] * traderCallParams.collateralDelta / mirrorPosition.collateral;
         }
 
-        bytes32 requestKey = _decrease(callConfig, traderCallParams, callParams, request);
-
-        request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + traderCallParams.executionFee;
-
-        callConfig.positionStore.setRequestAdjustment(requestKey, request);
-
-        emit RequestDecreasePosition__Request(request, subaccount, requestKey, traderCallParams.sizeDelta, traderCallParams.collateralDelta);
-    }
-
-    function _decrease(
-        CallConfig memory callConfig,
-        TraderCallParams calldata traderCallParams,
-        CallParams memory callParams,
-        PositionStore.RequestAdjustment memory request
-    ) internal returns (bytes32 requestKey) {
         GmxPositionUtils.CreateOrderParams memory orderParams = GmxPositionUtils.CreateOrderParams({
             addresses: GmxPositionUtils.CreateOrderParamsAddresses({
                 receiver: callConfig.positionRouterAddress,
@@ -120,21 +132,19 @@ library RequestDecreasePosition {
             referralCode: callConfig.referralCode
         });
 
-        TransferUtils.depositAndSendWnt(
-            callConfig.wnt,
-            address(callConfig.positionStore),
-            callConfig.tokenTransferGasLimit,
-            callConfig.gmxOrderVault,
-            traderCallParams.executionFee + traderCallParams.collateralDelta
-        );
-
-        (bool orderSuccess, bytes memory orderReturnData) = Subaccount(callParams.subaccount).execute(
+        (bool orderSuccess, bytes memory orderReturnData) = subaccount.execute(
             address(callConfig.gmxExchangeRouter), abi.encodeWithSelector(callConfig.gmxExchangeRouter.createOrder.selector, orderParams)
         );
 
         if (!orderSuccess) ErrorUtils.revertWithParsedMessage(orderReturnData);
 
-        requestKey = abi.decode(orderReturnData, (bytes32));
+        bytes32 requestKey = abi.decode(orderReturnData, (bytes32));
+
+        request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + traderCallParams.executionFee;
+
+        callConfig.positionStore.setRequestAdjustment(requestKey, request);
+
+        emit RequestDecreasePosition__Request(request, subaccountAddress, requestKey, traderCallParams.sizeDelta, traderCallParams.collateralDelta);
     }
 
     error RequestDecreasePosition__SubaccountNotFound(address from);

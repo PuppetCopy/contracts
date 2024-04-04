@@ -55,6 +55,7 @@ contract BasicSetup is PRBTest, StdCheats, StdUtils {
 
         dictator.setRoleCapability(MINT_PUPPET_ROLE, address(puppetToken), puppetToken.mint.selector, true);
         dictator.setRoleCapability(TRANSFER_TOKEN_ROLE, address(router), router.transfer.selector, true);
+        dictator.setRoleCapability(TRANSFER_TOKEN_ROLE, address(router), router.rawTransfer.selector, true);
 
         dictator.setUserRole(users.owner, ADMIN_ROLE, true);
     }

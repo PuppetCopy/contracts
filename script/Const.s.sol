@@ -26,8 +26,8 @@ library Const {
 
     address constant gmxExchangeRouter = 0x7C68C7866A64FA2160F78EEaE12217FFbf871fa8;
     address constant gmxRouter = 0x7452c558d45f8afC8c83dAe62C3f8A5BE19c71f6;
-    address constant gmxOracle = 0x9f5982374e63e5B011317451a424bE9E1275a03f;
-    address constant gmxDatastore = 0x75236b405F460245999F70bc06978AB2B4116920;
+    address constant gmxOracle = 0xa11B501c2dd83Acd29F6727570f2502FAaa617F2;
+    address constant gmxDatastore = 0xFD70de6b91282D8017aA4E741e9Ae325CAb992d8;
     address constant gmxOrderHandler = 0x352f684ab9e97a6321a13CF03A61316B681D9fD2;
     address constant gmxOrderVault = 0x31eF83a530Fde1B38EE9A18093A333D8Bbbc40D5;
     address constant gmxEthUsdcMarket = 0x70d95587d40A2caf56bd97485aB3Eec10Bee6336;

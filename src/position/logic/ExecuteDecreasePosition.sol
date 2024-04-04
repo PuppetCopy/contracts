@@ -13,21 +13,25 @@ import {Precision} from "./../../utils/Precision.sol";
 
 import {PuppetStore} from "../store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
-import {PositionUtils} from "./../util/PositionUtils.sol";
-import {UserGeneratedRevenue} from "../../shared/UserGeneratedRevenue.sol";
+
+import {CugarStore} from "./../../shared/store/CugarStore.sol";
+import {Cugar} from "../../shared/Cugar.sol";
 
 library ExecuteDecreasePosition {
-    // event ExecuteDecreasePosition__FailedTransfer(bytes32 positionKey, bytes32 requestKey, address puppet, uint amount);
+    event ExecuteDecreasePosition__DecreasePosition(
+        bytes32 requestKey, bytes32 positionKey, uint totalAmountOut, uint profit, uint totalPerformanceFee, uint traderPerformanceCutoffFee
+    );
 
     struct CallConfig {
         Router router;
         PositionStore positionStore;
         PuppetStore puppetStore;
-        UserGeneratedRevenue userGeneratedRevenue;
+        CugarStore cugarStore;
+        Cugar cugar;
         address positionRouterAddress;
         address gmxOrderHandler;
         uint tokenTransferGasLimit;
-        uint platformPerformanceFeeRate;
+        uint performanceFeeRate;
         uint traderPerformanceFeeShare;
     }
 
@@ -36,9 +40,9 @@ library ExecuteDecreasePosition {
         IGmxEventUtils.EventLogData eventLogData;
         bytes32 positionKey;
         bytes32 requestKey;
-        IERC20 outputTokenAddress;
-        address puppetStoreAddress;
+        address positionRouterAddress;
         IERC20 outputToken;
+        uint puppetListLength;
         uint totalAmountOut;
         uint profit;
     }
@@ -55,7 +59,6 @@ library ExecuteDecreasePosition {
             order.addresses.account, order.addresses.market, order.addresses.initialCollateralToken, order.flags.isLong
         );
 
-        IERC20 outputTokenAddress = IERC20(eventLogData.addressItems.items[0].value);
         uint totalAmountOut = eventLogData.uintItems.items[0].value;
 
         PositionStore.RequestAdjustment memory request = callConfig.positionStore.getRequestAdjustment(key);
@@ -76,9 +79,9 @@ library ExecuteDecreasePosition {
             eventLogData: eventLogData,
             positionKey: positionKey,
             requestKey: key,
-            outputTokenAddress: outputTokenAddress,
-            puppetStoreAddress: address(callConfig.puppetStore),
-            outputToken: IERC20(outputTokenAddress),
+            positionRouterAddress: address(callConfig.positionStore),
+            outputToken: IERC20(eventLogData.addressItems.items[0].value),
+            puppetListLength: mirrorPosition.puppetList.length,
             totalAmountOut: totalAmountOut,
             profit: profit
         });
@@ -92,63 +95,87 @@ library ExecuteDecreasePosition {
         CallParams memory callParams,
         PositionStore.RequestAdjustment memory request
     ) internal {
-        if (callParams.totalAmountOut > 0) {
-            uint traderPerformanceFee;
+        callParams.mirrorPosition.collateral -= request.collateralDelta;
+        callParams.mirrorPosition.size -= request.sizeDelta;
+        callParams.mirrorPosition.cumulativeTransactionCost += request.transactionCost;
 
-            uint amountOutMultiplier = Precision.toFactor(order.numbers.initialCollateralDeltaAmount, callParams.totalAmountOut);
+        uint[] memory feeAmountList = new uint[](callParams.puppetListLength);
+        uint[] memory balanceList = callConfig.puppetStore.getBalanceList(callParams.outputToken, callParams.mirrorPosition.puppetList);
+        uint totalPerformanceFee;
+        uint traderPerformanceCutoffFee;
 
-            for (uint i = 0; i < callParams.mirrorPosition.puppetList.length; i++) {
-                if (request.puppetCollateralDeltaList[i] == 0) continue;
+        for (uint i = 0; i < callParams.puppetListLength; i++) {
+            if (request.puppetCollateralDeltaList[i] == 0) continue;
 
-                uint collateralDelta = request.puppetCollateralDeltaList[i];
-                uint amountOut = collateralDelta * callParams.mirrorPosition.collateral / callParams.totalAmountOut;
-                uint amountOutAfterFee = amountOut - (callConfig.platformPerformanceFeeRate * amountOut / callParams.totalAmountOut);
+            uint collateralDelta = request.puppetCollateralDeltaList[i];
 
-                uint profitShare = callParams.profit * amountOut / callParams.totalAmountOut;
+            callParams.mirrorPosition.collateralList[i] -= collateralDelta;
 
-                callParams.mirrorPosition.collateralList[i] -= collateralDelta;
-
-                SafeERC20.safeTransferFrom(callParams.outputToken, callParams.puppetStoreAddress, request.trader, amountOutAfterFee);
-            }
-
-            callConfig.router.transfer(
-                callParams.outputToken,
-                callParams.puppetStoreAddress,
-                request.trader,
-                order.numbers.initialCollateralDeltaAmount * request.collateralDelta / callParams.totalAmountOut
+            (uint performanceFee, uint traderCutoff, uint amountOutAfterFee) = getDistribution(
+                callConfig.performanceFeeRate,
+                callConfig.traderPerformanceFeeShare,
+                callParams.profit,
+                collateralDelta * callParams.mirrorPosition.collateral / callParams.totalAmountOut,
+                callParams.totalAmountOut
             );
-        } else {
-            for (uint i = 0; i < callParams.mirrorPosition.puppetList.length; i++) {
-                uint collateralDelta = request.puppetCollateralDeltaList[i];
 
-                callParams.mirrorPosition.collateralList[i] -= collateralDelta;
-            }
+            totalPerformanceFee += performanceFee;
+            traderPerformanceCutoffFee += traderCutoff;
+
+            feeAmountList[i] = performanceFee;
+            balanceList[i] += amountOutAfterFee;
         }
+
+        callConfig.puppetStore.setBalanceList(callParams.outputToken, callParams.mirrorPosition.puppetList, balanceList);
+        callConfig.cugar.increaseCugarList(callConfig.cugarStore, callParams.outputToken, callParams.mirrorPosition.puppetList, feeAmountList);
 
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
         if (callParams.mirrorPosition.size == order.numbers.sizeDeltaUsd) {
             callConfig.positionStore.removeMirrorPosition(callParams.positionKey);
         } else {
-            callParams.mirrorPosition.size -= order.numbers.sizeDeltaUsd; // fix
-            callParams.mirrorPosition.collateral -= order.numbers.initialCollateralDeltaAmount;
-
             callConfig.positionStore.setMirrorPosition(callParams.positionKey, callParams.mirrorPosition);
         }
 
         callConfig.positionStore.removeRequestDecrease(callParams.requestKey);
 
-        // emit ExecuteDecreasePosition__DecreasePosition(
-        //     positionKey,
-        //     key,
-        //     order.addresses.account,
-        //     order.addresses.market,
-        //     order.addresses.initialCollateralToken,
-        //     order.flags.isLong,
-        //     order.numbers.sizeDeltaUsd,
-        //     order.numbers.initialCollateralDeltaAmount,
-        //     totalAmountOut,
-        //     profit
-        // );
+        if (request.collateralDelta > 0) {
+            callConfig.cugar.increaseCugar(
+                callConfig.cugarStore, callParams.outputToken, callParams.mirrorPosition.trader, traderPerformanceCutoffFee
+            );
+
+            SafeERC20.safeTransferFrom(
+                callParams.outputToken,
+                callConfig.positionRouterAddress,
+                callParams.mirrorPosition.trader,
+                request.collateralDelta * callParams.mirrorPosition.collateral / callParams.totalAmountOut
+            );
+        }
+
+        emit ExecuteDecreasePosition__DecreasePosition(
+            callParams.requestKey,
+            callParams.positionKey,
+            callParams.totalAmountOut,
+            callParams.profit,
+            totalPerformanceFee,
+            traderPerformanceCutoffFee
+        );
+    }
+
+    function getDistribution(uint performanceFeeRate, uint traderPerformanceFeeShare, uint totalProfit, uint amountOut, uint totalAmountOut)
+        internal
+        pure
+        returns (uint performanceFee, uint traderPerformanceCutoffFee, uint amountOutAfterFee)
+    {
+        uint profit = totalProfit * amountOut / totalAmountOut;
+
+        performanceFee = Precision.applyFactor(profit, performanceFeeRate);
+        amountOutAfterFee = profit - performanceFee;
+
+        traderPerformanceCutoffFee = Precision.applyFactor(performanceFee, traderPerformanceFeeShare);
+
+        performanceFee -= traderPerformanceCutoffFee;
+
+        return (performanceFee, traderPerformanceCutoffFee, amountOutAfterFee);
     }
 
     error ExecutePosition__InvalidRequest(bytes32 positionKey, bytes32 key);

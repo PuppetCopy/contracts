@@ -5,7 +5,7 @@ import {Precision} from "./../utils/Precision.sol";
 
 import {RewardLogic} from "./../tokenomics/logic/RewardLogic.sol";
 import {RewardRouter} from "./../RewardRouter.sol";
-import {UserGeneratedRevenueStore} from "./../shared/store/UserGeneratedRevenueStore.sol";
+import {CugarStore} from "./../shared/store/CugarStore.sol";
 
 contract RewardReader {
     RewardRouter public rewardRouter;
@@ -22,11 +22,7 @@ contract RewardReader {
         return Precision.applyBasisPoints(tokenAmount, config.rate);
     }
 
-    function getUserGeneratedRevenue(UserGeneratedRevenueStore rewardStore, address account)
-        public
-        view
-        returns (UserGeneratedRevenueStore.Revenue memory)
-    {
-        return rewardStore.getUserGeneratedRevenue(RewardLogic.getUserGeneratedRevenueKey(account));
+    function getClaimableUserGeneratedAllocatedRevenue(CugarStore rewardStore, address account) public view returns (uint) {
+        return rewardStore.getCugar(RewardLogic.getCugarKey(account));
     }
 }

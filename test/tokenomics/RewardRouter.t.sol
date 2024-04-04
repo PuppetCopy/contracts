@@ -13,8 +13,8 @@ import {VotingEscrow, MAXTIME} from "src/tokenomics/VotingEscrow.sol";
 import {RewardLogic} from "src/tokenomics/logic/RewardLogic.sol";
 import {VeRevenueDistributor} from "src/tokenomics/VeRevenueDistributor.sol";
 
-import {UserGeneratedRevenueStore} from "src/shared/store/UserGeneratedRevenueStore.sol";
-import {UserGeneratedRevenue} from "src/shared/UserGeneratedRevenue.sol";
+import {CugarStore} from "src/shared/store/CugarStore.sol";
+import {Cugar} from "src/shared/Cugar.sol";
 
 import {PositionUtils} from "src/position/util/PositionUtils.sol";
 
@@ -27,8 +27,8 @@ contract RewardRouterTest is BasicSetup {
     OracleStore usdPerWntStore;
     OracleStore puppetPerWntStore;
     RewardRouter rewardRouter;
-    UserGeneratedRevenue userGeneratedRevenue;
-    UserGeneratedRevenueStore userGeneratedRevenueStore;
+    Cugar cugar;
+    CugarStore cugarStore;
     VotingEscrow votingEscrow;
     VeRevenueDistributor revenueDistributor;
     IUniswapV3Pool[] wntUsdPoolList;
@@ -65,10 +65,10 @@ contract RewardRouterTest is BasicSetup {
         usdPerWntStore = new OracleStore(dictator, rewardRouterAddress, 100e30);
         puppetPerWntStore = new OracleStore(dictator, rewardRouterAddress, 1e18);
 
-        userGeneratedRevenue = new UserGeneratedRevenue(dictator);
-        userGeneratedRevenueStore = new UserGeneratedRevenueStore(dictator, address(userGeneratedRevenue));
-        dictator.setRoleCapability(REVENUE_OPERATOR, address(userGeneratedRevenue), userGeneratedRevenue.claimUserGeneratedRevenueList.selector, true);
-        dictator.setRoleCapability(REVENUE_OPERATOR, address(userGeneratedRevenue), userGeneratedRevenue.claimUserGeneratedRevenueList.selector, true);
+        cugar = new Cugar(dictator);
+        cugarStore = new CugarStore(dictator, address(cugar));
+        dictator.setRoleCapability(REVENUE_OPERATOR, address(cugar), cugar.claimUserGeneratedRevenueList.selector, true);
+        dictator.setRoleCapability(REVENUE_OPERATOR, address(cugar), cugar.claimUserGeneratedRevenueList.selector, true);
 
         votingEscrow = new VotingEscrow(dictator, router, puppetToken);
         dictator.setRoleCapability(VESTING_ROLE, address(votingEscrow), votingEscrow.lock.selector, true);
@@ -97,15 +97,15 @@ contract RewardRouterTest is BasicSetup {
                 lock: RewardLogic.CallLockConfig({
                     router: router,
                     votingEscrow: votingEscrow,
-                    userGeneratedRevenueStore: userGeneratedRevenueStore,
-                    userGeneratedRevenue: userGeneratedRevenue,
+                    cugarStore: cugarStore,
+                    cugar: cugar,
                     revenueDistributor: revenueDistributor,
                     puppetToken: puppetToken,
                     rate: 6000
                 }),
                 exit: RewardLogic.CallExitConfig({
-                    userGeneratedRevenueStore: userGeneratedRevenueStore,
-                    userGeneratedRevenue: userGeneratedRevenue,
+                    cugarStore: cugarStore,
+                    cugar: cugar,
                     revenueDistributor: revenueDistributor,
                     puppetToken: puppetToken,
                     rate: 3000
@@ -119,7 +119,7 @@ contract RewardRouterTest is BasicSetup {
         dictator.setUserRole(address(rewardRouter), MINT_PUPPET_ROLE, true);
         dictator.setUserRole(address(rewardRouter), REWARD_LOGIC_ROLE, true);
         dictator.setUserRole(address(rewardRouter), VESTING_ROLE, true);
-        dictator.setUserRole(address(userGeneratedRevenue), REVENUE_OPERATOR, true);
+        dictator.setUserRole(address(cugar), REVENUE_OPERATOR, true);
 
         dictator.setUserRole(address(rewardRouter), REVENUE_OPERATOR, true);
         dictator.setUserRole(users.owner, REVENUE_OPERATOR, true);
@@ -239,12 +239,12 @@ contract RewardRouterTest is BasicSetup {
         vm.startPrank(users.owner);
 
         _dealERC20(address(token), users.owner, amount);
-        userGeneratedRevenue.increaseUserGeneratedRevenue(
-            userGeneratedRevenueStore,
-            revenueDistributor,
-            PositionUtils.getUserGeneratedRevenueKey(token, users.owner, user),
-            UserGeneratedRevenueStore.Revenue({amountInToken: amount, amountInUsd: amount})
-        );
+        // userGeneratedRevenue.increaseUserGeneratedRevenue(
+        //     userGeneratedRevenueStore,
+        //     revenueDistributor,
+        //     PositionUtils.getUserGeneratedRevenueContributionKey(token, users.owner, user),
+        //     0
+        // );
 
         // skip block
         vm.roll(block.number + 1);
@@ -253,20 +253,16 @@ contract RewardRouterTest is BasicSetup {
         return amount;
     }
 
-    function getUserGeneratedRevenue(IERC20 token, address user) public view returns (UserGeneratedRevenueStore.Revenue memory) {
-        return userGeneratedRevenue.getUserGeneratedRevenue(
-            userGeneratedRevenueStore, PositionUtils.getUserGeneratedRevenueKey(token, users.owner, user)
-        );
+    function getCugar(IERC20 token, address user) public view returns (uint) {
+        return cugar.getCugar(cugarStore, PositionUtils.getCugarKey(token, users.owner, user));
     }
 
-    function getUserGeneratedRevenueInUsdc(address user) public view returns (UserGeneratedRevenueStore.Revenue memory) {
-        return
-            userGeneratedRevenue.getUserGeneratedRevenue(userGeneratedRevenueStore, PositionUtils.getUserGeneratedRevenueKey(usdc, users.owner, user));
+    function getUsdcCugar(address user) public view returns (uint) {
+        return cugar.getCugar(cugarStore, PositionUtils.getCugarKey(usdc, users.owner, user));
     }
 
-    function getUserGeneratedRevenueInWnt(address user) public view returns (UserGeneratedRevenueStore.Revenue memory) {
-        return
-            userGeneratedRevenue.getUserGeneratedRevenue(userGeneratedRevenueStore, PositionUtils.getUserGeneratedRevenueKey(wnt, users.owner, user));
+    function getWntCugar(address user) public view returns (uint) {
+        return cugar.getCugar(cugarStore, PositionUtils.getCugarKey(wnt, users.owner, user));
     }
 
     function getMaxTime() public view returns (uint) {

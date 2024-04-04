@@ -8,8 +8,8 @@ import {Precision} from "./../../utils/Precision.sol";
 import {Router} from "../../utils/Router.sol";
 import {VeRevenueDistributor} from "../VeRevenueDistributor.sol";
 
-import {UserGeneratedRevenueStore} from "../../shared/store/UserGeneratedRevenueStore.sol";
-import {UserGeneratedRevenue} from "../../shared/UserGeneratedRevenue.sol";
+import {CugarStore} from "../../shared/store/CugarStore.sol";
+import {Cugar} from "../../shared/Cugar.sol";
 import {PuppetToken} from "../PuppetToken.sol";
 import {PositionUtils} from "../../position/util/PositionUtils.sol";
 
@@ -21,25 +21,23 @@ library RewardLogic {
         EXIT
     }
 
-    event RewardLogic__ClaimOption(
-        Choice choice, address indexed account, UserGeneratedRevenueStore.Revenue[] revenueList, uint maxTokenAmount, uint amount
-    );
+    event RewardLogic__ClaimOption(Choice choice, address indexed account, uint[] revenueList, uint maxTokenAmount, uint amount);
 
     event RewardLogic__ReferralOwnershipTransferred(address referralStorage, bytes32 code, address newOwner, uint timestamp);
 
     struct CallLockConfig {
         VotingEscrow votingEscrow;
         Router router;
-        UserGeneratedRevenueStore userGeneratedRevenueStore;
-        UserGeneratedRevenue userGeneratedRevenue;
+        CugarStore cugarStore;
+        Cugar cugar;
         VeRevenueDistributor revenueDistributor;
         PuppetToken puppetToken;
         uint rate;
     }
 
     struct CallExitConfig {
-        UserGeneratedRevenueStore userGeneratedRevenueStore;
-        UserGeneratedRevenue userGeneratedRevenue;
+        CugarStore cugarStore;
+        Cugar cugar;
         VeRevenueDistributor revenueDistributor;
         PuppetToken puppetToken;
         uint rate;
@@ -67,11 +65,10 @@ library RewardLogic {
         bytes32[] memory keyList = new bytes32[](revTokenList.length);
 
         for (uint i = 0; i < revTokenList.length; i++) {
-            keyList[i] = PositionUtils.getUserGeneratedRevenueKey(revTokenList[i], from, from);
+            keyList[i] = PositionUtils.getCugarKey(revTokenList[i], from, from);
         }
 
-        (UserGeneratedRevenueStore.Revenue[] memory revenueList, uint totalClaimedInUsd) =
-            callLockConfig.userGeneratedRevenue.claimUserGeneratedRevenueList(callLockConfig.userGeneratedRevenueStore, address(this), keyList);
+        (uint[] memory revenueList, uint totalClaimedInUsd) = callLockConfig.cugar.claimUserGeneratedRevenueList(keyList);
 
         uint maxRewardTokenAmount = totalClaimedInUsd * 1e18 / tokenPrice;
 
@@ -92,11 +89,10 @@ library RewardLogic {
         bytes32[] memory keyList = new bytes32[](tokenList.length);
 
         for (uint i = 0; i < tokenList.length; i++) {
-            keyList[i] = PositionUtils.getUserGeneratedRevenueKey(tokenList[i], from, from);
+            keyList[i] = PositionUtils.getCugarKey(tokenList[i], from, from);
         }
 
-        (UserGeneratedRevenueStore.Revenue[] memory revenueList, uint totalClaimedInUsd) =
-            callExitConfig.userGeneratedRevenue.claimUserGeneratedRevenueList(callExitConfig.userGeneratedRevenueStore, address(this), keyList);
+        (uint[] memory revenueList, uint totalClaimedInUsd) = callExitConfig.cugar.claimUserGeneratedRevenueList(keyList);
 
         uint maxRewardTokenAmount = totalClaimedInUsd * 1e18 / tokenPrice;
 
@@ -131,7 +127,7 @@ library RewardLogic {
 
     // internal view
 
-    function getUserGeneratedRevenueKey(address account) internal pure returns (bytes32) {
+    function getCugarKey(address account) internal pure returns (bytes32) {
         return keccak256(abi.encode("USER_REVENUE", account));
     }
 

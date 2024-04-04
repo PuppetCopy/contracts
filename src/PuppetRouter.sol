@@ -17,7 +17,7 @@ contract PuppetRouter is Auth, ReentrancyGuard {
     struct CallConfig {
         PuppetLogic.CallSetRuleConfig setRule;
         PuppetLogic.CallCreateSubaccountConfig createSubaccount;
-        PuppetLogic.CallSetDepositWntConfig setWnt;
+        PuppetLogic.CallSetBalanceConfig setBalance;
     }
 
     CallConfig callConfig;
@@ -26,12 +26,20 @@ contract PuppetRouter is Auth, ReentrancyGuard {
         _setConfig(_callConfig);
     }
 
+    function deposit(IERC20 token, uint amount) external nonReentrant {
+        PuppetLogic.deposit(callConfig.setBalance, token, msg.sender, amount);
+    }
+
+    function withdraw(IERC20 token, uint amount) external nonReentrant {
+        PuppetLogic.withdraw(callConfig.setBalance, token, msg.sender, amount);
+    }
+
     function setRule(
         IERC20 collateralToken,
         address trader,
         PuppetStore.Rule calldata ruleParams //
     ) external nonReentrant {
-        PuppetLogic.setRule(callConfig.setRule, trader, collateralToken, msg.sender, ruleParams);
+        PuppetLogic.setRule(callConfig.setRule, collateralToken, msg.sender, trader, ruleParams);
     }
 
     function setRuleList(
@@ -39,7 +47,7 @@ contract PuppetRouter is Auth, ReentrancyGuard {
         address[] calldata traderList,
         IERC20[] calldata collateralTokenList
     ) external nonReentrant {
-        PuppetLogic.setRuleList(callConfig.setRule, traderList, collateralTokenList, ruleParams, msg.sender);
+        PuppetLogic.setRuleList(callConfig.setRule, msg.sender, traderList, collateralTokenList, ruleParams);
     }
 
     function createSubaccount() external nonReentrant {
@@ -58,14 +66,15 @@ contract PuppetRouter is Auth, ReentrancyGuard {
 
     // integration
 
-    function setMatchingActivity(
+    function setBalanceAndActivityList(
+        PuppetStore store,
         IERC20 collateralToken,
         address trader,
         address[] calldata _puppetList,
         uint[] calldata _activityList,
-        uint[] calldata _allowanceOptimList
+        uint[] calldata _balanceList
     ) external requiresAuth {
-        callConfig.setRule.store.setMatchingActivity(collateralToken, trader, _puppetList, _activityList, _allowanceOptimList);
+        store.setBalanceAndActivityList(collateralToken, trader, _puppetList, _activityList, _balanceList);
     }
 
     // internal

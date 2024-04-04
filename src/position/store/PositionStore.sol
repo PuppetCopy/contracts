@@ -13,7 +13,6 @@ contract PositionStore is StoreController {
     }
 
     struct RequestAdjustment {
-        address trader;
         uint[] puppetCollateralDeltaList;
         uint sizeDelta;
         uint collateralDelta;
@@ -21,10 +20,12 @@ contract PositionStore is StoreController {
     }
 
     struct MirrorPosition {
+        address trader;
         address[] puppetList;
         uint[] collateralList;
         uint size;
         uint collateral;
+        uint cumulativeTransactionCost;
     }
 
     struct UnhandledCallback {
@@ -34,7 +35,6 @@ contract PositionStore is StoreController {
     }
 
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
-
     mapping(bytes32 positionKey => RequestMatch) public requestMatchMap;
     mapping(bytes32 positionKey => MirrorPosition) public positionMap;
     mapping(bytes32 positionKey => UnhandledCallback) public unhandledCallbackMap;
@@ -59,6 +59,10 @@ contract PositionStore is StoreController {
 
     function setRequestMatch(bytes32 _key, RequestMatch calldata _rm) external isSetter {
         requestMatchMap[_key] = _rm;
+    }
+
+    function removeRequestMatch(bytes32 _key) external isSetter {
+        delete requestMatchMap[_key];
     }
 
     function removeRequestDecrease(bytes32 _key) external isSetter {

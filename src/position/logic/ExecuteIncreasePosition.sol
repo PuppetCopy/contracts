@@ -26,7 +26,6 @@ library ExecuteIncreasePosition {
     }
 
     function increase(CallConfig memory callConfig, bytes32 key, GmxPositionUtils.Props memory order) external {
-
         bytes32 positionKey = GmxPositionUtils.getPositionKey(
             order.addresses.account, order.addresses.market, order.addresses.initialCollateralToken, order.flags.isLong
         );
@@ -34,8 +33,17 @@ library ExecuteIncreasePosition {
         PositionStore.RequestAdjustment memory request = callConfig.positionStore.getRequestAdjustment(key);
         PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
 
+        if (mirrorPosition.size == 0) {
+            PositionStore.RequestMatch memory matchRequest = callConfig.positionStore.getRequestMatch(positionKey);
+            mirrorPosition.trader = matchRequest.trader;
+            mirrorPosition.puppetList = matchRequest.puppetList;
+
+            callConfig.positionStore.removeRequestMatch(positionKey);
+        }
+
         mirrorPosition.collateral += request.collateralDelta;
         mirrorPosition.size += request.sizeDelta;
+        mirrorPosition.cumulativeTransactionCost += request.transactionCost;
 
         callConfig.positionStore.setMirrorPosition(key, mirrorPosition);
         callConfig.positionStore.removeRequestAdjustment(key);

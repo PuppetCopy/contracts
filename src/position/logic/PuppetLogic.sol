@@ -2,8 +2,7 @@
 pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-import {IWNT} from "./../../utils/interfaces/IWNT.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {SubaccountFactory} from "./../../shared/SubaccountFactory.sol";
 import {SubaccountStore} from "./../../shared/store/SubaccountStore.sol";
@@ -14,8 +13,8 @@ import {PuppetStore} from "../store/PuppetStore.sol";
 
 library PuppetLogic {
     event PuppetLogic__SetRule(bytes32 ruleKey, PuppetStore.Rule rule);
-    event PuppetLogic__DepositWnt(address account, uint amount);
-    event PuppetLogic__WithdrawWnt(address account, uint amount);
+    event PuppetLogic__Deposit(IERC20 token, address account, uint amount);
+    event PuppetLogic__Withdraw(IERC20 token, address account, uint amount);
 
     struct CallSetRuleConfig {
         Router router;
@@ -30,76 +29,88 @@ library PuppetLogic {
         SubaccountStore store;
     }
 
-    struct CallSetDepositWntConfig {
-        IWNT wnt;
+    struct CallSetBalanceConfig {
+        Router router;
         PuppetStore store;
-        address holdingAddress;
-        uint gasLimit;
+        address positionRouterAddress;
     }
 
     function createSubaccount(CallCreateSubaccountConfig memory callConfig, address account) internal {
         callConfig.factory.createSubaccount(callConfig.store, account);
     }
 
+    function deposit(CallSetBalanceConfig memory callConfig, IERC20 token, address account, uint amount) internal {
+        if (amount == 0) revert PuppetLogic__InvalidAmount();
+
+        callConfig.router.transfer(token, msg.sender, callConfig.positionRouterAddress, amount);
+
+        uint balance = callConfig.store.getBalance(token, account);
+        callConfig.store.setBalance(token, account, balance + amount);
+
+        emit PuppetLogic__Deposit(token, account, amount);
+    }
+
+    function withdraw(CallSetBalanceConfig memory callConfig, IERC20 token, address account, uint amount) internal {
+        if (amount == 0) revert PuppetLogic__InvalidAmount();
+
+        uint balance = callConfig.store.getBalance(token, account);
+        if (amount > balance) revert PuppetLogic__InsufficientBalance();
+
+        SafeERC20.safeTransferFrom(token, callConfig.positionRouterAddress, msg.sender, amount);
+
+        callConfig.store.setBalance(token, account, balance - amount);
+
+        emit PuppetLogic__Withdraw(token, account, amount);
+    }
+
     function setRule(
         CallSetRuleConfig memory callConfig,
-        address trader,
         IERC20 collateralToken,
         address puppet,
+        address trader,
         PuppetStore.Rule calldata ruleParams
     ) internal {
         bytes32 ruleKey = PositionUtils.getRuleKey(collateralToken, puppet, trader);
+        _validatePuppetTokenAllowance(callConfig.store, collateralToken, puppet);
 
         PuppetStore.Rule memory storedRule = callConfig.store.getRule(ruleKey);
-        uint tokenAllowance = _validateTokenAllowance(callConfig, puppet, collateralToken);
-
-        callConfig.store.setTokenAllowanceActivity(PositionUtils.getAllownaceKey(collateralToken, puppet), tokenAllowance);
-
         PuppetStore.Rule memory rule = _setRule(callConfig, storedRule, ruleParams);
 
-        callConfig.store.setRule(rule, ruleKey);
+        callConfig.store.setRule(ruleKey, rule);
 
         emit PuppetLogic__SetRule(ruleKey, rule);
     }
 
     function setRuleList(
         CallSetRuleConfig memory callConfig,
+        address puppet,
         address[] calldata traderList,
         IERC20[] calldata collateralTokenList,
-        PuppetStore.Rule[] calldata ruleParams,
-        address puppet
+        PuppetStore.Rule[] calldata ruleParams
     ) internal {
-        uint length = traderList.length;
         IERC20[] memory verifyAllowanceTokenList = new IERC20[](0);
+        uint length = traderList.length;
         bytes32[] memory keyList = new bytes32[](length);
 
         for (uint i = 0; i < length; i++) {
-            bytes32 key = PositionUtils.getRuleKey(collateralTokenList[i], puppet, traderList[i]);
-
-            keyList[i] = key;
+            keyList[i] = PositionUtils.getRuleKey(collateralTokenList[i], puppet, traderList[i]);
         }
 
         PuppetStore.Rule[] memory storedRuleList = callConfig.store.getRuleList(keyList);
 
         for (uint i = 0; i < length; i++) {
-            bytes32 ruleKey = keyList[i];
-
             storedRuleList[i] = _setRule(callConfig, storedRuleList[i], ruleParams[i]);
 
             if (isArrayContains(verifyAllowanceTokenList, collateralTokenList[i])) {
                 verifyAllowanceTokenList[verifyAllowanceTokenList.length] = collateralTokenList[i];
             }
 
-            emit PuppetLogic__SetRule(ruleKey, storedRuleList[i]);
+            emit PuppetLogic__SetRule(keyList[i], storedRuleList[i]);
         }
 
-        callConfig.store.setRuleList(storedRuleList, keyList);
+        callConfig.store.setRuleList(keyList, storedRuleList);
 
-        for (uint i = 0; i < verifyAllowanceTokenList.length; i++) {
-            uint tokenAllowance = _validateTokenAllowance(callConfig, puppet, verifyAllowanceTokenList[i]);
-
-            callConfig.store.setTokenAllowanceActivity(PositionUtils.getAllownaceKey(collateralTokenList[i], puppet), tokenAllowance);
-        }
+        _validatePuppetTokenAllowanceList(callConfig.store, verifyAllowanceTokenList, puppet);
     }
 
     function _setRule(
@@ -140,26 +151,35 @@ library PuppetLogic {
         return false;
     }
 
-    function _validateTokenAllowance(
-        CallSetRuleConfig memory callConfig, //
-        address from,
-        IERC20 collateralToken
-    ) internal view returns (uint) {
-        uint tokenAllowance = IERC20(collateralToken).allowance(from, address(callConfig.router));
-        uint allowanceCap = callConfig.store.getTokenAllowanceCap(collateralToken);
-
-        if (allowanceCap == 0 || tokenAllowance > allowanceCap) {
-            revert PuppetLogic__NotAllowedCollateralTokenAmount();
+    function _validatePuppetTokenAllowanceList(
+        PuppetStore store, //
+        IERC20[] memory tokenList,
+        address puppet
+    ) internal view {
+        for (uint i = 0; i < tokenList.length; i++) {
+            _validatePuppetTokenAllowance(store, tokenList[i], puppet);
         }
+    }
+
+    function _validatePuppetTokenAllowance(
+        PuppetStore store, //
+        IERC20 token,
+        address puppet
+    ) internal view returns (uint) {
+        uint tokenAllowance = store.getBalance(token, puppet);
+        uint allowanceCap = store.getTokenAllowanceCap(token);
+
+        if (allowanceCap == 0) revert PuppetLogic__TokenNotAllowed();
+        if (tokenAllowance > allowanceCap) revert PuppetLogic__AllowanceAboveLimit(allowanceCap);
 
         return tokenAllowance;
     }
 
     error PuppetLogic__InvalidAllowanceRate(uint min, uint max);
     error PuppetLogic__ExpiredDate();
-    error PuppetLogic__NoAllowance();
-    error PuppetLogic__InsufficientAllowance();
-    error PuppetLogic__InsufficientBalance();
     error PuppetLogic__NotFound();
-    error PuppetLogic__NotAllowedCollateralTokenAmount();
+    error PuppetLogic__TokenNotAllowed();
+    error PuppetLogic__AllowanceAboveLimit(uint allowanceCap);
+    error PuppetLogic__InvalidAmount();
+    error PuppetLogic__InsufficientBalance();
 }

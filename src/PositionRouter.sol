@@ -6,6 +6,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 
 import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
 import {GmxPositionUtils} from "./position/util/GmxPositionUtils.sol";
+import {PositionUtils} from "./position/util/PositionUtils.sol";
 
 import {PositionStore} from "./position/store/PositionStore.sol";
 import {RequestIncreasePosition} from "./position/logic/RequestIncreasePosition.sol";
@@ -13,8 +14,6 @@ import {RequestDecreasePosition} from "./position/logic/RequestDecreasePosition.
 import {ExecuteIncreasePosition} from "./position/logic/ExecuteIncreasePosition.sol";
 import {ExecuteDecreasePosition} from "./position/logic/ExecuteDecreasePosition.sol";
 import {ExecuteRejectedAdjustment} from "./position/logic/ExecuteRejectedAdjustment.sol";
-
-import {TransferUtils} from "./utils/TransferUtils.sol";
 
 contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
     struct CallConfig {
@@ -33,48 +32,14 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
         _setConfig(_callConfig);
     }
 
-    function requestIncrease(RequestIncreasePosition.TraderCallParams calldata traderCallParams, address[] calldata puppetList)
-        external
-        payable
-        nonReentrant
-    {
-        uint startGas = gasleft();
-        PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
-            trader: msg.sender,
-            puppetCollateralDeltaList: new uint[](puppetList.length),
-            collateralDelta: traderCallParams.collateralDelta,
-            sizeDelta: traderCallParams.sizeDelta,
-            transactionCost: startGas
-        });
+    function requestIncrease(PositionUtils.TraderCallParams calldata traderCallParams, address[] calldata puppetList) external payable nonReentrant {
+        if (traderCallParams.account != msg.sender) revert PositionRouter__SenderNotMatchingTrader();
 
-        // native ETH can be identified by depositing more than the execution fee
-        if (address(traderCallParams.collateralToken) == address(callConfig.increase.wnt) && traderCallParams.executionFee > msg.value) {
-            TransferUtils.depositAndSendWnt(
-                callConfig.increase.wnt,
-                address(callConfig.increase.positionStore),
-                callConfig.increase.tokenTransferGasLimit,
-                callConfig.increase.gmxOrderVault,
-                traderCallParams.executionFee + traderCallParams.collateralDelta
-            );
-        } else {
-            TransferUtils.depositAndSendWnt(
-                callConfig.increase.wnt,
-                address(callConfig.increase.positionStore),
-                callConfig.increase.tokenTransferGasLimit,
-                callConfig.increase.gmxOrderVault,
-                traderCallParams.executionFee
-            );
-
-            callConfig.increase.router.transfer(
-                traderCallParams.collateralToken, msg.sender, callConfig.increase.gmxOrderVault, traderCallParams.collateralDelta
-            );
-        }
-
-        RequestIncreasePosition.increase(callConfig.increase, request, traderCallParams, puppetList);
+        RequestIncreasePosition.traderIncrease(callConfig.increase, traderCallParams, puppetList);
     }
 
-    function requestDecrease(RequestDecreasePosition.TraderCallParams calldata traderCallParams) external payable nonReentrant {
-        RequestDecreasePosition.decrease(callConfig.decrease, traderCallParams, msg.sender);
+    function requestDecrease(PositionUtils.TraderCallParams calldata traderCallParams) external payable nonReentrant {
+        RequestDecreasePosition.traderDecrease(callConfig.decrease, traderCallParams);
     }
 
     // attempt to execute the callback, if
@@ -95,40 +60,34 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
         }
     }
 
-    function afterOrderCancellation(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant {
+    function afterOrderCancellation(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData)
+        external
+        nonReentrant
+        requiresAuth
+    {
         try ExecuteRejectedAdjustment.handleCancelled(key, order) {}
         catch {
             storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.Cancelled, order, key, eventData);
         }
     }
 
-    function afterOrderFrozen(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant {
+    function afterOrderFrozen(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant requiresAuth {
         try ExecuteRejectedAdjustment.handleFrozen(key, order) {}
         catch {
-            storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.Cancelled, order, key, eventData);
+            storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.Frozen, order, key, eventData);
         }
     }
 
-    function proxyRequestIncrease(RequestIncreasePosition.TraderCallParams calldata traderCallParams, address trader, address[] calldata puppetList)
+    function proxyRequestIncrease(PositionUtils.TraderCallParams calldata traderCallParams, address[] calldata puppetList)
         external
         payable
         requiresAuth
     {
-        uint startGas = gasleft();
-
-        PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
-            trader: trader,
-            puppetCollateralDeltaList: new uint[](puppetList.length),
-            collateralDelta: 0,
-            sizeDelta: 0,
-            transactionCost: startGas
-        });
-
-        RequestIncreasePosition.increase(callConfig.increase, request, traderCallParams, puppetList);
+        RequestIncreasePosition.proxyIncrease(callConfig.increase, traderCallParams, puppetList);
     }
 
-    function proxyRequestDecrease(RequestDecreasePosition.TraderCallParams calldata traderCallParams) external payable requiresAuth {
-        RequestDecreasePosition.decrease(callConfig.decrease, traderCallParams, msg.sender);
+    function proxyRequestDecrease(PositionUtils.TraderCallParams calldata traderCallParams) external payable requiresAuth {
+        RequestDecreasePosition.proxyDecrease(callConfig.decrease, traderCallParams);
     }
 
     // integration
@@ -172,4 +131,5 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
     }
 
     error PositionRouter__InvalidOrderType(GmxPositionUtils.OrderType orderType);
+    error PositionRouter__SenderNotMatchingTrader();
 }
