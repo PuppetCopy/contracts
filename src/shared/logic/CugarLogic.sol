@@ -32,8 +32,8 @@ library CugarLogic {
         returns (uint)
     {
         uint tokenPrice = callClaimConfig.oracle.getMaxPriceInToken(token);
-        if (maxAcceptableTokenPriceInUsdc > tokenPrice) revert RewardLogic__UnacceptableTokenPrice(tokenPrice, maxAcceptableTokenPriceInUsdc);
-        if (tokenPrice == 0) revert Cugar__InvalidClaimPrice();
+        if (tokenPrice > maxAcceptableTokenPriceInUsdc) revert CugarLogic__UnacceptableTokenPrice(tokenPrice, maxAcceptableTokenPriceInUsdc);
+        if (tokenPrice == 0) revert CugarLogic__InvalidClaimPrice();
 
         bytes32 contributionKey = PositionUtils.getCugarKey(token, revenueSource, user);
         uint revenueInToken = callClaimConfig.store.getCugar(contributionKey);
@@ -76,8 +76,8 @@ library CugarLogic {
         revenueDistributor.checkpointToken(token);
     }
 
-    error Cugar__InvalidInputLength();
-    error Cugar__NothingToClaim();
-    error Cugar__InvalidClaimPrice();
-    error RewardLogic__UnacceptableTokenPrice(uint curentPrice, uint acceptablePrice);
+    error CugarLogic__InvalidInputLength();
+    error CugarLogic__NothingToClaim();
+    error CugarLogic__InvalidClaimPrice();
+    error CugarLogic__UnacceptableTokenPrice(uint curentPrice, uint acceptablePrice);
 }

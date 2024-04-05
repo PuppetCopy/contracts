@@ -3,7 +3,6 @@ pragma solidity 0.8.24;
 
 import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 
 import {OracleStore, SLOT_COUNT} from "../store/OracleStore.sol";
@@ -31,7 +30,7 @@ library OracleLogic {
     event OracleLogic__SlotSettled(uint updateInterval, uint seedTimestamp, uint seedPrice, uint maxPrice);
     event OracleLogic__PriceUpdate(uint timestamp, uint price);
 
-    struct WntPriceConfig {
+    struct ExchangePriceSourceConfig {
         bool enabled;
         IUniswapV3Pool[] sourceList;
         uint32 twapInterval;
@@ -39,20 +38,21 @@ library OracleLogic {
     }
 
     function getMaxPrice(OracleStore store, IVault vault, bytes32 poolId) internal view returns (uint) {
-        return Math.max(store.medianMax(), getVaultPriceInWnt(vault, poolId));
+        return Math.max(store.medianMax(), getPoolPrice(vault, poolId));
     }
 
     function getMinPrice(OracleStore store, IVault vault, bytes32 poolId) internal view returns (uint) {
-        return Math.min(store.medianMin(), getVaultPriceInWnt(vault, poolId));
+        return Math.min(store.medianMin(), getPoolPrice(vault, poolId));
     }
 
     function getMaxPriceInToken(
         OracleStore store, //
         IVault vault,
-        WntPriceConfig memory tokenPerWntConfig,
+        ExchangePriceSourceConfig memory tokenPerWntConfig,
         bytes32 poolId
     ) internal view returns (uint usdPerToken) {
-        uint sourceTokenPerWnt = getTokenPerWntUsingTwapMedian(tokenPerWntConfig.sourceList, tokenPerWntConfig.twapInterval);
+        uint denominator = 10 ** (18 + tokenPerWntConfig.sourceTokenDeicmals);
+        uint sourceTokenPerWnt = getTokenPerWntUsingTwapMedian(tokenPerWntConfig.sourceList, tokenPerWntConfig.twapInterval) * denominator;
         uint tokenPerWnt = getMaxPrice(store, vault, poolId);
         usdPerToken = sourceTokenPerWnt * 1e30 / tokenPerWnt;
     }
@@ -60,7 +60,7 @@ library OracleLogic {
     function getMinPriceInToken(
         OracleStore store, //
         IVault vault,
-        WntPriceConfig memory tokenPerWntConfig,
+        ExchangePriceSourceConfig memory tokenPerWntConfig,
         bytes32 poolId
     ) internal view returns (uint usdPerToken) {
         uint denominator = 10 ** (18 + tokenPerWntConfig.sourceTokenDeicmals);
@@ -70,7 +70,7 @@ library OracleLogic {
         usdPerToken = sourceTokenPerWnt * 1e30 / tokenPerWnt;
     }
 
-    function getVaultPriceInWnt(IVault vault, bytes32 poolId) internal view returns (uint price) {
+    function getPoolPrice(IVault vault, bytes32 poolId) internal view returns (uint price) {
         (, uint[] memory balances,) = vault.getPoolTokens(poolId);
 
         uint tokenBalance = balances[0];
@@ -109,7 +109,7 @@ library OracleLogic {
 
     // state
     function storePrice(OracleStore store, IVault vault, bytes32 poolId, uint updateInterval) internal {
-        uint price = getVaultPriceInWnt(vault, poolId);
+        uint price = getPoolPrice(vault, poolId);
         OracleStore.SlotSeed memory seed = store.getLatestSeed();
 
         if (seed.blockNumber == block.number && seed.price > price) {

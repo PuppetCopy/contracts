@@ -10,7 +10,6 @@ import {VeRevenueDistributor} from "../VeRevenueDistributor.sol";
 
 import {Cugar} from "./../../Cugar.sol";
 import {PuppetToken} from "../PuppetToken.sol";
-import {PositionUtils} from "../../position/util/PositionUtils.sol";
 
 import {VotingEscrow, MAXTIME} from "../VotingEscrow.sol";
 

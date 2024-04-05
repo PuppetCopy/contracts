@@ -10,7 +10,7 @@ import {OracleStore} from "./tokenomics/store/OracleStore.sol";
 import {OracleLogic} from "./tokenomics/logic/OracleLogic.sol";
 
 contract Oracle is Auth, ReentrancyGuard {
-    event RewardRouter__SetConfig(uint timestmap, CallConfig callConfig);
+    event RewardRouter__SetConfig(uint timestmap, CallConfig callConfig, OracleLogic.ExchangePriceSourceConfig[] exchangePriceSourceList);
 
     struct CallConfig {
         OracleStore store;
@@ -22,10 +22,19 @@ contract Oracle is Auth, ReentrancyGuard {
 
     CallConfig callConfig;
 
-    mapping(IERC20 token => OracleLogic.WntPriceConfig) tokenPerWntConfigMap;
+    mapping(IERC20 token => OracleLogic.ExchangePriceSourceConfig) tokenPerWntConfigMap;
 
-    constructor(Authority _authority, CallConfig memory _callConfig) Auth(address(0), _authority) {
-        _setConfig(_callConfig);
+    constructor(
+        Authority _authority,
+        CallConfig memory _callConfig,
+        IERC20[] memory _tokenList,
+        OracleLogic.ExchangePriceSourceConfig[] memory _exchangePriceSourceList
+    ) Auth(address(0), _authority) {
+        _setConfig(_callConfig, _tokenList, _exchangePriceSourceList);
+    }
+
+    function getPoolPrice() public view returns (uint) {
+        return OracleLogic.getPoolPrice(callConfig.vault, callConfig.poolId);
     }
 
     function getMaxPrice() public view returns (uint) {
@@ -54,28 +63,40 @@ contract Oracle is Auth, ReentrancyGuard {
 
     // governance
 
-    function setTokenPerWntConfig(IERC20 _token, OracleLogic.WntPriceConfig memory _config) external requiresAuth {
-        if (_config.sourceList.length % 2 == 0) revert Oracle__SourceCountNotOdd();
-        if (_config.sourceList.length < 3) revert Oracle__NotEnoughSources();
-
-        tokenPerWntConfigMap[_token] = _config;
-    }
-
-    function setConfig(CallConfig memory _callConfig) external requiresAuth {
+    function setConfig(
+        CallConfig memory _callConfig,
+        IERC20[] memory _tokenList,
+        OracleLogic.ExchangePriceSourceConfig[] memory _exchangePriceSourceList
+    ) external requiresAuth {
         if (_callConfig.poolId == bytes32(0)) revert Oracle__InvalidPoolId();
 
-        _setConfig(_callConfig);
+        _setConfig(_callConfig, _tokenList, _exchangePriceSourceList);
     }
 
     // internal
 
-    function _setConfig(CallConfig memory _callConfig) internal {
+    function _setConfig(
+        CallConfig memory _callConfig,
+        IERC20[] memory _tokenList,
+        OracleLogic.ExchangePriceSourceConfig[] memory _exchangePriceSourceList
+    ) internal {
         callConfig = _callConfig;
 
-        emit RewardRouter__SetConfig(block.timestamp, callConfig);
+        if (_tokenList.length != _exchangePriceSourceList.length) revert Oracle__TokenSourceListLengthMismatch();
+
+        for (uint i; i < _exchangePriceSourceList.length; i++) {
+            OracleLogic.ExchangePriceSourceConfig memory _config = _exchangePriceSourceList[i];
+            if (_config.sourceList.length % 2 == 0) revert Oracle__SourceCountNotOdd();
+            if (_config.sourceList.length < 3) revert Oracle__NotEnoughSources();
+
+            tokenPerWntConfigMap[_tokenList[i]] = _config;
+        }
+
+        emit RewardRouter__SetConfig(block.timestamp, callConfig, _exchangePriceSourceList);
     }
 
     error Oracle__InvalidPoolId();
     error Oracle__SourceCountNotOdd();
     error Oracle__NotEnoughSources();
+    error Oracle__TokenSourceListLengthMismatch();
 }
