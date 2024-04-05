@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 
 import {OracleStore, SLOT_COUNT} from "../store/OracleStore.sol";
 import {UniV3Prelude} from "../../utils/UniV3Prelude.sol";
@@ -20,41 +21,56 @@ import {UniV3Prelude} from "../../utils/UniV3Prelude.sol";
  * -- Flashloan
  * assuming attacker tries to flashloan a low price to affect the price
  * low price settlment manipulation would be mitigated by taking previous higher settled price within the same block
- * - DDOS
+ * -- DDOS
  * settlment has to be below Acceptable Price check can an attacker prevent other tx's from being settled?
  * there doesn't seem to have an ecnonomical sense but it could be a case
  *
  */
 library OracleLogic {
+    event OracleLogic__SyncDelayedSlot(uint updateInterval, uint seedTimestamp, uint currentTimestamp, uint delayedUpdateCount, uint price);
+    event OracleLogic__SlotSettled(uint updateInterval, uint seedTimestamp, uint seedPrice, uint maxPrice);
     event OracleLogic__PriceUpdate(uint timestamp, uint price);
-    event OracleLogic__SlotSettled(uint updateInterval, uint timestamp, uint minPrice, uint maxPrice);
-    event OracleLogic__SyncDelayedSlot(uint updateInterval, uint seedTimestamp, uint blockTimestamp, uint delayCount, uint price);
 
-    struct CallConfig {
-        IUniswapV3Pool[] wntUsdSourceList;
-        IVault vault;
-        OracleStore tokenPerWntStore;
-        // OracleStore usdPerWntStore;
-        bytes32 poolId;
+    struct WntPriceConfig {
+        bool enabled;
+        IUniswapV3Pool[] sourceList;
         uint32 twapInterval;
-        uint updateInterval;
+        uint8 sourceTokenDeicmals;
     }
 
-    function getMaxPrice(OracleStore store, uint latestPrice) public view returns (uint) {
-        return Math.max(store.medianMax(), latestPrice);
+    function getMaxPrice(OracleStore store, IVault vault, bytes32 poolId) internal view returns (uint) {
+        return Math.max(store.medianMax(), getVaultPriceInWnt(vault, poolId));
     }
 
-    function getMinPrice(OracleStore store, uint latestPrice) public view returns (uint) {
-        return Math.min(store.medianMin(), latestPrice);
+    function getMinPrice(OracleStore store, IVault vault, bytes32 poolId) internal view returns (uint) {
+        return Math.min(store.medianMin(), getVaultPriceInWnt(vault, poolId));
     }
 
-    function getTokenPerUsd(CallConfig calldata callConfig) public view returns (uint usdPerToken) {
-        uint usdPerWnt = getUsdPerWntUsingTwapMedian(callConfig.wntUsdSourceList, callConfig.twapInterval);
-        uint tokenPerWnt = getTokenPerWnt(callConfig.vault, callConfig.poolId);
-        usdPerToken = usdPerWnt * 1e30 / tokenPerWnt;
+    function getMaxPriceInToken(
+        OracleStore store, //
+        IVault vault,
+        WntPriceConfig memory tokenPerWntConfig,
+        bytes32 poolId
+    ) internal view returns (uint usdPerToken) {
+        uint sourceTokenPerWnt = getTokenPerWntUsingTwapMedian(tokenPerWntConfig.sourceList, tokenPerWntConfig.twapInterval);
+        uint tokenPerWnt = getMaxPrice(store, vault, poolId);
+        usdPerToken = sourceTokenPerWnt * 1e30 / tokenPerWnt;
     }
 
-    function getTokenPerWnt(IVault vault, bytes32 poolId) public view returns (uint price) {
+    function getMinPriceInToken(
+        OracleStore store, //
+        IVault vault,
+        WntPriceConfig memory tokenPerWntConfig,
+        bytes32 poolId
+    ) internal view returns (uint usdPerToken) {
+        uint denominator = 10 ** (18 + tokenPerWntConfig.sourceTokenDeicmals);
+
+        uint sourceTokenPerWnt = getTokenPerWntUsingTwapMedian(tokenPerWntConfig.sourceList, tokenPerWntConfig.twapInterval) * denominator;
+        uint tokenPerWnt = getMinPrice(store, vault, poolId);
+        usdPerToken = sourceTokenPerWnt * 1e30 / tokenPerWnt;
+    }
+
+    function getVaultPriceInWnt(IVault vault, bytes32 poolId) internal view returns (uint price) {
         (, uint[] memory balances,) = vault.getPoolTokens(poolId);
 
         uint tokenBalance = balances[0];
@@ -67,18 +83,18 @@ library OracleLogic {
         if (price == 0) revert OracleLogic__NonZeroPrice();
     }
 
-    function getUsdPerWntUsingTwapMedian(IUniswapV3Pool[] memory wntUsdSourceList, uint32 twapInterval) public view returns (uint medianPrice) {
-        uint sourceListLength = wntUsdSourceList.length;
+    function getTokenPerWntUsingTwapMedian(IUniswapV3Pool[] memory sourceList, uint32 twapInterval) internal view returns (uint medianPrice) {
+        uint sourceListLength = sourceList.length;
         if (sourceListLength < 3) revert OracleLogic__NotEnoughSources();
 
         uint[] memory priceList = new uint[](sourceListLength);
         uint medianIndex = (sourceListLength - 1) / 2; // Index of the median after the array is sorted
 
         // Initialize the first element
-        priceList[0] = UniV3Prelude.getTwapPrice(wntUsdSourceList[0], 18, twapInterval);
+        priceList[0] = UniV3Prelude.getTwapPrice(sourceList[0], 18, twapInterval);
 
         for (uint i = 1; i < sourceListLength; i++) {
-            uint currentPrice = UniV3Prelude.getTwapPrice(wntUsdSourceList[i], 18, twapInterval);
+            uint currentPrice = UniV3Prelude.getTwapPrice(sourceList[i], 18, twapInterval);
 
             uint j = i;
             while (j > 0 && priceList[j - 1] > currentPrice) {
@@ -88,32 +104,22 @@ library OracleLogic {
             priceList[j] = currentPrice;
         }
 
-        medianPrice = priceList[medianIndex] * 1e24;
+        medianPrice = priceList[medianIndex];
     }
 
     // state
-    function syncPrices(CallConfig memory callConfig) internal returns (uint usdPerWnt, uint tokenPerWnt, uint usdPerToken) {
-        usdPerWnt = getUsdPerWntUsingTwapMedian(callConfig.wntUsdSourceList, callConfig.twapInterval);
-        uint exchangeTokenPerWnt = getTokenPerWnt(callConfig.vault, callConfig.poolId);
-        tokenPerWnt = _storeAndGetMax(callConfig.tokenPerWntStore, callConfig.updateInterval, exchangeTokenPerWnt);
-        usdPerToken = usdPerWnt * 1e30 / tokenPerWnt;
-    }
-
-    // Internal
-
-    function _storeAndGetMax(OracleStore store, uint updateInterval, uint price) internal returns (uint) {
+    function storePrice(OracleStore store, IVault vault, bytes32 poolId, uint updateInterval) internal {
+        uint price = getVaultPriceInWnt(vault, poolId);
         OracleStore.SlotSeed memory seed = store.getLatestSeed();
 
         if (seed.blockNumber == block.number && seed.price > price) {
-            return getMaxPrice(store, seed.price);
+            return;
         }
 
-        _storeMinMax(store, updateInterval, price);
-
-        return getMaxPrice(store, price);
+        storeMinMax(store, updateInterval, price);
     }
 
-    function _storeMinMax(OracleStore store, uint updateInterval, uint price) internal {
+    function storeMinMax(OracleStore store, uint updateInterval, uint price) internal {
         OracleStore.SlotSeed memory seed = store.getLatestSeed();
 
         if (price == 0) revert OracleLogic__NonZeroPrice();
@@ -135,10 +141,10 @@ library OracleLogic {
             store.setSlot(slot);
 
             store.setSlotMin(slot, price);
-            store.setMedianMin(_getMedian(store.getSlotArrMin()));
+            store.setMedianMin(getMedian(store.getSlotArrMin()));
 
             store.setSlotMax(slot, price);
-            store.setMedianMax(_getMedian(store.getSlotArrMax()));
+            store.setMedianMax(getMedian(store.getSlotArrMax()));
 
             // in case previous slots are outdated, we need to update them with the current price
             uint timeDelta = block.timestamp - seed.timestamp;
@@ -164,7 +170,7 @@ library OracleLogic {
         emit OracleLogic__PriceUpdate(block.timestamp, price);
     }
 
-    function _getMedian(uint[7] memory arr) internal pure returns (uint) {
+    function getMedian(uint[7] memory arr) internal pure returns (uint) {
         for (uint i = 1; i < 7; i++) {
             uint ix = arr[i];
             uint j = i;

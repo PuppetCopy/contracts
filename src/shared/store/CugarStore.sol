@@ -44,7 +44,7 @@ contract CugarStore is StoreController {
         }
     }
 
-    function increaseCugarList(bytes32[] calldata _keyList, uint[] calldata _revenueList) external isSetter {
+    function increaseList(bytes32[] calldata _keyList, uint[] calldata _revenueList) external isSetter {
         if (_keyList.length != _revenueList.length) revert CugarStore__InvalidInputLength();
 
         for (uint i = 0; i < _keyList.length; i++) {

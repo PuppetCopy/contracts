@@ -8,8 +8,7 @@ import {Precision} from "./../../utils/Precision.sol";
 import {Router} from "../../utils/Router.sol";
 import {VeRevenueDistributor} from "../VeRevenueDistributor.sol";
 
-import {CugarStore} from "../../shared/store/CugarStore.sol";
-import {Cugar} from "../../shared/Cugar.sol";
+import {Cugar} from "./../../Cugar.sol";
 import {PuppetToken} from "../PuppetToken.sol";
 import {PositionUtils} from "../../position/util/PositionUtils.sol";
 
@@ -21,14 +20,13 @@ library RewardLogic {
         EXIT
     }
 
-    event RewardLogic__ClaimOption(Choice choice, address indexed account, uint[] revenueList, uint maxTokenAmount, uint amount);
+    event RewardLogic__ClaimOption(Choice choice, address account, IERC20 token, uint amount);
 
     event RewardLogic__ReferralOwnershipTransferred(address referralStorage, bytes32 code, address newOwner, uint timestamp);
 
     struct CallLockConfig {
         VotingEscrow votingEscrow;
         Router router;
-        CugarStore cugarStore;
         Cugar cugar;
         VeRevenueDistributor revenueDistributor;
         PuppetToken puppetToken;
@@ -36,7 +34,6 @@ library RewardLogic {
     }
 
     struct CallExitConfig {
-        CugarStore cugarStore;
         Cugar cugar;
         VeRevenueDistributor revenueDistributor;
         PuppetToken puppetToken;
@@ -61,48 +58,33 @@ library RewardLogic {
 
     // state
 
-    function lock(CallLockConfig memory callLockConfig, IERC20[] calldata revTokenList, uint tokenPrice, address from, uint unlockTime) internal {
-        bytes32[] memory keyList = new bytes32[](revTokenList.length);
+    function lock(CallLockConfig memory callLockConfig, IERC20 revenueToken, uint maxAcceptableTokenPriceInUsdc, address from, uint unlockTime)
+        internal
+    {
+        uint maxClaimableAmount = callLockConfig.cugar.claim(revenueToken, from, from, maxAcceptableTokenPriceInUsdc);
+        if (maxClaimableAmount == 0) revert RewardLogic__NoClaimableAmount();
 
-        for (uint i = 0; i < revTokenList.length; i++) {
-            keyList[i] = PositionUtils.getCugarKey(revTokenList[i], from, from);
-        }
-
-        (uint[] memory revenueList, uint totalClaimedInUsd) = callLockConfig.cugar.claimUserGeneratedRevenueList(keyList);
-
-        uint maxRewardTokenAmount = totalClaimedInUsd * 1e18 / tokenPrice;
-
-        if (totalClaimedInUsd == 0 || maxRewardTokenAmount == 0) revert RewardLogic__NoClaimableAmount();
-
-        uint amount = Precision.applyBasisPoints(
-            getClaimableAmount(callLockConfig.rate, maxRewardTokenAmount), //
+        uint claimableAmount = Precision.applyBasisPoints(
+            getClaimableAmount(callLockConfig.rate, maxClaimableAmount), //
             getRewardTimeMultiplier(callLockConfig.votingEscrow, from, unlockTime)
         );
-        callLockConfig.puppetToken.mint(address(this), amount);
-        SafeERC20.forceApprove(callLockConfig.puppetToken, address(callLockConfig.router), amount);
-        callLockConfig.votingEscrow.lock(address(this), from, amount, unlockTime);
 
-        emit RewardLogic__ClaimOption(Choice.LOCK, from, revenueList, maxRewardTokenAmount, amount);
+        callLockConfig.puppetToken.mint(address(this), claimableAmount);
+        SafeERC20.forceApprove(callLockConfig.puppetToken, address(callLockConfig.router), claimableAmount);
+        callLockConfig.votingEscrow.lock(address(this), from, claimableAmount, unlockTime);
+
+        emit RewardLogic__ClaimOption(Choice.LOCK, from, revenueToken, claimableAmount);
     }
 
-    function exit(CallExitConfig memory callExitConfig, IERC20[] calldata tokenList, uint tokenPrice, address from) internal {
-        bytes32[] memory keyList = new bytes32[](tokenList.length);
+    function exit(CallExitConfig memory callExitConfig, IERC20 revenueToken, uint maxAcceptableTokenPriceInUsdc, address from) internal {
+        uint maxClaimableAmount = callExitConfig.cugar.claim(revenueToken, from, from, maxAcceptableTokenPriceInUsdc);
+        if (maxClaimableAmount == 0) revert RewardLogic__NoClaimableAmount();
 
-        for (uint i = 0; i < tokenList.length; i++) {
-            keyList[i] = PositionUtils.getCugarKey(tokenList[i], from, from);
-        }
-
-        (uint[] memory revenueList, uint totalClaimedInUsd) = callExitConfig.cugar.claimUserGeneratedRevenueList(keyList);
-
-        uint maxRewardTokenAmount = totalClaimedInUsd * 1e18 / tokenPrice;
-
-        if (totalClaimedInUsd == 0 || maxRewardTokenAmount == 0) revert RewardLogic__NoClaimableAmount();
-
-        uint amount = getClaimableAmount(callExitConfig.rate, maxRewardTokenAmount);
+        uint amount = getClaimableAmount(callExitConfig.rate, maxClaimableAmount);
 
         callExitConfig.puppetToken.mint(from, amount);
 
-        emit RewardLogic__ClaimOption(Choice.EXIT, from, revenueList, maxRewardTokenAmount, amount);
+        emit RewardLogic__ClaimOption(Choice.EXIT, from, revenueToken, amount);
     }
 
     function claim(VeRevenueDistributor revenueDistributor, IERC20 token, address from, address to) internal {
@@ -133,6 +115,5 @@ library RewardLogic {
 
     error RewardLogic__TransferReferralFailed();
     error RewardLogic__NoClaimableAmount();
-    error RewardLogic__UnacceptableTokenPrice(uint curentPrice, uint acceptablePrice);
     error RewardLogic__AdjustOtherLock();
 }

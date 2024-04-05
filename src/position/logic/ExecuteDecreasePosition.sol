@@ -10,12 +10,12 @@ import {IGmxEventUtils} from "./../interface/IGmxEventUtils.sol";
 import {Router} from "src/utils/Router.sol";
 import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
 import {Precision} from "./../../utils/Precision.sol";
+import {PositionUtils} from "./../util/PositionUtils.sol";
 
 import {PuppetStore} from "../store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
 
-import {CugarStore} from "./../../shared/store/CugarStore.sol";
-import {Cugar} from "../../shared/Cugar.sol";
+import {Cugar} from "./../../Cugar.sol";
 
 library ExecuteDecreasePosition {
     event ExecuteDecreasePosition__DecreasePosition(
@@ -26,7 +26,6 @@ library ExecuteDecreasePosition {
         Router router;
         PositionStore positionStore;
         PuppetStore puppetStore;
-        CugarStore cugarStore;
         Cugar cugar;
         address positionRouterAddress;
         address gmxOrderHandler;
@@ -101,21 +100,23 @@ library ExecuteDecreasePosition {
 
         uint[] memory feeAmountList = new uint[](callParams.puppetListLength);
         uint[] memory balanceList = callConfig.puppetStore.getBalanceList(callParams.outputToken, callParams.mirrorPosition.puppetList);
+        bytes32[] memory keyList = new bytes32[](callParams.puppetListLength);
+
         uint totalPerformanceFee;
         uint traderPerformanceCutoffFee;
 
         for (uint i = 0; i < callParams.puppetListLength; i++) {
             if (request.puppetCollateralDeltaList[i] == 0) continue;
 
-            uint collateralDelta = request.puppetCollateralDeltaList[i];
+            keyList[i] = PositionUtils.getCugarKey(callParams.outputToken, callConfig.positionRouterAddress, callParams.mirrorPosition.puppetList[i]);
 
-            callParams.mirrorPosition.collateralList[i] -= collateralDelta;
+            callParams.mirrorPosition.collateralList[i] -= request.puppetCollateralDeltaList[i];
 
             (uint performanceFee, uint traderCutoff, uint amountOutAfterFee) = getDistribution(
                 callConfig.performanceFeeRate,
                 callConfig.traderPerformanceFeeShare,
                 callParams.profit,
-                collateralDelta * callParams.mirrorPosition.collateral / callParams.totalAmountOut,
+                request.puppetCollateralDeltaList[i] * callParams.mirrorPosition.collateral / callParams.totalAmountOut,
                 callParams.totalAmountOut
             );
 
@@ -127,7 +128,7 @@ library ExecuteDecreasePosition {
         }
 
         callConfig.puppetStore.setBalanceList(callParams.outputToken, callParams.mirrorPosition.puppetList, balanceList);
-        callConfig.cugar.increaseCugarList(callConfig.cugarStore, callParams.outputToken, callParams.mirrorPosition.puppetList, feeAmountList);
+        callConfig.cugar.increaseList(keyList, feeAmountList);
 
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
         if (callParams.mirrorPosition.size == order.numbers.sizeDeltaUsd) {
@@ -137,12 +138,9 @@ library ExecuteDecreasePosition {
         }
 
         callConfig.positionStore.removeRequestDecrease(callParams.requestKey);
+        callConfig.cugar.increase(callParams.outputToken, callParams.mirrorPosition.trader, traderPerformanceCutoffFee);
 
         if (request.collateralDelta > 0) {
-            callConfig.cugar.increaseCugar(
-                callConfig.cugarStore, callParams.outputToken, callParams.mirrorPosition.trader, traderPerformanceCutoffFee
-            );
-
             SafeERC20.safeTransferFrom(
                 callParams.outputToken,
                 callConfig.positionRouterAddress,

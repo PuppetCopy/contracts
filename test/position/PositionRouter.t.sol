@@ -10,7 +10,7 @@ import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {PositionUtils} from "src/position/util/PositionUtils.sol";
 
 import {SubaccountFactory} from "src/shared/SubaccountFactory.sol";
-import {Cugar} from "src/shared/Cugar.sol";
+import {Cugar} from "src/Cugar.sol";
 import {CugarStore} from "src/shared/store/CugarStore.sol";
 import {SubaccountStore} from "src/shared/store/SubaccountStore.sol";
 import {Subaccount} from "src/shared/Subaccount.sol";
@@ -143,7 +143,6 @@ contract PositionRouterTest is BasicSetup {
                 router: router,
                 positionStore: positionStore,
                 puppetStore: puppetStore,
-                cugarStore: cugarStore,
                 cugar: cugar,
                 positionRouterAddress: positionRouterAddress,
                 gmxOrderHandler: Const.gmxOrderHandler,

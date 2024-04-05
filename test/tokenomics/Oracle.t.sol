@@ -4,8 +4,11 @@ pragma solidity 0.8.24;
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {OracleLogic} from "./../../src/tokenomics/logic/OracleLogic.sol";
 import {OracleStore} from "src/tokenomics/store/OracleStore.sol";
+
+import {OracleLogic} from "./../../src/tokenomics/logic/OracleLogic.sol";
+
+import {Oracle} from "./../../src/Oracle.sol";
 
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
@@ -18,7 +21,9 @@ contract OracleTest is BasicSetup {
     MockWeightedPoolVault puppetWntPoolVault;
     IUniswapV3Pool[] wntUsdPoolList;
 
-    OracleLogic.CallConfig callOracleConfig;
+    Oracle oracle;
+
+    Oracle.CallConfig callOracleConfig;
 
     function setUp() public override {
         super.setUp();
@@ -35,24 +40,27 @@ contract OracleTest is BasicSetup {
 
         puppetPerWntStore = new OracleStore(dictator, users.owner, 1e18);
 
-        callOracleConfig = OracleLogic.CallConfig({
-            wntUsdSourceList: wntUsdPoolList,
-            vault: puppetWntPoolVault,
-            tokenPerWntStore: puppetPerWntStore,
-            // usdPerWntStore: usdPerWntStore,
-            poolId: 0,
-            twapInterval: 0,
-            updateInterval: 1 days
-        });
+        oracle.setTokenPerWntConfig(
+            usdc, //
+            OracleLogic.WntPriceConfig({enabled: true, sourceList: wntUsdPoolList, twapInterval: 0, sourceTokenDeicmals: 6})
+        );
 
-        (uint usdPerWnt, uint tokenPerWnt, uint usdPerToken) = OracleLogic.syncPrices(callOracleConfig);
+        callOracleConfig = Oracle.CallConfig({store: puppetPerWntStore, vault: puppetWntPoolVault, wnt: wnt, poolId: 0, updateInterval: 1 days});
+
+        oracle = new Oracle(dictator, callOracleConfig);
+
+        oracle.storePrice();
+
+        uint usdPerWnt = OracleLogic.getTokenPerWntUsingTwapMedian(wntUsdPoolList, 0);
+        uint tokenPerWnt = oracle.getMaxPrice();
+        uint usdPerToken = oracle.getMaxPriceInToken(usdc);
 
         assertEq(usdPerWnt, 100e30, "100 usd per wnt");
         assertEq(tokenPerWnt, 1e30, "1 puppet per wnt");
         assertEq(usdPerToken, 100e30, "100 usd per puppet");
 
-        assertEq(OracleLogic.getUsdPerWntUsingTwapMedian(callOracleConfig.wntUsdSourceList, callOracleConfig.twapInterval), 100e30, "100 usd per wnt");
-        assertEq(OracleLogic.getTokenPerWnt(callOracleConfig.vault, callOracleConfig.poolId), 1e30, "100 usd per wnt");
+        assertEq(OracleLogic.getTokenPerWntUsingTwapMedian(wntUsdPoolList, 0), 100e30, "100 usd per wnt");
+        assertEq(oracle.getMaxPrice(), 1e30, "100 usd per wnt");
     }
 
     function testMedianWntPriceInUsd() public {
@@ -64,29 +72,29 @@ contract OracleTest is BasicSetup {
         mockedPools[3] = new MockUniswapV3Pool(fromPriceToSqrt(1));
         mockedPools[4] = new MockUniswapV3Pool(fromPriceToSqrt(1));
 
-        assertAlmostEq(OracleLogic.getUsdPerWntUsingTwapMedian(mockedPools, 0), 3307.76e30, 0.05e30, "5 sources, 2 anomalies");
+        assertAlmostEq(OracleLogic.getTokenPerWntUsingTwapMedian(mockedPools, 0), 3307.76e30, 0.05e30, "5 sources, 2 anomalies");
     }
 
     function testStoreAndGetPrice() public {
         puppetWntPoolVault.setPoolBalances(40e18, 80e18);
-        assertAlmostEq(OracleLogic.getTokenPerUsd(callOracleConfig), 50e30, 0.1e30, "$50 as 40 PUPPET / 80 WETH");
+        assertAlmostEq(oracle.getMaxPrice(), 50e30, 0.1e30, "$50 as 40 PUPPET / 80 WETH");
         puppetWntPoolVault.setPoolBalances(4000e18, 80e18);
-        assertAlmostEq(OracleLogic.getTokenPerUsd(callOracleConfig), 0.5e30, 0.5e30, "$.5 as 4000 PUPPET / 80 WETH");
+        assertAlmostEq(oracle.getMaxPrice(), 0.5e30, 0.5e30, "$.5 as 4000 PUPPET / 80 WETH");
         puppetWntPoolVault.setPoolBalances(40_000e18, 80e18);
-        assertAlmostEq(OracleLogic.getTokenPerUsd(callOracleConfig), 0.05e30, 0.5e30, "$.005 as 40,000 PUPPET / 80 WETH");
+        assertAlmostEq(oracle.getMaxPrice(), 0.05e30, 0.5e30, "$.005 as 40,000 PUPPET / 80 WETH");
         puppetWntPoolVault.setPoolBalances(2e18, 80e18);
-        assertAlmostEq(OracleLogic.getTokenPerUsd(callOracleConfig), 1_000e30, 0.5e30, "$1000 as 2 PUPPET / 80 WETH");
+        assertAlmostEq(oracle.getMaxPrice(), 1_000e30, 0.5e30, "$1000 as 2 PUPPET / 80 WETH");
         puppetWntPoolVault.setPoolBalances(20e18, 80_000_000e18);
-        assertAlmostEq(OracleLogic.getTokenPerUsd(callOracleConfig), 100_000_000e30, 0.5e30, "$100,000,000 as 20 PUPPET / 80,000,000 WETH");
+        assertAlmostEq(oracle.getMaxPrice(), 100_000_000e30, 0.5e30, "$100,000,000 as 20 PUPPET / 80,000,000 WETH");
         puppetWntPoolVault.setPoolBalances(20_000_000e18, 80e18);
-        assertAlmostEq(OracleLogic.getTokenPerUsd(callOracleConfig), 0.0001e30, 0.1e30, "$0000.1 as 20,000,000 PUPPET / 80 WETH");
+        assertAlmostEq(oracle.getMaxPrice(), 0.0001e30, 0.1e30, "$0000.1 as 20,000,000 PUPPET / 80 WETH");
 
         puppetWntPoolVault.setPoolBalances(2_000e18, 0);
         vm.expectRevert();
-        OracleLogic.getTokenPerUsd(callOracleConfig);
+        oracle.getMaxPriceInToken(usdc);
         puppetWntPoolVault.setPoolBalances(0, 2_000e18);
         vm.expectRevert();
-        OracleLogic.getTokenPerUsd(callOracleConfig);
+        oracle.getMaxPriceInToken(usdc);
     }
 
     function testSlotMinMaxPrice() public {
@@ -123,17 +131,17 @@ contract OracleTest is BasicSetup {
     function _storeStepInUsd(uint balanceInWnt) internal returns (uint) {
         _storeStep(balanceInWnt);
 
-        (,, uint usdPerPuppet) = OracleLogic.syncPrices(callOracleConfig);
+        oracle.storePrice();
 
-        return usdPerPuppet;
+        return oracle.getMaxPriceInToken(usdc);
     }
 
     function _storeStepInWnt(uint balanceInWnt) internal returns (uint) {
         _storeStep(balanceInWnt);
 
-        (, uint puppetPerWnt,) = OracleLogic.syncPrices(callOracleConfig);
+        oracle.storePrice();
 
-        return puppetPerWnt;
+        return oracle.getMaxPrice();
     }
 
     function _storeStep(uint balanceInWnt) internal {
