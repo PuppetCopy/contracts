@@ -6,17 +6,17 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {RewardRouter} from "src/RewardRouter.sol";
-import {OracleLogic} from "src/tokenomics/logic/OracleLogic.sol";
 import {OracleStore} from "src/tokenomics/store/OracleStore.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {VotingEscrow, MAXTIME} from "src/tokenomics/VotingEscrow.sol";
 import {RewardLogic} from "src/tokenomics/logic/RewardLogic.sol";
 import {VeRevenueDistributor} from "src/tokenomics/VeRevenueDistributor.sol";
-import {Oracle} from "./../../src/Oracle.sol";
+import {Oracle} from "src/tokenomics/Oracle.sol";
+
+import {Precision} from "src/utils/Precision.sol";
 
 import {CugarStore} from "src/shared/store/CugarStore.sol";
-import {CugarLogic} from "./../../src/shared/logic/CugarLogic.sol";
-import {Cugar} from "src/Cugar.sol";
+import {Cugar} from "src/shared/Cugar.sol";
 
 import {PositionUtils} from "src/position/util/PositionUtils.sol";
 
@@ -25,9 +25,8 @@ import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 import {MockUniswapV3Pool} from "test/mocks/MockUniswapV3Pool.sol";
 
 contract RewardRouterTest is BasicSetup {
-    MockWeightedPoolVault puppetWntPoolVault;
-    OracleStore usdPerWntStore;
-    OracleStore puppetPerWntStore;
+    MockWeightedPoolVault primaryVaultPool;
+    OracleStore oracleStore;
     RewardRouter rewardRouter;
     Oracle oracle;
     Cugar cugar;
@@ -38,16 +37,17 @@ contract RewardRouterTest is BasicSetup {
 
     Oracle.CallConfig callOracleConfig;
 
-    uint8 constant SET_ORACLE_PRICE_ROLE = 2;
-    uint8 constant REVENUE_OPERATOR = 3;
-    uint8 constant REWARD_LOGIC_ROLE = 4;
-    uint8 constant VESTING_ROLE = 5;
-    uint8 constant REWARD_DISTRIBUTOR_ROLE = 6;
+    uint8 constant SET_ORACLE_PRICE_ROLE = 3;
+    uint8 constant CLAIM_AND_DISTRIBUTE_CUGAR_ROLE = 4;
+    uint8 constant INCREASE_CUGAR_ROLE = 5;
+    uint8 constant REWARD_LOGIC_ROLE = 6;
+    uint8 constant VESTING_ROLE = 7;
+    uint8 constant REWARD_DISTRIBUTOR_ROLE = 8;
 
     uint public lockRate = 6000;
     uint public exitRate = 3000;
 
-    IERC20[] revenueTokenList;
+    IERC20[] revenueInTokenList;
 
     function setUp() public override {
         super.setUp();
@@ -58,31 +58,36 @@ contract RewardRouterTest is BasicSetup {
         wntUsdPoolList[1] = new MockUniswapV3Pool(fromPriceToSqrt(100));
         wntUsdPoolList[2] = new MockUniswapV3Pool(fromPriceToSqrt(100));
 
-        revenueTokenList = new IERC20[](1);
-        revenueTokenList[0] = usdc;
+        revenueInTokenList = new IERC20[](1);
+        revenueInTokenList[0] = usdc;
 
-        OracleLogic.ExchangePriceSourceConfig[] memory exchangePriceSourceList = new OracleLogic.ExchangePriceSourceConfig[](1);
-        exchangePriceSourceList[0] =
-            OracleLogic.ExchangePriceSourceConfig({enabled: true, sourceList: wntUsdPoolList, twapInterval: 0, sourceTokenDeicmals: 6});
+        Oracle.SecondaryPriceConfig[] memory exchangePriceSourceList = new Oracle.SecondaryPriceConfig[](1);
+        exchangePriceSourceList[0] = Oracle.SecondaryPriceConfig({
+            enabled: true, //
+            sourceList: wntUsdPoolList,
+            twapInterval: 0,
+            sourceTokenDeicmals: 6
+        });
 
-        address rewardRouterAddress = computeCreateAddress(users.owner, vm.getNonce(users.owner) + 7);
+        primaryVaultPool = new MockWeightedPoolVault();
+        primaryVaultPool.initPool(address(puppetToken), address(address(0x0b)), 20e18, 80e18);
 
-        puppetWntPoolVault = new MockWeightedPoolVault();
-        puppetWntPoolVault.initPool(address(puppetToken), address(address(0x0b)), 20e18, 80e18);
+        address rewardRouterAddress = computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1);
 
-        usdPerWntStore = new OracleStore(dictator, rewardRouterAddress, 100e30);
-        puppetPerWntStore = new OracleStore(dictator, rewardRouterAddress, 1e18);
+        oracleStore = new OracleStore(dictator, rewardRouterAddress, 1e18);
         oracle = new Oracle(
             dictator,
-            Oracle.CallConfig({store: puppetPerWntStore, vault: puppetWntPoolVault, wnt: wnt, poolId: 0, updateInterval: 1 days}),
-            revenueTokenList,
+            oracleStore,
+            Oracle.CallConfig({vault: primaryVaultPool, wnt: wnt, poolId: 0, updateInterval: 1 days}),
+            revenueInTokenList,
             exchangePriceSourceList
         );
-        dictator.setRoleCapability(SET_ORACLE_PRICE_ROLE, address(oracle), oracle.storePrice.selector, true);
+        dictator.setRoleCapability(SET_ORACLE_PRICE_ROLE, address(oracle), oracle.setPoolPrice.selector, true);
 
-        cugar = new Cugar(dictator);
-        cugarStore = new CugarStore(dictator, address(cugar));
-        dictator.setRoleCapability(REVENUE_OPERATOR, address(cugar), cugar.claim.selector, true);
+        cugarStore = new CugarStore(dictator, computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1));
+        cugar = new Cugar(dictator, Cugar.CallConfig({store: cugarStore}));
+        dictator.setRoleCapability(INCREASE_CUGAR_ROLE, address(cugar), cugar.increase.selector, true);
+        dictator.setRoleCapability(CLAIM_AND_DISTRIBUTE_CUGAR_ROLE, address(cugar), cugar.claimAndDistribute.selector, true);
 
         votingEscrow = new VotingEscrow(dictator, router, puppetToken);
         dictator.setRoleCapability(VESTING_ROLE, address(votingEscrow), votingEscrow.lock.selector, true);
@@ -103,47 +108,68 @@ contract RewardRouterTest is BasicSetup {
                 lock: RewardLogic.CallLockConfig({
                     router: router,
                     votingEscrow: votingEscrow,
+                    oracle: oracle,
                     cugar: cugar,
                     revenueDistributor: revenueDistributor,
                     puppetToken: puppetToken,
+                    revenueSource: users.owner,
                     rate: 6000
                 }),
-                exit: RewardLogic.CallExitConfig({cugar: cugar, revenueDistributor: revenueDistributor, puppetToken: puppetToken, rate: 3000})
+                exit: RewardLogic.CallExitConfig({
+                    router: router,
+                    oracle: oracle,
+                    cugar: cugar,
+                    revenueDistributor: revenueDistributor,
+                    puppetToken: puppetToken,
+                    revenueSource: users.owner,
+                    rate: 3000
+                })
             })
         );
 
         dictator.setUserRole(address(votingEscrow), TRANSFER_TOKEN_ROLE, true);
         dictator.setUserRole(address(revenueDistributor), TRANSFER_TOKEN_ROLE, true);
+        dictator.setUserRole(address(cugar), TRANSFER_TOKEN_ROLE, true);
 
         dictator.setUserRole(address(rewardRouter), MINT_PUPPET_ROLE, true);
         dictator.setUserRole(address(rewardRouter), REWARD_LOGIC_ROLE, true);
         dictator.setUserRole(address(rewardRouter), VESTING_ROLE, true);
 
-        dictator.setUserRole(address(rewardRouter), REVENUE_OPERATOR, true);
-        dictator.setUserRole(users.owner, REVENUE_OPERATOR, true);
-        dictator.setUserRole(users.owner, SET_ORACLE_PRICE_ROLE, true);
+        dictator.setUserRole(address(rewardRouter), SET_ORACLE_PRICE_ROLE, true);
+        dictator.setUserRole(address(rewardRouter), CLAIM_AND_DISTRIBUTE_CUGAR_ROLE, true);
+        dictator.setUserRole(users.owner, INCREASE_CUGAR_ROLE, true);
+
+        revenueInTokenList[0].approve(address(router), type(uint).max - 1);
     }
 
     function testOption() public {
-        // assertAlmostEq(rewardRouter.getMedianWntPriceInUsd(callOracleConfig), 100e30, 0.5e30, "wnt at $100");
-
         vm.warp(2 weeks);
 
         puppetToken.transfer(address(0x123), puppetToken.balanceOf(users.owner));
-        vm.expectRevert(abi.encodeWithSelector(CugarLogic.CugarLogic__UnacceptableTokenPrice.selector, 100e30));
+        vm.expectRevert(abi.encodeWithSelector(RewardLogic.RewardLogic__UnacceptableTokenPrice.selector, 100e30));
         rewardRouter.lock(usdc, 99e30, getMaxTime());
 
-        // vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
-        // rewardRouter.lock(usdc, 100e30, getMaxTime());
+        vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
+        rewardRouter.lock(usdc, 100e30, getMaxTime());
 
-        // generateUserRevenueInUsdc(users.alice, 100e30);
-        // vm.expectRevert(VotingEscrow.VotingEscrow__InvalidLockValue.selector);
-        // rewardRouter.lock(usdc, 100e30, 0);
+        generateUserRevenueInUsdc(users.alice, 100e30);
+        assertEq(getCugarInUsdc(users.alice), 100e30);
+        vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
+        rewardRouter.lock(usdc, 100e30, 0);
 
-        // assertEq(getUserGeneratedRevenueInUsdc(users.alice).amountInUsd, 100e30);
+        rewardRouter.lock(usdc, 100.1e30, getMaxTime());
+        assertAlmostEq(votingEscrow.balanceOf(users.alice), Precision.toBasisPoints(lockRate, 100e18), 10e17);
 
-        // rewardRouter.lock(100.1e30, getMaxTime());
-        // assertAlmostEq(votingEscrow.balanceOf(users.alice), RewardLogic.getClaimableAmount(lockRate, 100e18), 10e17);
+            // │   ├─ emit RewardLogic__ClaimOption(
+            //     choice: 0,
+            //     rate: 6000,
+            //     cugarKey: 0x3337c027c162ab217dbca5490603dd8966026f12ea894902671dab06da90f9bc,
+            //     account: Alice: [0xBf0b5A4099F0bf6c8bC4252eBeC548Bae95602Ea],
+            //     token: MockERC20: [0x2a9e8fa175F45b235efDdD97d2727741EF4Eee63],
+            //     poolPrice: 1000000000000000000000000000000 [1e30],
+            //     priceInToken: 100000000000000000000000000000000 [1e32],
+            //     amount: 6000000000000000 [6e15]
+            // )
 
         // vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
         // rewardRouter.lock(100.1e30, getMaxTime());
@@ -226,42 +252,35 @@ contract RewardRouterTest is BasicSetup {
     //     token.balanceOf(address(revenueDistributor));
     // }
 
-    function generateUserRevenueInUsdc(address user, uint amount) public returns (uint) {
-        return generateUserRevenue(usdc, user, amount);
+    function generateUserRevenueInUsdc(address user, uint amount) public {
+        generateUserRevenue(usdc, user, amount);
     }
 
-    function generateUserRevenueInWnt(address user, uint amount) public returns (uint) {
-        return generateUserRevenue(wnt, user, amount);
+    function generateUserRevenueInWnt(address user, uint amount) public {
+        generateUserRevenue(wnt, user, amount);
     }
 
-    function generateUserRevenue(IERC20 token, address user, uint amount) public returns (uint) {
+    function generateUserRevenue(IERC20 token, address user, uint amount) public {
         vm.startPrank(users.owner);
 
         _dealERC20(address(token), users.owner, amount);
-        // userGeneratedRevenue.increaseUserGeneratedRevenue(
-        //     userGeneratedRevenueStore,
-        //     revenueDistributor,
-        //     PositionUtils.getUserGeneratedRevenueContributionKey(token, users.owner, user),
-        //     0
-        // );
+        cugar.increase(PositionUtils.getCugarKey(token, user), amount);
 
         // skip block
         vm.roll(block.number + 1);
         vm.startPrank(user);
-
-        return amount;
     }
 
     function getCugar(IERC20 token, address user) public view returns (uint) {
-        return cugar.getCugar(cugarStore, PositionUtils.getCugarKey(token, users.owner, user));
+        return cugar.get(PositionUtils.getCugarKey(token, user));
     }
 
-    function getUsdcCugar(address user) public view returns (uint) {
-        return cugar.getCugar(cugarStore, PositionUtils.getCugarKey(usdc, users.owner, user));
+    function getCugarInUsdc(address user) public view returns (uint) {
+        return cugar.get(PositionUtils.getCugarKey(usdc, user));
     }
 
-    function getWntCugar(address user) public view returns (uint) {
-        return cugar.getCugar(cugarStore, PositionUtils.getCugarKey(wnt, users.owner, user));
+    function getCugarInWnt(address user) public view returns (uint) {
+        return cugar.get(PositionUtils.getCugarKey(wnt, user));
     }
 
     function getMaxTime() public view returns (uint) {

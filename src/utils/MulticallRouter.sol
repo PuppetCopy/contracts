@@ -19,7 +19,7 @@ abstract contract MulticallRouter is ReentrancyGuard, Router, Multicall {
     uint tokenGasLimit = 200_000;
     address holdingAddress;
 
-    constructor(Authority _authority, IWNT _wnt, Router _router, address _holdingAddress) Router(_authority) {
+    constructor(Authority _authority, IWNT _wnt, Router _router, address _holdingAddress) Router(_authority, tokenGasLimit) {
         wnt = _wnt;
         router = _router;
         holdingAddress = _holdingAddress;

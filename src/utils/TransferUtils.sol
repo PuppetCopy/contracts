@@ -2,9 +2,9 @@
 pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IWNT} from "./interfaces/IWNT.sol";
 import {ErrorUtils} from "./ErrorUtils.sol";
+import {ExternalCallUtils} from "./ExternalCallUtils.sol";
 
 /**
  * @title TokenUtils
@@ -24,7 +24,7 @@ library TransferUtils {
      */
     function sendNativeToken(IWNT wnt, address holdingAddress, uint gasLimit, address receiver, uint amount) internal {
         if (amount == 0) return;
-        validateDestination(receiver);
+        ExternalCallUtils.validateDestination(receiver);
 
         bool success;
         // use an assembly call to avoid loading large data into memory
@@ -62,7 +62,7 @@ library TransferUtils {
      */
     function depositAndSendWnt(IWNT wnt, address holdingAddress, uint gasLimit, address receiver, uint amount) internal {
         if (amount == 0) return;
-        validateDestination(receiver);
+        ExternalCallUtils.validateDestination(receiver);
 
         wnt.deposit{value: amount}();
 
@@ -86,7 +86,7 @@ library TransferUtils {
      */
     function withdrawAndSendNativeToken(IWNT wnt, uint gasLimit, address holdingAddress, address receiver, uint amount) internal {
         if (amount == 0) return;
-        validateDestination(receiver);
+        ExternalCallUtils.validateDestination(receiver);
 
         wnt.withdraw(amount);
 
@@ -128,10 +128,10 @@ library TransferUtils {
      */
     function transfer(uint gasLimit, address holdingAddress, IERC20 token, address receiver, uint amount) internal {
         if (amount == 0) return;
-        validateDestination(receiver);
+        ExternalCallUtils.validateDestination(receiver);
 
         if (gasLimit == 0) {
-            revert EmptyTokenTranferGasLimit(address(token));
+            revert TransferUtils__EmptyTokenTranferGasLimit(address(token));
         }
 
         (bool success0, /* bytes memory returndata */ ) = nonRevertingTransferWithGasLimit(token, receiver, amount, gasLimit);
@@ -139,7 +139,7 @@ library TransferUtils {
         if (success0) return;
 
         if (holdingAddress == address(0)) {
-            revert EmptyHoldingAddress();
+            revert TransferUtils__EmptyHoldingAddress();
         }
 
         // in case transfers to the receiver fail due to blacklisting or other reasons
@@ -150,12 +150,12 @@ library TransferUtils {
         if (success1) return;
 
         (string memory reason, /* bool hasRevertMessage */ ) = ErrorUtils.getRevertMessage(returndata);
-        emit TokenTransferReverted(reason, returndata);
+        emit TransferUtils__TokenTransferReverted(reason, returndata);
 
         // throw custom errors to prevent spoofing of errors
         // this is necessary because contracts like DepositHandler, WithdrawalHandler, OrderHandler
         // do not cancel requests for specific errors
-        revert TokenTransferError(address(token), receiver, amount);
+        revert TransferUtils__TokenTransferError(address(token), receiver, amount);
     }
 
     /**
@@ -179,7 +179,7 @@ library TransferUtils {
             if (returndata.length == 0) {
                 // only check isContract if the call was successful and the return data is empty
                 // otherwise we already know that it was a contract
-                if (!isContract(address(token))) {
+                if (ExternalCallUtils.isContract(address(token)) == false) {
                     return (false, "Call to non-contract");
                 }
             }
@@ -198,42 +198,9 @@ library TransferUtils {
         return (false, returndata);
     }
 
-    /**
-     * @dev Checks if the specified address is a contract.
-     *
-     * @param account The address to check.
-     * @return a boolean indicating whether the specified address is a contract.
-     */
-    function isContract(address account) internal view returns (bool) {
-        // According to EIP-1052, 0x0 is the value returned for not-yet created accounts
-        // and 0xc5d246... is returned for accounts without code, i.e., `keccak256('')`
-        uint size;
-        // inline assembly is used to access the EVM's `extcodesize` operation
-        assembly {
-            size := extcodesize(account)
-        }
-        return size > 0;
-    }
+    error TransferUtils__EmptyTokenTranferGasLimit(address token);
+    error TransferUtils__TokenTransferError(address token, address receiver, uint amount);
+    error TransferUtils__EmptyHoldingAddress();
 
-    /**
-     * @dev Validates that the specified destination address is not the zero address.
-     *
-     * @param destination The address to validate.
-     */
-    function validateDestination(address destination) internal pure {
-        if (destination == address(0)) {
-            revert EmptyReceiver();
-        }
-    }
-
-    error EmptyReceiver();
-    error EmptyTokenTranferGasLimit(address token);
-    error TokenTransferError(address token, address receiver, uint amount);
-    error EmptyHoldingAddress();
-
-    event TokenTransferReverted(string reason, bytes returndata);
-
-    error InvalidNativeTokenSender(address msgSender);
-    error TransferFailed(address sender, uint amount);
-    error SelfTransferNotSupported(address receiver);
+    event TransferUtils__TokenTransferReverted(string reason, bytes returndata);
 }

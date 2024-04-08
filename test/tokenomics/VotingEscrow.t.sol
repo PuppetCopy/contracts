@@ -17,7 +17,6 @@ contract VotingEscrowTests is BasicSetup {
 
         dictator.setUserRole(users.owner, MINT_PUPPET_ROLE, true);
 
-        router = new Router(dictator);
         votingEscrow = new VotingEscrow(dictator, router, puppetToken);
 
         puppetToken.mint(users.alice, 100 * 1e18);

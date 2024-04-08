@@ -3,7 +3,6 @@ pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IGmxEventUtils} from "./../interface/IGmxEventUtils.sol";
 
@@ -15,7 +14,7 @@ import {PositionUtils} from "./../util/PositionUtils.sol";
 import {PuppetStore} from "../store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
 
-import {Cugar} from "./../../Cugar.sol";
+import {Cugar} from "./../../shared/Cugar.sol";
 
 library ExecuteDecreasePosition {
     event ExecuteDecreasePosition__DecreasePosition(
@@ -27,8 +26,7 @@ library ExecuteDecreasePosition {
         PositionStore positionStore;
         PuppetStore puppetStore;
         Cugar cugar;
-        address positionRouterAddress;
-        address gmxOrderHandler;
+        address gmxOrderReciever;
         uint tokenTransferGasLimit;
         uint performanceFeeRate;
         uint traderPerformanceFeeShare;
@@ -108,7 +106,7 @@ library ExecuteDecreasePosition {
         for (uint i = 0; i < callParams.puppetListLength; i++) {
             if (request.puppetCollateralDeltaList[i] == 0) continue;
 
-            keyList[i] = PositionUtils.getCugarKey(callParams.outputToken, callConfig.positionRouterAddress, callParams.mirrorPosition.puppetList[i]);
+            keyList[i] = PositionUtils.getCugarKey(callParams.outputToken, callParams.mirrorPosition.puppetList[i]);
 
             callParams.mirrorPosition.collateralList[i] -= request.puppetCollateralDeltaList[i];
 
@@ -127,7 +125,7 @@ library ExecuteDecreasePosition {
             balanceList[i] += amountOutAfterFee;
         }
 
-        callConfig.puppetStore.setBalanceList(callParams.outputToken, callParams.mirrorPosition.puppetList, balanceList);
+        callConfig.puppetStore.increaseBalanceList(callParams.outputToken, address(this), callParams.mirrorPosition.puppetList, balanceList);
         callConfig.cugar.increaseList(keyList, feeAmountList);
 
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
@@ -138,12 +136,15 @@ library ExecuteDecreasePosition {
         }
 
         callConfig.positionStore.removeRequestDecrease(callParams.requestKey);
-        callConfig.cugar.increase(callParams.outputToken, callParams.mirrorPosition.trader, traderPerformanceCutoffFee);
+        callConfig.cugar.increase(
+            PositionUtils.getCugarKey(callParams.outputToken, callParams.mirrorPosition.trader), //
+            traderPerformanceCutoffFee
+        );
 
         if (request.collateralDelta > 0) {
-            SafeERC20.safeTransferFrom(
+            callConfig.router.transfer(
                 callParams.outputToken,
-                callConfig.positionRouterAddress,
+                callConfig.gmxOrderReciever,
                 callParams.mirrorPosition.trader,
                 request.collateralDelta * callParams.mirrorPosition.collateral / callParams.totalAmountOut
             );
@@ -166,10 +167,10 @@ library ExecuteDecreasePosition {
     {
         uint profit = totalProfit * amountOut / totalAmountOut;
 
-        performanceFee = Precision.applyFactor(profit, performanceFeeRate);
+        performanceFee = Precision.applyFactor(performanceFeeRate, profit);
         amountOutAfterFee = profit - performanceFee;
 
-        traderPerformanceCutoffFee = Precision.applyFactor(performanceFee, traderPerformanceFeeShare);
+        traderPerformanceCutoffFee = Precision.applyFactor(traderPerformanceFeeShare, performanceFee);
 
         performanceFee -= traderPerformanceCutoffFee;
 

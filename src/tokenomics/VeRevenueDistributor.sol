@@ -16,7 +16,6 @@ pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -157,7 +156,7 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
      */
     function depositToken(IERC20 token, uint amount) external {
         _checkpointToken(token, false);
-        SafeERC20.safeTransferFrom(token, msg.sender, address(this), amount);
+        router.transfer(token, msg.sender, address(this), amount);
         _checkpointToken(token, true);
     }
 
@@ -176,7 +175,7 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
         uint length = tokens.length;
         for (uint i = 0; i < length;) {
             _checkpointToken(tokens[i], false);
-            SafeERC20.safeTransferFrom(tokens[i], msg.sender, address(this), amounts[i]);
+            router.transfer(tokens[i], msg.sender, address(this), amounts[i]);
             _checkpointToken(tokens[i], true);
 
             unchecked {
@@ -293,7 +292,7 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
         if (amount > 0) {
             // For a token to be claimable it must have been added to the cached balance so this is safe.
             tokenState.cachedBalance = uint128(tokenState.cachedBalance - amount);
-            SafeERC20.safeTransfer(token, to, amount);
+            router.transfer(token, address(this), to, amount);
             emit VeRevenueDistributor__TokensClaim(from, to, token, amount, nextUserTokenWeekToClaim);
         }
 

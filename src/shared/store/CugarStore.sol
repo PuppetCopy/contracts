@@ -10,23 +10,23 @@ contract CugarStore is StoreController {
 
     constructor(Authority _authority, address _initSetter) StoreController(_authority, _initSetter) {}
 
-    function getCugar(bytes32 _key) external view returns (uint) {
+    function get(bytes32 _key) external view returns (uint) {
         return cugarAmountMap[_key];
     }
 
-    function setCugar(bytes32 _key, uint _ugr) external isSetter {
-        cugarAmountMap[_key] = _ugr;
+    function set(bytes32 _key, uint _value) external isSetter {
+        cugarAmountMap[_key] = _value;
     }
 
-    function increaseCugar(bytes32 _key, uint _ugr) external isSetter {
-        cugarAmountMap[_key] += _ugr;
+    function increase(bytes32 _key, uint _amount) external isSetter {
+        cugarAmountMap[_key] += _amount;
     }
 
-    function resetCugar(bytes32 _key) external isSetter {
-        delete cugarAmountMap[_key];
+    function decrease(bytes32 _key, uint _amount) external isSetter {
+        cugarAmountMap[_key] -= _amount;
     }
 
-    function getCugarList(bytes32[] calldata _keyList) external view returns (uint[] memory) {
+    function getList(bytes32[] calldata _keyList) external view returns (uint[] memory) {
         uint[] memory _revenueList = new uint[](_keyList.length);
 
         for (uint i = 0; i < _keyList.length; i++) {
@@ -36,25 +36,25 @@ contract CugarStore is StoreController {
         return _revenueList;
     }
 
-    function setCugarList(bytes32[] calldata _keyList, uint[] calldata _revenueList) external isSetter {
-        if (_keyList.length != _revenueList.length) revert CugarStore__InvalidInputLength();
+    function setList(bytes32[] calldata _keyList, uint[] calldata _valueList) external isSetter {
+        if (_keyList.length != _valueList.length) revert CugarStore__InvalidInputLength();
 
         for (uint i = 0; i < _keyList.length; i++) {
-            cugarAmountMap[_keyList[i]] = _revenueList[i];
+            cugarAmountMap[_keyList[i]] = _valueList[i];
         }
     }
 
-    function increaseList(bytes32[] calldata _keyList, uint[] calldata _revenueList) external isSetter {
-        if (_keyList.length != _revenueList.length) revert CugarStore__InvalidInputLength();
+    function increaseList(bytes32[] calldata _keyList, uint[] calldata _amountList) external isSetter {
+        if (_keyList.length != _amountList.length) revert CugarStore__InvalidInputLength();
 
         for (uint i = 0; i < _keyList.length; i++) {
-            cugarAmountMap[_keyList[i]] += _revenueList[i];
+            cugarAmountMap[_keyList[i]] += _amountList[i];
         }
     }
 
-    function resetCugarList(bytes32[] calldata _keyList) external isSetter {
+    function decreaseList(bytes32[] calldata _keyList, uint[] calldata _amountList) external isSetter {
         for (uint i = 0; i < _keyList.length; i++) {
-            delete cugarAmountMap[_keyList[i]];
+            cugarAmountMap[_keyList[i]] -= _amountList[i];
         }
     }
 

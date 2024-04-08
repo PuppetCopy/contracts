@@ -50,7 +50,8 @@ library RequestIncreasePosition {
         PositionStore positionStore;
         PuppetRouter puppetRouter;
         PuppetStore puppetStore;
-        address positionRouterAddress;
+        address gmxOrderCallbackHandler;
+        address gmxOrderReciever;
         address gmxOrderVault;
         bytes32 referralCode;
         uint callbackGasLimit;
@@ -64,7 +65,7 @@ library RequestIncreasePosition {
         bytes32 positionKey;
         PuppetStore.Rule[] ruleList;
         uint[] activityList;
-        uint[] depositList;
+        uint[] balanceList;
         uint puppetLength;
         uint sizeDeltaMultiplier;
     }
@@ -133,7 +134,7 @@ library RequestIncreasePosition {
             callConfig.router.transfer(
                 traderCallParams.collateralToken, //
                 traderCallParams.account,
-                callConfig.positionRouterAddress,
+                callConfig.gmxOrderVault,
                 traderCallParams.collateralDelta
             );
         }
@@ -158,7 +159,7 @@ library RequestIncreasePosition {
 
         PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
 
-        (PuppetStore.Rule[] memory ruleList, uint[] memory activityList, uint[] memory depositList) =
+        (PuppetStore.Rule[] memory ruleList, uint[] memory activityList, uint[] memory balanceList) =
             callConfig.puppetStore.getBalanceAndActivityList(traderCallParams.collateralToken, traderCallParams.account, puppetList);
 
         if (mirrorPosition.size == 0) {
@@ -167,7 +168,7 @@ library RequestIncreasePosition {
                 positionKey: positionKey,
                 ruleList: ruleList,
                 activityList: activityList,
-                depositList: depositList,
+                balanceList: balanceList,
                 puppetLength: puppetList.length,
                 sizeDeltaMultiplier: Precision.toBasisPoints(traderCallParams.sizeDelta, traderCallParams.collateralDelta)
             });
@@ -180,7 +181,7 @@ library RequestIncreasePosition {
                 positionKey: positionKey,
                 ruleList: ruleList,
                 activityList: activityList,
-                depositList: depositList,
+                depositList: balanceList,
                 puppetLength: mirrorPosition.puppetList.length,
                 sizeDeltaMultiplier: Precision.toBasisPoints(traderCallParams.sizeDelta, traderCallParams.collateralDelta),
                 mpLeverage: Precision.toBasisPoints(mirrorPosition.size, mirrorPosition.collateral),
@@ -221,29 +222,30 @@ library RequestIncreasePosition {
             if (
                 rule.expiry > block.timestamp // puppet rule expired or not set
                     || callParams.activityList[i] + rule.throttleActivity < block.timestamp // current time is greater than throttle activity period
-                    || callParams.depositList[i] > callConfig.minimumMatchAmount // has enough allowance or token allowance cap exists
+                    || callParams.balanceList[i] > callConfig.minimumMatchAmount // has enough allowance or token allowance cap exists
             ) {
                 // the lowest of either the allowance or the trader's deposit
-                uint amountIn = Math.min(
-                    Precision.applyBasisPoints(callParams.depositList[i], rule.allowanceRate),
+                uint collateralDelta = Math.min(
+                    Precision.applyBasisPoints(rule.allowanceRate, callParams.balanceList[i]),
                     traderCallParams.collateralDelta // trader own deposit
                 );
-                callParams.depositList[i] -= amountIn;
+                callParams.balanceList[i] = collateralDelta;
                 callParams.activityList[i] = block.timestamp;
 
-                request.puppetCollateralDeltaList[i] = amountIn;
-                request.collateralDelta += amountIn;
-                request.sizeDelta += Precision.applyBasisPoints(amountIn, callParams.sizeDeltaMultiplier);
+                request.puppetCollateralDeltaList[i] = collateralDelta;
+                request.collateralDelta += collateralDelta;
+                request.sizeDelta += Precision.applyBasisPoints(callParams.sizeDeltaMultiplier, collateralDelta);
             }
         }
 
-        callConfig.puppetRouter.setBalanceAndActivityList(
+        callConfig.puppetRouter.decreaseBalanceAndSetActivityList(
             callConfig.puppetStore,
             traderCallParams.collateralToken,
+            callConfig.gmxOrderVault,
             traderCallParams.account,
             puppetList,
             callParams.activityList,
-            callParams.depositList
+            callParams.balanceList
         );
         callConfig.positionStore.setRequestMatch(callParams.positionKey, requestMatch);
 
@@ -289,7 +291,7 @@ library RequestIncreasePosition {
 
                 request.puppetCollateralDeltaList[i] += collateralDelta;
                 request.collateralDelta += collateralDelta;
-                request.sizeDelta += Precision.applyBasisPoints(collateralDelta, callParams.sizeDeltaMultiplier);
+                request.sizeDelta += Precision.applyBasisPoints(callParams.sizeDeltaMultiplier, collateralDelta);
             }
 
             if (callParams.mpTargetLeverage > callParams.mpLeverage) {
@@ -305,9 +307,10 @@ library RequestIncreasePosition {
 
         bytes32 requestKey;
 
-        callConfig.puppetRouter.setBalanceAndActivityList(
+        callConfig.puppetRouter.decreaseBalanceAndSetActivityList(
             callConfig.puppetStore,
             traderCallParams.collateralToken,
+            callConfig.gmxOrderVault,
             traderCallParams.account,
             mirrorPosition.puppetList,
             callParams.activityList,
@@ -355,8 +358,8 @@ library RequestIncreasePosition {
     ) internal returns (bytes32 requestKey) {
         GmxPositionUtils.CreateOrderParams memory orderParams = GmxPositionUtils.CreateOrderParams({
             addresses: GmxPositionUtils.CreateOrderParamsAddresses({
-                receiver: callConfig.positionRouterAddress,
-                callbackContract: callConfig.positionRouterAddress,
+                receiver: callConfig.gmxOrderReciever,
+                callbackContract: callConfig.gmxOrderCallbackHandler,
                 uiFeeReceiver: address(0),
                 market: traderCallParams.market,
                 initialCollateralToken: traderCallParams.collateralToken,
@@ -397,8 +400,8 @@ library RequestIncreasePosition {
     ) internal returns (bytes32 requestKey) {
         GmxPositionUtils.CreateOrderParams memory params = GmxPositionUtils.CreateOrderParams({
             addresses: GmxPositionUtils.CreateOrderParamsAddresses({
-                receiver: callConfig.positionRouterAddress,
-                callbackContract: callConfig.positionRouterAddress,
+                receiver: callConfig.gmxOrderReciever,
+                callbackContract: callConfig.gmxOrderCallbackHandler,
                 uiFeeReceiver: address(0),
                 market: traderCallparams.market,
                 initialCollateralToken: traderCallparams.collateralToken,

@@ -11,7 +11,7 @@ library Precision {
         return a > b ? a - b : b - a;
     }
 
-    function applyBasisPoints(uint value, uint bps) internal pure returns (uint) {
+    function applyBasisPoints(uint bps, uint value) internal pure returns (uint) {
         return Math.mulDiv(value, bps, BASIS_POINT_DIVISOR);
     }
 
@@ -19,7 +19,7 @@ library Precision {
         return Math.mulDiv(value, BASIS_POINT_DIVISOR, divisor);
     }
 
-    function applyFactor(uint value, uint factor) internal pure returns (uint) {
+    function applyFactor(uint factor, uint value) internal pure returns (uint) {
         return Math.mulDiv(value, factor, FLOAT_PRECISION);
     }
 

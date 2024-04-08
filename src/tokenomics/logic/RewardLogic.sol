@@ -2,14 +2,16 @@
 pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {Precision} from "./../../utils/Precision.sol";
 import {Router} from "../../utils/Router.sol";
 import {VeRevenueDistributor} from "../VeRevenueDistributor.sol";
 
-import {Cugar} from "./../../Cugar.sol";
+import {Cugar} from "./../../shared/Cugar.sol";
+import {Oracle} from "./../Oracle.sol";
 import {PuppetToken} from "../PuppetToken.sol";
+import {IReferralStorage} from "./../../position/interface/IReferralStorage.sol";
+import {PositionUtils} from "./../../position/util/PositionUtils.sol";
 
 import {VotingEscrow, MAXTIME} from "../VotingEscrow.sol";
 
@@ -19,34 +21,44 @@ library RewardLogic {
         EXIT
     }
 
-    event RewardLogic__ClaimOption(Choice choice, address account, IERC20 token, uint amount);
+    event RewardLogic__ClaimOption(
+        Choice choice, uint rate, bytes32 cugarKey, address account, IERC20 token, uint poolPrice, uint priceInToken, uint amount
+    );
 
     event RewardLogic__ReferralOwnershipTransferred(address referralStorage, bytes32 code, address newOwner, uint timestamp);
 
     struct CallLockConfig {
-        VotingEscrow votingEscrow;
         Router router;
+        VotingEscrow votingEscrow;
+        Oracle oracle;
         Cugar cugar;
         VeRevenueDistributor revenueDistributor;
         PuppetToken puppetToken;
+        address revenueSource;
         uint rate;
     }
 
     struct CallExitConfig {
+        Router router;
         Cugar cugar;
+        Oracle oracle;
         VeRevenueDistributor revenueDistributor;
         PuppetToken puppetToken;
+        address revenueSource;
         uint rate;
     }
 
-    function getClaimableAmount(uint distributionRatio, uint tokenAmount) public pure returns (uint) {
-        return Precision.applyBasisPoints(tokenAmount, distributionRatio);
+    function getClaimableAmount(Cugar cugar, uint rate, IERC20 token, uint price, address user) public view returns (uint) {
+        uint revenueInToken = cugar.get(PositionUtils.getCugarKey(token, user));
+
+        if (revenueInToken == 0) return 0;
+
+        uint maxClaimable = (revenueInToken) * (price) / 1e48;
+        return Precision.applyBasisPoints(maxClaimable, rate);
     }
 
-    function getRewardTimeMultiplier(VotingEscrow votingEscrow, address account, uint unlockTime) public view returns (uint) {
-        if (unlockTime == 0) {
-            unlockTime = votingEscrow.lockedEnd(account);
-        }
+    function getLockRewardTimeMultiplier(VotingEscrow votingEscrow, address account, uint unlockTime) public view returns (uint) {
+        if (unlockTime == 0) unlockTime = votingEscrow.lockedEnd(account);
 
         uint maxTime = block.timestamp + MAXTIME;
 
@@ -57,53 +69,63 @@ library RewardLogic {
 
     // state
 
-    function lock(CallLockConfig memory callLockConfig, IERC20 revenueToken, uint maxAcceptableTokenPriceInUsdc, address from, uint unlockTime)
-        internal
-    {
-        uint maxClaimableAmount = callLockConfig.cugar.claim(revenueToken, from, from, maxAcceptableTokenPriceInUsdc);
-        if (maxClaimableAmount == 0) revert RewardLogic__NoClaimableAmount();
+    function lock(CallLockConfig memory callLockConfig, IERC20 revenueToken, address user, uint maxAcceptableTokenPrice, uint unlockTime) internal {
+        bytes32 cugarKey = PositionUtils.getCugarKey(revenueToken, user);
+        (uint poolPrice, uint priceInToken) = _syncPrice(callLockConfig.oracle, revenueToken, maxAcceptableTokenPrice);
 
-        uint claimableAmount = Precision.applyBasisPoints(
-            getClaimableAmount(callLockConfig.rate, maxClaimableAmount), //
-            getRewardTimeMultiplier(callLockConfig.votingEscrow, from, unlockTime)
-        );
+        uint lockTimeMultiplier = getLockRewardTimeMultiplier(callLockConfig.votingEscrow, user, unlockTime);
+        uint maxClaimableAmount = getClaimableAmount(callLockConfig.cugar, callLockConfig.rate, revenueToken, priceInToken, user);
+
+        uint claimableAmount = Precision.applyBasisPoints(lockTimeMultiplier, maxClaimableAmount);
+        if (claimableAmount == 0) revert RewardLogic__NoClaimableAmount();
 
         callLockConfig.puppetToken.mint(address(this), claimableAmount);
-        SafeERC20.forceApprove(callLockConfig.puppetToken, address(callLockConfig.router), claimableAmount);
-        callLockConfig.votingEscrow.lock(address(this), from, claimableAmount, unlockTime);
+        callLockConfig.votingEscrow.lock(address(this), user, claimableAmount, unlockTime);
+        callLockConfig.cugar.claimAndDistribute(
+            callLockConfig.router, callLockConfig.revenueDistributor, cugarKey, callLockConfig.revenueSource, revenueToken, claimableAmount
+        );
 
-        emit RewardLogic__ClaimOption(Choice.LOCK, from, revenueToken, claimableAmount);
+        emit RewardLogic__ClaimOption(Choice.LOCK, callLockConfig.rate, cugarKey, user, revenueToken, poolPrice, priceInToken, claimableAmount);
     }
 
-    function exit(CallExitConfig memory callExitConfig, IERC20 revenueToken, uint maxAcceptableTokenPriceInUsdc, address from) internal {
-        uint maxClaimableAmount = callExitConfig.cugar.claim(revenueToken, from, from, maxAcceptableTokenPriceInUsdc);
-        if (maxClaimableAmount == 0) revert RewardLogic__NoClaimableAmount();
+    function exit(CallExitConfig memory callExitConfig, IERC20 revenueToken, address from, uint maxAcceptableTokenPrice) internal {
+        bytes32 cugarKey = PositionUtils.getCugarKey(revenueToken, from);
+        (uint poolPrice, uint priceInToken) = _syncPrice(callExitConfig.oracle, revenueToken, maxAcceptableTokenPrice);
 
-        uint amount = getClaimableAmount(callExitConfig.rate, maxClaimableAmount);
+        uint claimableAmount = getClaimableAmount(callExitConfig.cugar, callExitConfig.rate, revenueToken, priceInToken, from);
+        if (claimableAmount == 0) revert RewardLogic__NoClaimableAmount();
 
-        callExitConfig.puppetToken.mint(from, amount);
+        callExitConfig.puppetToken.mint(from, claimableAmount);
+        callExitConfig.cugar.claimAndDistribute(
+            callExitConfig.router, callExitConfig.revenueDistributor, cugarKey, callExitConfig.revenueSource, revenueToken, claimableAmount
+        );
 
-        emit RewardLogic__ClaimOption(Choice.EXIT, from, revenueToken, amount);
+        emit RewardLogic__ClaimOption(Choice.EXIT, callExitConfig.rate, cugarKey, from, revenueToken, poolPrice, priceInToken, claimableAmount);
     }
 
-    function claim(VeRevenueDistributor revenueDistributor, IERC20 token, address from, address to) internal {
-        revenueDistributor.claim(token, from, to);
+    function _syncPrice(Oracle oracle, IERC20 token, uint maxAcceptableTokenPrice) internal returns (uint maxPrimaryPrice, uint priceInToken) {
+        maxPrimaryPrice = oracle.getMaxPrimaryPrice(oracle.setPoolPrice());
+        priceInToken = oracle.getSecondaryPrice(token, maxPrimaryPrice);
+        if (priceInToken > maxAcceptableTokenPrice) revert RewardLogic__UnacceptableTokenPrice(priceInToken);
+        if (priceInToken == 0) revert RewardLogic__InvalidClaimPrice();
     }
 
-    function claimList(VeRevenueDistributor revenueDistributor, IERC20[] calldata tokenList, address from, address to) internal {
-        revenueDistributor.claimList(tokenList, from, to);
+    function claim(VeRevenueDistributor revenueDistributor, IERC20 token, address from, address to) internal returns (uint) {
+        return revenueDistributor.claim(token, from, to);
+    }
+
+    function claimList(VeRevenueDistributor revenueDistributor, IERC20[] calldata tokenList, address from, address to)
+        internal
+        returns (uint[] memory)
+    {
+        return revenueDistributor.claimList(tokenList, from, to);
     }
 
     // governance
 
     // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/mock/ReferralStorage.sol#L127
-    function transferReferralOwnership(address _referralStorage, bytes32 _code, address _newOwner) internal {
-        bytes memory data = abi.encodeWithSignature("setCodeOwner(bytes32,address)", _code, _newOwner);
-        (bool success,) = _referralStorage.call(data);
-
-        if (!success) revert RewardLogic__TransferReferralFailed();
-
-        emit RewardLogic__ReferralOwnershipTransferred(_referralStorage, _code, _newOwner, block.timestamp);
+    function transferReferralOwnership(IReferralStorage _referralStorage, bytes32 _code, address _newOwner) internal {
+        _referralStorage.setCodeOwner(_code, _newOwner);
     }
 
     // internal view
@@ -112,7 +134,7 @@ library RewardLogic {
         return keccak256(abi.encode("USER_REVENUE", account));
     }
 
-    error RewardLogic__TransferReferralFailed();
     error RewardLogic__NoClaimableAmount();
-    error RewardLogic__AdjustOtherLock();
+    error RewardLogic__UnacceptableTokenPrice(uint tokenPrice);
+    error RewardLogic__InvalidClaimPrice();
 }

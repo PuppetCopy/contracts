@@ -44,7 +44,7 @@ contract PuppetToken is Auth, ERC20 {
     }
 
     function getLimitAmount() public view returns (uint) {
-        return Precision.applyFactor(totalSupply(), limitFactor);
+        return Precision.applyFactor(limitFactor, totalSupply());
     }
 
     function getMarginAmount() public view returns (uint) {
@@ -83,8 +83,8 @@ contract PuppetToken is Auth, ERC20 {
 
         uint timeElapsed = CORE_RELEASE_END_SCHEDULE - block.timestamp;
         uint timeMultiplier = Math.min(Precision.toFactor(timeElapsed, CORE_RELEASE_END_SCHEDULE), Precision.FLOAT_PRECISION);
-        uint maxMintableAmount = Precision.applyFactor(totalSupply(), CORE_RELEASE_RATE);
-        uint maxMintableAmountForPeriod = Precision.applyFactor(maxMintableAmount, timeMultiplier);
+        uint maxMintableAmount = Precision.applyFactor(CORE_RELEASE_RATE, totalSupply());
+        uint maxMintableAmountForPeriod = Precision.applyFactor(timeMultiplier, maxMintableAmount);
         uint mintableAmount = maxMintableAmountForPeriod - coreReleasedAmount;
 
         _mint(_to, mintableAmount);

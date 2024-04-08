@@ -15,7 +15,7 @@ import {Dictator} from "src/utils/Dictator.sol";
 import {Router} from "src/utils/Router.sol";
 import {IWNT} from "./../src/utils/interfaces/IWNT.sol";
 
-import {OracleLogic} from "src/tokenomics/logic/OracleLogic.sol";
+import {Oracle} from "./../src/tokenomics/Oracle.sol";
 import {OracleStore} from "src/tokenomics/store/OracleStore.sol";
 import {RewardRouter} from "src/RewardRouter.sol";
 // import {DataStore} from "src/integrations/utils/DataStore.sol";

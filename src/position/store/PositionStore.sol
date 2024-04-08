@@ -3,10 +3,11 @@ pragma solidity 0.8.24;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
-import {StoreController} from "../../utils/StoreController.sol";
+import {Router} from "./../../utils/Router.sol";
+import {BankStore} from "./../../utils/BankStore.sol";
 import {GmxPositionUtils} from "./../util/GmxPositionUtils.sol";
 
-contract PositionStore is StoreController {
+contract PositionStore is BankStore {
     struct RequestMatch {
         address trader;
         address[] puppetList;
@@ -39,7 +40,7 @@ contract PositionStore is StoreController {
     mapping(bytes32 positionKey => MirrorPosition) public positionMap;
     mapping(bytes32 positionKey => UnhandledCallback) public unhandledCallbackMap;
 
-    constructor(Authority _authority, address _initSetter) StoreController(_authority, _initSetter) {}
+    constructor(Authority _authority, Router _router, address _initSetter) BankStore(_authority, _router, _initSetter) {}
 
     function getRequestAdjustment(bytes32 _key) external view returns (RequestAdjustment memory) {
         return requestAdjustmentMap[_key];

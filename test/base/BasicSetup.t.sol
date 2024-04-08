@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {StdCheats} from "forge-std/src/StdCheats.sol";
 import {StdUtils} from "forge-std/src/StdUtils.sol";
@@ -11,9 +12,6 @@ import {Dictator} from "src/utils/Dictator.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {Router} from "src/utils/Router.sol";
 import {IWNT} from "./../../src/utils/interfaces/IWNT.sol";
-
-import {Const} from "script/Const.s.sol";
-
 
 contract BasicSetup is PRBTest, StdCheats, StdUtils {
     struct Users {
@@ -31,8 +29,8 @@ contract BasicSetup is PRBTest, StdCheats, StdUtils {
 
     Users users;
 
-    IWNT wnt = IWNT(Const.wnt);
-    IERC20 usdc = IERC20(Const.usdc);
+    IWNT wnt = IWNT(address(deployMockERC20("Wrapped Native", "WNT", 18)));
+    IERC20 usdc = IERC20(address(deployMockERC20("USDC", "USDC", 18)));
 
     Dictator dictator;
     PuppetToken puppetToken;
@@ -51,11 +49,10 @@ contract BasicSetup is PRBTest, StdCheats, StdUtils {
 
         dictator = new Dictator(users.owner);
         puppetToken = new PuppetToken(dictator);
-        router = new Router(dictator);
+        router = new Router(dictator, 200_000);
 
         dictator.setRoleCapability(MINT_PUPPET_ROLE, address(puppetToken), puppetToken.mint.selector, true);
         dictator.setRoleCapability(TRANSFER_TOKEN_ROLE, address(router), router.transfer.selector, true);
-        dictator.setRoleCapability(TRANSFER_TOKEN_ROLE, address(router), router.rawTransfer.selector, true);
 
         dictator.setUserRole(users.owner, ADMIN_ROLE, true);
     }

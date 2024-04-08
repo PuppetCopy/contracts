@@ -3,7 +3,6 @@ pragma solidity 0.8.24;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -271,8 +270,7 @@ contract VotingEscrow is Auth {
         supply = _supplyBefore - _value;
 
         _checkpoint(_from, _oldLocked, _lock);
-
-        SafeERC20.safeTransfer(token, _to, _value);
+        router.transfer(token, address(this), _to, _value);
 
         emit VotingEscrow__Withdraw(_from, _to, _value, block.timestamp);
         emit VotingEscrow__Supply(_supplyBefore, _supplyBefore - _value);

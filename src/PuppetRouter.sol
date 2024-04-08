@@ -30,8 +30,8 @@ contract PuppetRouter is Auth, ReentrancyGuard {
         PuppetLogic.deposit(callConfig.setBalance, token, msg.sender, amount);
     }
 
-    function withdraw(IERC20 token, uint amount) external nonReentrant {
-        PuppetLogic.withdraw(callConfig.setBalance, token, msg.sender, amount);
+    function withdraw(IERC20 token, address to, uint amount) external nonReentrant {
+        PuppetLogic.withdraw(callConfig.setBalance, token, msg.sender, to, amount);
     }
 
     function setRule(
@@ -66,15 +66,16 @@ contract PuppetRouter is Auth, ReentrancyGuard {
 
     // integration
 
-    function setBalanceAndActivityList(
+    function decreaseBalanceAndSetActivityList(
         PuppetStore store,
-        IERC20 collateralToken,
+        IERC20 token,
+        address receiver,
         address trader,
         address[] calldata _puppetList,
         uint[] calldata _activityList,
         uint[] calldata _balanceList
     ) external requiresAuth {
-        store.setBalanceAndActivityList(collateralToken, trader, _puppetList, _activityList, _balanceList);
+        store.decreaseBalanceAndSetActivityList(token, receiver, trader, _puppetList, _activityList, _balanceList);
     }
 
     // internal

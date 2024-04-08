@@ -3,11 +3,14 @@ pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {IReferralStorage} from "./position/interface/IReferralStorage.sol";
+
 import {MulticallRouter} from "./utils/MulticallRouter.sol";
 import {IWNT} from "./utils/interfaces/IWNT.sol";
 import {Router} from "./utils/Router.sol";
 import {Dictator} from "./utils/Dictator.sol";
 import {Precision} from "./utils/Precision.sol";
+import {PositionUtils} from "./position/util/PositionUtils.sol";
 
 import {RewardLogic} from "./tokenomics/logic/RewardLogic.sol";
 import {VotingEscrow} from "./tokenomics/VotingEscrow.sol";
@@ -26,6 +29,20 @@ contract RewardRouter is MulticallRouter {
     VotingEscrow votingEscrow;
     VeRevenueDistributor revenueDistributor;
 
+    function getClaimableAmount(RewardLogic.Choice choice, IERC20 token, address user) public view returns (uint claimableAmount) {
+        uint rate = choice == RewardLogic.Choice.LOCK ? callConfig.lock.rate : callConfig.exit.rate;
+        uint poolPrice = callConfig.lock.oracle.getPoolPrice();
+        uint maxPoolPrice = callConfig.lock.oracle.getMaxPrimaryPrice(poolPrice);
+        uint priceInToken = callConfig.lock.oracle.getSecondaryPrice(token, maxPoolPrice);
+
+        uint revenueInToken = callConfig.lock.cugar.get(PositionUtils.getCugarKey(token, user));
+
+        if (revenueInToken > 0) {
+            uint maxClaimable = priceInToken / revenueInToken;
+            claimableAmount = Precision.toBasisPoints(maxClaimable, rate);
+        }
+    }
+
     constructor(
         Dictator _dictator,
         IWNT _wnt,
@@ -38,14 +55,15 @@ contract RewardRouter is MulticallRouter {
         revenueDistributor = _revenueDistributor;
 
         _setConfig(_callConfig);
+        callConfig.lock.puppetToken.approve(address(_router), type(uint).max);
     }
 
-    function lock(IERC20 revenueToken, uint maxAcceptableTokenPriceInUsdc, uint unlockTime) public nonReentrant {
-        RewardLogic.lock(callConfig.lock, revenueToken, maxAcceptableTokenPriceInUsdc, msg.sender, unlockTime);
+    function lock(IERC20 revenueToken, uint maxAcceptableTokenPrice, uint unlockTime) public nonReentrant {
+        RewardLogic.lock(callConfig.lock, revenueToken, msg.sender, maxAcceptableTokenPrice, unlockTime);
     }
 
-    function exit(IERC20 revenueToken, uint maxAcceptableTokenPriceInUsdc) public nonReentrant {
-        RewardLogic.exit(callConfig.exit, revenueToken, maxAcceptableTokenPriceInUsdc, msg.sender);
+    function exit(IERC20 revenueToken, uint maxAcceptableTokenPrice) public nonReentrant {
+        RewardLogic.exit(callConfig.exit, revenueToken, msg.sender, maxAcceptableTokenPrice);
     }
 
     function veLock(uint _tokenAmount, uint unlockTime) external nonReentrant {
@@ -74,7 +92,7 @@ contract RewardRouter is MulticallRouter {
         _setConfig(_callConfig);
     }
 
-    function transferReferralOwnership(address _referralStorage, bytes32 _code, address _newOwner) external requiresAuth {
+    function transferReferralOwnership(IReferralStorage _referralStorage, bytes32 _code, address _newOwner) external requiresAuth {
         RewardLogic.transferReferralOwnership(_referralStorage, _code, _newOwner);
     }
 
