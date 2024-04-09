@@ -48,7 +48,8 @@ contract BasicSetup is PRBTest, StdCheats, StdUtils {
         vm.startPrank(users.owner);
 
         dictator = new Dictator(users.owner);
-        puppetToken = new PuppetToken(dictator);
+
+        puppetToken = new PuppetToken(dictator, PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}));
         router = new Router(dictator, 200_000);
 
         dictator.setRoleCapability(MINT_PUPPET_ROLE, address(puppetToken), puppetToken.mint.selector, true);

@@ -10,7 +10,6 @@ import {IWNT} from "./utils/interfaces/IWNT.sol";
 import {Router} from "./utils/Router.sol";
 import {Dictator} from "./utils/Dictator.sol";
 import {Precision} from "./utils/Precision.sol";
-import {PositionUtils} from "./position/util/PositionUtils.sol";
 
 import {RewardLogic} from "./tokenomics/logic/RewardLogic.sol";
 import {VotingEscrow} from "./tokenomics/VotingEscrow.sol";
@@ -29,18 +28,23 @@ contract RewardRouter is MulticallRouter {
     VotingEscrow votingEscrow;
     VeRevenueDistributor revenueDistributor;
 
-    function getClaimableAmount(RewardLogic.Choice choice, IERC20 token, address user) public view returns (uint claimableAmount) {
+    function getClaimableAmountInToken(
+        RewardLogic.Choice choice, //
+        IERC20 token,
+        address user,
+        uint tokenPrice
+    ) public view returns (uint claimableAmount) {
         uint rate = choice == RewardLogic.Choice.LOCK ? callConfig.lock.rate : callConfig.exit.rate;
-        uint poolPrice = callConfig.lock.oracle.getPoolPrice();
-        uint maxPoolPrice = callConfig.lock.oracle.getMaxPrimaryPrice(poolPrice);
-        uint priceInToken = callConfig.lock.oracle.getSecondaryPrice(token, maxPoolPrice);
 
-        uint revenueInToken = callConfig.lock.cugar.get(PositionUtils.getCugarKey(token, user));
+        return RewardLogic.getClaimableAmountInToken(callConfig.lock.cugar, rate, token, tokenPrice, user);
+    }
 
-        if (revenueInToken > 0) {
-            uint maxClaimable = priceInToken / revenueInToken;
-            claimableAmount = Precision.toBasisPoints(maxClaimable, rate);
-        }
+    function getClaimableAmountInToken(
+        RewardLogic.Choice choice, //
+        IERC20 token,
+        address user
+    ) public view returns (uint claimableAmount) {
+        return getClaimableAmountInToken(choice, token, user, callConfig.lock.oracle.getMaxPrice(token));
     }
 
     constructor(
@@ -78,12 +82,12 @@ contract RewardRouter is MulticallRouter {
         votingEscrow.withdraw(msg.sender, to);
     }
 
-    function claim(IERC20 token, address to) internal {
-        revenueDistributor.claim(token, msg.sender, to);
+    function claim(IERC20 token, address to) internal returns (uint) {
+        return revenueDistributor.claim(token, msg.sender, to);
     }
 
-    function claimList(IERC20[] calldata tokenList, address to) internal {
-        revenueDistributor.claimList(tokenList, msg.sender, to);
+    function claimList(IERC20[] calldata tokenList, address to) internal returns (uint[] memory) {
+        return revenueDistributor.claimList(tokenList, msg.sender, to);
     }
 
     // governance

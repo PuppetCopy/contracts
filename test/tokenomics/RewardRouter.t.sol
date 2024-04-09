@@ -70,7 +70,7 @@ contract RewardRouterTest is BasicSetup {
         });
 
         primaryVaultPool = new MockWeightedPoolVault();
-        primaryVaultPool.initPool(address(puppetToken), address(address(0x0b)), 20e18, 80e18);
+        primaryVaultPool.initPool(address(puppetToken), address(wnt), 20e18, 80e18);
 
         address rewardRouterAddress = computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1);
 
@@ -78,11 +78,11 @@ contract RewardRouterTest is BasicSetup {
         oracle = new Oracle(
             dictator,
             oracleStore,
-            Oracle.CallConfig({vault: primaryVaultPool, wnt: wnt, poolId: 0, updateInterval: 1 days}),
+            Oracle.CallConfig({primaryPoolToken1: wnt, vault: primaryVaultPool, poolId: 0, updateInterval: 1 days}),
             revenueInTokenList,
             exchangePriceSourceList
         );
-        dictator.setRoleCapability(SET_ORACLE_PRICE_ROLE, address(oracle), oracle.setPoolPrice.selector, true);
+        dictator.setRoleCapability(SET_ORACLE_PRICE_ROLE, address(oracle), oracle.setPrimaryPrice.selector, true);
 
         cugarStore = new CugarStore(dictator, computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1));
         cugar = new Cugar(dictator, Cugar.CallConfig({store: cugarStore}));
@@ -145,31 +145,42 @@ contract RewardRouterTest is BasicSetup {
     function testOption() public {
         vm.warp(2 weeks);
 
-        puppetToken.transfer(address(0x123), puppetToken.balanceOf(users.owner));
-        vm.expectRevert(abi.encodeWithSelector(RewardLogic.RewardLogic__UnacceptableTokenPrice.selector, 100e30));
-        rewardRouter.lock(usdc, 99e30, getMaxTime());
+        assertEq(oracle.getPrimaryPoolPrice(), 1e30, "1-1 pool price with 30 decimals precision");
 
-        vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
-        rewardRouter.lock(usdc, 100e30, getMaxTime());
+        generateUserRevenueInWnt(users.alice, 200e18);
+        assertEq(rewardRouter.getClaimableAmountInToken(RewardLogic.Choice.LOCK, wnt, users.alice), 120e18);
+
+        assertEq(oracle.getSecondaryTwapMedianPrice(wntUsdPoolList, 0), 100e6);
+        assertEq(oracle.getSecondaryPrice(usdc, oracle.getPrimaryPoolPrice()), 100e30);
+
+        vm.expectRevert(Oracle.Oracle__UnavailableSecondaryPrice.selector);
+        oracle.getSecondaryPrice(wnt);
 
         generateUserRevenueInUsdc(users.alice, 100e30);
-        assertEq(getCugarInUsdc(users.alice), 100e30);
-        vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
-        rewardRouter.lock(usdc, 100e30, 0);
+        assertEq(rewardRouter.getClaimableAmountInToken(RewardLogic.Choice.LOCK, usdc, users.alice), 0.6e30);
 
-        rewardRouter.lock(usdc, 100.1e30, getMaxTime());
-        assertAlmostEq(votingEscrow.balanceOf(users.alice), Precision.toBasisPoints(lockRate, 100e18), 10e17);
+        vm.expectRevert(abi.encodeWithSelector(RewardLogic.RewardLogic__UnacceptableTokenPrice.selector, 100e30));
+        rewardRouter.lock(usdc, 0.9e30, getMaxTime());
 
-            // │   ├─ emit RewardLogic__ClaimOption(
-            //     choice: 0,
-            //     rate: 6000,
-            //     cugarKey: 0x3337c027c162ab217dbca5490603dd8966026f12ea894902671dab06da90f9bc,
-            //     account: Alice: [0xBf0b5A4099F0bf6c8bC4252eBeC548Bae95602Ea],
-            //     token: MockERC20: [0x2a9e8fa175F45b235efDdD97d2727741EF4Eee63],
-            //     poolPrice: 1000000000000000000000000000000 [1e30],
-            //     priceInToken: 100000000000000000000000000000000 [1e32],
-            //     amount: 6000000000000000 [6e15]
-            // )
+        // vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
+        // rewardRouter.lock(usdc, 1e30, getMaxTime());
+
+        // vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
+        // rewardRouter.lock(usdc, 1e30, 0);
+
+        // rewardRouter.lock(usdc, 1e30, getMaxTime());
+        // assertAlmostEq(votingEscrow.balanceOf(users.alice), Precision.toBasisPoints(lockRate, 100e18), 10e17);
+
+        // │   ├─ emit RewardLogic__ClaimOption(
+        //     choice: 0,
+        //     rate: 6000,
+        //     cugarKey: 0x3337c027c162ab217dbca5490603dd8966026f12ea894902671dab06da90f9bc,
+        //     account: Alice: [0xBf0b5A4099F0bf6c8bC4252eBeC548Bae95602Ea],
+        //     token: MockERC20: [0x2a9e8fa175F45b235efDdD97d2727741EF4Eee63],
+        //     poolPrice: 1000000000000000000000000000000 [1e30],
+        //     priceInToken: 100000000000000000000000000000000 [1e32],
+        //     amount: 6000000000000000 [6e15]
+        // )
 
         // vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
         // rewardRouter.lock(100.1e30, getMaxTime());

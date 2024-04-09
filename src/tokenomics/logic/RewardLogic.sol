@@ -22,7 +22,7 @@ library RewardLogic {
     }
 
     event RewardLogic__ClaimOption(
-        Choice choice, uint rate, bytes32 cugarKey, address account, IERC20 token, uint poolPrice, uint priceInToken, uint amount
+        Choice choice, uint rate, bytes32 cugarKey, address account, IERC20 revenueToken, uint maxPriceInRevenueToken, uint rewardInToken
     );
 
     event RewardLogic__ReferralOwnershipTransferred(address referralStorage, bytes32 code, address newOwner, uint timestamp);
@@ -48,16 +48,16 @@ library RewardLogic {
         uint rate;
     }
 
-    function getClaimableAmount(Cugar cugar, uint rate, IERC20 token, uint price, address user) public view returns (uint) {
+    function getClaimableAmountInToken(Cugar cugar, uint rate, IERC20 token, uint tokenPrice, address user) internal view returns (uint) {
         uint revenueInToken = cugar.get(PositionUtils.getCugarKey(token, user));
 
         if (revenueInToken == 0) return 0;
 
-        uint maxClaimable = (revenueInToken) * (price) / 1e48;
-        return Precision.applyBasisPoints(maxClaimable, rate);
+        uint maxClaimable = revenueInToken * Precision.FLOAT_PRECISION / tokenPrice;
+        return Precision.applyBasisPoints(rate, maxClaimable);
     }
 
-    function getLockRewardTimeMultiplier(VotingEscrow votingEscrow, address account, uint unlockTime) public view returns (uint) {
+    function getLockRewardTimeMultiplier(VotingEscrow votingEscrow, address account, uint unlockTime) internal view returns (uint) {
         if (unlockTime == 0) unlockTime = votingEscrow.lockedEnd(account);
 
         uint maxTime = block.timestamp + MAXTIME;
@@ -71,43 +71,50 @@ library RewardLogic {
 
     function lock(CallLockConfig memory callLockConfig, IERC20 revenueToken, address user, uint maxAcceptableTokenPrice, uint unlockTime) internal {
         bytes32 cugarKey = PositionUtils.getCugarKey(revenueToken, user);
-        (uint poolPrice, uint priceInToken) = _syncPrice(callLockConfig.oracle, revenueToken, maxAcceptableTokenPrice);
+        uint maxPriceInRevenueToken = _syncPrice(callLockConfig.oracle, revenueToken, maxAcceptableTokenPrice);
 
         uint lockTimeMultiplier = getLockRewardTimeMultiplier(callLockConfig.votingEscrow, user, unlockTime);
-        uint maxClaimableAmount = getClaimableAmount(callLockConfig.cugar, callLockConfig.rate, revenueToken, priceInToken, user);
+        uint claimableInToken = getClaimableAmountInToken(callLockConfig.cugar, callLockConfig.rate, revenueToken, maxPriceInRevenueToken, user);
 
-        uint claimableAmount = Precision.applyBasisPoints(lockTimeMultiplier, maxClaimableAmount);
-        if (claimableAmount == 0) revert RewardLogic__NoClaimableAmount();
+        uint claimableInTokenAferLockMultiplier = Precision.applyBasisPoints(lockTimeMultiplier, claimableInToken);
+        if (claimableInTokenAferLockMultiplier == 0) revert RewardLogic__NoClaimableAmount();
 
-        callLockConfig.puppetToken.mint(address(this), claimableAmount);
-        callLockConfig.votingEscrow.lock(address(this), user, claimableAmount, unlockTime);
+        callLockConfig.puppetToken.mint(address(this), claimableInTokenAferLockMultiplier);
+        callLockConfig.votingEscrow.lock(address(this), user, claimableInTokenAferLockMultiplier, unlockTime);
         callLockConfig.cugar.claimAndDistribute(
-            callLockConfig.router, callLockConfig.revenueDistributor, cugarKey, callLockConfig.revenueSource, revenueToken, claimableAmount
+            callLockConfig.router,
+            callLockConfig.revenueDistributor,
+            cugarKey,
+            callLockConfig.revenueSource,
+            revenueToken,
+            claimableInTokenAferLockMultiplier
         );
 
-        emit RewardLogic__ClaimOption(Choice.LOCK, callLockConfig.rate, cugarKey, user, revenueToken, poolPrice, priceInToken, claimableAmount);
+        emit RewardLogic__ClaimOption(
+            Choice.LOCK, callLockConfig.rate, cugarKey, user, revenueToken, maxPriceInRevenueToken, claimableInTokenAferLockMultiplier
+        );
     }
 
     function exit(CallExitConfig memory callExitConfig, IERC20 revenueToken, address from, uint maxAcceptableTokenPrice) internal {
         bytes32 cugarKey = PositionUtils.getCugarKey(revenueToken, from);
-        (uint poolPrice, uint priceInToken) = _syncPrice(callExitConfig.oracle, revenueToken, maxAcceptableTokenPrice);
+        uint maxPriceInRevenueToken = _syncPrice(callExitConfig.oracle, revenueToken, maxAcceptableTokenPrice);
 
-        uint claimableAmount = getClaimableAmount(callExitConfig.cugar, callExitConfig.rate, revenueToken, priceInToken, from);
-        if (claimableAmount == 0) revert RewardLogic__NoClaimableAmount();
+        uint claimableInToken = getClaimableAmountInToken(callExitConfig.cugar, callExitConfig.rate, revenueToken, maxPriceInRevenueToken, from);
+        if (claimableInToken == 0) revert RewardLogic__NoClaimableAmount();
 
-        callExitConfig.puppetToken.mint(from, claimableAmount);
+        callExitConfig.puppetToken.mint(from, claimableInToken);
         callExitConfig.cugar.claimAndDistribute(
-            callExitConfig.router, callExitConfig.revenueDistributor, cugarKey, callExitConfig.revenueSource, revenueToken, claimableAmount
+            callExitConfig.router, callExitConfig.revenueDistributor, cugarKey, callExitConfig.revenueSource, revenueToken, claimableInToken
         );
 
-        emit RewardLogic__ClaimOption(Choice.EXIT, callExitConfig.rate, cugarKey, from, revenueToken, poolPrice, priceInToken, claimableAmount);
+        emit RewardLogic__ClaimOption(Choice.EXIT, callExitConfig.rate, cugarKey, from, revenueToken, maxPriceInRevenueToken, claimableInToken);
     }
 
-    function _syncPrice(Oracle oracle, IERC20 token, uint maxAcceptableTokenPrice) internal returns (uint maxPrimaryPrice, uint priceInToken) {
-        maxPrimaryPrice = oracle.getMaxPrimaryPrice(oracle.setPoolPrice());
-        priceInToken = oracle.getSecondaryPrice(token, maxPrimaryPrice);
-        if (priceInToken > maxAcceptableTokenPrice) revert RewardLogic__UnacceptableTokenPrice(priceInToken);
-        if (priceInToken == 0) revert RewardLogic__InvalidClaimPrice();
+    function _syncPrice(Oracle oracle, IERC20 token, uint maxAcceptableTokenPrice) internal returns (uint maxPrice) {
+        uint poolPrice = oracle.setPrimaryPrice();
+        maxPrice = oracle.getMaxPrice(token, poolPrice);
+        if (maxPrice > maxAcceptableTokenPrice) revert RewardLogic__UnacceptableTokenPrice(maxPrice);
+        if (maxPrice == 0) revert RewardLogic__InvalidClaimPrice();
     }
 
     function claim(VeRevenueDistributor revenueDistributor, IERC20 token, address from, address to) internal returns (uint) {

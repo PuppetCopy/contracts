@@ -26,8 +26,8 @@ contract Oracle is Auth, ReentrancyGuard {
     }
 
     struct CallConfig {
+        IERC20 primaryPoolToken1;
         IVault vault;
-        IERC20 wnt;
         bytes32 poolId;
         uint updateInterval;
     }
@@ -35,37 +35,47 @@ contract Oracle is Auth, ReentrancyGuard {
     OracleStore store;
     CallConfig callConfig;
 
-    function getMaxPrimaryPrice(uint poolPrice) public view returns (uint) {
-        return Math.max(store.medianMax(), poolPrice);
+    function getMaxPrice(IERC20 token) public view returns (uint) {
+        return getMaxPrice(token, getPrimaryPoolPrice());
     }
 
-    function getMinPrimaryPrice(uint poolPrice) public view returns (uint) {
-        return Math.min(store.medianMin(), poolPrice);
+    function getMinPrice(IERC20 token) public view returns (uint) {
+        return getMinPrice(token, getPrimaryPoolPrice());
     }
 
-    function getMaxPrimaryPrice() public view returns (uint) {
-        return getMaxPrimaryPrice(getPoolPrice());
+    function getMaxPrice(IERC20 token, uint poolPrice) public view returns (uint) {
+        uint maxPrimaryPrice = Math.max(store.medianMax(), poolPrice);
+        if (callConfig.primaryPoolToken1 == token) {
+            return maxPrimaryPrice;
+        }
+
+        return getSecondaryPrice(token, maxPrimaryPrice);
     }
 
-    function getMinPrice() public view returns (uint) {
-        return getMinPrimaryPrice(getPoolPrice());
+    function getMinPrice(IERC20 token, uint poolPrice) public view returns (uint) {
+        uint minPrimaryPrice = Math.min(store.medianMin(), poolPrice);
+        if (callConfig.primaryPoolToken1 == token) {
+            return minPrimaryPrice;
+        }
+
+        return getSecondaryPrice(token, minPrimaryPrice);
     }
 
     function getSecondaryPrice(IERC20 token, uint primaryPrice) public view returns (uint usdPerToken) {
-        SecondaryPriceConfig memory tokenPerWntConfig = tokenPerWntConfigMap[token];
+        SecondaryPriceConfig memory tokenPerWntConfig = secondarySourceConfigMap[token];
 
         if (tokenPerWntConfig.enabled == false) revert Oracle__UnavailableSecondaryPrice();
 
         uint denominator = 10 ** (18 + tokenPerWntConfig.sourceTokenDeicmals);
-        uint sourceTokenPerWnt = getTokenPerWntUsingTwapMedian(tokenPerWntConfig.sourceList, tokenPerWntConfig.twapInterval) * denominator;
+        uint sourceTokenPerWnt = getSecondaryTwapMedianPrice(tokenPerWntConfig.sourceList, tokenPerWntConfig.twapInterval) * denominator;
         usdPerToken = sourceTokenPerWnt * 1e30 / primaryPrice;
     }
 
     function getSecondaryPrice(IERC20 token) external view returns (uint usdPerToken) {
-        return getSecondaryPrice(token, getPoolPrice());
+        return getSecondaryPrice(token, getPrimaryPoolPrice());
     }
 
-    function getPoolPrice() public view returns (uint price) {
+    function getPrimaryPoolPrice() public view returns (uint price) {
         (, uint[] memory balances,) = callConfig.vault.getPoolTokens(callConfig.poolId);
 
         uint tokenBalance = balances[0];
@@ -78,12 +88,11 @@ contract Oracle is Auth, ReentrancyGuard {
         if (price == 0) revert Oracle__NonZeroPrice();
     }
 
-    function getTokenPerWntUsingTwapMedian(IUniswapV3Pool[] memory sourceList, uint32 twapInterval) public view returns (uint medianPrice) {
+    function getSecondaryTwapMedianPrice(IUniswapV3Pool[] memory sourceList, uint32 twapInterval) public view returns (uint medianPrice) {
         uint sourceListLength = sourceList.length;
         if (sourceListLength < 3) revert Oracle__NotEnoughSources();
 
         uint[] memory priceList = new uint[](sourceListLength);
-        uint medianIndex = (sourceListLength - 1) / 2; // Index of the median after the array is sorted
 
         // Initialize the first element
         priceList[0] = UniV3Prelude.getTwapPrice(sourceList[0], 18, twapInterval);
@@ -99,10 +108,11 @@ contract Oracle is Auth, ReentrancyGuard {
             priceList[j] = currentPrice;
         }
 
+        uint medianIndex = (sourceListLength - 1) / 2; // Index of the median after the array is sorted
         medianPrice = priceList[medianIndex];
     }
 
-    mapping(IERC20 token => SecondaryPriceConfig) tokenPerWntConfigMap;
+    mapping(IERC20 token => SecondaryPriceConfig) secondarySourceConfigMap;
 
     constructor(
         Authority _authority,
@@ -128,9 +138,7 @@ contract Oracle is Auth, ReentrancyGuard {
 
     // internal
 
-    function _setConfig(CallConfig memory _callConfig, IERC20[] memory _tokenList, SecondaryPriceConfig[] memory _exchangePriceSourceList)
-        internal
-    {
+    function _setConfig(CallConfig memory _callConfig, IERC20[] memory _tokenList, SecondaryPriceConfig[] memory _exchangePriceSourceList) internal {
         callConfig = _callConfig;
 
         if (_tokenList.length != _exchangePriceSourceList.length) revert Oracle__TokenSourceListLengthMismatch();
@@ -140,36 +148,36 @@ contract Oracle is Auth, ReentrancyGuard {
             if (_config.sourceList.length % 2 == 0) revert Oracle__SourceCountNotOdd();
             if (_config.sourceList.length < 3) revert Oracle__NotEnoughSources();
 
-            tokenPerWntConfigMap[_tokenList[i]] = _config;
+            secondarySourceConfigMap[_tokenList[i]] = _config;
         }
 
         emit Oracle__SetConfig(block.timestamp, callConfig, _exchangePriceSourceList);
     }
 
     // state
-    function setPoolPrice() external requiresAuth returns (uint) {
-        uint currentPrice = getPoolPrice();
+    function setPrimaryPrice() external requiresAuth returns (uint) {
+        uint currentPrice = getPrimaryPoolPrice();
 
-        OracleStore.SlotSeed memory seed = store.getLatestSeed();
+        OracleStore.SeedSlot memory seed = store.getLatestSeed();
 
         if (seed.blockNumber == block.number && seed.price > currentPrice) {
             return seed.price;
         }
 
-        setMinMax(currentPrice);
+        setPrimaryMinMax(currentPrice);
 
         return currentPrice;
     }
 
-    function setMinMax(uint price) internal {
-        OracleStore.SlotSeed memory seed = store.getLatestSeed();
+    function setPrimaryMinMax(uint price) internal {
+        OracleStore.SeedSlot memory seed = store.getLatestSeed();
 
         if (price == 0) revert Oracle__NonZeroPrice();
 
         uint8 slot = uint8(block.timestamp / callConfig.updateInterval % SLOT_COUNT);
         uint storedSlot = store.slot();
 
-        store.setLatestUpdate(OracleStore.SlotSeed({price: price, blockNumber: block.number, timestamp: block.timestamp}));
+        store.setLatestSeed(OracleStore.SeedSlot({price: price, blockNumber: block.number, timestamp: block.timestamp}));
 
         uint max = store.slotMax(slot);
 

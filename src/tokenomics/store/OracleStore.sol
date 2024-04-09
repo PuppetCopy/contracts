@@ -8,13 +8,13 @@ import {StoreController} from "../../utils/StoreController.sol";
 uint8 constant SLOT_COUNT = 7;
 
 contract OracleStore is StoreController {
-    struct SlotSeed {
+    struct SeedSlot {
         uint price;
         uint blockNumber;
         uint timestamp;
     }
 
-    SlotSeed public seedUpdate;
+    SeedSlot public seed;
 
     uint public slot;
 
@@ -27,7 +27,7 @@ contract OracleStore is StoreController {
     constructor(Authority _authority, address _initSetter, uint _seedPrice) StoreController(_authority, _initSetter) {
         require(_seedPrice > 0, "Seed price cannot be 0");
 
-        seedUpdate = SlotSeed({price: _seedPrice, blockNumber: block.number, timestamp: block.timestamp});
+        seed = SeedSlot({price: _seedPrice, blockNumber: block.number, timestamp: block.timestamp});
 
         /// seed all the OHLC data with the initial high price
         for (uint i = 0; i < SLOT_COUNT; i++) {
@@ -39,36 +39,36 @@ contract OracleStore is StoreController {
         medianMax = _seedPrice;
     }
 
-    function getLatestSeed() external view returns (SlotSeed memory) {
-        return seedUpdate;
+    function getLatestSeed() external view returns (SeedSlot memory) {
+        return seed;
+    }
+
+    function setLatestSeed(SeedSlot memory _seed) external isSetter {
+        seed = _seed;
     }
 
     function getSlotArrMin() external view returns (uint[SLOT_COUNT] memory) {
         return slotMin;
     }
 
+    function setSlotMin(uint8 _slot, uint _price) external isSetter {
+        slotMin[_slot] = _price;
+    }
+
     function getSlotArrMax() external view returns (uint[SLOT_COUNT] memory) {
         return slotMax;
     }
 
-    function setLatestUpdate(SlotSeed memory _seedUpdate) external isSetter {
-        seedUpdate = _seedUpdate;
+    function setSlotMax(uint8 _slot, uint _price) external isSetter {
+        slotMax[_slot] = _price;
     }
 
     function setSlot(uint8 _slot) external isSetter {
         slot = _slot;
     }
 
-    function setSlotMin(uint8 _slot, uint _price) external isSetter {
-        slotMin[_slot] = _price;
-    }
-
     function setMedianMin(uint _medianMin) external isSetter {
         medianMin = _medianMin;
-    }
-
-    function setSlotMax(uint8 _slot, uint _price) external isSetter {
-        slotMax[_slot] = _price;
     }
 
     function setMedianMax(uint _medianMax) external isSetter {
