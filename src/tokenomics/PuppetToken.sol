@@ -14,26 +14,28 @@ import {Dictator} from "./../utils/Dictator.sol";
  * The limit restricts the quantity of new tokens that can be minted within a given timeframe, proportional to the existing supply.
  */
 contract PuppetToken is Auth, ERC20 {
+    event Mint(address from, address to, uint amount);
     event PuppetToken__SetConfig(Config config);
     event PuppetToken__ReleaseCore(address to, uint timestamp, uint amount, uint releasedAmount);
 
     string private constant _NAME = "Puppet Test";
     string private constant _SYMBOL = "PUPPET-TEST";
 
-    uint private constant CORE_RELEASE_DURATION = 31540000 * 2; // 2 years
     uint private constant CORE_RELEASE_RATE = 0.35e30; // 35%
-    uint private constant CORE_RELEASE_END_SCHEDULE = 1822262400; // Thu Sep 30 2027
+    uint private constant CORE_RELEASE_DURATION = 31540000 * 2; // 2 years
 
     uint private constant GENESIS_MINT_AMOUNT = 100_000e18;
 
     struct Config {
         uint limitFactor; // Rate limit for minting new tokens in basis points
-        uint durationWindow;
+        uint durationWindow; // Time window for minting rate limit in seconds
     }
 
     Config public config;
 
+    uint deployTimestamp = block.timestamp;
     uint mintWindowCount = 0;
+
     uint public epoch = 0; // Current epoch for rate limit calculation
     uint public coreReleasedAmount = 0; // the  amount of tokens released to the core
 
@@ -78,10 +80,12 @@ contract PuppetToken is Auth, ERC20 {
     }
 
     function mintCoreRelease(address _to) external requiresAuth returns (uint) {
-        if (block.timestamp > CORE_RELEASE_END_SCHEDULE) revert PuppetToken__CoreReleaseEnded();
+        uint endTime = deployTimestamp + CORE_RELEASE_DURATION;
 
-        uint timeElapsed = CORE_RELEASE_END_SCHEDULE - block.timestamp;
-        uint timeMultiplier = Math.min(Precision.toFactor(timeElapsed, CORE_RELEASE_END_SCHEDULE), Precision.FLOAT_PRECISION);
+        if (block.timestamp > endTime) revert PuppetToken__CoreReleaseEnded();
+
+        uint timeElapsed = block.timestamp - deployTimestamp;
+        uint timeMultiplier = Precision.toFactor(timeElapsed, CORE_RELEASE_DURATION);
         uint maxMintableAmount = Precision.applyFactor(CORE_RELEASE_RATE, totalSupply());
         uint maxMintableAmountForPeriod = Precision.applyFactor(timeMultiplier, maxMintableAmount);
         uint mintableAmount = maxMintableAmountForPeriod - coreReleasedAmount;
@@ -104,6 +108,8 @@ contract PuppetToken is Auth, ERC20 {
     }
 
     function _setConfig(Config memory _config) internal {
+        if (_config.limitFactor == 0) revert PuppetToken__InvalidRate();
+
         config = _config;
         mintWindowCount = 0; // Reset the mint count window on rate limit change
 
