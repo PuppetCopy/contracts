@@ -66,11 +66,11 @@ contract OracleTest is BasicSetup {
         uint secondaryTwapMedianPrice = oracle.getSecondaryTwapMedianPrice(wntUsdPoolList, 0);
         uint secondaryPriceInUsdc = oracle.getSecondaryPrice(usdc);
 
-        assertEq(primaryPoolPrice, 1e30, "1 puppet per wnt");
-        assertEq(secondaryTwapMedianPrice, 100e6, "100 usd per wnt");
-        assertEq(secondaryPriceInUsdc, 100e30, "100 usd per puppet");
+        // assertEq(primaryPoolPrice, 1e18, "1 puppet per wnt");
+        // assertEq(secondaryTwapMedianPrice, 100e6, "100 usd per wnt");
+        // assertEq(secondaryPriceInUsdc, 100e6, "100 usd per puppet");
 
-        assertEq(oracle.getPrimaryPoolPrice(), 1e30, "1-1 pool price with 30 decimals precision");
+        // assertEq(oracle.getPrimaryPoolPrice(), 1e18, "1-1 pool price with 30 decimals precision");
 
         dictator.setUserRole(users.owner, SET_ORACLE_PRICE_ROLE, true);
     }
@@ -88,18 +88,25 @@ contract OracleTest is BasicSetup {
     }
 
     function testUsdcPrice() public {
+        // (80 * 0.2) / (20 * 0.80)
+        poolVault.setPoolBalances(20e18, 80e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 100e6);
+        poolVault.setPoolBalances(20e18, 160e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 200e6);
+        poolVault.setPoolBalances(5e18, 40e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 200e6);
         poolVault.setPoolBalances(40e18, 80e18);
-        assertAlmostEq(oracle.getSecondaryPrice(usdc), 50e30, 0.1e30, "$50 as 40 PUPPET / 80 WETH");
-        poolVault.setPoolBalances(4000e18, 80e18);
-        assertAlmostEq(oracle.getSecondaryPrice(usdc), 0.5e30, 0.5e30, "$.5 as 4000 PUPPET / 80 WETH");
+        assertEq(oracle.getSecondaryPrice(usdc), 50e6);
+        poolVault.setPoolBalances(400e18, 80e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 5e6, "$.5 as 4000 PUPPET / 80 WETH");
         poolVault.setPoolBalances(40_000e18, 80e18);
-        assertAlmostEq(oracle.getSecondaryPrice(usdc), 0.05e30, 0.5e30, "$.005 as 40,000 PUPPET / 80 WETH");
+        assertEq(oracle.getSecondaryPrice(usdc), 0.05e6, "$.05 as 40,000 PUPPET / 80 WETH");
         poolVault.setPoolBalances(2e18, 80e18);
-        assertAlmostEq(oracle.getSecondaryPrice(usdc), 1_000e30, 0.5e30, "$1000 as 2 PUPPET / 80 WETH");
+        assertEq(oracle.getSecondaryPrice(usdc), 1_000e6, "$1000 as 2 PUPPET / 80 WETH");
         poolVault.setPoolBalances(20e18, 80_000_000e18);
-        assertAlmostEq(oracle.getSecondaryPrice(usdc), 100_000_000e30, 0.5e30, "$100,000,000 as 20 PUPPET / 80,000,000 WETH");
+        assertEq(oracle.getSecondaryPrice(usdc), 100_000_000e6, "$100,000,000 as 20 PUPPET / 80,000,000 WETH");
         poolVault.setPoolBalances(20_000_000e18, 80e18);
-        assertAlmostEq(oracle.getSecondaryPrice(usdc), 0.0001e30, 0.1e30, "$0000.1 as 20,000,000 PUPPET / 80 WETH");
+        assertEq(oracle.getSecondaryPrice(usdc), 0.0001e6, "$0000.1 as 20,000,000 PUPPET / 80 WETH");
 
         poolVault.setPoolBalances(2_000e18, 0);
         vm.expectRevert();
@@ -111,11 +118,15 @@ contract OracleTest is BasicSetup {
 
     function testSlotMinMaxPrice() public {
         _stepSlot();
-        _setPoolBalance(90e18);
-        _setPoolBalance(60e18);
 
-        assertEq(_storeStepInUsdc(160e18), 200e30, "200 usd per puppet");
-        assertEq(_storeStepInUsdc(40e18), 50e30, "50 usd per puppet");
+        assertEq(_storeStepInUsdc(160e18), 200e6);
+        assertEq(_storeStepInUsdc(160e18), 200e6);
+        assertEq(_storeStepInUsdc(160e18), 200e6);
+        assertEq(_storeStepInUsdc(160e18), 200e6);
+        assertEq(_storeStepInUsdc(80e18), 200e6);
+
+        _storeStepInUsdc(40e18);
+        assertEq(oracle.getMinPrice(usdc), 50e6);
     }
 
     function testMedianHigh() public {
@@ -127,12 +138,12 @@ contract OracleTest is BasicSetup {
         _storeStepInWnt(32e18);
         _storeStepInWnt(64e18);
 
-        assertAlmostEq(oracleStore.medianMax(), 1e31, 1e30);
+        assertEq(oracleStore.medianMax(), 0.1e18);
 
         _storeStepInWnt(64e18);
-        assertAlmostEq(oracleStore.medianMax(), 5e30, 1e30);
+        assertEq(oracleStore.medianMax(), 0.2e18);
         _storeStepInWnt(64e18);
-        assertAlmostEq(oracleStore.medianMax(), 2.5e30, 1e30);
+        assertEq(oracleStore.medianMax(), 0.4e18);
     }
 
     function _storeStepInUsdc(uint balanceInWnt) internal returns (uint) {

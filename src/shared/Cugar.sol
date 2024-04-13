@@ -2,14 +2,20 @@
 pragma solidity 0.8.24;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {CugarStore} from "./store/CugarStore.sol";
 import {VeRevenueDistributor} from "./../tokenomics/VeRevenueDistributor.sol";
-import {Router} from "./../utils/Router.sol";
 
-contract Cugar is Auth {
+import {CugarStore} from "./store/CugarStore.sol";
+
+contract Cugar is Auth, ReentrancyGuard {
     event RewardRouter__SetConfig(uint timestmap, CallConfig callConfig);
+
+    struct RevenueSourceConfig {
+        address account;
+        IERC20 token;
+    }
 
     struct CallConfig {
         CugarStore store;
@@ -39,21 +45,11 @@ contract Cugar is Auth {
         callConfig.store.increaseList(keyList, amountList);
     }
 
-    function decreaseList(bytes32[] calldata contributionKeyList, uint[] calldata amountList) external requiresAuth {
-        callConfig.store.decreaseList(contributionKeyList, amountList);
-    }
-
-    function claimAndDistribute(
-        Router router, //
-        VeRevenueDistributor revenueDistributor,
-        bytes32 key,
-        address revenueSource,
-        IERC20 token,
-        uint amount
-    ) external requiresAuth {
-        revenueDistributor.checkpointToken(token);
-        router.transfer(token, revenueSource, address(revenueDistributor), amount);
-        revenueDistributor.checkpointToken(token);
+    function distribute(VeRevenueDistributor revenueDistributor, address revenueSource, bytes32 key, IERC20 token, uint amount)
+        external
+        requiresAuth
+    {
+        revenueDistributor.depositTokenFrom(token, revenueSource, amount);
         callConfig.store.decrease(key, amount);
     }
 
@@ -72,4 +68,5 @@ contract Cugar is Auth {
     }
 
     error Cugar__InvalidInputLength();
+    error Cugar__UnauthorizedRevenueSource();
 }

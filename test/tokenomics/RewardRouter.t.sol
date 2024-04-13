@@ -40,9 +40,10 @@ contract RewardRouterTest is BasicSetup {
     uint8 constant SET_ORACLE_PRICE_ROLE = 3;
     uint8 constant CLAIM_AND_DISTRIBUTE_CUGAR_ROLE = 4;
     uint8 constant INCREASE_CUGAR_ROLE = 5;
-    uint8 constant REWARD_LOGIC_ROLE = 6;
-    uint8 constant VESTING_ROLE = 7;
-    uint8 constant REWARD_DISTRIBUTOR_ROLE = 8;
+    uint8 constant DISTRIBUTE_CUGAR_ROLE = 6;
+    uint8 constant VEST_ROLE = 8;
+    uint8 constant REWARD_DISTRIBUTOR_ROLE = 9;
+    uint8 constant DEPOSIT_TOKEN_FROM_ROLE = 10;
 
     uint public lockRate = 6000;
     uint public exitRate = 3000;
@@ -87,16 +88,17 @@ contract RewardRouterTest is BasicSetup {
         cugarStore = new CugarStore(dictator, computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1));
         cugar = new Cugar(dictator, Cugar.CallConfig({store: cugarStore}));
         dictator.setRoleCapability(INCREASE_CUGAR_ROLE, address(cugar), cugar.increase.selector, true);
-        dictator.setRoleCapability(CLAIM_AND_DISTRIBUTE_CUGAR_ROLE, address(cugar), cugar.claimAndDistribute.selector, true);
+        dictator.setRoleCapability(DISTRIBUTE_CUGAR_ROLE, address(cugar), cugar.distribute.selector, true);
+        dictator.setRoleCapability(CLAIM_AND_DISTRIBUTE_CUGAR_ROLE, address(cugar), cugar.distribute.selector, true);
 
         votingEscrow = new VotingEscrow(dictator, router, puppetToken);
-        dictator.setRoleCapability(VESTING_ROLE, address(votingEscrow), votingEscrow.lock.selector, true);
-        dictator.setRoleCapability(VESTING_ROLE, address(votingEscrow), votingEscrow.depositFor.selector, true);
-        dictator.setRoleCapability(VESTING_ROLE, address(votingEscrow), votingEscrow.withdraw.selector, true);
+        dictator.setRoleCapability(VEST_ROLE, address(votingEscrow), votingEscrow.lock.selector, true);
+        dictator.setRoleCapability(VEST_ROLE, address(votingEscrow), votingEscrow.withdraw.selector, true);
+        dictator.setRoleCapability(VEST_ROLE, address(votingEscrow), votingEscrow.depositFor.selector, true);
 
-        revenueDistributor = new VeRevenueDistributor(dictator, votingEscrow, router, 1 weeks);
+        revenueDistributor = new VeRevenueDistributor(dictator, votingEscrow, router, block.timestamp + 1 weeks);
         dictator.setRoleCapability(REWARD_DISTRIBUTOR_ROLE, address(revenueDistributor), revenueDistributor.claim.selector, true);
-        dictator.setRoleCapability(REWARD_DISTRIBUTOR_ROLE, address(revenueDistributor), revenueDistributor.depositToken.selector, true);
+        dictator.setRoleCapability(DEPOSIT_TOKEN_FROM_ROLE, address(revenueDistributor), revenueDistributor.depositTokenFrom.selector, true);
 
         rewardRouter = new RewardRouter(
             dictator,
@@ -132,100 +134,98 @@ contract RewardRouterTest is BasicSetup {
         dictator.setUserRole(address(cugar), TRANSFER_TOKEN_ROLE, true);
 
         dictator.setUserRole(address(rewardRouter), MINT_PUPPET_ROLE, true);
-        dictator.setUserRole(address(rewardRouter), REWARD_LOGIC_ROLE, true);
-        dictator.setUserRole(address(rewardRouter), VESTING_ROLE, true);
+        dictator.setUserRole(address(rewardRouter), VEST_ROLE, true);
 
         dictator.setUserRole(address(rewardRouter), SET_ORACLE_PRICE_ROLE, true);
         dictator.setUserRole(address(rewardRouter), CLAIM_AND_DISTRIBUTE_CUGAR_ROLE, true);
+
+        dictator.setUserRole(address(cugar), DEPOSIT_TOKEN_FROM_ROLE, true);
         dictator.setUserRole(users.owner, INCREASE_CUGAR_ROLE, true);
 
+        wnt.approve(address(router), type(uint).max - 1);
         revenueInTokenList[0].approve(address(router), type(uint).max - 1);
     }
 
     function testOption() public {
-        vm.warp(2 weeks);
+        skip(1 weeks);
 
-        assertEq(oracle.getPrimaryPoolPrice(), 1e30, "1-1 pool price with 30 decimals precision");
 
-        generateUserRevenueInWnt(users.alice, 200e18);
-        assertEq(rewardRouter.getClaimableAmountInToken(RewardLogic.Choice.LOCK, wnt, users.alice), 120e18);
+        assertEq(oracle.getPrimaryPoolPrice(), 1e18, "1-1 pool price with 30 decimals precision");
+        assertEq(oracle.getMaxPrice(usdc), 100e6, "100usdc per puppet");
 
-        assertEq(oracle.getSecondaryTwapMedianPrice(wntUsdPoolList, 0), 100e6);
-        assertEq(oracle.getSecondaryPrice(usdc, oracle.getPrimaryPoolPrice()), 100e30);
+        vm.expectRevert(abi.encodeWithSelector(RewardLogic.RewardLogic__NotEnoughToClaim.selector, 0));
+        rewardRouter.lock(wnt, getMaxTime(), 1e18, 200e18);
+
+        generateUserRevenueInWnt(users.alice, 1e18);
+        assertEq(rewardRouter.getClaimableAmount(RewardLogic.Choice.LOCK, wnt, users.alice, 1e18), 0.6e18);
+        generateUserRevenueInUsdc(users.alice, 100e6);
+        assertEq(rewardRouter.getClaimableAmount(RewardLogic.Choice.LOCK, usdc, users.alice, 100e6), 0.6e18);
 
         vm.expectRevert(Oracle.Oracle__UnavailableSecondaryPrice.selector);
         oracle.getSecondaryPrice(wnt);
+        vm.expectRevert(Oracle.Oracle__UnavailableSecondaryPrice.selector);
+        oracle.getSecondaryPrice(puppetToken);
 
-        generateUserRevenueInUsdc(users.alice, 100e30);
-        assertEq(rewardRouter.getClaimableAmountInToken(RewardLogic.Choice.LOCK, usdc, users.alice), 0.6e30);
+        vm.expectRevert(abi.encodeWithSelector(RewardLogic.RewardLogic__UnacceptableTokenPrice.selector, 100e6));
+        rewardRouter.lock(usdc, getMaxTime(), 0.9e6, 100e6);
 
-        vm.expectRevert(abi.encodeWithSelector(RewardLogic.RewardLogic__UnacceptableTokenPrice.selector, 100e30));
-        rewardRouter.lock(usdc, 0.9e30, getMaxTime());
+        vm.expectRevert(abi.encodeWithSelector(RewardLogic.RewardLogic__NotEnoughToClaim.selector, 100e6));
+        rewardRouter.lock(usdc, getMaxTime(), 100e6, 200e6);
+        vm.expectRevert(abi.encodeWithSelector(RewardLogic.RewardLogic__NotEnoughToClaim.selector, 1e18));
+        rewardRouter.lock(wnt, getMaxTime(), 1e18, 200e18);
 
-        // vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
-        // rewardRouter.lock(usdc, 1e30, getMaxTime());
+        wnt.balanceOf(address(users.alice));
+        rewardRouter.lock(wnt, getMaxTime(), 1e18, 1e18);
+        uint veBalanceAfterLock = votingEscrow.balanceOf(users.alice);
+        assertAlmostEq(veBalanceAfterLock, Precision.applyBasisPoints(lockRate, 1e18), 5e16);
+        rewardRouter.lock(usdc, getMaxTime(), 100e6, 100e6);
+        assertAlmostEq(votingEscrow.balanceOf(users.alice), Precision.applyBasisPoints(lockRate, 1e18) + veBalanceAfterLock, 0.01e18);
 
-        // vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
-        // rewardRouter.lock(usdc, 1e30, 0);
+        vm.expectRevert(abi.encodeWithSelector(RewardLogic.RewardLogic__NotEnoughToClaim.selector, 0));
+        rewardRouter.lock(usdc, getMaxTime(), 100e6, 100e6);
 
-        // rewardRouter.lock(usdc, 1e30, getMaxTime());
-        // assertAlmostEq(votingEscrow.balanceOf(users.alice), Precision.toBasisPoints(lockRate, 100e18), 10e17);
+        vm.expectRevert(abi.encodeWithSelector(RewardLogic.RewardLogic__NotEnoughToClaim.selector, 0));
+        rewardRouter.lock(wnt, getMaxTime(), 1e18, 1e18);
 
-        // │   ├─ emit RewardLogic__ClaimOption(
-        //     choice: 0,
-        //     rate: 6000,
-        //     cugarKey: 0x3337c027c162ab217dbca5490603dd8966026f12ea894902671dab06da90f9bc,
-        //     account: Alice: [0xBf0b5A4099F0bf6c8bC4252eBeC548Bae95602Ea],
-        //     token: MockERC20: [0x2a9e8fa175F45b235efDdD97d2727741EF4Eee63],
-        //     poolPrice: 1000000000000000000000000000000 [1e30],
-        //     priceInToken: 100000000000000000000000000000000 [1e32],
-        //     amount: 6000000000000000 [6e15]
-        // )
+        assertEq(cugar.get(PositionUtils.getCugarKey(wnt, users.alice)), 0);
+        assertEq(cugar.get(PositionUtils.getCugarKey(usdc, users.alice)), 0);
 
-        // vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
-        // rewardRouter.lock(100.1e30, getMaxTime());
+        generateUserRevenueInWnt(users.alice, 1e18);
+        rewardRouter.exit(wnt, 1e18, 1e18);
+        generateUserRevenueInUsdc(users.alice, 100e6);
+        rewardRouter.exit(usdc, 100e6, 100e6);
+        assertEq(puppetToken.balanceOf(users.alice), 0.6e18);
 
-        // assertEq(userGeneratedRevenue.getUserGeneratedRevenue(userGeneratedRevenueStore, users.alice).amountInUsd, 0);
+        generateUserRevenueInUsdc(users.bob, 100e6);
+        assertEq(rewardRouter.getClaimableAmount(RewardLogic.Choice.LOCK, usdc, users.bob, 100e6), 0.6e18);
+        rewardRouter.exit(usdc, 100e6, 100e6);
+        assertEq(puppetToken.balanceOf(users.bob), 0.3e18);
 
-        // generateUserRevenueInUsdc(users.alice, 100e30);
-        // rewardRouter.exit(1e30);
-        // assertEq(puppetToken.balanceOf(users.alice), 30e18);
+        generateUserRevenueInUsdc(users.bob, 100e6);
+        assertEq(rewardRouter.getClaimableAmount(RewardLogic.Choice.LOCK, usdc, users.bob, 100e6), 0.6e18);
+        rewardRouter.lock(usdc, getMaxTime() / 2, 100e6, 100e6);
+        assertAlmostEq(votingEscrow.balanceOf(users.bob), Precision.applyBasisPoints(lockRate, 1e18) / 4, 0.01e18);
 
-        // vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
-        // rewardRouter.exit(1e30);
+        skip(1 weeks);
 
-        // generateUserRevenueInUsdc(users.alice, 100e30);
-        // assertEq(userGeneratedRevenue.getUserGeneratedRevenue(userGeneratedRevenueStore, users.alice).amountInUsd, 100e30);
-        // rewardRouter.lock(1e30, 0);
-        // assertAlmostEq(votingEscrow.balanceOf(users.alice), RewardLogic.getClaimableAmount(lockRate, 200e18), 10e17);
 
-        // generateUserRevenueInUsdc(users.bob, 100e30);
-        // assertEq(userGeneratedRevenue.getUserGeneratedRevenue(userGeneratedRevenueStore, users.bob).amountInUsd, 100e30);
-        // rewardRouter.lock(1e30, getMaxTime());
-        // assertAlmostEq(votingEscrow.balanceOf(users.bob), RewardLogic.getClaimableAmount(lockRate, 100e18), 10e17);
+        votingEscrow.userPointEpoch(users.alice);
+        votingEscrow.userPointHistory(users.alice, 1);
+        votingEscrow.findTimestampUserEpoch(users.alice, block.timestamp, 0, 1);
 
-        // generateUserRevenueInUsdc(users.yossi, 100e30);
-        // assertEq(userGeneratedRevenue.getUserGeneratedRevenue(userGeneratedRevenueStore, users.yossi).amountInUsd, 100e30);
-        // rewardRouter.lock(1e30, getMaxTime() / 2);
-        // assertAlmostEq(votingEscrow.balanceOf(users.yossi), RewardLogic.getClaimableAmount(lockRate, 100e18 / 2) / 2, 10e17);
-        // assertEq(votingEscrow.lockedAmount(users.yossi), RewardLogic.getClaimableAmount(lockRate, 100e18) / 2);
-        // assertEq(RewardLogic.getRewardTimeMultiplier(votingEscrow, users.yossi, getMaxTime() / 2), 5000);
-
-        // // vm.warp(3 weeks);
-
-        // depositRevenue(500e30);
-        // assertEq(revenueDistributor.getTokensDistributedInWeek(usdcTokenRevenue, 3 weeks), 500e30);
+        // revenueDistributor.getUserState(users.alice);
+        revenueDistributor.getTokensDistributedInWeek(usdc, revenueDistributor.getTimeCursor());
+        revenueDistributor.getTokensDistributedInWeek(usdc, 1 weeks);
 
         // revenueDistributor.getUserTokenTimeCursor(users.alice, usdcTokenRevenue);
         // revenueDistributor.getTotalSupplyAtTimestamp(3 weeks);
         // revenueDistributor.getTimeCursor();
-        // revenueDistributor.getClaimableToken(usdcTokenRevenue, users.alice);
-        // assertGt(rewardRouter.claim(users.bob), 0, "Alice has no claimable revenue");
+        revenueDistributor.getUserState(users.alice);
+        assertGt(revenueDistributor.claim(usdc), 0, "Alice has no claimable revenue");
 
         // Users claim their revenue
         // uint aliceRevenueBefore = revenueInToken.balanceOf(users.alice);
         // uint bobRevenueBefore = revenueInToken.balanceOf(users.bob);
-        // revenueDistributor.getUserTimeCursor(users.alice);
 
         // votingEscrow.getUserPointHistory(users.alice, revenueDistributor.userEpochOf(users.alice));
         // uint _lastTokenTime = (revenueDistributor.lastTokenTime() / 1 weeks) * 1 weeks;

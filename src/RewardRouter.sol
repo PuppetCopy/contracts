@@ -28,23 +28,26 @@ contract RewardRouter is MulticallRouter {
     VotingEscrow votingEscrow;
     VeRevenueDistributor revenueDistributor;
 
-    function getClaimableAmountInToken(
+    function getClaimableAmount(
         RewardLogic.Choice choice, //
         IERC20 token,
         address user,
+        uint cugarAmount,
         uint tokenPrice
     ) public view returns (uint claimableAmount) {
         uint rate = choice == RewardLogic.Choice.LOCK ? callConfig.lock.rate : callConfig.exit.rate;
 
-        return RewardLogic.getClaimableAmountInToken(callConfig.lock.cugar, rate, token, tokenPrice, user);
+        return RewardLogic.getClaimableAmount(callConfig.lock.cugar, rate, token, tokenPrice, user, cugarAmount);
     }
 
-    function getClaimableAmountInToken(
+    function getClaimableAmount(
         RewardLogic.Choice choice, //
         IERC20 token,
-        address user
+        address user,
+        uint cugarAmount
     ) public view returns (uint claimableAmount) {
-        return getClaimableAmountInToken(choice, token, user, callConfig.lock.oracle.getMaxPrice(token));
+        uint tokenPrice = callConfig.lock.oracle.getMaxPrice(token);
+        return getClaimableAmount(choice, token, user, cugarAmount, tokenPrice);
     }
 
     constructor(
@@ -62,12 +65,12 @@ contract RewardRouter is MulticallRouter {
         callConfig.lock.puppetToken.approve(address(_router), type(uint).max);
     }
 
-    function lock(IERC20 revenueToken, uint maxAcceptableTokenPrice, uint unlockTime) public nonReentrant {
-        RewardLogic.lock(callConfig.lock, revenueToken, msg.sender, maxAcceptableTokenPrice, unlockTime);
+    function lock(IERC20 revenueToken, uint unlockTime, uint acceptableTokenPrice, uint cugarAmount) public nonReentrant {
+        RewardLogic.lock(callConfig.lock, revenueToken, msg.sender, acceptableTokenPrice, unlockTime, cugarAmount);
     }
 
-    function exit(IERC20 revenueToken, uint maxAcceptableTokenPrice) public nonReentrant {
-        RewardLogic.exit(callConfig.exit, revenueToken, msg.sender, maxAcceptableTokenPrice);
+    function exit(IERC20 revenueToken, uint acceptableTokenPrice, uint cugarAmount) public nonReentrant {
+        RewardLogic.exit(callConfig.exit, revenueToken, msg.sender, acceptableTokenPrice, cugarAmount);
     }
 
     function veLock(uint _tokenAmount, uint unlockTime) external nonReentrant {
@@ -80,14 +83,6 @@ contract RewardRouter is MulticallRouter {
 
     function veWithdraw(address to) external nonReentrant {
         votingEscrow.withdraw(msg.sender, to);
-    }
-
-    function claim(IERC20 token, address to) internal returns (uint) {
-        return revenueDistributor.claim(token, msg.sender, to);
-    }
-
-    function claimList(IERC20[] calldata tokenList, address to) internal returns (uint[] memory) {
-        return revenueDistributor.claimList(tokenList, msg.sender, to);
     }
 
     // governance

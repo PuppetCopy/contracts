@@ -34,6 +34,7 @@ contract Oracle is Auth, ReentrancyGuard {
 
     OracleStore store;
     CallConfig callConfig;
+    mapping(IERC20 token => SecondaryPriceConfig) secondarySourceConfigMap;
 
     function getMaxPrice(IERC20 token) public view returns (uint) {
         return getMaxPrice(token, getPrimaryPoolPrice());
@@ -66,9 +67,10 @@ contract Oracle is Auth, ReentrancyGuard {
 
         if (tokenPerWntConfig.enabled == false) revert Oracle__UnavailableSecondaryPrice();
 
-        uint denominator = 10 ** (18 + tokenPerWntConfig.sourceTokenDeicmals);
-        uint sourceTokenPerWnt = getSecondaryTwapMedianPrice(tokenPerWntConfig.sourceList, tokenPerWntConfig.twapInterval) * denominator;
-        usdPerToken = sourceTokenPerWnt * 1e30 / primaryPrice;
+        uint adjForDecimals = 10 ** (18 - tokenPerWntConfig.sourceTokenDeicmals);
+        uint secondaryPrice = getSecondaryTwapMedianPrice(tokenPerWntConfig.sourceList, tokenPerWntConfig.twapInterval);
+
+        usdPerToken = secondaryPrice * adjForDecimals * primaryPrice / 1e30;
     }
 
     function getSecondaryPrice(IERC20 token) external view returns (uint usdPerToken) {
@@ -79,13 +81,23 @@ contract Oracle is Auth, ReentrancyGuard {
         (, uint[] memory balances,) = callConfig.vault.getPoolTokens(callConfig.poolId);
 
         uint tokenBalance = balances[0];
-        uint nSlotBalance = balances[1];
-        uint precision = 10 ** 30;
+        uint primaryBalance = balances[1];
 
-        uint balanceRatio = (tokenBalance * 80 * precision) / (nSlotBalance * 20);
+        uint balanceRatio = ((primaryBalance * 20e18) / (tokenBalance * 80));
         price = balanceRatio;
 
         if (price == 0) revert Oracle__NonZeroPrice();
+    }
+
+    function getSecondaryPoolPrice(IERC20 token) public view returns (uint usdPerToken) {
+        SecondaryPriceConfig memory tokenPerWntConfig = secondarySourceConfigMap[token];
+
+        if (tokenPerWntConfig.enabled == false) revert Oracle__UnavailableSecondaryPrice();
+
+        uint adjForDecimals = 10 ** (18 - tokenPerWntConfig.sourceTokenDeicmals);
+        uint secondaryPrice = getSecondaryTwapMedianPrice(tokenPerWntConfig.sourceList, tokenPerWntConfig.twapInterval);
+
+        usdPerToken = secondaryPrice * adjForDecimals;
     }
 
     function getSecondaryTwapMedianPrice(IUniswapV3Pool[] memory sourceList, uint32 twapInterval) public view returns (uint medianPrice) {
@@ -111,8 +123,6 @@ contract Oracle is Auth, ReentrancyGuard {
         uint medianIndex = (sourceListLength - 1) / 2; // Index of the median after the array is sorted
         medianPrice = priceList[medianIndex];
     }
-
-    mapping(IERC20 token => SecondaryPriceConfig) secondarySourceConfigMap;
 
     constructor(
         Authority _authority,
@@ -155,7 +165,7 @@ contract Oracle is Auth, ReentrancyGuard {
     }
 
     // state
-    function setPrimaryPrice() external requiresAuth returns (uint) {
+    function setPrimaryPrice() external requiresAuth nonReentrant returns (uint) {
         uint currentPrice = getPrimaryPoolPrice();
 
         OracleStore.SeedSlot memory seed = store.getLatestSeed();
