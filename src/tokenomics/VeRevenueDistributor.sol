@@ -38,17 +38,6 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
     event VeRevenueDistributor__TokenCheckpoint(IERC20 token, uint amount, uint lastCheckpointTimestamp);
     event VeRevenueDistributor__TokensClaim(address from, address to, IERC20 token, uint amount, uint userTokenTimeCursor);
 
-    VotingEscrow public _votingEscrow;
-    Router private immutable _router;
-
-    uint private immutable _startTime;
-
-    // Global State
-    uint private _timeCursor;
-    mapping(uint => uint) private _veSupplyCache;
-
-    // Token State
-
     // `startTime` and `timeCursor` are both timestamps so comfortably fit in a uint64.
     // `cachedBalance` will comfortably fit the total supply of any meaningful token.
     // Should more than 2^128 tokens be sent to this contract then checkpointing this token will fail until enough
@@ -56,121 +45,112 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
     struct TokenState {
         uint64 startTime;
         uint64 timeCursor;
-        uint128 cachedBalance;
+        uint cachedBalance;
     }
 
-    mapping(IERC20 => TokenState) private _tokenState;
-    mapping(IERC20 => mapping(uint => uint)) private _tokensPerWeek;
-
-    // User State
-
-    // `startTime` and `timeCursor` are timestamps so will comfortably fit in a uint64.
-    // For `lastEpochCheckpointed` to overflow would need over 2^128 transactions to the VotingEscrow contract.
     struct UserState {
         uint64 startTime;
         uint64 timeCursor;
         uint128 lastEpochCheckpointed;
     }
 
-    mapping(address => UserState) internal _userState;
-    mapping(address => mapping(uint => uint)) private _userBalanceAtTimestamp;
-    mapping(address => mapping(IERC20 => uint)) private _userTokenTimeCursor;
+    VotingEscrow public immutable votingEscrow;
+    Router immutable router;
+    uint immutable startTime;
 
-    constructor(Authority _authority, VotingEscrow votingEscrow, Router router, uint startTime)
-        EIP712("FeeDistributor", "1")
-        Auth(address(0), _authority)
-    {
-        _votingEscrow = votingEscrow;
-        _router = router;
+    uint public timeCursor;
 
-        startTime = _roundDownTimestamp(startTime);
-        uint currentWeek = _roundDownTimestamp(block.timestamp);
-        require(startTime >= currentWeek, "Cannot start before current week");
-        if (startTime == currentWeek) {
-            // We assume that `votingEscrow` has been deployed in a week previous to this one.
-            // If `votingEscrow` did not have a non-zero supply at the beginning of the current week
-            // then any tokens which are distributed this week will be lost permanently.
-            require(votingEscrow.totalSupply(currentWeek) > 0, "Zero total supply results in lost tokens");
-        }
-        _startTime = startTime;
-        _timeCursor = startTime;
-    }
+    mapping(uint => uint) _veSupplyCache;
+    mapping(IERC20 => TokenState) _tokenState;
+    mapping(IERC20 => mapping(uint => uint)) _tokensPerWeek;
 
-    /**
-     * @notice Returns the global time cursor representing the most earliest uncheckpointed week.
-     */
-    function getTimeCursor() external view returns (uint) {
-        return _timeCursor;
-    }
+    mapping(address => UserState) _userState;
+    mapping(address => mapping(uint => uint)) _userBalanceAtTimestamp;
+    mapping(address => mapping(IERC20 => uint)) _userTokenTimeCursor;
 
     /**
      * @notice Returns the user-level time cursor representing the most earliest uncheckpointed week.
-     * @param user - The address of the user to query.
+     * @param _user - The address of the user to query.
      */
-    function getUserState(address user) external view returns (UserState memory) {
-        return _userState[user];
-    }
-
-    /**
-     * @notice Returns the user-level time cursor representing the most earliest uncheckpointed week.
-     * @param user - The address of the user to query.
-     */
-    function getUserTimeCursor(address user) external view returns (uint) {
-        return _userState[user].timeCursor;
+    function getUserState(address _user) external view returns (UserState memory) {
+        return _userState[_user];
     }
 
     /**
      * @notice Returns the token-level time cursor storing the timestamp at up to which tokens have been distributed.
-     * @param token - The ERC20 token address to query.
+     * @param _token - The ERC20 token address to query.
      */
-    function getTokenTimeCursor(IERC20 token) external view returns (uint) {
-        return _tokenState[token].timeCursor;
+    function getTokenState(IERC20 _token) external view returns (TokenState memory) {
+        return _tokenState[_token];
     }
 
     /**
      * @notice Returns the user-level time cursor storing the timestamp of the latest token distribution claimed.
-     * @param user - The address of the user to query.
-     * @param token - The ERC20 token address to query.
+     * @param _user - The address of the user to query.
+     * @param _token - The ERC20 token address to query.
      */
-    function getUserTokenTimeCursor(address user, IERC20 token) external view returns (uint) {
-        return _getUserTokenTimeCursor(user, token);
+    function getUserTokenTimeCursor(address _user, IERC20 _token) external view returns (uint) {
+        return _getUserTokenTimeCursor(_user, _token);
     }
 
     /**
      * @notice Returns the user's cached balance of veBAL as of the provided timestamp.
      * @dev Only timestamps which fall on Thursdays 00:00:00 UTC will return correct values.
      * This function requires `user` to have been checkpointed past `timestamp` so that their balance is cached.
-     * @param user - The address of the user of which to read the cached balance of.
-     * @param timestamp - The timestamp at which to read the `user`'s cached balance at.
+     * @param _user - The address of the user of which to read the cached balance of.
+     * @param _timestamp - The timestamp at which to read the `user`'s cached balance at.
      */
-    function getUserBalanceAtTimestamp(address user, uint timestamp) external view returns (uint) {
-        return _userBalanceAtTimestamp[user][timestamp];
+    function getUserBalanceAtTimestamp(address _user, uint _timestamp) external view returns (uint) {
+        return _userBalanceAtTimestamp[_user][_timestamp];
     }
 
     /**
      * @notice Returns the cached total supply of veBAL as of the provided timestamp.
      * @dev Only timestamps which fall on Thursdays 00:00:00 UTC will return correct values.
      * This function requires the contract to have been checkpointed past `timestamp` so that the supply is cached.
-     * @param timestamp - The timestamp at which to read the cached total supply at.
+     * @param _timestamp - The timestamp at which to read the cached total supply at.
      */
-    function getTotalSupplyAtTimestamp(uint timestamp) external view returns (uint) {
-        return _veSupplyCache[timestamp];
-    }
-
-    /**
-     * @notice Returns the FeeDistributor's cached balance of `token`.
-     */
-    function getTokenLastBalance(IERC20 token) external view returns (uint) {
-        return _tokenState[token].cachedBalance;
+    function getTotalSupplyAtTimestamp(uint _timestamp) external view returns (uint) {
+        return _veSupplyCache[_timestamp];
     }
 
     /**
      * @notice Returns the amount of `token` which the FeeDistributor received in the week beginning at `timestamp`.
-     * @param token - The ERC20 token address to query.
-     * @param timestamp - The timestamp corresponding to the beginning of the week of interest.
+     * @param _token - The ERC20 token address to query.
+     * @param _timestamp - The timestamp corresponding to the beginning of the week of interest.
      */
-    function getTokensDistributedInWeek(IERC20 token, uint timestamp) external view returns (uint) {
-        return _tokensPerWeek[token][timestamp];
+    function getTokensDistributedInWeek(IERC20 _token, uint _timestamp) external view returns (uint) {
+        return _tokensPerWeek[_token][_timestamp];
+    }
+
+    /**
+     * @notice Returns the amount of `token` which the FeeDistributor received in the current week.
+     * @param _token - The ERC20 token address to query.
+     * @param _timestamp - The timestamp corresponding to the beginning of the week of interest.
+     * @return The amount of `token` received in the current week.
+     */
+    function getTokensPerWeek(IERC20 _token, uint _timestamp) external view returns (uint) {
+        return _tokensPerWeek[_token][_timestamp];
+    }
+
+    constructor(Authority _authority, VotingEscrow _votingEscrow, Router _router, uint _startTime)
+        EIP712("FeeDistributor", "1")
+        Auth(address(0), _authority)
+    {
+        votingEscrow = _votingEscrow;
+        router = _router;
+
+        _startTime = _roundDownTimestamp(_startTime);
+        uint currentWeek = _roundDownTimestamp(block.timestamp);
+        require(_startTime >= currentWeek, "Cannot start before current week");
+        if (_startTime == currentWeek) {
+            // We assume that `votingEscrow` has been deployed in a week previous to this one.
+            // If `votingEscrow` did not have a non-zero supply at the beginning of the current week
+            // then any tokens which are distributed this week will be lost permanently.
+            require(votingEscrow.totalSupply(currentWeek) > 0, "Zero total supply results in lost tokens");
+        }
+        startTime = _startTime;
+        timeCursor = _startTime;
     }
 
     // Depositing
@@ -182,18 +162,18 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
      *
      * If for some reason `depositToken` cannot be called, in order to ensure that all tokens are correctly distributed
      * manually call `checkpointToken` before and after the token transfer.
-     * @param token - The ERC20 token address to distribute.
-     * @param amount - The amount of tokens to deposit.
+     * @param _token - The ERC20 token address to distribute.
+     * @param _amount - The amount of tokens to deposit.
      */
-    function depositToken(IERC20 token, uint amount) external nonReentrant {
-        _checkpointToken(token, false);
-        _router.transfer(token, msg.sender, address(this), amount);
-        _checkpointToken(token, true);
+    function depositToken(IERC20 _token, uint _amount) external nonReentrant {
+        _checkpointToken(_token, false);
+        router.transfer(_token, msg.sender, address(this), _amount);
+        _checkpointToken(_token, true);
     }
 
     function depositTokenFrom(IERC20 token, address from, uint amount) external nonReentrant requiresAuth {
         _checkpointToken(token, false);
-        _router.transfer(token, from, address(this), amount);
+        router.transfer(token, from, address(this), amount);
         _checkpointToken(token, true);
     }
 
@@ -201,18 +181,18 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
      * @notice Deposits tokens to be distributed in the current week.
      * @dev A version of `depositToken` which supports depositing multiple `tokens` at once.
      * See `depositToken` for more details.
-     * @param tokens - An array of ERC20 token addresses to distribute.
-     * @param amounts - An array of token amounts to deposit.
+     * @param _tokens - An array of ERC20 token addresses to distribute.
+     * @param _amounts - An array of token amounts to deposit.
      */
-    function depositTokens(IERC20[] calldata tokens, uint[] calldata amounts) external nonReentrant {
+    function depositTokens(IERC20[] calldata _tokens, uint[] calldata _amounts) external nonReentrant {
         // InputHelpers.ensureInputLengthMatch(tokens.length, amounts.length);
-        if (tokens.length != amounts.length) revert VeRevenueDistributor__MismatchedArrayLengths();
+        if (_tokens.length != _amounts.length) revert VeRevenueDistributor__MismatchedArrayLengths();
 
-        uint length = tokens.length;
+        uint length = _tokens.length;
         for (uint i = 0; i < length; ++i) {
-            _checkpointToken(tokens[i], false);
-            _router.transfer(tokens[i], msg.sender, address(this), amounts[i]);
-            _checkpointToken(tokens[i], true);
+            _checkpointToken(_tokens[i], false);
+            router.transfer(_tokens[i], msg.sender, address(this), _amounts[i]);
+            _checkpointToken(_tokens[i], true);
         }
     }
 
@@ -229,10 +209,10 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
     /**
      * @notice Caches the user's balance of veBAL at the beginning of each week.
      * This function will be called automatically before claiming tokens to ensure the contract is properly updated.
-     * @param user - The address of the user to be checkpointed.
+     * @param _user - The address of the user to be checkpointed.
      */
-    function checkpointUser(address user) external nonReentrant {
-        _checkpointUserBalance(user);
+    function checkpointUser(address _user) external nonReentrant {
+        _checkpointUserBalance(_user);
     }
 
     /**
@@ -241,22 +221,22 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
      * will be distributed evenly across the time period since `token` was last checkpointed.
      *
      * This function will be called automatically before claiming tokens to ensure the contract is properly updated.
-     * @param token - The ERC20 token address to be checkpointed.
+     * @param _token - The ERC20 token address to be checkpointed.
      */
-    function checkpointToken(IERC20 token) external nonReentrant {
-        _checkpointToken(token, true);
+    function checkpointToken(IERC20 _token) external nonReentrant {
+        _checkpointToken(_token, true);
     }
 
     /**
      * @notice Assigns any newly-received tokens held by the FeeDistributor to weekly distributions.
      * @dev A version of `checkpointToken` which supports checkpointing multiple tokens.
      * See `checkpointToken` for more details.
-     * @param tokens - An array of ERC20 token addresses to be checkpointed.
+     * @param _tokens - An array of ERC20 token addresses to be checkpointed.
      */
-    function checkpointTokens(IERC20[] calldata tokens) external nonReentrant {
-        uint tokensLength = tokens.length;
+    function checkpointTokens(IERC20[] calldata _tokens) external nonReentrant {
+        uint tokensLength = _tokens.length;
         for (uint i = 0; i < tokensLength; ++i) {
-            _checkpointToken(tokens[i], true);
+            _checkpointToken(_tokens[i], true);
         }
     }
 
@@ -266,15 +246,16 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
      * @notice Claims all pending distributions of the provided token for a user.
      * @dev It's not necessary to explicitly checkpoint before calling this function, it will ensure the FeeDistributor
      * is up to date before calculating the amount of tokens to be claimed.
-     * @param token - The ERC20 token address to be claimed.
+     * @param _token - The ERC20 token address to be claimed.
+     * @param _receiver - The address which will receive the claimed tokens.
      * @return The amount of `token` sent to `user` as a result of claiming.
      */
-    function claim(IERC20 token) external nonReentrant returns (uint) {
+    function claim(IERC20 _token, address _receiver) external nonReentrant returns (uint) {
         _checkpointTotalSupply();
         _checkpointUserBalance(msg.sender);
-        _checkpointToken(token, false);
+        _checkpointToken(_token, false);
 
-        uint amount = _claimToken(msg.sender, token);
+        uint amount = _claimToken(_receiver, _token);
         return amount;
     }
 
@@ -282,18 +263,19 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
      * @notice Claims a number of tokens on behalf of a user.
      * @dev A version of `claimToken` which supports claiming multiple `tokens` on behalf of `user`.
      * See `claimToken` for more details.
-     * @param tokenList - An array of ERC20 token addresses to be claimed.
+     * @param _tokenList - An array of ERC20 token addresses to be claimed.
+     * @param _receiver - The address which will receive the claimed tokens.
      * @return An array of the amounts of each token in `tokens` sent to `user` as a result of claiming.
      */
-    function claimList(IERC20[] calldata tokenList) external nonReentrant returns (uint[] memory) {
+    function claimList(IERC20[] calldata _tokenList, address _receiver) external nonReentrant returns (uint[] memory) {
         _checkpointTotalSupply();
         _checkpointUserBalance(msg.sender);
 
-        uint tokensLength = tokenList.length;
+        uint tokensLength = _tokenList.length;
         uint[] memory amounts = new uint[](tokensLength);
         for (uint i = 0; i < tokensLength; ++i) {
-            _checkpointToken(tokenList[i], false);
-            amounts[i] = _claimToken(msg.sender, tokenList[i]);
+            _checkpointToken(_tokenList[i], false);
+            amounts[i] = _claimToken(_receiver, _tokenList[i]);
         }
 
         return amounts;
@@ -305,9 +287,9 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
      * @dev It is required that both the global, token and user state have been properly checkpointed
      * before calling this function.
      */
-    function _claimToken(address user, IERC20 token) internal returns (uint) {
-        TokenState storage tokenState = _tokenState[token];
-        uint nextUserTokenWeekToClaim = _getUserTokenTimeCursor(user, token);
+    function _claimToken(address _user, IERC20 _token) internal returns (uint) {
+        TokenState storage tokenState = _tokenState[_token];
+        uint nextUserTokenWeekToClaim = _getUserTokenTimeCursor(_user, _token);
 
         // The first week which cannot be correctly claimed is the earliest of:
         // - A) The global or user time cursor (whichever is earliest), rounded up to the end of the week.
@@ -317,11 +299,13 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
         // - A) A user may claim a week for which we have not processed their balance, resulting in tokens being locked.
         // - B) A user may claim a week which then receives more tokens to be distributed. However the user has
         //      already claimed for that week so their share of these new tokens are lost.
-        uint firstUnclaimableWeek =
-            Math.min(_roundUpTimestamp(Math.min(_timeCursor, _userState[user].timeCursor)), _roundDownTimestamp(tokenState.timeCursor));
+        uint firstUnclaimableWeek = Math.min(
+            _roundUpTimestamp(Math.min(timeCursor, _userState[_user].timeCursor)), //
+            _roundDownTimestamp(tokenState.timeCursor)
+        );
 
-        mapping(uint => uint) storage tokensPerWeek = _tokensPerWeek[token];
-        mapping(uint => uint) storage userBalanceAtTimestamp = _userBalanceAtTimestamp[user];
+        mapping(uint => uint) storage tokensPerWeek = _tokensPerWeek[_token];
+        mapping(uint => uint) storage userBalanceAtTimestamp = _userBalanceAtTimestamp[_user];
 
         uint amount;
         for (uint i = 0; i < 20; ++i) {
@@ -333,14 +317,14 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
             nextUserTokenWeekToClaim += 1 weeks;
         }
         // Update the stored user-token time cursor to prevent this user claiming this week again.
-        _userTokenTimeCursor[user][token] = nextUserTokenWeekToClaim;
+        _userTokenTimeCursor[_user][_token] = nextUserTokenWeekToClaim;
 
         if (amount > 0) {
             // For a token to be claimable it must have been added to the cached balance so this is safe.
             tokenState.cachedBalance = uint128(tokenState.cachedBalance - amount);
-            token.transfer(user, amount);
+            _token.transfer(_user, amount);
             // emit TokensClaimed(user, token, amount, nextUserTokenWeekToClaim);
-            emit VeRevenueDistributor__TokensClaim(msg.sender, user, token, amount, nextUserTokenWeekToClaim);
+            emit VeRevenueDistributor__TokensClaim(msg.sender, _user, _token, amount, nextUserTokenWeekToClaim);
         }
 
         return amount;
@@ -349,22 +333,22 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
     /**
      * @dev Calculate the amount of `token` to be distributed to `_votingEscrow` holders since the last checkpoint.
      */
-    function _checkpointToken(IERC20 token, bool force) internal {
-        TokenState storage tokenState = _tokenState[token];
+    function _checkpointToken(IERC20 _token, bool _force) internal {
+        TokenState storage tokenState = _tokenState[_token];
         uint lastTokenTime = tokenState.timeCursor;
         uint timeSinceLastCheckpoint;
         if (lastTokenTime == 0) {
+            // Prevent someone from assigning tokens to an inaccessible week.
+            require(block.timestamp > startTime, "Fee distribution has not started yet");
+
             // If it's the first time we're checkpointing this token then start distributing from now.
             // Also mark at which timestamp users should start attempts to claim this token from.
             lastTokenTime = block.timestamp;
             tokenState.startTime = uint64(_roundDownTimestamp(block.timestamp));
-
-            // Prevent someone from assigning tokens to an inaccessible week.
-            require(block.timestamp > _startTime, "Fee distribution has not started yet");
         } else {
             timeSinceLastCheckpoint = block.timestamp - lastTokenTime;
 
-            if (!force) {
+            if (!_force) {
                 // Checkpointing N times within a single week is completely equivalent to checkpointing once at the end.
                 // We then want to get as close as possible to a single checkpoint every Wed 23:59 UTC to save gas.
 
@@ -384,7 +368,7 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
 
         tokenState.timeCursor = uint64(block.timestamp);
 
-        uint tokenBalance = token.balanceOf(address(this));
+        uint tokenBalance = _token.balanceOf(address(this));
         uint newTokensToDistribute = tokenBalance - tokenState.cachedBalance;
         if (newTokensToDistribute == 0) return;
         require(tokenBalance <= type(uint128).max, "Maximum token balance exceeded");
@@ -395,7 +379,7 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
 
         // Distribute `newTokensToDistribute` evenly across the time period from `lastTokenTime` to now.
         // These tokens are assigned to weeks proportionally to how much of this period falls into each week.
-        mapping(uint => uint) storage tokensPerWeek = _tokensPerWeek[token];
+        mapping(uint => uint) storage tokensPerWeek = _tokensPerWeek[_token];
         for (uint i = 0; i < 20; ++i) {
             // This is safe as we're incrementing a timestamp.
             nextWeek = firstIncompleteWeek + 1 weeks;
@@ -425,29 +409,28 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
             firstIncompleteWeek = nextWeek;
         }
 
-        emit VeRevenueDistributor__TokenCheckpoint(token, newTokensToDistribute, lastTokenTime);
+        emit VeRevenueDistributor__TokenCheckpoint(_token, newTokensToDistribute, lastTokenTime);
     }
 
     /**
      * @dev Cache the `user`'s balance of `_votingEscrow` at the beginning of each new week
      */
-    function _checkpointUserBalance(address user) internal {
-        uint maxUserEpoch = _votingEscrow.userPointEpoch(user);
+    function _checkpointUserBalance(address _user) internal {
+        uint _maxUserEpoch = votingEscrow.userPointEpoch(_user);
 
         // If user has no epochs then they have never locked veBAL.
         // They clearly will not then receive fees.
-        if (maxUserEpoch == 0) return;
+        if (_maxUserEpoch == 0) return;
 
-        UserState storage userState = _userState[user];
+        UserState storage userState = _userState[_user];
 
         // `nextWeekToCheckpoint` represents the timestamp of the beginning of the first week
         // which we haven't checkpointed the user's VotingEscrow balance yet.
         uint nextWeekToCheckpoint = userState.timeCursor;
-
         uint userEpoch;
         if (nextWeekToCheckpoint == 0) {
             // First checkpoint for user so need to do the initial binary search
-            userEpoch = _findTimestampUserEpoch(user, _startTime, 0, maxUserEpoch);
+            userEpoch = votingEscrow.findTimestampUserEpoch(_user, startTime, 0, _maxUserEpoch);
         } else {
             if (nextWeekToCheckpoint >= block.timestamp) {
                 // User has checkpointed the current week already so perform early return.
@@ -465,8 +448,8 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
             // most of the week's irrelevant checkpoints.
             // The slight tradeoff is that users who have multiple infrequent `VotingEscrow` interactions and also don't
             // claim frequently will also perform the binary search, despite it not leading to gas savings.
-            if (maxUserEpoch - userEpoch > 20) {
-                userEpoch = _findTimestampUserEpoch(user, nextWeekToCheckpoint, userEpoch, maxUserEpoch);
+            if (_maxUserEpoch - userEpoch > 20) {
+                userEpoch = votingEscrow.findTimestampUserEpoch(_user, nextWeekToCheckpoint, userEpoch, _maxUserEpoch);
             }
         }
 
@@ -475,15 +458,15 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
             userEpoch = 1;
         }
 
-        VotingEscrow.Point memory nextUserPoint = _votingEscrow.getUserPointHistory(user, userEpoch);
+        VotingEscrow.Point memory nextUserPoint = votingEscrow.getUserPointHistory(_user, userEpoch);
 
         // If this is the first checkpoint for the user, calculate the first week they're eligible for.
         // i.e. the timestamp of the first Thursday after they locked.
         // If this is earlier then the first distribution then fast forward to then.
         if (nextWeekToCheckpoint == 0) {
             // Disallow checkpointing before `startTime`.
-            require(block.timestamp > _startTime, "Fee distribution has not started yet");
-            nextWeekToCheckpoint = Math.max(_startTime, _roundUpTimestamp(nextUserPoint.ts));
+            require(block.timestamp > startTime, "Fee distribution has not started yet");
+            nextWeekToCheckpoint = Math.max(startTime, _roundUpTimestamp(nextUserPoint.ts));
             userState.startTime = uint64(nextWeekToCheckpoint);
         }
 
@@ -491,17 +474,17 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
         // are always much smaller than 2^256 and are being incremented by small values.
         VotingEscrow.Point memory currentUserPoint;
         for (uint i = 0; i < 50; ++i) {
-            if (nextWeekToCheckpoint >= nextUserPoint.ts && userEpoch <= maxUserEpoch) {
+            if (nextWeekToCheckpoint >= nextUserPoint.ts && userEpoch <= _maxUserEpoch) {
                 // The week being considered is contained in a user epoch after that described by `currentUserPoint`.
                 // We then shift `nextUserPoint` into `currentUserPoint` and query the Point for the next user epoch.
                 // We do this in order to step though epochs until we find the first epoch starting after
                 // `nextWeekToCheckpoint`, making the previous epoch the one that contains `nextWeekToCheckpoint`.
                 userEpoch += 1;
                 currentUserPoint = nextUserPoint;
-                if (userEpoch > maxUserEpoch) {
+                if (userEpoch > _maxUserEpoch) {
                     nextUserPoint = VotingEscrow.Point(0, 0, 0, 0);
                 } else {
-                    nextUserPoint = _votingEscrow.getUserPointHistory(user, userEpoch);
+                    nextUserPoint = votingEscrow.getUserPointHistory(_user, userEpoch);
                 }
             } else {
                 // The week being considered lies inside the user epoch described by `oldUserPoint`
@@ -513,18 +496,17 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
                     break;
                 }
 
-                int128 dt = int128(int(nextWeekToCheckpoint - currentUserPoint.ts));
-                uint userBalance =
-                    currentUserPoint.bias > currentUserPoint.slope * dt ? uint(int(currentUserPoint.bias - currentUserPoint.slope * dt)) : 0;
+                uint dt = nextWeekToCheckpoint - currentUserPoint.ts;
+                uint userBalance = currentUserPoint.bias > currentUserPoint.slope * dt ? currentUserPoint.bias - currentUserPoint.slope * dt : 0;
 
                 // User's lock has expired and they haven't relocked yet.
-                if (userBalance == 0 && userEpoch > maxUserEpoch) {
+                if (userBalance == 0 && userEpoch > _maxUserEpoch) {
                     nextWeekToCheckpoint = _roundUpTimestamp(block.timestamp);
                     break;
                 }
 
                 // User had a nonzero lock and so is eligible to collect fees.
-                _userBalanceAtTimestamp[user][nextWeekToCheckpoint] = userBalance;
+                _userBalanceAtTimestamp[_user][nextWeekToCheckpoint] = userBalance;
 
                 nextWeekToCheckpoint += 1 weeks;
             }
@@ -542,7 +524,7 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
      * @dev Cache the totalSupply of VotingEscrow token at the beginning of each new week
      */
     function _checkpointTotalSupply() internal {
-        uint nextWeekToCheckpoint = _timeCursor;
+        uint nextWeekToCheckpoint = timeCursor;
         uint weekStart = _roundDownTimestamp(block.timestamp);
 
         // We expect `timeCursor == weekStart + 1 weeks` when fully up to date.
@@ -551,75 +533,52 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
             return;
         }
 
-        _votingEscrow.checkpoint();
+        votingEscrow.checkpoint();
 
         // Step through the each week and cache the total supply at beginning of week on this contract
         for (uint i = 0; i < 20; ++i) {
             if (nextWeekToCheckpoint > weekStart) break;
 
-            _veSupplyCache[nextWeekToCheckpoint] = _votingEscrow.totalSupply(nextWeekToCheckpoint);
+            _veSupplyCache[nextWeekToCheckpoint] = votingEscrow.totalSupply(nextWeekToCheckpoint);
+            emit Log(_veSupplyCache[nextWeekToCheckpoint]); // TODO remove
 
             // This is safe as we're incrementing a timestamp
             nextWeekToCheckpoint += 1 weeks;
         }
         // Update state to the end of the current week (`weekStart` + 1 weeks)
-        _timeCursor = nextWeekToCheckpoint;
+        timeCursor = nextWeekToCheckpoint;
     }
-
     // Helper functions
 
     /**
      * @dev Wrapper around `_userTokenTimeCursor` which returns the start timestamp for `token`
      * if `user` has not attempted to interact with it previously.
      */
-    function _getUserTokenTimeCursor(address user, IERC20 token) internal view returns (uint) {
-        uint userTimeCursor = _userTokenTimeCursor[user][token];
+    function _getUserTokenTimeCursor(address _user, IERC20 _token) internal view returns (uint) {
+        uint userTimeCursor = _userTokenTimeCursor[_user][_token];
         if (userTimeCursor > 0) return userTimeCursor;
         // This is the first time that the user has interacted with this token.
         // We then start from the latest out of either when `user` first locked veBAL or `token` was first checkpointed.
-        return Math.max(_userState[user].startTime, _tokenState[token].startTime);
-    }
-
-    /**
-     * @dev Return the user epoch number for `user` corresponding to the provided `timestamp`
-     */
-    function _findTimestampUserEpoch(address user, uint timestamp, uint minUserEpoch, uint maxUserEpoch) internal view returns (uint) {
-        uint min = minUserEpoch;
-        uint max = maxUserEpoch;
-
-        // Perform binary search through epochs to find epoch containing `timestamp`
-        for (uint i = 0; i < 128; ++i) {
-            if (min >= max) break;
-
-            // Algorithm assumes that inputs are less than 2^128 so this operation is safe.
-            // +2 avoids getting stuck in min == mid < max
-            uint mid = (min + max + 2) / 2;
-            VotingEscrow.Point memory pt = _votingEscrow.getUserPointHistory(user, mid);
-            if (pt.ts <= timestamp) {
-                min = mid;
-            } else {
-                // max > min so this is safe.
-                max = mid - 1;
-            }
-        }
-        return min;
+        return Math.max(_userState[_user].startTime, _tokenState[_token].startTime);
     }
 
     /**
      * @dev Rounds the provided timestamp down to the beginning of the previous week (Thurs 00:00 UTC)
      */
-    function _roundDownTimestamp(uint timestamp) private pure returns (uint) {
+    function _roundDownTimestamp(uint _timestamp) private pure returns (uint) {
         // Division by zero or overflows are impossible here.
-        return (timestamp / 1 weeks) * 1 weeks;
+        return (_timestamp / 1 weeks) * 1 weeks;
     }
 
     /**
      * @dev Rounds the provided timestamp up to the beginning of the next week (Thurs 00:00 UTC)
      */
-    function _roundUpTimestamp(uint timestamp) private pure returns (uint) {
+    function _roundUpTimestamp(uint _timestamp) private pure returns (uint) {
         // Overflows are impossible here for all realistic inputs.
-        return _roundDownTimestamp(timestamp + 604799);
+        return _roundDownTimestamp(_timestamp + 604799);
     }
 
     error VeRevenueDistributor__MismatchedArrayLengths();
+
+    event Log(uint value); // TODO remove
 }

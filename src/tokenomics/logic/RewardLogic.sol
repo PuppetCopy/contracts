@@ -52,9 +52,7 @@ library RewardLogic {
         Cugar cugar, //
         uint rate,
         bytes32 cugarKey,
-        IERC20 token,
         uint tokenPrice,
-        address user,
         uint cugarAmount
     ) internal view returns (uint) {
         uint claimable = cugar.get(cugarKey);

@@ -2,7 +2,6 @@
 pragma solidity 0.8.24;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -24,8 +23,8 @@ uint constant MAXTIME = 2 * 365 * 86400; // 2 years
 //       maxtime (2 years)
 contract VotingEscrow is Auth {
     struct Point {
-        int128 bias;
-        int128 slope; // - dweight / dt
+        uint bias;
+        uint slope; // - dweight / dt
         uint ts;
         uint blk; // block
     }
@@ -46,7 +45,7 @@ contract VotingEscrow is Auth {
     uint public epoch;
 
     mapping(address => uint) public userPointEpoch;
-    mapping(uint => int128) public slopeChanges; // time -> signed slope change
+    mapping(uint => uint) public slopeChanges; // time -> signed slope change
     mapping(address => LockedBalance) public locked;
     mapping(uint => Point) public pointHistory; // epoch -> unsigned point
     mapping(address => Point[1000000000]) public userPointHistory; // user -> Point[user_epoch]
@@ -85,7 +84,11 @@ contract VotingEscrow is Auth {
         return userPointHistory[_addr][_idx];
     }
 
-    function getLastUserSlope(address _addr) external view returns (int128) {
+    function getPointHistory(uint _idx) external view returns (Point memory) {
+        return pointHistory[_idx];
+    }
+
+    function getLastUserSlope(address _addr) external view returns (uint) {
         uint _uepoch = userPointEpoch[_addr];
         return userPointHistory[_addr][_uepoch].slope;
     }
@@ -118,16 +121,21 @@ contract VotingEscrow is Auth {
         return _min;
     }
 
-    function findTimestampEpoch(uint _timestamp) public view returns (uint) {
+    function findTimestampEpoch(uint timestamp) external view returns (uint) {
         uint _min = 0;
         uint _max = epoch;
+
+        // Perform binary search through epochs to find epoch containing `timestamp`
         for (uint i = 0; i < 128; i++) {
             if (_min >= _max) break;
-            uint _mid = (_min + _max + 2) / 2;
-            if (pointHistory[_mid].ts <= _timestamp) {
-                _min = _mid;
+
+            // Algorithm assumes that inputs are less than 2^128 so this operation is safe.
+            // +2 avoids getting stuck in min == mid < max
+            uint mid = (_min + _max + 2) / 2;
+            if (pointHistory[mid].ts <= timestamp) {
+                _min = mid;
             } else {
-                _max = _mid - 1;
+                _max = mid - 1;
             }
         }
         return _min;
@@ -185,9 +193,9 @@ contract VotingEscrow is Auth {
             _blockTime += (_dT * (_block - _point0.blk)) / _dBlock;
         }
 
-        upoint.bias -= upoint.slope * int128(int(_blockTime - upoint.ts));
+        upoint.bias -= upoint.slope * (_blockTime - upoint.ts);
         if (upoint.bias >= 0) {
-            return uint(int(upoint.bias));
+            return upoint.bias;
         } else {
             return 0;
         }
@@ -219,8 +227,8 @@ contract VotingEscrow is Auth {
                 _dt = ((_block - _point.blk) * (block.timestamp - _point.ts)) / (block.number - _point.blk);
             }
         }
-        // Now dt contains info on how far are we beyond point
 
+        // Now dt contains info on how far are we beyond point
         return _supplyAt(_point, _point.ts + _dt);
     }
 
@@ -231,49 +239,35 @@ contract VotingEscrow is Auth {
     }
 
     function lock(address _from, address _to, uint _value, uint _unlockTime) external requiresAuth {
-        LockedBalance storage _lock = locked[_to];
+        LockedBalance memory _storedLock = locked[_to];
 
-        if (_value == 0 && _unlockTime == 0 || _lock.amount == 0 && _value == 0) revert VotingEscrow__InvalidLockValue();
+        if (_value == 0 && _unlockTime == 0 || _storedLock.amount == 0 && _value == 0) revert VotingEscrow__InvalidLockValue();
 
-        _unlockTime = Math.max(_unlockTime, _lock.end);
+        _unlockTime = Math.max(_unlockTime, _storedLock.end);
 
         if (_unlockTime < (block.timestamp + WEEK)) revert VotingEscrow__InvaidLockingSchedule();
 
         _unlockTime = _roundEpochTime(Math.min(block.timestamp + MAXTIME, _unlockTime)); // Round down unlock time to the start of the week
 
-        _deposit(_from, _to, _value, _unlockTime, _lock);
-    }
-
-    function depositFor(address _from, address _to, uint _value) external requiresAuth {
-        LockedBalance storage _lock = locked[_to];
-
-        if (_lock.amount <= 0) revert VotingEscrow__NoLockFound();
-        if (_value == 0) revert VotingEscrow__InvalidLockValue();
-        if (_lock.end <= block.timestamp) revert VotingEscrow__LockExpired();
-
-        _deposit(_from, _to, _value, 0, _lock);
+        _deposit(_from, _to, _value, _unlockTime, _storedLock);
     }
 
     function withdraw(address _from, address _to) external requiresAuth {
-        LockedBalance storage _lock = locked[_from];
-        LockedBalance memory _oldLocked = _lock;
+        LockedBalance memory _storedLock = locked[_from];
 
-        if (_lock.amount == 0) revert VotingEscrow__NoLockFound();
-        if (_lock.end > block.timestamp) revert VotingEscrow__LockNotExpired();
+        if (_storedLock.end > block.timestamp) revert VotingEscrow__LockNotExpired();
+        if (_storedLock.amount == 0) revert VotingEscrow__NoLockFound();
 
-        uint _value = _lock.amount;
+        LockedBalance memory _newLock = LockedBalance(0, 0);
 
-        _lock.end = 0;
-        _lock.amount = 0;
+        locked[_from] = _newLock;
+        supply -= _storedLock.amount;
 
-        uint _supplyBefore = supply;
-        supply = _supplyBefore - _value;
+        _checkpoint(_from, _storedLock, _newLock);
+        token.transfer(_to, _storedLock.amount);
 
-        _checkpoint(_from, _oldLocked, _lock);
-        router.transfer(token, address(this), _to, _value);
-
-        emit VotingEscrow__Withdraw(_from, _to, _value, block.timestamp);
-        emit VotingEscrow__Supply(_supplyBefore, _supplyBefore - _value);
+        emit VotingEscrow__Withdraw(_from, _to, block.timestamp, _storedLock.amount);
+        emit VotingEscrow__Supply(block.timestamp, supply);
     }
 
     // internal
@@ -302,9 +296,7 @@ contract VotingEscrow is Auth {
     }
 
     function _totalSupply(uint _t) internal view returns (uint) {
-        uint _epoch = epoch;
-        Point memory lastPoint = pointHistory[_epoch];
-        return _supplyAt(lastPoint, _t);
+        return _supplyAt(pointHistory[epoch], _t);
     }
 
     /// @notice Calculate total supply of voting power at a given time _t
@@ -317,13 +309,13 @@ contract VotingEscrow is Auth {
 
         for (uint i; i < 255;) {
             _ti += WEEK;
-            int128 _dSlope = 0;
+            uint _dSlope = 0;
             if (_ti > _t) {
                 _ti = _t;
             } else {
                 _dSlope = slopeChanges[_ti];
             }
-            _lastPoint.bias -= _lastPoint.slope * int128(int(_ti) - int(_lastPoint.ts));
+            _lastPoint.bias -= _lastPoint.slope * (_ti - _lastPoint.ts);
             if (_ti == _t) {
                 break;
             }
@@ -334,10 +326,7 @@ contract VotingEscrow is Auth {
             }
         }
 
-        if (_lastPoint.bias < 0) {
-            _lastPoint.bias = 0;
-        }
-        return uint(int(_lastPoint.bias));
+        return _lastPoint.bias;
     }
 
     /// @notice Get an address voting power
@@ -350,11 +339,9 @@ contract VotingEscrow is Auth {
         if (_epoch == 0) return 0;
 
         Point memory _lastPoint = userPointHistory[_addr][_epoch];
-        _lastPoint.bias -= _lastPoint.slope * _toI128(_t - _lastPoint.ts);
-        if (_lastPoint.bias < 0) {
-            _lastPoint.bias = 0;
-        }
-        return uint(int(_lastPoint.bias));
+        _lastPoint.bias -= _lastPoint.slope * (_t - _lastPoint.ts);
+
+        return _lastPoint.bias;
     }
 
     /// @notice Deposit and lock tokens for a user
@@ -362,73 +349,67 @@ contract VotingEscrow is Auth {
     /// @param _to beneficiary of the tokens
     /// @param _value Amount to deposit
     /// @param _unlockTime New time when to unlock the tokens, or 0 if unchanged
-    /// @param _lock stored locked amount / timestamp
-    function _deposit(address _from, address _to, uint _value, uint _unlockTime, LockedBalance storage _lock) internal {
-        uint _supplyBefore = supply;
-        supply = _supplyBefore + _value;
+    /// @param _storedLocked stored locked amount / timestamp
+    function _deposit(address _from, address _to, uint _value, uint _unlockTime, LockedBalance memory _storedLocked) internal {
+        LockedBalance memory _locked = _storedLocked;
 
-        LockedBalance memory _oldLocked = _lock;
-
+        supply += _value;
+        LockedBalance memory oldLocked = _locked;
         // Adding to existing lock, or if a lock is expired - creating a new one
-        _lock.amount += _value;
-        if (_unlockTime > 0) {
-            _lock.end = _unlockTime;
+        _locked.amount += _value;
+        if (_unlockTime != 0) {
+            _locked.end = _unlockTime;
         }
+        locked[_to] = _locked;
 
-        // Possibilities:
-        // Both _oldLocked.end could be current or expired (>/< block.timestamp)
+        // Possibilities{
+        // Both oldLocked.end could be current or expired (>/< block.timestamp)
         // value == 0 (extend lock) or value > 0 (add to lock or extend lock)
         // _locked.end > block.timestamp (always)
-        _checkpoint(_to, _oldLocked, _lock);
+        _checkpoint(_to, oldLocked, _locked);
 
         if (_value > 0) router.transfer(token, _from, address(this), _value);
 
-        emit VotingEscrow__Deposit(_from, _to, _value, _lock.end, block.timestamp);
-        emit VotingEscrow__Supply(_supplyBefore, _supplyBefore + _value);
+        emit VotingEscrow__Deposit(_from, _to, block.timestamp, _value, _unlockTime);
+        emit VotingEscrow__Supply(block.timestamp, supply);
     }
 
-    /// @notice Record global and per-user data to checkpoint
-    /// @param _addr User's wallet address. No user checkpoint if 0x0
-    /// @param _oldLocked Pevious locked amount / end lock time for the user
-    /// @param _newLocked New locked amount / end lock time for the user
-    function _checkpoint(address _addr, LockedBalance memory _oldLocked, LockedBalance memory _newLocked) internal {
+    function _checkpoint(address _to, LockedBalance memory _oldLock, LockedBalance memory _newLock) internal {
         Point memory _uOld;
         Point memory _uNew;
-        int128 _oldDslope = 0;
-        int128 _newDslope = 0;
+        uint _oldDslope = 0;
+        uint _newDslope = 0;
         uint _epoch = epoch;
 
-        if (_addr != ZERO_ADDRESS) {
+        if (_to != ZERO_ADDRESS) {
             // Calculate slopes and biases
             // Kept at zero when they have to
-            if (_oldLocked.end > block.timestamp && _oldLocked.amount > 0) {
-                _uOld.slope = _toI128(_oldLocked.amount / MAXTIME);
-                _uOld.bias = _uOld.slope * _toI128(_oldLocked.end - block.timestamp);
+            if (_oldLock.end > block.timestamp && _oldLock.amount > 0) {
+                _uOld.slope = _oldLock.amount / MAXTIME;
+                _uOld.bias = _uOld.slope * (_oldLock.end - block.timestamp);
             }
-            if (_newLocked.end > block.timestamp && _newLocked.amount > 0) {
-                _uNew.slope = _toI128(_newLocked.amount / MAXTIME);
-                _uNew.bias = _uNew.slope * _toI128(_newLocked.end - block.timestamp);
+            if (_newLock.end > block.timestamp && _newLock.amount > 0) {
+                _uNew.slope = _newLock.amount / MAXTIME;
+                _uNew.bias = _uNew.slope * (_newLock.end - block.timestamp);
             }
 
             // Read values of scheduled changes in the slope
-            // _oldLocked.end can be in the past and in the future
-            // _newLocked.end can ONLY by in the FUTURE unless everything expired: than zeros
-            _oldDslope = slopeChanges[_oldLocked.end];
-            if (_newLocked.end != 0) {
-                if (_newLocked.end == _oldLocked.end) {
+            // oldLocked.end can be in the past and in the future
+            // newLocked.end can ONLY by in the FUTURE unless everything expired{ than zeros
+            _oldDslope = slopeChanges[_oldLock.end];
+            if (_newLock.end != 0) {
+                if (_newLock.end == _oldLock.end) {
                     _newDslope = _oldDslope;
                 } else {
-                    _newDslope = slopeChanges[_newLocked.end];
+                    _newDslope = slopeChanges[_newLock.end];
                 }
             }
         }
 
-        Point memory _lastPoint = Point({bias: 0, slope: 0, ts: block.timestamp, blk: block.number});
-        if (_epoch > 0) {
-            _lastPoint = pointHistory[_epoch];
-        }
+        Point memory _lastPoint = pointHistory[_epoch];
+
         uint _lastCheckpoint = _lastPoint.ts;
-        // initial_last_point is used for extrapolation to calculate block number
+        // initialLastPoint is used for extrapolation to calculate block number
         // (approximately, for *At methods) and save them
         // as we cannot figure that out exactly from inside the contract
 
@@ -448,24 +429,16 @@ contract VotingEscrow is Auth {
             // Hopefully it won't happen that this won't get used in 5 years!
             // If it does, users will be able to withdraw but vote weight will be broken
             _tI += WEEK;
-            int128 _dSlope = 0;
+            uint _dSlope = 0;
             if (_tI > block.timestamp) {
                 _tI = block.timestamp;
             } else {
                 _dSlope = slopeChanges[_tI];
             }
 
-            _lastPoint.bias -= _lastPoint.slope * _toI128(_tI - _lastCheckpoint);
+            _lastPoint.bias -= _lastPoint.slope * (_tI - _lastCheckpoint);
             _lastPoint.slope += _dSlope;
 
-            if (_lastPoint.bias < 0) {
-                // This can happen
-                _lastPoint.bias = 0;
-            }
-            if (_lastPoint.slope < 0) {
-                // This cannot happen - just in case
-                _lastPoint.slope = 0;
-            }
             _lastCheckpoint = _tI;
             _lastPoint.ts = _tI;
             _lastPoint.blk = _initialLastPointBlk + (_blockSlope * (_tI - _initialLastPointTs)) / MULTIPLIER;
@@ -481,61 +454,52 @@ contract VotingEscrow is Auth {
         epoch = _epoch;
         // Now pointHistory is filled until t=now
 
-        if (_addr != ZERO_ADDRESS) {
+        if (_to != ZERO_ADDRESS) {
             // If last point was in this block, the slope change has been applied already
             // But in such case we have 0 slope(s)
             _lastPoint.slope += (_uNew.slope - _uOld.slope);
             _lastPoint.bias += (_uNew.bias - _uOld.bias);
-            if (_lastPoint.slope < 0) {
-                _lastPoint.slope = 0;
-            }
-            if (_lastPoint.bias < 0) {
-                _lastPoint.bias = 0;
-            }
         }
 
         // Record the changed point into history
         pointHistory[_epoch] = _lastPoint;
 
-        if (_addr != ZERO_ADDRESS) {
+        if (_to != ZERO_ADDRESS) {
             // Schedule the slope changes (slope is going down)
-            // We subtract new_user_slope from [_newLocked.end]
-            // and add old_user_slope to [_oldLocked.end]
-            if (_oldLocked.end > block.timestamp) {
-                // _oldDslope was <something> - _uOld.slope, so we cancel that
+            // We subtract newUserSlope from [newLocked.end]
+            // and add oldUserSlope to [oldLocked.end]
+            if (_oldLock.end > block.timestamp) {
+                // oldDslope was <something> - uOld.slope, so we cancel that
                 _oldDslope += _uOld.slope;
-                if (_newLocked.end == _oldLocked.end) {
+                if (_newLock.end == _oldLock.end) {
                     _oldDslope -= _uNew.slope; // It was a new deposit, not extension
                 }
-                slopeChanges[_oldLocked.end] = _oldDslope;
+                slopeChanges[_oldLock.end] = _oldDslope;
             }
 
-            if (_newLocked.end > block.timestamp) {
-                if (_newLocked.end > _oldLocked.end) {
+            if (_newLock.end > block.timestamp) {
+                if (_newLock.end > _oldLock.end) {
                     _newDslope -= _uNew.slope; // old slope disappeared at this point
-                    slopeChanges[_newLocked.end] = _newDslope;
+                    slopeChanges[_newLock.end] = _newDslope;
                 }
-                // else: we recorded it already in _oldDslope
+                // else{ we recorded it already in oldDslope
             }
-            // Now handle user history
-            address addr = _addr;
-            uint _userEpoch = userPointEpoch[addr] + 1;
 
-            userPointEpoch[addr] = _userEpoch;
+            // Now handle user history
+            address _addr = _to;
+            uint _userEpoch = userPointEpoch[_addr] + 1;
+            userPointEpoch[_addr] = _userEpoch;
+
             _uNew.ts = block.timestamp;
             _uNew.blk = block.number;
-            userPointHistory[addr][_userEpoch] = _uNew;
+            userPointHistory[_addr][_userEpoch] = _uNew;
         }
-    }
-
-    function _toI128(uint n) internal pure returns (int128) {
-        return SafeCast.toInt128(SafeCast.toInt256(n));
     }
 
     function _roundEpochTime(uint timestamp) private pure returns (uint) {
         unchecked {
             // Division by zero or overflows are impossible here.
-            return (timestamp / 1 weeks) * 1 weeks;
+            return (timestamp / WEEK) * WEEK;
         }
     }
 
@@ -543,9 +507,9 @@ contract VotingEscrow is Auth {
     // Events
     // ============================================================================================
 
-    event VotingEscrow__Deposit(address from, address to, uint value, uint locktime, uint ts);
-    event VotingEscrow__Withdraw(address from, address to, uint value, uint ts);
-    event VotingEscrow__Supply(uint prevSupply, uint supply);
+    event VotingEscrow__Deposit(address from, address to, uint timestamp, uint value, uint locktime);
+    event VotingEscrow__Withdraw(address from, address to, uint timestamp, uint value);
+    event VotingEscrow__Supply(uint timestamp, uint supply);
 
     // ============================================================================================
     // Errors

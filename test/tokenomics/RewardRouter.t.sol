@@ -52,6 +52,7 @@ contract RewardRouterTest is BasicSetup {
 
     function setUp() public override {
         super.setUp();
+        vm.warp(1 weeks);
 
         wntUsdPoolList = new MockUniswapV3Pool[](3);
 
@@ -63,12 +64,7 @@ contract RewardRouterTest is BasicSetup {
         revenueInTokenList[0] = usdc;
 
         Oracle.SecondaryPriceConfig[] memory exchangePriceSourceList = new Oracle.SecondaryPriceConfig[](1);
-        exchangePriceSourceList[0] = Oracle.SecondaryPriceConfig({
-            enabled: true, //
-            sourceList: wntUsdPoolList,
-            twapInterval: 0,
-            sourceTokenDeicmals: 6
-        });
+        exchangePriceSourceList[0] = Oracle.SecondaryPriceConfig({enabled: true, sourceList: wntUsdPoolList, twapInterval: 0, sourceTokenDeicmals: 6});
 
         primaryVaultPool = new MockWeightedPoolVault();
         primaryVaultPool.initPool(address(puppetToken), address(wnt), 20e18, 80e18);
@@ -92,17 +88,16 @@ contract RewardRouterTest is BasicSetup {
         dictator.setRoleCapability(CLAIM_AND_DISTRIBUTE_CUGAR_ROLE, address(cugar), cugar.distribute.selector, true);
 
         votingEscrow = new VotingEscrow(dictator, router, puppetToken);
+        // votingEscrow.checkpoint();
         dictator.setRoleCapability(VEST_ROLE, address(votingEscrow), votingEscrow.lock.selector, true);
         dictator.setRoleCapability(VEST_ROLE, address(votingEscrow), votingEscrow.withdraw.selector, true);
-        dictator.setRoleCapability(VEST_ROLE, address(votingEscrow), votingEscrow.depositFor.selector, true);
 
-        revenueDistributor = new VeRevenueDistributor(dictator, votingEscrow, router, block.timestamp + 1 weeks);
+        revenueDistributor = new VeRevenueDistributor(dictator, votingEscrow, router, 2 weeks);
         dictator.setRoleCapability(REWARD_DISTRIBUTOR_ROLE, address(revenueDistributor), revenueDistributor.claim.selector, true);
         dictator.setRoleCapability(DEPOSIT_TOKEN_FROM_ROLE, address(revenueDistributor), revenueDistributor.depositTokenFrom.selector, true);
 
         rewardRouter = new RewardRouter(
             dictator,
-            wnt,
             router,
             votingEscrow,
             revenueDistributor,
@@ -147,8 +142,7 @@ contract RewardRouterTest is BasicSetup {
     }
 
     function testOption() public {
-        skip(1 weeks);
-
+        skip(1 weeks + 1);
 
         assertEq(oracle.getPrimaryPoolPrice(), 1e18, "1-1 pool price with 30 decimals precision");
         assertEq(oracle.getMaxPrice(usdc), 100e6, "100usdc per puppet");
@@ -174,12 +168,10 @@ contract RewardRouterTest is BasicSetup {
         vm.expectRevert(abi.encodeWithSelector(RewardLogic.RewardLogic__NotEnoughToClaim.selector, 1e18));
         rewardRouter.lock(wnt, getMaxTime(), 1e18, 200e18);
 
-        wnt.balanceOf(address(users.alice));
         rewardRouter.lock(wnt, getMaxTime(), 1e18, 1e18);
-        uint veBalanceAfterLock = votingEscrow.balanceOf(users.alice);
-        assertAlmostEq(veBalanceAfterLock, Precision.applyBasisPoints(lockRate, 1e18), 5e16);
+        assertAlmostEq(votingEscrow.balanceOf(users.alice), Precision.applyBasisPoints(lockRate, 1e18), 5e16);
         rewardRouter.lock(usdc, getMaxTime(), 100e6, 100e6);
-        assertAlmostEq(votingEscrow.balanceOf(users.alice), Precision.applyBasisPoints(lockRate, 1e18) + veBalanceAfterLock, 0.01e18);
+        assertAlmostEq(votingEscrow.balanceOf(users.alice), Precision.applyBasisPoints(lockRate, 2e18), 0.01e18);
 
         vm.expectRevert(abi.encodeWithSelector(RewardLogic.RewardLogic__NotEnoughToClaim.selector, 0));
         rewardRouter.lock(usdc, getMaxTime(), 100e6, 100e6);
@@ -198,6 +190,7 @@ contract RewardRouterTest is BasicSetup {
 
         generateUserRevenueInUsdc(users.bob, 100e6);
         assertEq(rewardRouter.getClaimableAmount(RewardLogic.Choice.LOCK, usdc, users.bob, 100e6), 0.6e18);
+        assertEq(rewardRouter.getClaimableAmount(RewardLogic.Choice.EXIT, usdc, users.bob, 100e6), 0.3e18);
         rewardRouter.exit(usdc, 100e6, 100e6);
         assertEq(puppetToken.balanceOf(users.bob), 0.3e18);
 
@@ -206,22 +199,19 @@ contract RewardRouterTest is BasicSetup {
         rewardRouter.lock(usdc, getMaxTime() / 2, 100e6, 100e6);
         assertAlmostEq(votingEscrow.balanceOf(users.bob), Precision.applyBasisPoints(lockRate, 1e18) / 4, 0.01e18);
 
-        skip(1 weeks);
-
-
-        votingEscrow.userPointEpoch(users.alice);
-        votingEscrow.userPointHistory(users.alice, 1);
-        votingEscrow.findTimestampUserEpoch(users.alice, block.timestamp, 0, 1);
-
+        // votingEscrow.checkpoint();
+        // revenueDistributor.checkpoint();
         // revenueDistributor.getUserState(users.alice);
-        revenueDistributor.getTokensDistributedInWeek(usdc, revenueDistributor.getTimeCursor());
-        revenueDistributor.getTokensDistributedInWeek(usdc, 1 weeks);
-
-        // revenueDistributor.getUserTokenTimeCursor(users.alice, usdcTokenRevenue);
+        // revenueDistributor.getUserBalanceAtTimestamp(users.alice, 3 weeks);
+        // revenueDistributor.getTokensDistributedInWeek(usdc, 3 weeks);
         // revenueDistributor.getTotalSupplyAtTimestamp(3 weeks);
-        // revenueDistributor.getTimeCursor();
-        revenueDistributor.getUserState(users.alice);
-        assertGt(revenueDistributor.claim(usdc), 0, "Alice has no claimable revenue");
+        // revenueDistributor.getTokensPerWeek(usdc, 3 weeks);
+
+        skip(7 days);
+        votingEscrow.getPointHistory(1);
+        votingEscrow.getPointHistory(2);
+
+        assertGt(revenueDistributor.claim(usdc, users.alice), 0, "Alice has no claimable revenue");
 
         // Users claim their revenue
         // uint aliceRevenueBefore = revenueInToken.balanceOf(users.alice);
@@ -300,5 +290,21 @@ contract RewardRouterTest is BasicSetup {
 
     function fromPriceToSqrt(uint usdcPerWeth) public pure returns (uint160) {
         return uint160(Math.sqrt(usdcPerWeth * 1e12) << 96) / 1e12 + 1;
+    }
+
+    /**
+     * @dev Rounds the provided timestamp down to the beginning of the previous week (Thurs 00:00 UTC)
+     */
+    function _roundDownTimestamp(uint timestamp) private pure returns (uint) {
+        // Division by zero or overflows are impossible here.
+        return (timestamp / 1 weeks) * 1 weeks;
+    }
+
+    /**
+     * @dev Rounds the provided timestamp up to the beginning of the next week (Thurs 00:00 UTC)
+     */
+    function _roundUpTimestamp(uint timestamp) private pure returns (uint) {
+        // Overflows are impossible here for all realistic inputs.
+        return _roundDownTimestamp(timestamp + 604799);
     }
 }

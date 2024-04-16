@@ -12,18 +12,18 @@ import {Dictator} from "./../utils/Dictator.sol";
  * @title PuppetToken
  * @dev An ERC20 token with a mint rate limit designed to mitigate and provide feedback of a potential critical faults or bugs in the minting process.
  * The limit restricts the quantity of new tokens that can be minted within a given timeframe, proportional to the existing supply.
+ *
+ * The mintCore function in the contract is designed to allocate tokens to the core contributors over time, with the allocation amount decreasing
+ * as more time passes from the deployment of the contract. This is intended to gradually transfer governance power and incentivises broader ownership
  */
 contract PuppetToken is Auth, ERC20 {
-    event Mint(address from, address to, uint amount);
     event PuppetToken__SetConfig(Config config);
     event PuppetToken__ReleaseCore(address to, uint timestamp, uint amount, uint releasedAmount);
 
     string private constant _NAME = "Puppet Test";
     string private constant _SYMBOL = "PUPPET-TEST";
 
-    uint private constant CORE_RELEASE_RATE = 0.35e30; // 35%
-    uint private constant CORE_RELEASE_DURATION = 31540000 * 2; // 2 years
-
+    uint private constant CORE_RELEASE_DIVISOR = 31540000; // 1 year
     uint private constant GENESIS_MINT_AMOUNT = 100_000e18;
 
     struct Config {
@@ -37,7 +37,8 @@ contract PuppetToken is Auth, ERC20 {
     uint mintWindowCount = 0;
 
     uint public epoch = 0; // Current epoch for rate limit calculation
-    uint public coreReleasedAmount = 0; // the  amount of tokens released to the core
+    uint public mineMintCount = 0; // the amount of tokens minted through protocol use
+    uint public coreMintCount = 0; // the  amount of tokens released to the core
 
     constructor(Dictator _authority, Config memory _config) Auth(address(0), _authority) ERC20(_NAME, _SYMBOL) {
         _setConfig(_config); // init at 1% of circulating supply per hour
@@ -54,11 +55,11 @@ contract PuppetToken is Auth, ERC20 {
 
     /**
      * @dev Mints new tokens with a governance-controlled rate limit.
-     * @param _for The address to mint tokens for.
+     * @param _to The address to mint tokens to.
      * @param _amount The amount of tokens to mint.
      * @return The amount of tokens minted.
      */
-    function mint(address _for, uint _amount) external requiresAuth returns (uint) {
+    function mint(address _to, uint _amount) external requiresAuth returns (uint) {
         uint nextEpoch = block.timestamp / config.durationWindow;
 
         // Reset mint count and update epoch at the start of a new window
@@ -69,32 +70,33 @@ contract PuppetToken is Auth, ERC20 {
 
         // Add the requested mint amount to the window's mint count
         mintWindowCount += _amount;
+        mineMintCount += _amount;
 
         // Enforce the mint rate limit based on total emitted tokens
         if (mintWindowCount > getLimitAmount()) {
             revert PuppetToken__ExceededRateLimit(config, getLimitAmount());
         }
 
-        _mint(_for, _amount);
+        _mint(_to, _amount);
         return _amount;
     }
 
-    function mintCoreRelease(address _to) external requiresAuth returns (uint) {
-        uint endTime = deployTimestamp + CORE_RELEASE_DURATION;
-
-        if (block.timestamp > endTime) revert PuppetToken__CoreReleaseEnded();
-
+    /**
+     * @dev Mints new tokens to the core with a time-based reduction release schedule.
+     * @param _to The address to mint tokens to.
+     * @return The amount of tokens minted.
+     */
+    function mintCore(address _to) external requiresAuth returns (uint) {
         uint timeElapsed = block.timestamp - deployTimestamp;
-        uint timeMultiplier = Precision.toFactor(timeElapsed, CORE_RELEASE_DURATION);
-        uint maxMintableAmount = Precision.applyFactor(CORE_RELEASE_RATE, totalSupply());
-        uint maxMintableAmountForPeriod = Precision.applyFactor(timeMultiplier, maxMintableAmount);
-        uint mintableAmount = maxMintableAmountForPeriod - coreReleasedAmount;
+        uint releaseFactor = Precision.toFactor(CORE_RELEASE_DIVISOR, timeElapsed + CORE_RELEASE_DIVISOR);
+        uint maxMintableAmount = Precision.applyFactor(releaseFactor, mineMintCount);
+        uint mintableAmount = maxMintableAmount - coreMintCount;
 
         _mint(_to, mintableAmount);
 
-        coreReleasedAmount += mintableAmount;
+        coreMintCount += mintableAmount;
 
-        emit PuppetToken__ReleaseCore(_to, block.timestamp, mintableAmount, coreReleasedAmount);
+        emit PuppetToken__ReleaseCore(_to, block.timestamp, mintableAmount, coreMintCount);
 
         return mintableAmount;
     }
@@ -118,5 +120,4 @@ contract PuppetToken is Auth, ERC20 {
 
     error PuppetToken__InvalidRate();
     error PuppetToken__ExceededRateLimit(Config config, uint maxMintAmount);
-    error PuppetToken__CoreReleaseEnded();
 }
