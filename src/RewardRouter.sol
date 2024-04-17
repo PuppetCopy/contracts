@@ -13,6 +13,7 @@ import {Precision} from "./utils/Precision.sol";
 import {RewardLogic} from "./tokenomics/logic/RewardLogic.sol";
 import {VotingEscrow} from "./tokenomics/VotingEscrow.sol";
 import {VeRevenueDistributor} from "./tokenomics/VeRevenueDistributor.sol";
+import {RevenueDistributor2} from "./tokenomics/RevenueDistributor2.sol";
 
 contract RewardRouter is Auth, ReentrancyGuard {
     event RewardRouter__SetConfig(uint timestmap, CallConfig callConfig);
@@ -25,7 +26,7 @@ contract RewardRouter is Auth, ReentrancyGuard {
     CallConfig callConfig;
 
     VotingEscrow votingEscrow;
-    VeRevenueDistributor revenueDistributor;
+    RevenueDistributor2 revenueDistributor;
 
     function getClaimableAmount(
         RewardLogic.Choice choice, //
@@ -53,7 +54,7 @@ contract RewardRouter is Auth, ReentrancyGuard {
         Authority _authority,
         Router _router,
         VotingEscrow _votingEscrow,
-        VeRevenueDistributor _revenueDistributor,
+        RevenueDistributor2 _revenueDistributor,
         CallConfig memory _callConfig
     ) Auth(address(0), _authority) {
         votingEscrow = _votingEscrow;

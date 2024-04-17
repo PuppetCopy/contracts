@@ -143,12 +143,7 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
         _startTime = _roundDownTimestamp(_startTime);
         uint currentWeek = _roundDownTimestamp(block.timestamp);
         require(_startTime >= currentWeek, "Cannot start before current week");
-        if (_startTime == currentWeek) {
-            // We assume that `votingEscrow` has been deployed in a week previous to this one.
-            // If `votingEscrow` did not have a non-zero supply at the beginning of the current week
-            // then any tokens which are distributed this week will be lost permanently.
-            require(votingEscrow.totalSupply(currentWeek) > 0, "Zero total supply results in lost tokens");
-        }
+
         startTime = _startTime;
         timeCursor = _startTime;
     }
@@ -479,7 +474,7 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
                 // We then shift `nextUserPoint` into `currentUserPoint` and query the Point for the next user epoch.
                 // We do this in order to step though epochs until we find the first epoch starting after
                 // `nextWeekToCheckpoint`, making the previous epoch the one that contains `nextWeekToCheckpoint`.
-                userEpoch += 1;
+                userEpoch += 1; 
                 currentUserPoint = nextUserPoint;
                 if (userEpoch > _maxUserEpoch) {
                     nextUserPoint = VotingEscrow.Point(0, 0, 0, 0);
@@ -496,8 +491,9 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
                     break;
                 }
 
-                uint dt = nextWeekToCheckpoint - currentUserPoint.ts;
-                uint userBalance = currentUserPoint.bias > currentUserPoint.slope * dt ? currentUserPoint.bias - currentUserPoint.slope * dt : 0;
+                int128 dt = int128(int(nextWeekToCheckpoint - currentUserPoint.ts));
+                uint userBalance =
+                    currentUserPoint.bias > currentUserPoint.slope * dt ? uint(int(currentUserPoint.bias - currentUserPoint.slope * dt)) : 0;
 
                 // User's lock has expired and they haven't relocked yet.
                 if (userBalance == 0 && userEpoch > _maxUserEpoch) {
@@ -540,7 +536,6 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
             if (nextWeekToCheckpoint > weekStart) break;
 
             _veSupplyCache[nextWeekToCheckpoint] = votingEscrow.totalSupply(nextWeekToCheckpoint);
-            emit Log(_veSupplyCache[nextWeekToCheckpoint]); // TODO remove
 
             // This is safe as we're incrementing a timestamp
             nextWeekToCheckpoint += 1 weeks;
@@ -581,4 +576,5 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
     error VeRevenueDistributor__MismatchedArrayLengths();
 
     event Log(uint value); // TODO remove
+    event LogAddress(address addr); // TODO remove
 }

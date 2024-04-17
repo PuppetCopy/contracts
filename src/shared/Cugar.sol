@@ -6,6 +6,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {VeRevenueDistributor} from "./../tokenomics/VeRevenueDistributor.sol";
+import {RevenueDistributor2} from "./../tokenomics/RevenueDistributor2.sol";
 
 import {CugarStore} from "./store/CugarStore.sol";
 
@@ -45,7 +46,15 @@ contract Cugar is Auth, ReentrancyGuard {
         callConfig.store.increaseList(keyList, amountList);
     }
 
-    function distribute(VeRevenueDistributor revenueDistributor, address revenueSource, bytes32 key, IERC20 token, uint amount)
+    // function distribute(VeRevenueDistributor revenueDistributor, address revenueSource, bytes32 key, IERC20 token, uint amount)
+    //     external
+    //     requiresAuth
+    // {
+    //     revenueDistributor.depositTokenFrom(token, revenueSource, amount);
+    //     callConfig.store.decrease(key, amount);
+    // }
+
+    function distribute(RevenueDistributor2 revenueDistributor, address revenueSource, bytes32 key, IERC20 token, uint amount)
         external
         requiresAuth
     {

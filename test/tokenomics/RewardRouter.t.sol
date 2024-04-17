@@ -11,6 +11,7 @@ import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {VotingEscrow, MAXTIME} from "src/tokenomics/VotingEscrow.sol";
 import {RewardLogic} from "src/tokenomics/logic/RewardLogic.sol";
 import {VeRevenueDistributor} from "src/tokenomics/VeRevenueDistributor.sol";
+import {RevenueDistributor2} from "./../../src/tokenomics/RevenueDistributor2.sol";
 import {Oracle} from "src/tokenomics/Oracle.sol";
 
 import {Precision} from "src/utils/Precision.sol";
@@ -32,7 +33,7 @@ contract RewardRouterTest is BasicSetup {
     Cugar cugar;
     CugarStore cugarStore;
     VotingEscrow votingEscrow;
-    VeRevenueDistributor revenueDistributor;
+    RevenueDistributor2 revenueDistributor;
     IUniswapV3Pool[] wntUsdPoolList;
 
     Oracle.CallConfig callOracleConfig;
@@ -52,7 +53,6 @@ contract RewardRouterTest is BasicSetup {
 
     function setUp() public override {
         super.setUp();
-        vm.warp(1 weeks);
 
         wntUsdPoolList = new MockUniswapV3Pool[](3);
 
@@ -92,7 +92,9 @@ contract RewardRouterTest is BasicSetup {
         dictator.setRoleCapability(VEST_ROLE, address(votingEscrow), votingEscrow.lock.selector, true);
         dictator.setRoleCapability(VEST_ROLE, address(votingEscrow), votingEscrow.withdraw.selector, true);
 
-        revenueDistributor = new VeRevenueDistributor(dictator, votingEscrow, router, 2 weeks);
+        revenueDistributor = new RevenueDistributor2(dictator, votingEscrow, router, block.timestamp);
+        skip(1 weeks);
+
         dictator.setRoleCapability(REWARD_DISTRIBUTOR_ROLE, address(revenueDistributor), revenueDistributor.claim.selector, true);
         dictator.setRoleCapability(DEPOSIT_TOKEN_FROM_ROLE, address(revenueDistributor), revenueDistributor.depositTokenFrom.selector, true);
 
@@ -142,8 +144,6 @@ contract RewardRouterTest is BasicSetup {
     }
 
     function testOption() public {
-        skip(1 weeks + 1);
-
         assertEq(oracle.getPrimaryPoolPrice(), 1e18, "1-1 pool price with 30 decimals precision");
         assertEq(oracle.getMaxPrice(usdc), 100e6, "100usdc per puppet");
 
@@ -182,11 +182,13 @@ contract RewardRouterTest is BasicSetup {
         assertEq(cugar.get(PositionUtils.getCugarKey(wnt, users.alice)), 0);
         assertEq(cugar.get(PositionUtils.getCugarKey(usdc, users.alice)), 0);
 
+        // skip(1 weeks);
+
         generateUserRevenueInWnt(users.alice, 1e18);
         rewardRouter.exit(wnt, 1e18, 1e18);
         generateUserRevenueInUsdc(users.alice, 100e6);
-        rewardRouter.exit(usdc, 100e6, 100e6);
-        assertEq(puppetToken.balanceOf(users.alice), 0.6e18);
+        rewardRouter.lock(usdc, getMaxTime(), 100e6, 100e6);
+        assertEq(puppetToken.balanceOf(users.alice), 0.3e18);
 
         generateUserRevenueInUsdc(users.bob, 100e6);
         assertEq(rewardRouter.getClaimableAmount(RewardLogic.Choice.LOCK, usdc, users.bob, 100e6), 0.6e18);
@@ -199,19 +201,23 @@ contract RewardRouterTest is BasicSetup {
         rewardRouter.lock(usdc, getMaxTime() / 2, 100e6, 100e6);
         assertAlmostEq(votingEscrow.balanceOf(users.bob), Precision.applyBasisPoints(lockRate, 1e18) / 4, 0.01e18);
 
-        // votingEscrow.checkpoint();
+        votingEscrow.checkpoint();
+        votingEscrow.epoch();
+
         // revenueDistributor.checkpoint();
-        // revenueDistributor.getUserState(users.alice);
-        // revenueDistributor.getUserBalanceAtTimestamp(users.alice, 3 weeks);
+
         // revenueDistributor.getTokensDistributedInWeek(usdc, 3 weeks);
         // revenueDistributor.getTotalSupplyAtTimestamp(3 weeks);
+        // revenueDistributor.getTokensPerWeek(usdc, 2 weeks);
         // revenueDistributor.getTokensPerWeek(usdc, 3 weeks);
 
-        skip(7 days);
-        votingEscrow.getPointHistory(1);
-        votingEscrow.getPointHistory(2);
+        skip(1 weeks);
+        // revenueDistributor.getUserState(users.alice);
+        // revenueDistributor.getUserBalanceAtTimestamp(users.alice, 2 weeks);
 
+        vm.startPrank(users.alice);
         assertGt(revenueDistributor.claim(usdc, users.alice), 0, "Alice has no claimable revenue");
+        
 
         // Users claim their revenue
         // uint aliceRevenueBefore = revenueInToken.balanceOf(users.alice);

@@ -199,26 +199,28 @@ contract VotingEscrow is Auth {
     }
 
     function lock(address _from, address _to, uint _value, uint _unlockTime) external requiresAuth {
-        LockedBalance storage _lock = locked[_to];
-        LockedBalance memory _oldLock = _lock;
+        LockedBalance memory _newLock = locked[_to];
 
-        if (_value == 0 && _unlockTime == 0 || _lock.amount == 0 && _value == 0) revert VotingEscrow__InvalidLockValue();
+        if (_value == 0 && _unlockTime == 0 || _newLock.amount == 0 && _value == 0) revert VotingEscrow__InvalidLockValue();
 
-        _unlockTime = Math.max(_unlockTime, _lock.end);
+        _unlockTime = Math.max(_unlockTime, _newLock.end);
 
         if (_unlockTime < (block.timestamp + WEEK)) revert VotingEscrow__InvaidLockingSchedule();
 
         _unlockTime = _roundEpochTime(Math.min(block.timestamp + MAXTIME, _unlockTime)); // Round down unlock time to the start of the week
 
+        LockedBalance memory _oldLock = LockedBalance({amount: _newLock.amount, end: _newLock.end});
+
         // Adding to existing lock, or if a lock is expired - creating a new one
-        _lock.amount += _value;
+        _newLock.amount += _value;
         if (_unlockTime != 0) {
-            _lock.end = _unlockTime;
+            _newLock.end = _unlockTime;
         }
 
+        locked[_to] = _newLock;
         supply += _value;
 
-        _checkpoint(_to, _oldLock, _lock);
+        _checkpoint(_to, _oldLock, _newLock);
 
         if (_value > 0) router.transfer(token, _from, address(this), _value);
 
@@ -227,20 +229,20 @@ contract VotingEscrow is Auth {
     }
 
     function withdraw(address _from, address _to) external requiresAuth {
-        LockedBalance memory _storedLock = locked[_from];
+        LockedBalance memory _oldLock = locked[_from];
 
-        if (_storedLock.end > block.timestamp) revert VotingEscrow__LockNotExpired();
-        if (_storedLock.amount == 0) revert VotingEscrow__NoLockFound();
+        if (_oldLock.end > block.timestamp) revert VotingEscrow__LockNotExpired();
+        if (_oldLock.amount == 0) revert VotingEscrow__NoLockFound();
 
         LockedBalance memory _newLock = LockedBalance(0, 0);
 
         locked[_from] = _newLock;
-        supply -= _storedLock.amount;
+        supply -= _oldLock.amount;
 
-        _checkpoint(_from, _storedLock, _newLock);
-        token.transfer(_to, _storedLock.amount);
+        _checkpoint(_from, _oldLock, _newLock);
+        token.transfer(_to, _oldLock.amount);
 
-        emit VotingEscrow__Withdraw(_from, _to, block.timestamp, _storedLock.amount);
+        emit VotingEscrow__Withdraw(_from, _to, block.timestamp, _oldLock.amount);
         emit VotingEscrow__Supply(block.timestamp, supply);
     }
 
@@ -325,7 +327,7 @@ contract VotingEscrow is Auth {
     /// @param _to User's wallet address. No user checkpoint if 0x0
     /// @param _oldLocked Pevious locked amount / end lock time for the user
     /// @param _newLocked New locked amount / end lock time for the user
-    function _checkpoint(address _to, LockedBalance memory _oldLocked, LockedBalance memory _newLocked) internal returns (Point memory _lastPoint) {
+    function _checkpoint(address _to, LockedBalance memory _oldLocked, LockedBalance memory _newLocked) internal returns (Point memory) {
         Point memory _uOld;
         Point memory _uNew;
         int128 _oldDslope = 0;
@@ -357,7 +359,7 @@ contract VotingEscrow is Auth {
             }
         }
 
-        _lastPoint = pointHistory[_epoch];
+        Point memory _lastPoint = pointHistory[_epoch];
 
         uint _lastCheckpoint = _lastPoint.ts;
         // initial_last_point is used for extrapolation to calculate block number
@@ -374,38 +376,40 @@ contract VotingEscrow is Auth {
         // But that's ok b/c we know the block in such case
 
         // Go over weeks to fill history and calculate what the current point is
-        uint _tI = _roundEpochTime(_lastCheckpoint);
-        for (uint i = 0; i < 255; ++i) {
-            // Hopefully it won't happen that this won't get used in 5 years!
-            // If it does, users will be able to withdraw but vote weight will be broken
-            _tI += WEEK;
-            int128 _dSlope = 0;
-            if (_tI > block.timestamp) {
-                _tI = block.timestamp;
-            } else {
-                _dSlope = slopeChanges[_tI];
-            }
+        {
+            uint _tI = _roundEpochTime(_lastCheckpoint);
+            for (uint i = 0; i < 255; ++i) {
+                // Hopefully it won't happen that this won't get used in 5 years!
+                // If it does, users will be able to withdraw but vote weight will be broken
+                _tI += WEEK;
+                int128 _dSlope = 0;
+                if (_tI > block.timestamp) {
+                    _tI = block.timestamp;
+                } else {
+                    _dSlope = slopeChanges[_tI];
+                }
 
-            _lastPoint.bias -= _lastPoint.slope * _toI128(_tI - _lastCheckpoint);
-            _lastPoint.slope += _dSlope;
+                _lastPoint.bias -= _lastPoint.slope * _toI128(_tI - _lastCheckpoint);
+                _lastPoint.slope += _dSlope;
 
-            if (_lastPoint.bias < 0) {
-                // This can happen
-                _lastPoint.bias = 0;
-            }
-            if (_lastPoint.slope < 0) {
-                // This cannot happen - just in case
-                _lastPoint.slope = 0;
-            }
-            _lastCheckpoint = _tI;
-            _lastPoint.ts = _tI;
-            _lastPoint.blk = _initialLastPointBlk + (_blockSlope * (_tI - _initialLastPointTs)) / MULTIPLIER;
-            _epoch += 1;
-            if (_tI == block.timestamp) {
-                _lastPoint.blk = block.number;
-                break;
-            } else {
-                pointHistory[_epoch] = _lastPoint;
+                if (_lastPoint.bias < 0) {
+                    // This can happen
+                    _lastPoint.bias = 0;
+                }
+                if (_lastPoint.slope < 0) {
+                    // This cannot happen - just in case
+                    _lastPoint.slope = 0;
+                }
+                _lastCheckpoint = _tI;
+                _lastPoint.ts = _tI;
+                _lastPoint.blk = _initialLastPointBlk + (_blockSlope * (_tI - _initialLastPointTs)) / MULTIPLIER;
+                _epoch += 1;
+                if (_tI == block.timestamp) {
+                    _lastPoint.blk = block.number;
+                    break;
+                } else {
+                    pointHistory[_epoch] = _lastPoint;
+                }
             }
         }
 

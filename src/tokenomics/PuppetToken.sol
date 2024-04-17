@@ -88,7 +88,7 @@ contract PuppetToken is Auth, ERC20 {
      */
     function mintCore(address _to) external requiresAuth returns (uint) {
         uint timeElapsed = block.timestamp - deployTimestamp;
-        uint releaseFactor = Precision.toFactor(CORE_RELEASE_DIVISOR, timeElapsed + CORE_RELEASE_DIVISOR);
+        uint releaseFactor = Precision.toFactor(timeElapsed - CORE_RELEASE_DIVISOR, CORE_RELEASE_DIVISOR);
         uint maxMintableAmount = Precision.applyFactor(releaseFactor, mineMintCount);
         uint mintableAmount = maxMintableAmount - coreMintCount;
 

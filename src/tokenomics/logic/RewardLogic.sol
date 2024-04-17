@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Precision} from "./../../utils/Precision.sol";
 import {Router} from "../../utils/Router.sol";
-import {VeRevenueDistributor} from "../VeRevenueDistributor.sol";
+import {RevenueDistributor2} from "./../RevenueDistributor2.sol";
 
 import {Cugar} from "./../../shared/Cugar.sol";
 import {Oracle} from "./../Oracle.sol";
@@ -32,7 +32,7 @@ library RewardLogic {
         VotingEscrow votingEscrow;
         Oracle oracle;
         Cugar cugar;
-        VeRevenueDistributor revenueDistributor;
+        RevenueDistributor2 revenueDistributor;
         PuppetToken puppetToken;
         address revenueSource;
         uint rate;
@@ -42,7 +42,7 @@ library RewardLogic {
         Router router;
         Cugar cugar;
         Oracle oracle;
-        VeRevenueDistributor revenueDistributor;
+        RevenueDistributor2 revenueDistributor;
         PuppetToken puppetToken;
         address revenueSource;
         uint rate;
