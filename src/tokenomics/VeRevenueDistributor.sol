@@ -36,7 +36,7 @@ import {VeRevenueDistributor} from "./VeRevenueDistributor.sol";
  */
 contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
     event VeRevenueDistributor__TokenCheckpoint(IERC20 token, uint amount, uint lastCheckpointTimestamp);
-    event VeRevenueDistributor__TokensClaim(address from, address to, IERC20 token, uint amount, uint userTokenTimeCursor);
+    event VeRevenueDistributor__TokensClaim(address user, address receiver, IERC20 token, uint amount, uint userTokenTimeCursor);
 
     // `startTime` and `timeCursor` are both timestamps so comfortably fit in a uint64.
     // `cachedBalance` will comfortably fit the total supply of any meaningful token.
@@ -166,9 +166,9 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
         _checkpointToken(_token, true);
     }
 
-    function depositTokenFrom(IERC20 token, address from, uint amount) external nonReentrant requiresAuth {
+    function depositTokenFrom(IERC20 token, address user, uint amount) external nonReentrant requiresAuth {
         _checkpointToken(token, false);
-        router.transfer(token, from, address(this), amount);
+        router.transfer(token, user, address(this), amount);
         _checkpointToken(token, true);
     }
 

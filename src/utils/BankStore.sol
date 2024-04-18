@@ -18,15 +18,34 @@ abstract contract BankStore is StoreController {
         router = _router;
     }
 
-    function transferOut(IERC20 _token, address _receiver, uint _amount) internal isSetter {
-        if (_receiver == address(this)) {
-            revert Bank__SelfTransferNotSupported(_receiver);
-        }
-
-        router.transfer(_token, address(this), _receiver, _amount);
-
-        tokenBalanceMap[_token] = _token.balanceOf(address(this));
+    function syncTokenBalance(IERC20 _token) external isSetter {
+        _syncTokenBalance(_token);
     }
 
-    error Bank__SelfTransferNotSupported(address receiver);
+    function recordTransferIn(IERC20 _token) external isSetter {
+        _recordTransferIn(_token);
+    }
+
+    function transferIn(IERC20 _token, address _user, uint _amount) internal {
+        router.transfer(_token, _user, address(this), _amount);
+        tokenBalanceMap[_token] += _amount;
+    }
+
+    function transferOut(IERC20 _token, address _receiver, uint _amount) internal {
+        router.transfer(_token, address(this), _receiver, _amount);
+        tokenBalanceMap[_token] -= _amount;
+    }
+
+    function _recordTransferIn(IERC20 _token) internal returns (uint) {
+        uint prevBalance = tokenBalanceMap[_token];
+        uint currentBalance = _syncTokenBalance(_token);
+
+        return currentBalance - prevBalance;
+    }
+
+    function _syncTokenBalance(IERC20 _token) internal returns (uint) {
+        uint currentBalance = _token.balanceOf(address(this));
+        tokenBalanceMap[_token] = currentBalance;
+        return currentBalance;
+    }
 }

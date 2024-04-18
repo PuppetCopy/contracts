@@ -12,8 +12,8 @@ import {PuppetStore} from "../store/PuppetStore.sol";
 
 library PuppetLogic {
     event PuppetLogic__SetRule(bytes32 ruleKey, PuppetStore.Rule rule);
-    event PuppetLogic__Deposit(IERC20 token, address account, uint amount);
-    event PuppetLogic__Withdraw(IERC20 token, address account, uint amount);
+    event PuppetLogic__Deposit(IERC20 token, address user, uint amount);
+    event PuppetLogic__Withdraw(IERC20 token, address user, uint amount);
 
     struct CallSetRuleConfig {
         Router router;
@@ -33,27 +33,27 @@ library PuppetLogic {
         PuppetStore store;
     }
 
-    function createSubaccount(CallCreateSubaccountConfig memory callConfig, address account) internal {
-        callConfig.factory.createSubaccount(callConfig.store, account);
+    function createSubaccount(CallCreateSubaccountConfig memory callConfig, address user) internal {
+        callConfig.factory.createSubaccount(callConfig.store, user);
     }
 
-    function deposit(CallSetBalanceConfig memory callConfig, IERC20 token, address from, uint amount) internal {
+    function deposit(CallSetBalanceConfig memory callConfig, IERC20 token, address user, uint amount) internal {
         if (amount == 0) revert PuppetLogic__InvalidAmount();
 
-        callConfig.store.increaseBalance(token, from, amount);
+        callConfig.store.increaseBalance(token, user, amount);
 
-        emit PuppetLogic__Deposit(token, from, amount);
+        emit PuppetLogic__Deposit(token, user, amount);
     }
 
-    function withdraw(CallSetBalanceConfig memory callConfig, IERC20 token, address from, address to, uint amount) internal {
+    function withdraw(CallSetBalanceConfig memory callConfig, IERC20 token, address user, address receiver, uint amount) internal {
         if (amount == 0) revert PuppetLogic__InvalidAmount();
 
-        uint balance = callConfig.store.getBalance(token, from);
+        uint balance = callConfig.store.getBalance(token, user);
         if (amount > balance) revert PuppetLogic__InsufficientBalance();
 
-        callConfig.store.decreaseBalance(token, from, to, amount);
+        callConfig.store.decreaseBalance(token, user, receiver, amount);
 
-        emit PuppetLogic__Withdraw(token, from, amount);
+        emit PuppetLogic__Withdraw(token, user, amount);
     }
 
     function setRule(

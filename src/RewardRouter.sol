@@ -12,8 +12,6 @@ import {Precision} from "./utils/Precision.sol";
 
 import {RewardLogic} from "./tokenomics/logic/RewardLogic.sol";
 import {VotingEscrow} from "./tokenomics/VotingEscrow.sol";
-import {VeRevenueDistributor} from "./tokenomics/VeRevenueDistributor.sol";
-import {RevenueDistributor2} from "./tokenomics/RevenueDistributor2.sol";
 
 contract RewardRouter is Auth, ReentrancyGuard {
     event RewardRouter__SetConfig(uint timestmap, CallConfig callConfig);
@@ -26,7 +24,6 @@ contract RewardRouter is Auth, ReentrancyGuard {
     CallConfig callConfig;
 
     VotingEscrow votingEscrow;
-    RevenueDistributor2 revenueDistributor;
 
     function getClaimableAmount(
         RewardLogic.Choice choice, //
@@ -37,7 +34,7 @@ contract RewardRouter is Auth, ReentrancyGuard {
     ) public view returns (uint claimableAmount) {
         uint rate = choice == RewardLogic.Choice.LOCK ? callConfig.lock.rate : callConfig.exit.rate;
 
-        return RewardLogic.getClaimableAmount(callConfig.lock.cugar, rate, token, tokenPrice, user, cugarAmount);
+        return RewardLogic.getCommitedAmount(callConfig.lock.cugar, rate, token, tokenPrice, user, cugarAmount);
     }
 
     function getClaimableAmount(
@@ -50,15 +47,8 @@ contract RewardRouter is Auth, ReentrancyGuard {
         return getClaimableAmount(choice, token, user, cugarAmount, tokenPrice);
     }
 
-    constructor(
-        Authority _authority,
-        Router _router,
-        VotingEscrow _votingEscrow,
-        RevenueDistributor2 _revenueDistributor,
-        CallConfig memory _callConfig
-    ) Auth(address(0), _authority) {
+    constructor(Authority _authority, Router _router, VotingEscrow _votingEscrow, CallConfig memory _callConfig) Auth(address(0), _authority) {
         votingEscrow = _votingEscrow;
-        revenueDistributor = _revenueDistributor;
 
         _setConfig(_callConfig);
         callConfig.lock.puppetToken.approve(address(_router), type(uint).max);
@@ -76,8 +66,8 @@ contract RewardRouter is Auth, ReentrancyGuard {
         votingEscrow.lock(msg.sender, msg.sender, _tokenAmount, unlockTime);
     }
 
-    function veWithdraw(address to) external nonReentrant {
-        votingEscrow.withdraw(msg.sender, to);
+    function veWithdraw(address receiver) external nonReentrant {
+        votingEscrow.withdraw(msg.sender, receiver);
     }
 
     // governance

@@ -18,7 +18,7 @@ import {Dictator} from "./../utils/Dictator.sol";
  */
 contract PuppetToken is Auth, ERC20 {
     event PuppetToken__SetConfig(Config config);
-    event PuppetToken__ReleaseCore(address to, uint timestamp, uint amount, uint releasedAmount);
+    event PuppetToken__ReleaseCore(address operator, address receiver, uint timestamp, uint amount, uint releasedAmount);
 
     string private constant _NAME = "Puppet Test";
     string private constant _SYMBOL = "PUPPET-TEST";
@@ -55,11 +55,11 @@ contract PuppetToken is Auth, ERC20 {
 
     /**
      * @dev Mints new tokens with a governance-controlled rate limit.
-     * @param _to The address to mint tokens to.
+     * @param _receiver The address to mint tokens to.
      * @param _amount The amount of tokens to mint.
      * @return The amount of tokens minted.
      */
-    function mint(address _to, uint _amount) external requiresAuth returns (uint) {
+    function mint(address _receiver, uint _amount) external requiresAuth returns (uint) {
         uint nextEpoch = block.timestamp / config.durationWindow;
 
         // Reset mint count and update epoch at the start of a new window
@@ -77,26 +77,26 @@ contract PuppetToken is Auth, ERC20 {
             revert PuppetToken__ExceededRateLimit(config, getLimitAmount());
         }
 
-        _mint(_to, _amount);
+        _mint(_receiver, _amount);
         return _amount;
     }
 
     /**
      * @dev Mints new tokens to the core with a time-based reduction release schedule.
-     * @param _to The address to mint tokens to.
+     * @param _receiver The address to mint tokens to.
      * @return The amount of tokens minted.
      */
-    function mintCore(address _to) external requiresAuth returns (uint) {
+    function mintCore(address _receiver) external requiresAuth returns (uint) {
         uint timeElapsed = block.timestamp - deployTimestamp;
         uint releaseFactor = Precision.toFactor(timeElapsed - CORE_RELEASE_DIVISOR, CORE_RELEASE_DIVISOR);
         uint maxMintableAmount = Precision.applyFactor(releaseFactor, mineMintCount);
         uint mintableAmount = maxMintableAmount - coreMintCount;
 
-        _mint(_to, mintableAmount);
+        _mint(_receiver, mintableAmount);
 
         coreMintCount += mintableAmount;
 
-        emit PuppetToken__ReleaseCore(_to, block.timestamp, mintableAmount, coreMintCount);
+        emit PuppetToken__ReleaseCore(msg.sender, _receiver, block.timestamp, mintableAmount, coreMintCount);
 
         return mintableAmount;
     }

@@ -11,10 +11,10 @@ abstract contract StoreController is Auth {
         _;
     }
 
-    constructor(Authority _authority, address initSetter) Auth(address(0), _authority) {
-        setter = initSetter;
+    constructor(Authority _authority, address _setter) Auth(address(0), _authority) {
+        setter = _setter;
 
-        emit AssignSetter(address(0), initSetter, block.timestamp);
+        emit AssignSetter(address(0), _setter, block.timestamp);
     }
 
     function switchSetter(address nextSetter) external requiresAuth {

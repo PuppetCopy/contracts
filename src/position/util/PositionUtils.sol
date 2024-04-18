@@ -16,8 +16,8 @@ library PositionUtils {
         uint triggerPrice;
     }
 
-    function getCugarKey(IERC20 token, address account) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(token, account));
+    function getCugarKey(IERC20 token, address user, uint cursorTime) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(token, user, cursorTime));
     }
 
     function getRuleKey(IERC20 token, address puppet, address trader) internal pure returns (bytes32) {

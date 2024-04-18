@@ -39,9 +39,9 @@ contract PuppetStore is BankStore {
         router.transfer(_token, _from, address(this), _amount);
     }
 
-    function decreaseBalance(IERC20 _token, address _from, address _to, uint _amount) public isSetter {
+    function decreaseBalance(IERC20 _token, address _from, address _receiver, uint _amount) public isSetter {
         balanceMap[_from][_token] -= _amount;
-        transferOut(_token, _to, _amount);
+        transferOut(_token, _receiver, _amount);
     }
 
     function getRule(bytes32 _key) external view returns (Rule memory) {
@@ -72,10 +72,10 @@ contract PuppetStore is BankStore {
             totalAmountIn += _amountList[i];
         }
 
-        router.transfer(_token, _from, address(this), totalAmountIn);
+        transferIn(_token, _from, totalAmountIn);
     }
 
-    function decreaseBalanceList(IERC20 _token, address _to, address[] calldata _accountList, uint[] calldata _amountList) external isSetter {
+    function decreaseBalanceList(IERC20 _token, address _receiver, address[] calldata _accountList, uint[] calldata _amountList) external isSetter {
         uint _accountListLength = _accountList.length;
         uint totalAmountOut;
 
@@ -86,7 +86,7 @@ contract PuppetStore is BankStore {
             totalAmountOut -= _amountList[i];
         }
 
-        transferOut(_token, _to, totalAmountOut);
+        transferOut(_token, _receiver, totalAmountOut);
     }
 
     function getRuleList(bytes32[] calldata _keyList) external view returns (Rule[] memory) {

@@ -30,8 +30,8 @@ contract PuppetRouter is Auth, ReentrancyGuard {
         PuppetLogic.deposit(callConfig.setBalance, token, msg.sender, amount);
     }
 
-    function withdraw(IERC20 token, address to, uint amount) external nonReentrant {
-        PuppetLogic.withdraw(callConfig.setBalance, token, msg.sender, to, amount);
+    function withdraw(IERC20 token, address receiver, uint amount) external nonReentrant {
+        PuppetLogic.withdraw(callConfig.setBalance, token, msg.sender, receiver, amount);
     }
 
     function setRule(

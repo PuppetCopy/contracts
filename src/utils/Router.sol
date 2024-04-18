@@ -21,12 +21,12 @@ contract Router is Auth {
     /**
      * @dev low level call to an ERC20 contract, return raw data to be handled by authorised contract
      * @param token the token to transfer
-     * @param from the account to transfer from
-     * @param to the account to transfer to
+     * @param user the account to transfer from
+     * @param receiver the account to transfer to
      * @param amount the amount to transfer
      */
-    function transfer(IERC20 token, address from, address to, uint amount) external requiresAuth {
-        ExternalCallUtils.callTarget(transferGasLimit, address(token), abi.encodeCall(token.transferFrom, (from, to, amount)));
+    function transfer(IERC20 token, address user, address receiver, uint amount) external requiresAuth {
+        ExternalCallUtils.callTarget(transferGasLimit, address(token), abi.encodeCall(token.transferFrom, (user, to, amount)));
     }
 
     function setTransferGasLimit(uint _trasnferGasLimit) external requiresAuth {

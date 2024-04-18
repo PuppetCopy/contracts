@@ -107,8 +107,8 @@ library GmxPositionUtils {
         return orderType == OrderType.Liquidation;
     }
 
-    function getPositionKey(address account, address market, IERC20 collateralToken, bool isLong) internal pure returns (bytes32) {
-        return keccak256(abi.encode(account, market, collateralToken, isLong));
+    function getPositionKey(address trader, address market, IERC20 collateralToken, bool isLong) internal pure returns (bytes32) {
+        return keccak256(abi.encode(trader, market, collateralToken, isLong));
     }
 
     function getCurrentNonce(IGmxDatastore dataStore) internal view returns (uint) {

@@ -9,7 +9,6 @@ import {IGmxEventUtils} from "./../interface/IGmxEventUtils.sol";
 import {Router} from "src/utils/Router.sol";
 import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
 import {Precision} from "./../../utils/Precision.sol";
-import {PositionUtils} from "./../util/PositionUtils.sol";
 
 import {PuppetStore} from "../store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
@@ -96,9 +95,8 @@ library ExecuteDecreasePosition {
         callParams.mirrorPosition.size -= request.sizeDelta;
         callParams.mirrorPosition.cumulativeTransactionCost += request.transactionCost;
 
-        uint[] memory feeAmountList = new uint[](callParams.puppetListLength);
-        uint[] memory balanceList = callConfig.puppetStore.getBalanceList(callParams.outputToken, callParams.mirrorPosition.puppetList);
-        bytes32[] memory keyList = new bytes32[](callParams.puppetListLength);
+        uint[] memory outputAmountList = new uint[](callParams.puppetListLength);
+        uint[] memory commitFeeList = new uint[](callParams.puppetListLength);
 
         uint totalPerformanceFee;
         uint traderPerformanceCutoffFee;
@@ -106,27 +104,29 @@ library ExecuteDecreasePosition {
         for (uint i = 0; i < callParams.puppetListLength; i++) {
             if (request.puppetCollateralDeltaList[i] == 0) continue;
 
-            keyList[i] = PositionUtils.getCugarKey(callParams.outputToken, callParams.mirrorPosition.puppetList[i]);
-
             callParams.mirrorPosition.collateralList[i] -= request.puppetCollateralDeltaList[i];
 
             (uint performanceFee, uint traderCutoff, uint amountOutAfterFee) = getDistribution(
                 callConfig.performanceFeeRate,
                 callConfig.traderPerformanceFeeShare,
                 callParams.profit,
-                request.puppetCollateralDeltaList[i] * callParams.mirrorPosition.collateral / callParams.totalAmountOut,
-                callParams.totalAmountOut
+                request.puppetCollateralDeltaList[i] * callParams.mirrorPosition.collateral / callParams.profit,
+                callParams.profit
             );
 
             totalPerformanceFee += performanceFee;
             traderPerformanceCutoffFee += traderCutoff;
 
-            feeAmountList[i] = performanceFee;
-            balanceList[i] += amountOutAfterFee;
+            commitFeeList[i] = performanceFee;
+            outputAmountList[i] += amountOutAfterFee;
         }
 
-        callConfig.puppetStore.increaseBalanceList(callParams.outputToken, address(this), callParams.mirrorPosition.puppetList, balanceList);
-        callConfig.cugar.increaseList(keyList, feeAmountList);
+        callConfig.puppetStore.increaseBalanceList(callParams.outputToken, address(this), callParams.mirrorPosition.puppetList, outputAmountList);
+
+        if (callParams.profit > 0) {
+            callConfig.cugar.commitList(callParams.outputToken, callParams.mirrorPosition.puppetList, commitFeeList);
+            callConfig.cugar.commit(callParams.outputToken, callParams.mirrorPosition.trader, traderPerformanceCutoffFee);
+        }
 
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
         if (callParams.mirrorPosition.size == order.numbers.sizeDeltaUsd) {
@@ -136,10 +136,6 @@ library ExecuteDecreasePosition {
         }
 
         callConfig.positionStore.removeRequestDecrease(callParams.requestKey);
-        callConfig.cugar.increase(
-            PositionUtils.getCugarKey(callParams.outputToken, callParams.mirrorPosition.trader), //
-            traderPerformanceCutoffFee
-        );
 
         if (request.collateralDelta > 0) {
             callConfig.router.transfer(
@@ -160,11 +156,13 @@ library ExecuteDecreasePosition {
         );
     }
 
-    function getDistribution(uint performanceFeeRate, uint traderPerformanceFeeShare, uint totalProfit, uint amountOut, uint totalAmountOut)
-        internal
-        pure
-        returns (uint performanceFee, uint traderPerformanceCutoffFee, uint amountOutAfterFee)
-    {
+    function getDistribution(
+        uint performanceFeeRate, //
+        uint traderPerformanceFeeShare,
+        uint totalProfit,
+        uint amountOut,
+        uint totalAmountOut
+    ) internal pure returns (uint performanceFee, uint traderPerformanceCutoffFee, uint amountOutAfterFee) {
         uint profit = totalProfit * amountOut / totalAmountOut;
 
         performanceFee = Precision.applyFactor(performanceFeeRate, profit);

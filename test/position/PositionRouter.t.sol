@@ -15,6 +15,8 @@ import {CugarStore} from "src/shared/store/CugarStore.sol";
 import {SubaccountStore} from "src/shared/store/SubaccountStore.sol";
 import {Subaccount} from "src/shared/Subaccount.sol";
 
+import {VotingEscrow} from "src/tokenomics/VotingEscrow.sol";
+
 import {PuppetLogic} from "src/position/logic/PuppetLogic.sol";
 import {PositionRouter} from "src/PositionRouter.sol";
 
@@ -49,6 +51,7 @@ contract PositionRouterTest is BasicSetup {
     IGmxExchangeRouter gmxExchangeRouter;
     CugarStore cugarStore;
     Cugar cugar;
+    VotingEscrow votingEscrow;
 
     PositionRouter.CallConfig callConfig;
 
@@ -71,8 +74,10 @@ contract PositionRouterTest is BasicSetup {
         puppetStore = new PuppetStore(dictator, router, puppetRouterAddress);
         positionStore = new PositionStore(dictator, router, positionRouterAddress);
 
-        cugarStore = new CugarStore(dictator, computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1));
-        cugar = new Cugar(dictator, Cugar.CallConfig({store: cugarStore}));
+        votingEscrow = new VotingEscrow(dictator, router, puppetToken);
+
+        cugarStore = new CugarStore(dictator, router, computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1));
+        cugar = new Cugar(dictator, Cugar.CallConfig({store: cugarStore, votingEscrow: votingEscrow}));
 
         puppetRouter = new PuppetRouter(
             dictator,

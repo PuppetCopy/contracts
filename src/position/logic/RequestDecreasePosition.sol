@@ -148,5 +148,5 @@ library RequestDecreasePosition {
         emit RequestDecreasePosition__Request(request, subaccountAddress, requestKey, traderCallParams.sizeDelta, traderCallParams.collateralDelta);
     }
 
-    error RequestDecreasePosition__SubaccountNotFound(address from);
+    error RequestDecreasePosition__SubaccountNotFound(address user);
 }

@@ -8,17 +8,17 @@ import {SubaccountStore} from "./store/SubaccountStore.sol";
 import {Subaccount} from "./Subaccount.sol";
 
 contract SubaccountFactory is Auth, ReentrancyGuard {
-    event PositionLogic__CreateSubaccount(address account, address subaccount);
+    event PositionLogic__CreateSubaccount(address user, address subaccount);
 
     constructor(Authority _authority) Auth(address(0), _authority) {}
 
-    function createSubaccount(SubaccountStore store, address account) external requiresAuth nonReentrant returns (Subaccount subaccount) {
-        if (address(store.getSubaccount(account)) == account) revert SubaccountFactory__AlreadyExists();
+    function createSubaccount(SubaccountStore store, address user) external requiresAuth nonReentrant returns (Subaccount subaccount) {
+        if (address(store.getSubaccount(user)) == user) revert SubaccountFactory__AlreadyExists();
 
-        subaccount = new Subaccount(store, account);
-        store.setSubaccount(account, subaccount);
+        subaccount = new Subaccount(store, user);
+        store.setSubaccount(user, subaccount);
 
-        emit PositionLogic__CreateSubaccount(account, address(subaccount));
+        emit PositionLogic__CreateSubaccount(user, address(subaccount));
     }
 
     error SubaccountFactory__AlreadyExists();

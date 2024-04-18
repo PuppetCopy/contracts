@@ -80,7 +80,7 @@ contract VotingEscrow is Auth {
         token = _token;
 
         pointHistory[0].blk = block.number;
-        pointHistory[0].ts = _roundEpochTime(block.timestamp);
+        pointHistory[0].ts = _roundWeekTime(block.timestamp);
 
         pointTime[0] = pointHistory[0];
     }
@@ -195,11 +195,12 @@ contract VotingEscrow is Auth {
     // state
 
     function checkpoint() external returns (Point memory) {
-        return _checkpoint(address(0), LockedBalance(0, 0), LockedBalance(0, 0));
+        LockedBalance memory empty;
+        return _checkpoint(ZERO_ADDRESS, empty, empty);
     }
 
-    function lock(address _from, address _to, uint _value, uint _unlockTime) external requiresAuth {
-        LockedBalance memory _newLock = locked[_to];
+    function lock(address _depositor, address _user, uint _value, uint _unlockTime) external requiresAuth {
+        LockedBalance memory _newLock = locked[_user];
 
         if (_value == 0 && _unlockTime == 0 || _newLock.amount == 0 && _value == 0) revert VotingEscrow__InvalidLockValue();
 
@@ -207,7 +208,7 @@ contract VotingEscrow is Auth {
 
         if (_unlockTime < (block.timestamp + WEEK)) revert VotingEscrow__InvaidLockingSchedule();
 
-        _unlockTime = _roundEpochTime(Math.min(block.timestamp + MAXTIME, _unlockTime)); // Round down unlock time to the start of the week
+        _unlockTime = _roundWeekTime(Math.min(block.timestamp + MAXTIME, _unlockTime)); // Round down unlock time to the start of the week
 
         LockedBalance memory _oldLock = LockedBalance({amount: _newLock.amount, end: _newLock.end});
 
@@ -217,32 +218,32 @@ contract VotingEscrow is Auth {
             _newLock.end = _unlockTime;
         }
 
-        locked[_to] = _newLock;
+        locked[_user] = _newLock;
         supply += _value;
 
-        _checkpoint(_to, _oldLock, _newLock);
+        _checkpoint(_user, _oldLock, _newLock);
 
-        if (_value > 0) router.transfer(token, _from, address(this), _value);
+        if (_value > 0) router.transfer(token, _depositor, address(this), _value);
 
-        emit VotingEscrow__Deposit(_from, _to, block.timestamp, _value, _unlockTime);
+        emit VotingEscrow__Deposit(_depositor, _user, block.timestamp, _value, _unlockTime);
         emit VotingEscrow__Supply(block.timestamp, supply);
     }
 
-    function withdraw(address _from, address _to) external requiresAuth {
-        LockedBalance memory _oldLock = locked[_from];
+    function withdraw(address _user, address _receiver) external requiresAuth {
+        LockedBalance memory _oldLock = locked[_user];
 
         if (_oldLock.end > block.timestamp) revert VotingEscrow__LockNotExpired();
         if (_oldLock.amount == 0) revert VotingEscrow__NoLockFound();
 
         LockedBalance memory _newLock = LockedBalance(0, 0);
 
-        locked[_from] = _newLock;
+        locked[_user] = _newLock;
         supply -= _oldLock.amount;
 
-        _checkpoint(_from, _oldLock, _newLock);
-        token.transfer(_to, _oldLock.amount);
+        _checkpoint(_user, _oldLock, _newLock);
+        token.transfer(_receiver, _oldLock.amount);
 
-        emit VotingEscrow__Withdraw(_from, _to, block.timestamp, _oldLock.amount);
+        emit VotingEscrow__Withdraw(_user, _receiver, block.timestamp, _oldLock.amount);
         emit VotingEscrow__Supply(block.timestamp, supply);
     }
 
@@ -280,7 +281,7 @@ contract VotingEscrow is Auth {
     /// @return totalSupply at given point in time
     function _supplyAt(Point memory _point, uint _t) internal view returns (uint) {
         Point memory _lastPoint = _point;
-        uint _ti = _roundEpochTime(_lastPoint.ts);
+        uint _ti = _roundWeekTime(_lastPoint.ts);
 
         for (uint i; i < 255;) {
             _ti += WEEK;
@@ -377,7 +378,7 @@ contract VotingEscrow is Auth {
 
         // Go over weeks to fill history and calculate what the current point is
         {
-            uint _tI = _roundEpochTime(_lastCheckpoint);
+            uint _tI = _roundWeekTime(_lastCheckpoint);
             for (uint i = 0; i < 255; ++i) {
                 // Hopefully it won't happen that this won't get used in 5 years!
                 // If it does, users will be able to withdraw but vote weight will be broken
@@ -465,7 +466,7 @@ contract VotingEscrow is Auth {
         return _lastPoint;
     }
 
-    function _roundEpochTime(uint timestamp) private pure returns (uint) {
+    function _roundWeekTime(uint timestamp) private pure returns (uint) {
         unchecked {
             // Division by zero or overflows are impossible here.
             return (timestamp / WEEK) * WEEK;
@@ -484,8 +485,8 @@ contract VotingEscrow is Auth {
     // Events
     // ============================================================================================
 
-    event VotingEscrow__Deposit(address from, address to, uint timestamp, uint value, uint locktime);
-    event VotingEscrow__Withdraw(address from, address to, uint timestamp, uint value);
+    event VotingEscrow__Deposit(address depositor, address user, uint timestamp, uint value, uint locktime);
+    event VotingEscrow__Withdraw(address user, address receiver, uint timestamp, uint value);
     event VotingEscrow__Supply(uint timestamp, uint supply);
 
     // ============================================================================================
