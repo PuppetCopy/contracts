@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import {Router} from "./utils/Router.sol";
 import {Router} from "./utils/Router.sol";
@@ -11,7 +12,7 @@ import {Router} from "./utils/Router.sol";
 import {PuppetStore} from "./position/store/PuppetStore.sol";
 import {PuppetLogic} from "./position/logic/PuppetLogic.sol";
 
-contract PuppetRouter is Auth, ReentrancyGuard {
+contract PuppetRouter is Auth, EIP712, ReentrancyGuard {
     event PuppetRouter__SetConfig(uint timestamp, CallConfig callConfig);
 
     struct CallConfig {
@@ -22,7 +23,7 @@ contract PuppetRouter is Auth, ReentrancyGuard {
 
     CallConfig callConfig;
 
-    constructor(Authority _authority, CallConfig memory _callConfig) Auth(address(0), _authority) {
+    constructor(Authority _authority, CallConfig memory _callConfig) Auth(address(0), _authority) EIP712("Puppet Router", "1") {
         _setConfig(_callConfig);
     }
 

@@ -15,7 +15,7 @@ import {Oracle} from "src/tokenomics/Oracle.sol";
 import {Precision} from "src/utils/Precision.sol";
 
 import {CugarStore} from "src/shared/store/CugarStore.sol";
-import {Cugar} from "src/shared/Cugar.sol";
+import {Cugar, CURSOR_INTERVAL} from "src/shared/Cugar.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
@@ -79,7 +79,7 @@ contract RewardRouterTest is BasicSetup {
         votingEscrow = new VotingEscrow(dictator, router, puppetToken);
 
         cugarStore = new CugarStore(dictator, router, computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1));
-        cugar = new Cugar(dictator, Cugar.CallConfig({store: cugarStore, votingEscrow: votingEscrow}));
+        cugar = new Cugar(dictator, cugarStore, votingEscrow);
         dictator.setRoleCapability(COMMIT_ROLE, address(cugar), cugar.commit.selector, true);
         dictator.setRoleCapability(DECREASE_COMMIT_ROLE, address(cugar), cugar.decreaseCommit.selector, true);
         dictator.setRoleCapability(UPDATE_CURSOR_ROLE, address(cugar), cugar.updateCursor.selector, true);
@@ -88,8 +88,6 @@ contract RewardRouterTest is BasicSetup {
         // votingEscrow.checkpoint();
         dictator.setRoleCapability(VEST_ROLE, address(votingEscrow), votingEscrow.lock.selector, true);
         dictator.setRoleCapability(VEST_ROLE, address(votingEscrow), votingEscrow.withdraw.selector, true);
-
-        skip(1 weeks);
 
         rewardRouter = new RewardRouter(
             dictator,
@@ -185,10 +183,10 @@ contract RewardRouterTest is BasicSetup {
         votingEscrow.checkpoint();
         votingEscrow.epoch();
 
-        skip(1 weeks);
+        // skip(1 weeks);
 
         // vm.startPrank(users.alice);
-        assertGt(cugarStore.getCursorBalance(usdc, 2 weeks), 0, "Alice has no claimable revenue");
+        assertGt(cugarStore.getCursorBalance(usdc, getCursor(0 weeks)), 0, "Alice has no claimable revenue");
         assertGt(rewardRouter.claim(usdc, users.alice), 0, "Alice has no claimable revenue");
 
         // Users claim their revenue
@@ -271,19 +269,7 @@ contract RewardRouterTest is BasicSetup {
         return uint160(Math.sqrt(usdcPerWeth * 1e12) << 96) / 1e12 + 1;
     }
 
-    /**
-     * @dev Rounds the provided timestamp down to the beginning of the previous week (Thurs 00:00 UTC)
-     */
-    function _roundDownTimestamp(uint timestamp) private pure returns (uint) {
-        // Division by zero or overflows are impossible here.
-        return (timestamp / 1 weeks) * 1 weeks;
-    }
-
-    /**
-     * @dev Rounds the provided timestamp up to the beginning of the next week (Thurs 00:00 UTC)
-     */
-    function _roundUpTimestamp(uint timestamp) private pure returns (uint) {
-        // Overflows are impossible here for all realistic inputs.
-        return _roundDownTimestamp(timestamp + 604799);
+    function getCursor(uint _time) internal pure returns (uint) {
+        return _time / CURSOR_INTERVAL;
     }
 }

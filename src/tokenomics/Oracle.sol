@@ -7,12 +7,13 @@ import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import {UniV3Prelude} from "../utils/UniV3Prelude.sol";
 
 import {OracleStore, SLOT_COUNT} from "./store/OracleStore.sol";
 
-contract Oracle is Auth, ReentrancyGuard {
+contract Oracle is Auth, EIP712, ReentrancyGuard {
     event Oracle__SetConfig(uint timestmap, CallConfig callConfig, SecondaryPriceConfig[] exchangePriceSourceList);
     event Oracle__SyncDelayedSlot(uint updateInterval, uint seedTimestamp, uint currentTimestamp, uint delayedUpdateCount, uint price);
     event Oracle__SlotSettled(uint updateInterval, uint seedTimestamp, uint seedPrice, uint maxPrice);
@@ -83,7 +84,7 @@ contract Oracle is Auth, ReentrancyGuard {
         uint tokenBalance = balances[0];
         uint primaryBalance = balances[1];
 
-        uint balanceRatio = ((primaryBalance * 20e18) / (tokenBalance * 80));
+        uint balanceRatio = (primaryBalance * 20e18) / (tokenBalance * 80);
         price = balanceRatio;
 
         if (price == 0) revert Oracle__NonZeroPrice();
@@ -130,7 +131,7 @@ contract Oracle is Auth, ReentrancyGuard {
         CallConfig memory _callConfig,
         IERC20[] memory _tokenList,
         SecondaryPriceConfig[] memory _exchangePriceSourceList
-    ) Auth(address(0), _authority) {
+    ) Auth(address(0), _authority) EIP712("Oracle", "1") {
         store = _store;
         _setConfig(_callConfig, _tokenList, _exchangePriceSourceList);
     }

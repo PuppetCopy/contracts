@@ -77,7 +77,7 @@ contract PositionRouterTest is BasicSetup {
         votingEscrow = new VotingEscrow(dictator, router, puppetToken);
 
         cugarStore = new CugarStore(dictator, router, computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1));
-        cugar = new Cugar(dictator, Cugar.CallConfig({store: cugarStore, votingEscrow: votingEscrow}));
+        cugar = new Cugar(dictator, cugarStore, votingEscrow);
 
         puppetRouter = new PuppetRouter(
             dictator,

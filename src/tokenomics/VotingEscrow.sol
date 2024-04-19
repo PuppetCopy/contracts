@@ -5,6 +5,7 @@ import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import {Router} from "../utils/Router.sol";
 
@@ -28,7 +29,7 @@ uint constant MAXTIME = 2 * 365 * 86400; // 2 years
  *       maxtime (2 years)
  *
  */
-contract VotingEscrow is Auth {
+contract VotingEscrow is Auth, EIP712 {
     struct Point {
         int128 bias;
         int128 slope; // - dweight / dt
@@ -43,10 +44,6 @@ contract VotingEscrow is Auth {
         uint amount;
         uint end;
     }
-
-    string public constant name = "Puppet Voting Escrow";
-    string public constant symbol = "vePUPPET";
-    string public constant version = "0.0.1";
 
     uint public supply;
     uint public epoch;
@@ -73,7 +70,7 @@ contract VotingEscrow is Auth {
     /// @notice Contract constructor
     /// @param _authority Aragon authority address
     /// @param _token `ERC20CRV` token address
-    constructor(Authority _authority, Router _router, IERC20 _token) Auth(address(0), _authority) {
+    constructor(Authority _authority, Router _router, IERC20 _token) Auth(address(0), _authority) EIP712("Puppet Voting Escrow", "1") {
         router = _router;
         token = _token;
 

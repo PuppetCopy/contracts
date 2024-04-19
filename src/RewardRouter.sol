@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import {IReferralStorage} from "./position/interface/IReferralStorage.sol";
 
@@ -13,7 +14,7 @@ import {Precision} from "./utils/Precision.sol";
 import {RewardLogic} from "./tokenomics/logic/RewardLogic.sol";
 import {VotingEscrow} from "./tokenomics/VotingEscrow.sol";
 
-contract RewardRouter is Auth, ReentrancyGuard {
+contract RewardRouter is Auth, EIP712, ReentrancyGuard {
     event RewardRouter__SetConfig(uint timestmap, CallConfig callConfig);
 
     struct CallConfig {
@@ -22,10 +23,12 @@ contract RewardRouter is Auth, ReentrancyGuard {
     }
 
     CallConfig callConfig;
-
     VotingEscrow votingEscrow;
 
-    constructor(Authority _authority, Router _router, VotingEscrow _votingEscrow, CallConfig memory _callConfig) Auth(address(0), _authority) {
+    constructor(Authority _authority, Router _router, VotingEscrow _votingEscrow, CallConfig memory _callConfig)
+        Auth(address(0), _authority)
+        EIP712("Reward Router", "1")
+    {
         votingEscrow = _votingEscrow;
 
         _setConfig(_callConfig);

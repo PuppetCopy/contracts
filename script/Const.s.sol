@@ -13,7 +13,6 @@ library Const {
     address constant PriceStore = 0xe9e9ce24275Ec23257551Cbb62D79A4e9cfE2428;
     address constant RewardLogic = 0x356Df7BE8a48d514c3A24A4b4cC0CB4AAd45B617;
     address constant VotingEscrow = 0xd6D057D0b2f16a9bcdca4b8A7EF3532386cB3058;
-    address constant VeRevenueDistributor = 0xeA1e7206dD22cD452E8bb4A393C003ABF9C5826e;
     address constant RewardRouter = 0xeBE43819468Bc0B167Baa5224Fe46A9EaDCA67Ce;
 
     address constant nt = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;

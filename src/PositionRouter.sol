@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
 import {GmxPositionUtils} from "./position/util/GmxPositionUtils.sol";
@@ -15,7 +16,7 @@ import {ExecuteIncreasePosition} from "./position/logic/ExecuteIncreasePosition.
 import {ExecuteDecreasePosition} from "./position/logic/ExecuteDecreasePosition.sol";
 import {ExecuteRejectedAdjustment} from "./position/logic/ExecuteRejectedAdjustment.sol";
 
-contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
+contract PositionRouter is Auth, EIP712, ReentrancyGuard, IGmxOrderCallbackReceiver {
     struct CallConfig {
         RequestIncreasePosition.CallConfig increase;
         RequestDecreasePosition.CallConfig decrease;
@@ -28,7 +29,7 @@ contract PositionRouter is Auth, ReentrancyGuard, IGmxOrderCallbackReceiver {
 
     CallConfig callConfig;
 
-    constructor(Authority _authority, CallConfig memory _callConfig) Auth(address(0), _authority) {
+    constructor(Authority _authority, CallConfig memory _callConfig) Auth(address(0), _authority) EIP712("Position Router", "1") {
         _setConfig(_callConfig);
     }
 

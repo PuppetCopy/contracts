@@ -20,9 +20,6 @@ contract PuppetToken is Auth, ERC20 {
     event PuppetToken__SetConfig(Config config);
     event PuppetToken__ReleaseCore(address operator, address receiver, uint timestamp, uint amount, uint releasedAmount);
 
-    string private constant _NAME = "Puppet Test";
-    string private constant _SYMBOL = "PUPPET-TEST";
-
     uint private constant CORE_RELEASE_DIVISOR = 31540000; // 1 year
     uint private constant GENESIS_MINT_AMOUNT = 100_000e18;
 
@@ -33,14 +30,14 @@ contract PuppetToken is Auth, ERC20 {
 
     Config public config;
 
-    uint deployTimestamp = block.timestamp;
-    uint mintWindowCount = 0;
+    uint deployTimestamp = block.timestamp; // used to calculate the deminishing mint rate for core minting
+    uint mintWindowCount = 0; // Current mint count for the rate limit window
+    uint epoch = 0; // Current epoch for rate limit calculation
 
-    uint public epoch = 0; // Current epoch for rate limit calculation
     uint public mineMintCount = 0; // the amount of tokens minted through protocol use
     uint public coreMintCount = 0; // the  amount of tokens released to the core
 
-    constructor(Dictator _authority, Config memory _config) Auth(address(0), _authority) ERC20(_NAME, _SYMBOL) {
+    constructor(Dictator _authority, Config memory _config) Auth(address(0), _authority) ERC20("Puppet Test", "PUPPET-TEST") {
         _setConfig(_config); // init at 1% of circulating supply per hour
         _mint(_authority.owner(), GENESIS_MINT_AMOUNT);
     }

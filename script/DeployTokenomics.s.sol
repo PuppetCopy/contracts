@@ -22,7 +22,6 @@ import {RewardRouter} from "src/RewardRouter.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {VotingEscrow} from "src/tokenomics/VotingEscrow.sol";
 // import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
-import {VeRevenueDistributor} from "src/tokenomics/VeRevenueDistributor.sol";
 
 import {Const} from "script/Const.s.sol";
 
