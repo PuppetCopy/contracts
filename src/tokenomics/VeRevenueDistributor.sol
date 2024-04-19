@@ -474,7 +474,7 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
                 // We then shift `nextUserPoint` into `currentUserPoint` and query the Point for the next user epoch.
                 // We do this in order to step though epochs until we find the first epoch starting after
                 // `nextWeekToCheckpoint`, making the previous epoch the one that contains `nextWeekToCheckpoint`.
-                userEpoch += 1; 
+                userEpoch += 1;
                 currentUserPoint = nextUserPoint;
                 if (userEpoch > _maxUserEpoch) {
                     nextUserPoint = VotingEscrow.Point(0, 0, 0, 0);
@@ -574,7 +574,4 @@ contract VeRevenueDistributor is Auth, EIP712, ReentrancyGuard {
     }
 
     error VeRevenueDistributor__MismatchedArrayLengths();
-
-    event Log(uint value); // TODO remove
-    event LogAddress(address addr); // TODO remove
 }

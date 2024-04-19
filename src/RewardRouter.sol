@@ -25,28 +25,6 @@ contract RewardRouter is Auth, ReentrancyGuard {
 
     VotingEscrow votingEscrow;
 
-    function getClaimableAmount(
-        RewardLogic.Choice choice, //
-        IERC20 token,
-        address user,
-        uint cugarAmount,
-        uint tokenPrice
-    ) public view returns (uint claimableAmount) {
-        uint rate = choice == RewardLogic.Choice.LOCK ? callConfig.lock.rate : callConfig.exit.rate;
-
-        return RewardLogic.getCommitedAmount(callConfig.lock.cugar, rate, token, tokenPrice, user, cugarAmount);
-    }
-
-    function getClaimableAmount(
-        RewardLogic.Choice choice, //
-        IERC20 token,
-        address user,
-        uint cugarAmount
-    ) public view returns (uint claimableAmount) {
-        uint tokenPrice = callConfig.lock.oracle.getMaxPrice(token);
-        return getClaimableAmount(choice, token, user, cugarAmount, tokenPrice);
-    }
-
     constructor(Authority _authority, Router _router, VotingEscrow _votingEscrow, CallConfig memory _callConfig) Auth(address(0), _authority) {
         votingEscrow = _votingEscrow;
 
@@ -56,6 +34,14 @@ contract RewardRouter is Auth, ReentrancyGuard {
 
     function lock(IERC20 revenueToken, uint unlockTime, uint acceptableTokenPrice, uint cugarAmount) public nonReentrant {
         RewardLogic.lock(callConfig.lock, revenueToken, msg.sender, acceptableTokenPrice, unlockTime, cugarAmount);
+    }
+
+    function claim(IERC20 revenueToken) external nonReentrant returns (uint) {
+        return claim(revenueToken, msg.sender);
+    }
+
+    function claim(IERC20 revenueToken, address receiver) public nonReentrant returns (uint) {
+        return callConfig.lock.cugar.claim(revenueToken, msg.sender, receiver);
     }
 
     function exit(IERC20 revenueToken, uint acceptableTokenPrice, uint cugarAmount) public nonReentrant {

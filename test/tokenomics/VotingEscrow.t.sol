@@ -7,7 +7,7 @@ import {Router} from "src/utils/Router.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
-contract VotingEscrowTests is BasicSetup {
+contract VotingEscrowTest is BasicSetup {
     uint private constant MAXTIME = 2 * 365 * 86400; // 4 years
 
     VotingEscrow votingEscrow;

@@ -12,7 +12,7 @@ uint constant MAXTIME = 2 * 365 * 86400; // 2 years
 
 /**
  * @title Voting Escrow
- * @notice a slight modified version of Curve's VotingEscrow accesible through Auth contract
+ * @notice a slight modified version of Curve's VotingEscrow
  *
  * Voting escrow to have time-weighted votes
  * Votes have a weight depending on time, so that users are committed
@@ -29,8 +29,6 @@ uint constant MAXTIME = 2 * 365 * 86400; // 2 years
  *
  */
 contract VotingEscrow is Auth {
-    event Log(uint val);
-
     struct Point {
         int128 bias;
         int128 slope; // - dweight / dt

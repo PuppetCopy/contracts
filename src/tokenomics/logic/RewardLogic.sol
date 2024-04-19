@@ -4,7 +4,6 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Precision} from "./../../utils/Precision.sol";
-import {Router} from "../../utils/Router.sol";
 
 import {Cugar} from "./../../shared/Cugar.sol";
 import {Oracle} from "./../Oracle.sol";
@@ -23,7 +22,6 @@ library RewardLogic {
     event RewardLogic__ReferralOwnershipTransferred(address referralStorage, bytes32 code, address newOwner, uint timestamp);
 
     struct CallLockConfig {
-        Router router;
         VotingEscrow votingEscrow;
         Oracle oracle;
         Cugar cugar;
@@ -33,7 +31,6 @@ library RewardLogic {
     }
 
     struct CallExitConfig {
-        Router router;
         Cugar cugar;
         Oracle oracle;
         PuppetToken puppetToken;
@@ -61,8 +58,6 @@ library RewardLogic {
         uint unlockTime,
         uint cugarAmount
     ) internal {
-        callLockConfig.cugar.decreaseCommit(revenueToken, user, cugarAmount);
-
         uint maxPriceInRevenueToken = _syncPrice(callLockConfig.oracle, revenueToken, acceptableTokenPrice);
         uint maxClaimable = cugarAmount * 1e18 / maxPriceInRevenueToken;
         uint claimableInToken = Precision.applyBasisPoints(callLockConfig.rate, maxClaimable);
@@ -74,7 +69,7 @@ library RewardLogic {
 
         callLockConfig.puppetToken.mint(address(this), claimableInTokenAferLockMultiplier);
         callLockConfig.votingEscrow.lock(address(this), user, claimableInTokenAferLockMultiplier, unlockTime);
-        callLockConfig.cugar.updateCursor(revenueToken, cugarAmount);
+        callLockConfig.cugar.updateCursor(revenueToken, user, cugarAmount);
 
         emit RewardLogic__ClaimOption(
             Choice.LOCK, callLockConfig.rate, user, revenueToken, maxPriceInRevenueToken, claimableInTokenAferLockMultiplier
@@ -88,13 +83,11 @@ library RewardLogic {
         uint acceptableTokenPrice,
         uint cugarAmount
     ) internal {
-        callExitConfig.cugar.decreaseCommit(revenueToken, user, cugarAmount);
-
         uint maxPriceInRevenueToken = _syncPrice(callExitConfig.oracle, revenueToken, acceptableTokenPrice);
         uint maxClaimable = cugarAmount * 1e18 / maxPriceInRevenueToken;
         uint claimableInToken = Precision.applyBasisPoints(callExitConfig.rate, maxClaimable);
 
-        callExitConfig.cugar.updateCursor(revenueToken, cugarAmount);
+        callExitConfig.cugar.updateCursor(revenueToken, user, cugarAmount);
         callExitConfig.puppetToken.mint(user, claimableInToken);
 
         emit RewardLogic__ClaimOption(Choice.EXIT, callExitConfig.rate, user, revenueToken, maxPriceInRevenueToken, claimableInToken);

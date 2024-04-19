@@ -18,17 +18,27 @@ contract Cugar is Auth, ReentrancyGuard {
     struct CallConfig {
         CugarStore store;
         VotingEscrow votingEscrow;
-        uint cursorInterval;
     }
 
     CallConfig callConfig;
 
-    function getList(IERC20 token, address[] calldata userList) external view returns (uint _totalAmount, uint[] memory _userCommitList) {
-        return callConfig.store.getCommitList(token, userList);
+    function getClaimable(IERC20 token, address user, uint cursor) internal view returns (uint) {
+        uint cursorTokenBalance = callConfig.store.getCursorBalance(token, cursor);
+
+        if (cursorTokenBalance == 0) return 0;
+
+        uint balance = callConfig.votingEscrow.balanceOf(user, cursor);
+        uint veSupply = callConfig.store.getCursorVeSupply(cursor);
+
+        return balance * cursorTokenBalance / veSupply;
     }
 
-    function getClaimable(IERC20 _token, address user, uint fromCursor, uint toCursor) external view returns (uint) {
-        return _getClimable(_token, user, fromCursor, toCursor);
+    function getClaimableCursor(IERC20 _token, address user, uint toCursor, uint fromCursor) external view returns (uint amount) {
+        if (fromCursor > toCursor) return 0;
+
+        for (uint iCursor = fromCursor; iCursor < toCursor; iCursor += CURSOR_INTERVAL) {
+            amount += getClaimable(_token, user, iCursor);
+        }
     }
 
     function getClaimableCursor(address user, IERC20 _token) external view returns (uint) {
@@ -43,57 +53,60 @@ contract Cugar is Auth, ReentrancyGuard {
 
     // integration
 
+    function commit(IERC20 token, address depositor, address user, uint amountInToken) external requiresAuth {
+        uint cursor = _getCursor(block.timestamp + CURSOR_INTERVAL);
+        callConfig.store.increaseCommit(token, cursor, depositor, user, amountInToken);
+    }
+
     function decreaseCommit(IERC20 token, address user, uint amount) external requiresAuth {
         callConfig.store.decreaseCommit(token, user, amount);
     }
 
-    function commit(IERC20 token, address user, uint amountInToken) external requiresAuth {
-        // uint _nextCursor = _roundTimestamp(block.timestamp + WEEK);
-        callConfig.store.increaseCommit(token, user, user, amountInToken);
-    }
-
     function commitList(IERC20 token, address[] calldata userList, uint[] calldata amountList) external requiresAuth {
-        // uint _nextCursor = _roundTimestamp(block.timestamp + WEEK);
-        callConfig.store.increaseCommitList(token, msg.sender, userList, amountList);
+        uint cursor = _getCursor(block.timestamp + CURSOR_INTERVAL);
+        callConfig.store.increaseCommitList(token, cursor, msg.sender, userList, amountList);
     }
 
-    function updateCursor(IERC20 token, uint amount) external requiresAuth {
-        if (amount == 0) revert Cugar__ZeroValue();
+    function updateCursor(IERC20 token, address user, uint amount) external requiresAuth {
+        callConfig.store.decreaseCommit(token, user, amount);
 
-        uint cursor = _getCursor(block.timestamp);
+        uint cursor = _getCursor(block.timestamp + CURSOR_INTERVAL);
         uint cursorVeSupply = callConfig.store.getCursorVeSupply(cursor);
+        uint userCursor = callConfig.store.getUserTokenCursor(token, user);
+
+        if (userCursor == 0) {
+            callConfig.store.setUserTokenCursor(token, user, cursor);
+        }
 
         if (cursorVeSupply == 0) {
             uint supply = callConfig.votingEscrow.totalSupply();
 
             if (supply == 0) revert Cugar__ZeroVeBias();
-
-            uint cummulativeCursorBalance = callConfig.store.getCummulativeCursorBalance(token);
-
             callConfig.store.setCursorVeSupply(cursor, supply);
-            callConfig.store.setCursorBalance(token, cursor, cummulativeCursorBalance);
         }
 
         emit Cugar__CheckpointToken(block.timestamp, amount);
     }
 
-    function claim(IERC20 token, address user, address receiver) external requiresAuth {
-        uint _weekTime = _getCursor(block.timestamp);
-
+    function claim(IERC20 token, address user, address receiver) external requiresAuth returns (uint amount) {
         uint fromCursor = callConfig.store.getUserTokenCursor(token, user);
         uint toCursor = _getCursor(block.timestamp);
 
-        if (fromCursor >= toCursor) revert Cugar__BeyondClaimableCursor(fromCursor);
+        if (fromCursor > toCursor) revert Cugar__BeyondClaimableCursor(fromCursor);
 
-        uint amount = _getClimable(token, user, fromCursor, toCursor);
+        for (uint iCursor = fromCursor; iCursor < toCursor; iCursor += CURSOR_INTERVAL) {
+            uint cursorAmount = getClaimable(token, user, iCursor);
 
-        callConfig.store.setUserTokenCursor(token, user, _weekTime);
+            if (cursorAmount > 0) callConfig.store.decreaseCursorBalance(token, iCursor, user, amount);
+
+            amount += cursorAmount;
+        }
 
         if (amount == 0) revert Cugar__NothingToClaim();
 
-        emit Cugar__Claimed(user, receiver, fromCursor, amount);
+        callConfig.store.setUserTokenCursor(token, user, toCursor);
 
-        callConfig.store.decreaseCummulativeCursorBalance(token, receiver, amount);
+        emit Cugar__Claimed(user, receiver, fromCursor, amount);
     }
 
     // governance
@@ -104,26 +117,27 @@ contract Cugar is Auth, ReentrancyGuard {
 
     // internal
 
-    function _getCursor(uint _time) private pure returns (uint) {
+    function _getCursor(uint _time) internal pure returns (uint) {
         return (_time / CURSOR_INTERVAL) * CURSOR_INTERVAL;
     }
 
     function _getClimable(
-        IERC20 _token, //
-        address _user,
+        IERC20 token, //
+        address user,
         uint fromCursor,
         uint toCursor
-    ) internal view returns (uint claimable) {
-        if (fromCursor >= toCursor) return 0;
+    ) internal view returns (uint amount) {
+        if (fromCursor > toCursor) return 0;
 
-        uint cursorDelta = toCursor - fromCursor;
+        for (uint iCursor = fromCursor; iCursor < toCursor; iCursor += CURSOR_INTERVAL) {
+            uint veSupply = callConfig.store.getCursorVeSupply(iCursor);
+            uint cursorTokenBalance = callConfig.store.getCursorBalance(token, iCursor);
 
-        for (uint iCursor = fromCursor; iCursor < cursorDelta; iCursor += CURSOR_INTERVAL) {
-            uint veSupply = callConfig.store.getVeSupply(fromCursor);
-            uint cursorTokenBalance = callConfig.store.getCursorBalance(_token, fromCursor);
-            uint balance = callConfig.votingEscrow.balanceOf(_user, iCursor);
+            if (cursorTokenBalance == 0) continue;
 
-            claimable += balance * cursorTokenBalance / veSupply;
+            uint balance = callConfig.votingEscrow.balanceOf(user, iCursor);
+
+            amount += balance * cursorTokenBalance / veSupply;
         }
     }
 
@@ -133,9 +147,6 @@ contract Cugar is Auth, ReentrancyGuard {
         emit Cugar__SetConfig(block.timestamp, callConfig);
     }
 
-    error Cugar__InvalidInputLength();
-    error Cugar__UnauthorizedRevenueSource();
-    error Cugar__ZeroValue();
     error Cugar__BeyondClaimableCursor(uint cursor);
     error Cugar__ZeroVeBias();
     error Cugar__NothingToClaim();

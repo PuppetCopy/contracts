@@ -34,13 +34,13 @@ contract PuppetStore is BankStore {
         return balanceMap[_account][_token];
     }
 
-    function increaseBalance(IERC20 _token, address _from, uint _amount) external isSetter {
-        balanceMap[_from][_token] += _amount;
-        router.transfer(_token, _from, address(this), _amount);
+    function increaseBalance(IERC20 _token, address _user, uint _amount) external isSetter {
+        balanceMap[_user][_token] += _amount;
+        router.transfer(_token, _user, address(this), _amount);
     }
 
-    function decreaseBalance(IERC20 _token, address _from, address _receiver, uint _amount) public isSetter {
-        balanceMap[_from][_token] -= _amount;
+    function decreaseBalance(IERC20 _token, address _user, address _receiver, uint _amount) public isSetter {
+        balanceMap[_user][_token] -= _amount;
         transferOut(_token, _receiver, _amount);
     }
 
@@ -61,7 +61,7 @@ contract PuppetStore is BankStore {
         return _balanceList;
     }
 
-    function increaseBalanceList(IERC20 _token, address _from, address[] calldata _accountList, uint[] calldata _amountList) external isSetter {
+    function increaseBalanceList(IERC20 _token, address _depositor, address[] calldata _accountList, uint[] calldata _amountList) external isSetter {
         uint _accountListLength = _accountList.length;
         uint totalAmountIn;
 
@@ -72,7 +72,7 @@ contract PuppetStore is BankStore {
             totalAmountIn += _amountList[i];
         }
 
-        transferIn(_token, _from, totalAmountIn);
+        transferIn(_token, _depositor, totalAmountIn);
     }
 
     function decreaseBalanceList(IERC20 _token, address _receiver, address[] calldata _accountList, uint[] calldata _amountList) external isSetter {
