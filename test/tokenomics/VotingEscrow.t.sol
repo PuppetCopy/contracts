@@ -190,7 +190,7 @@ contract VotingEscrowTest is BasicSetup {
         vm.startPrank(users.alice);
         _aliceBalanceBefore = puppetToken.balanceOf(users.alice);
         votingEscrow.withdraw(users.alice, users.alice);
-        (uint amount, uint end) = votingEscrow.locked(users.alice);
+        (int128 amount, uint end) = votingEscrow.locked(users.alice);
         assertEq(amount, 0);
         assertEq(end, 0);
         vm.stopPrank();
