@@ -290,7 +290,7 @@ contract VotingEscrow is Auth, EIP712 {
             } else {
                 _dSlope = slopeChanges[_ti];
             }
-            _lastPoint.bias -= _lastPoint.slope * _toI128(_ti - _lastPoint.ts);
+            _lastPoint.bias -= _lastPoint.slope * int128(int(_ti) - int(_lastPoint.ts));
             if (_ti == _time) {
                 break;
             }
