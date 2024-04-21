@@ -8,75 +8,68 @@ import {BankStore} from "./../../utils/BankStore.sol";
 import {Router} from "./../../utils/Router.sol";
 
 contract CugarStore is BankStore {
-    mapping(uint cursorTime => uint) cursorVeSupplyMap;
     mapping(IERC20 => mapping(uint cursorTime => uint)) cursorBalanceMap;
-
-    mapping(IERC20 => mapping(address => uint)) userCommitMap;
+    mapping(IERC20 => mapping(address => uint)) seedContributionMap;
     mapping(IERC20 => mapping(address => uint)) public userTokenCursorMap;
 
     constructor(Authority _authority, Router _router, address _initSetter) BankStore(_authority, _router, _initSetter) {}
 
-    function setCursorVeSupply(uint _cursor, uint _value) external isSetter {
-        cursorVeSupplyMap[_cursor] = _value;
-    }
-
-    function getCursorVeSupply(uint _cursor) external view returns (uint) {
-        return cursorVeSupplyMap[_cursor];
-    }
-
-    function increaseCommitList(
+    function increaseSeedContributionList(
         IERC20 _token, //
         uint _cursor,
         address _depositor,
         address[] calldata _userList,
-        uint[] calldata _amountList
+        uint[] calldata _valueList
     ) external isSetter {
-        uint _amountListLength = _amountList.length;
+        uint _valueListLength = _valueList.length;
         uint _totalAmount = 0;
 
-        if (_amountListLength != _amountList.length) revert CugarStore__InvalidLength();
+        if (_valueListLength != _valueList.length) revert CugarStore__InvalidLength();
 
-        for (uint i = 0; i < _amountListLength; i++) {
-            userCommitMap[_token][_userList[i]] += _amountList[i];
-            _totalAmount += _amountList[i];
+        for (uint i = 0; i < _valueListLength; i++) {
+            seedContributionMap[_token][_userList[i]] += _valueList[i];
+            _totalAmount += _valueList[i];
         }
 
         cursorBalanceMap[_token][_cursor] += _totalAmount;
         transferIn(_token, _depositor, _totalAmount);
     }
 
-    function increaseCommit(IERC20 _token, uint _cursor, address _depositor, address _user, uint _amount) external isSetter {
-        userCommitMap[_token][_user] += _amount;
-        cursorBalanceMap[_token][_cursor] += _amount;
-        transferIn(_token, _depositor, _amount);
+    function increaseSeedContribution(IERC20 _token, uint _cursor, address _depositor, address _user, uint _value) external isSetter {
+        seedContributionMap[_token][_user] += _value;
+        cursorBalanceMap[_token][_cursor] += _value;
+        transferIn(_token, _depositor, _value);
     }
 
-    function decreaseCommit(IERC20 _token, address _user, uint _amount) external isSetter {
-        userCommitMap[_token][_user] -= _amount;
+    function setSeedContribution(IERC20 _token, address _user, uint _value) external isSetter {
+        seedContributionMap[_token][_user] = _value;
     }
 
-    function getCommit(IERC20 _token, address _user) external view returns (uint) {
-        return userCommitMap[_token][_user];
+    function getSeedContribution(IERC20 _token, address _user) external view returns (uint) {
+        return seedContributionMap[_token][_user];
     }
 
     function getCursorBalance(IERC20 _token, uint _cursor) external view returns (uint) {
         return cursorBalanceMap[_token][_cursor];
     }
 
-    function decreaseCursorBalance(IERC20 _token, uint _cursor, address _receiver, uint _amount) external isSetter {
-        cursorBalanceMap[_token][_cursor] -= _amount;
-        transferOut(_token, _receiver, _amount);
+    function decreaseCursorBalance(IERC20 _token, uint _cursor, address _receiver, uint _value) external isSetter {
+        cursorBalanceMap[_token][_cursor] -= _value;
+        transferOut(_token, _receiver, _value);
     }
 
-    function getCommitList(IERC20 _token, address[] calldata _userList) external view returns (uint _totalAmount, uint[] memory _userCommitList) {
+    function getSeedContributionList(
+        IERC20 _token, //
+        address[] calldata _userList
+    ) external view returns (uint _totalAmount, uint[] memory _valueList) {
         uint _userListLength = _userList.length;
 
-        _userCommitList = new uint[](_userListLength);
+        _valueList = new uint[](_userListLength);
         _totalAmount = 0;
 
         for (uint i = 0; i < _userListLength; i++) {
-            _userCommitList[i] = userCommitMap[_token][_userList[i]];
-            _totalAmount += _userCommitList[i];
+            _valueList[i] = seedContributionMap[_token][_userList[i]];
+            _totalAmount += _valueList[i];
         }
     }
 

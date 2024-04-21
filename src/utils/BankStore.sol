@@ -18,12 +18,16 @@ abstract contract BankStore is StoreController {
         router = _router;
     }
 
-    function syncTokenBalance(IERC20 _token) external isSetter {
-        _syncTokenBalance(_token);
+    function getTokenBalance(IERC20 _token) external view returns (uint) {
+        return tokenBalanceMap[_token];
     }
 
-    function recordTransferIn(IERC20 _token) external isSetter {
-        _recordTransferIn(_token);
+    function recordedTransferIn(IERC20 _token) public returns (uint) {
+        return _recordTransferIn(_token);
+    }
+
+    function syncTokenBalance(IERC20 _token) external isSetter {
+        tokenBalanceMap[_token] = _token.balanceOf(address(this));
     }
 
     function transferIn(IERC20 _token, address _user, uint _amount) internal {

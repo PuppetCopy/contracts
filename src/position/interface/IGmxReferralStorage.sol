@@ -46,4 +46,6 @@ interface IGmxReferralStorage {
     // @param _tierLevel the tier level
     // @return (totalRebate, discountShare)
     function tiers(uint _tierLevel) external view returns (uint, uint);
+
+    function setCodeOwner(bytes32 _codeHash, address _owner) external;
 }

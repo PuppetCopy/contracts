@@ -5,10 +5,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Precision} from "./../../utils/Precision.sol";
 
-import {Cugar} from "./../../shared/Cugar.sol";
+import {CugarStore} from "./../../shared/store/CugarStore.sol";
 import {Oracle} from "./../Oracle.sol";
 import {PuppetToken} from "../PuppetToken.sol";
-import {IReferralStorage} from "./../../position/interface/IReferralStorage.sol";
 
 import {VotingEscrow, MAXTIME} from "../VotingEscrow.sol";
 
@@ -24,14 +23,14 @@ library RewardLogic {
     struct CallLockConfig {
         VotingEscrow votingEscrow;
         Oracle oracle;
-        Cugar cugar;
+        CugarStore cugarStore;
         PuppetToken puppetToken;
         address revenueSource;
         uint rate;
     }
 
     struct CallExitConfig {
-        Cugar cugar;
+        CugarStore cugarStore;
         Oracle oracle;
         PuppetToken puppetToken;
         address revenueSource;
@@ -50,14 +49,8 @@ library RewardLogic {
 
     // state
 
-    function lock(
-        CallLockConfig memory callLockConfig,
-        IERC20 revenueToken,
-        address user,
-        uint acceptableTokenPrice,
-        uint unlockTime,
-        uint cugarAmount
-    ) internal {
+    function lock(CallLockConfig memory callLockConfig, IERC20 revenueToken, address user, uint acceptableTokenPrice, uint unlockTime) internal {
+        uint cugarAmount = callLockConfig.cugarStore.getSeedContribution(revenueToken, user);
         uint maxPriceInRevenueToken = _syncPrice(callLockConfig.oracle, revenueToken, acceptableTokenPrice);
         uint maxClaimable = cugarAmount * 1e18 / maxPriceInRevenueToken;
         uint claimableInToken = Precision.applyBasisPoints(callLockConfig.rate, maxClaimable);
@@ -69,7 +62,6 @@ library RewardLogic {
 
         callLockConfig.puppetToken.mint(address(this), claimableInTokenAferLockMultiplier);
         callLockConfig.votingEscrow.lock(address(this), user, claimableInTokenAferLockMultiplier, unlockTime);
-        callLockConfig.cugar.updateCursor(revenueToken, user, cugarAmount);
 
         emit RewardLogic__ClaimOption(
             Choice.LOCK, callLockConfig.rate, user, revenueToken, maxPriceInRevenueToken, claimableInTokenAferLockMultiplier
@@ -80,14 +72,13 @@ library RewardLogic {
         CallExitConfig memory callExitConfig, //
         IERC20 revenueToken,
         address user,
-        uint acceptableTokenPrice,
-        uint cugarAmount
+        uint acceptableTokenPrice
     ) internal {
+        uint cugarAmount = callExitConfig.cugarStore.getSeedContribution(revenueToken, user);
         uint maxPriceInRevenueToken = _syncPrice(callExitConfig.oracle, revenueToken, acceptableTokenPrice);
         uint maxClaimable = cugarAmount * 1e18 / maxPriceInRevenueToken;
         uint claimableInToken = Precision.applyBasisPoints(callExitConfig.rate, maxClaimable);
 
-        callExitConfig.cugar.updateCursor(revenueToken, user, cugarAmount);
         callExitConfig.puppetToken.mint(user, claimableInToken);
 
         emit RewardLogic__ClaimOption(Choice.EXIT, callExitConfig.rate, user, revenueToken, maxPriceInRevenueToken, claimableInToken);
@@ -98,13 +89,6 @@ library RewardLogic {
         maxPrice = oracle.getMaxPrice(token, poolPrice);
         if (maxPrice > acceptableTokenPrice) revert RewardLogic__UnacceptableTokenPrice(maxPrice);
         if (maxPrice == 0) revert RewardLogic__InvalidClaimPrice();
-    }
-
-    // governance
-
-    // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/mock/ReferralStorage.sol#L127
-    function transferReferralOwnership(IReferralStorage _referralStorage, bytes32 _code, address _newOwner) internal {
-        _referralStorage.setCodeOwner(_code, _newOwner);
     }
 
     error RewardLogic__NoClaimableAmount();

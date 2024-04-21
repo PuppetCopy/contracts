@@ -6,11 +6,10 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-import {IReferralStorage} from "./position/interface/IReferralStorage.sol";
-
 import {Router} from "./utils/Router.sol";
 import {Precision} from "./utils/Precision.sol";
 
+import {Cugar} from "./shared/Cugar.sol";
 import {RewardLogic} from "./tokenomics/logic/RewardLogic.sol";
 import {VotingEscrow} from "./tokenomics/VotingEscrow.sol";
 
@@ -24,19 +23,21 @@ contract RewardRouter is Auth, EIP712, ReentrancyGuard {
 
     CallConfig callConfig;
     VotingEscrow votingEscrow;
+    Cugar cugar;
 
-    constructor(Authority _authority, Router _router, VotingEscrow _votingEscrow, CallConfig memory _callConfig)
+    constructor(Authority _authority, Router _router, VotingEscrow _votingEscrow, Cugar _Cugar, CallConfig memory _callConfig)
         Auth(address(0), _authority)
         EIP712("Reward Router", "1")
     {
         votingEscrow = _votingEscrow;
+        cugar = _Cugar;
 
         _setConfig(_callConfig);
         callConfig.lock.puppetToken.approve(address(_router), type(uint).max);
     }
 
-    function lock(IERC20 revenueToken, uint unlockTime, uint acceptableTokenPrice, uint cugarAmount) public nonReentrant {
-        RewardLogic.lock(callConfig.lock, revenueToken, msg.sender, acceptableTokenPrice, unlockTime, cugarAmount);
+    function lock(IERC20 revenueToken, uint unlockTime, uint acceptableTokenPrice) public nonReentrant {
+        RewardLogic.lock(callConfig.lock, revenueToken, msg.sender, acceptableTokenPrice, unlockTime);
     }
 
     function claim(IERC20 revenueToken) external nonReentrant returns (uint) {
@@ -44,11 +45,11 @@ contract RewardRouter is Auth, EIP712, ReentrancyGuard {
     }
 
     function claim(IERC20 revenueToken, address receiver) public nonReentrant returns (uint) {
-        return callConfig.lock.cugar.claim(revenueToken, msg.sender, receiver);
+        return cugar.claim(revenueToken, msg.sender, receiver);
     }
 
-    function exit(IERC20 revenueToken, uint acceptableTokenPrice, uint cugarAmount) public nonReentrant {
-        RewardLogic.exit(callConfig.exit, revenueToken, msg.sender, acceptableTokenPrice, cugarAmount);
+    function exit(IERC20 revenueToken, uint acceptableTokenPrice) public nonReentrant {
+        RewardLogic.exit(callConfig.exit, revenueToken, msg.sender, acceptableTokenPrice);
     }
 
     function veLock(uint _tokenAmount, uint unlockTime) external nonReentrant {
@@ -63,10 +64,6 @@ contract RewardRouter is Auth, EIP712, ReentrancyGuard {
 
     function setConfig(CallConfig memory _callConfig) external requiresAuth {
         _setConfig(_callConfig);
-    }
-
-    function transferReferralOwnership(IReferralStorage _referralStorage, bytes32 _code, address _newOwner) external requiresAuth {
-        RewardLogic.transferReferralOwnership(_referralStorage, _code, _newOwner);
     }
 
     // internal

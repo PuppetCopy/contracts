@@ -33,7 +33,6 @@ library ExecuteDecreasePosition {
 
     struct CallParams {
         PositionStore.MirrorPosition mirrorPosition;
-        IGmxEventUtils.EventLogData eventLogData;
         bytes32 positionKey;
         bytes32 requestKey;
         address positionRouterAddress;
@@ -72,7 +71,6 @@ library ExecuteDecreasePosition {
 
         CallParams memory callParams = CallParams({
             mirrorPosition: mirrorPosition,
-            eventLogData: eventLogData,
             positionKey: positionKey,
             requestKey: key,
             positionRouterAddress: address(callConfig.positionStore),
@@ -96,7 +94,7 @@ library ExecuteDecreasePosition {
         callParams.mirrorPosition.cumulativeTransactionCost += request.transactionCost;
 
         uint[] memory outputAmountList = new uint[](callParams.puppetListLength);
-        uint[] memory commitFeeList = new uint[](callParams.puppetListLength);
+        uint[] memory contributionList = new uint[](callParams.puppetListLength);
 
         uint totalPerformanceFee;
         uint traderPerformanceCutoffFee;
@@ -117,15 +115,15 @@ library ExecuteDecreasePosition {
             totalPerformanceFee += performanceFee;
             traderPerformanceCutoffFee += traderCutoff;
 
-            commitFeeList[i] = performanceFee;
+            contributionList[i] = performanceFee;
             outputAmountList[i] += amountOutAfterFee;
         }
 
         callConfig.puppetStore.increaseBalanceList(callParams.outputToken, address(this), callParams.mirrorPosition.puppetList, outputAmountList);
 
         if (callParams.profit > 0) {
-            callConfig.cugar.commitList(callParams.outputToken, callParams.mirrorPosition.puppetList, commitFeeList);
-            callConfig.cugar.commit(callParams.outputToken, address(this), callParams.mirrorPosition.trader, traderPerformanceCutoffFee);
+            callConfig.cugar.increaseSeedContributionList(callParams.outputToken, callParams.mirrorPosition.puppetList, contributionList);
+            callConfig.cugar.increaseSeedContribution(callParams.outputToken, address(this), callParams.mirrorPosition.trader, traderPerformanceCutoffFee);
         }
 
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
