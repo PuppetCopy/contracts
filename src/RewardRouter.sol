@@ -36,8 +36,12 @@ contract RewardRouter is Auth, EIP712, ReentrancyGuard {
         callConfig.lock.puppetToken.approve(address(_router), type(uint).max);
     }
 
-    function lock(IERC20 revenueToken, uint unlockTime, uint acceptableTokenPrice) public nonReentrant {
-        RewardLogic.lock(callConfig.lock, revenueToken, msg.sender, acceptableTokenPrice, unlockTime);
+    function lock(IERC20 revenueToken, uint unlockTime, uint acceptableTokenPrice, uint cugarAmount) public nonReentrant {
+        RewardLogic.lock(callConfig.lock, revenueToken, msg.sender, acceptableTokenPrice, unlockTime, cugarAmount);
+    }
+
+    function exit(IERC20 revenueToken, uint acceptableTokenPrice, uint cugarAmount) public nonReentrant {
+        RewardLogic.exit(callConfig.exit, revenueToken, msg.sender, acceptableTokenPrice, cugarAmount);
     }
 
     function claim(IERC20 revenueToken) external nonReentrant returns (uint) {
@@ -46,10 +50,6 @@ contract RewardRouter is Auth, EIP712, ReentrancyGuard {
 
     function claim(IERC20 revenueToken, address receiver) public nonReentrant returns (uint) {
         return cugar.claim(revenueToken, msg.sender, receiver);
-    }
-
-    function exit(IERC20 revenueToken, uint acceptableTokenPrice) public nonReentrant {
-        RewardLogic.exit(callConfig.exit, revenueToken, msg.sender, acceptableTokenPrice);
     }
 
     function veLock(uint _tokenAmount, uint unlockTime) external nonReentrant {

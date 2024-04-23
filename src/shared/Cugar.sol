@@ -19,26 +19,39 @@ contract Cugar is Auth, ReentrancyGuard {
     VotingEscrow votingEscrow;
 
     function getClaimableCursor(IERC20 token, address user, uint cursor) public view returns (uint) {
-        uint cursorTokenBalance = store.getCursorBalance(token, cursor);
-
-        if (cursorTokenBalance == 0) return 0;
-
-        uint veSupply = votingEscrow.totalSupply(cursor);
         uint balance = votingEscrow.balanceOf(user, cursor);
+
+        if (balance == 0) return 0;
+
+        (uint veSupply, uint cursorTokenBalance) = store.getCursorVeSupplyAndBalance(token, cursor);
+
+        if (veSupply == 0) return 0;
 
         return balance * cursorTokenBalance / veSupply;
     }
 
     function getClaimable(IERC20 token, address user) public view returns (uint amount) {
-        return getClaimable(token, user, store.getUserTokenCursor(token, user), _getCursor(block.timestamp));
+        uint toCursor = _getCursor(block.timestamp);
+        uint fromCursor = getUserTokenCursor(token, user);
+
+        return getClaimable(token, user, fromCursor, toCursor);
     }
 
     function getClaimable(IERC20 token, address user, uint fromCursor, uint toCursor) public view returns (uint amount) {
-        if (toCursor > fromCursor) return 0;
+        if (fromCursor > toCursor) return 0;
 
         for (uint iCursor = fromCursor; iCursor < toCursor; iCursor += CURSOR_INTERVAL) {
             amount += getClaimableCursor(token, user, iCursor);
         }
+    }
+
+    function getUserTokenCursor(IERC20 token, address user) public view returns (uint) {
+        uint fromCursor = store.getUserTokenCursor(token, user);
+        if (fromCursor == 0) {
+            return _getCursor(votingEscrow.userPointHistoryTs(user, 1));
+        }
+
+        return fromCursor;
     }
 
     constructor(Authority _authority, CugarStore _store, VotingEscrow _votingEscrow) Auth(address(0), _authority) {
@@ -48,31 +61,39 @@ contract Cugar is Auth, ReentrancyGuard {
 
     // integration
 
-    function increaseSeedContribution(IERC20 token, address depositor, address user, uint amountInToken) external requiresAuth {
+    function increaseSeedContribution(IERC20 token, address user, uint amountInToken) external requiresAuth {
         uint cursor = _getCursor(block.timestamp);
-        store.increaseSeedContribution(token, cursor, depositor, user, amountInToken);
+
+        store.increaseUserSeedContribution(token, cursor, msg.sender, user, amountInToken);
+    }
+
+    function contribute(IERC20 token, address user, uint amountInToken) external requiresAuth {
+        store.decreaseUserSeedContribution(token, user, amountInToken);
+
+        uint cursor = _getCursor(block.timestamp);
+        uint veSupply = votingEscrow.totalSupply(cursor);
+        votingEscrow.getLastPointHistory();
+        store.setVeSupply(token, cursor, veSupply);
     }
 
     function increaseSeedContributionList(IERC20 token, address[] calldata userList, uint[] calldata amountList) external requiresAuth {
         uint cursor = _getCursor(block.timestamp);
-        store.increaseSeedContributionList(token, cursor, msg.sender, userList, amountList);
+
+        store.increaseUserSeedContributionList(token, cursor, msg.sender, userList, amountList);
     }
 
     function claim(IERC20 token, address user, address receiver) external requiresAuth returns (uint amount) {
-        uint fromCursor = store.getUserTokenCursor(token, user);
+        uint fromCursor = getUserTokenCursor(token, user);
         uint toCursor = _getCursor(block.timestamp);
 
         amount = getClaimable(token, user, fromCursor, toCursor);
 
         if (amount == 0) revert Cugar__NothingToClaim();
-
-        if (fromCursor == 0) {
-            uint fromCursorIntervals = CURSOR_INTERVAL * 20;
-            uint fromEpoch = fromCursorIntervals > toCursor ? 0 : toCursor - fromCursorIntervals;
-            store.setUserTokenCursor(token, user, fromEpoch);
-        } else if (toCursor > fromCursor) {
+        if (toCursor > fromCursor) {
             store.setUserTokenCursor(token, user, toCursor);
         }
+
+        store.transferOut(token, receiver, amount);
 
         emit Cugar__Claimed(user, receiver, fromCursor, toCursor, amount);
     }
@@ -86,7 +107,7 @@ contract Cugar is Auth, ReentrancyGuard {
     // internal
 
     function _getCursor(uint _time) internal pure returns (uint) {
-        return _time / CURSOR_INTERVAL * CURSOR_INTERVAL;
+        return (_time / CURSOR_INTERVAL) * CURSOR_INTERVAL;
     }
 
     error Cugar__BeyondClaimableCursor(uint cursor);

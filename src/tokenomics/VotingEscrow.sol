@@ -93,17 +93,20 @@ contract VotingEscrow is Auth, EIP712 {
         return userPointHistory[_user][_idx];
     }
 
+    function userPointHistoryTs(address _user, uint _idx) external view returns (uint) {
+        return userPointHistory[_user][_idx].ts;
+    }
+
     function getPointHistory(uint _idx) external view returns (Point memory) {
         return pointHistory[_idx];
+    }
+    function getLastPointHistory() external view returns (Point memory) {
+        return pointHistory[epoch];
     }
 
     function getLastUserSlope(address _user) external view returns (int128) {
         uint _uepoch = userPointEpoch[_user];
         return userPointHistory[_user][_uepoch].slope;
-    }
-
-    function userPointHistoryTs(address _user, uint _idx) external view returns (uint) {
-        return userPointHistory[_user][_idx].ts;
     }
 
     function lockedEnd(address _user) external view returns (uint) {
@@ -189,6 +192,7 @@ contract VotingEscrow is Auth, EIP712 {
         return _supplyAt(_point, _point.ts + _dt);
     }
 
+
     // state
 
     function checkpoint() external returns (Point memory) {
@@ -196,7 +200,7 @@ contract VotingEscrow is Auth, EIP712 {
         return _checkpoint(ZERO_ADDRESS, empty, empty);
     }
 
-    function lock(address _depositor, address _user, uint _value, uint _unlockTime) external requiresAuth {
+    function lock(address _depositor, address _user, uint _value, uint _unlockTime) external requiresAuth returns (Point memory _point) {
         LockedBalance memory _newLock = locked[_user];
 
         if (_value == 0 && _unlockTime == 0 || _newLock.amount == 0 && _value == 0) revert VotingEscrow__InvalidLockValue();
@@ -216,17 +220,17 @@ contract VotingEscrow is Auth, EIP712 {
         }
 
         locked[_user] = _newLock;
-        supply += _value;
-
-        _checkpoint(_user, _oldLock, _newLock);
+        uint _supply = supply + _value;
+        supply = _supply;
+        _point = _checkpoint(_user, _oldLock, _newLock);
 
         if (_value > 0) router.transfer(token, _depositor, address(this), _value);
 
         emit VotingEscrow__Deposit(_depositor, _user, block.timestamp, _value, _unlockTime);
-        emit VotingEscrow__Supply(block.timestamp, supply);
+        emit VotingEscrow__Point(block.timestamp, _supply, _point);
     }
 
-    function withdraw(address _user, address _receiver) external requiresAuth {
+    function withdraw(address _user, address _receiver) external requiresAuth returns (Point memory _point) {
         LockedBalance memory _oldLock = locked[_user];
 
         if (_oldLock.end > block.timestamp) revert VotingEscrow__LockNotExpired();
@@ -234,16 +238,18 @@ contract VotingEscrow is Auth, EIP712 {
 
         LockedBalance memory _newLock = LockedBalance(0, 0);
 
-        uint value = _toUint(_oldLock.amount);
+        uint _value = _toUint(_oldLock.amount);
 
         locked[_user] = _newLock;
-        supply -= value;
 
-        _checkpoint(_user, _oldLock, _newLock);
-        token.transfer(_receiver, value);
+        uint _supply = supply - _value;
+        supply = _supply;
 
-        emit VotingEscrow__Withdraw(_user, _receiver, block.timestamp, value);
-        emit VotingEscrow__Supply(block.timestamp, supply);
+        _point = _checkpoint(_user, _oldLock, _newLock);
+        token.transfer(_receiver, _value);
+
+        emit VotingEscrow__Withdraw(_user, _receiver, block.timestamp, _value);
+        emit VotingEscrow__Point(block.timestamp, _supply, _point);
     }
 
     // internal
@@ -490,7 +496,7 @@ contract VotingEscrow is Auth, EIP712 {
 
     event VotingEscrow__Deposit(address depositor, address user, uint timestamp, uint value, uint locktime);
     event VotingEscrow__Withdraw(address user, address receiver, uint timestamp, uint value);
-    event VotingEscrow__Supply(uint timestamp, uint supply);
+    event VotingEscrow__Point(uint timestamp, uint supply, Point _point);
 
     // ============================================================================================
     // Errors

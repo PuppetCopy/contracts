@@ -30,15 +30,15 @@ abstract contract BankStore is StoreController {
         tokenBalanceMap[_token] = _token.balanceOf(address(this));
     }
 
-    function transferIn(IERC20 _token, address _user, uint _amount) internal {
-        router.transfer(_token, _user, address(this), _amount);
-        tokenBalanceMap[_token] += _amount;
+    function _transferOut(IERC20 _token, address _receiver, uint _value) internal {
+        // router.transfer(_token, address(this), _receiver, _amount);
+        _token.transfer(_receiver, _value);
+        tokenBalanceMap[_token] -= _value;
     }
 
-    function transferOut(IERC20 _token, address _receiver, uint _amount) internal {
-        // router.transfer(_token, address(this), _receiver, _amount);
-        _token.transfer(_receiver, _amount);
-        tokenBalanceMap[_token] -= _amount;
+    function _transferIn(IERC20 _token, address _user, uint _value) internal {
+        router.transfer(_token, _user, address(this), _value);
+        tokenBalanceMap[_token] += _value;
     }
 
     function _recordTransferIn(IERC20 _token) internal returns (uint) {

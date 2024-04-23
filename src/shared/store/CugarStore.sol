@@ -9,12 +9,18 @@ import {Router} from "./../../utils/Router.sol";
 
 contract CugarStore is BankStore {
     mapping(IERC20 => mapping(uint cursorTime => uint)) cursorBalanceMap;
-    mapping(IERC20 => mapping(address => uint)) seedContributionMap;
+    mapping(IERC20 => mapping(uint cursorTime => uint)) cursorVeSupplyMap;
+
+    mapping(IERC20 => mapping(address => uint)) userSeedContributionMap;
     mapping(IERC20 => mapping(address => uint)) public userTokenCursorMap;
 
     constructor(Authority _authority, Router _router, address _initSetter) BankStore(_authority, _router, _initSetter) {}
 
-    function increaseSeedContributionList(
+    function getSeedContribution(IERC20 _token, address _user) external view returns (uint) {
+        return userSeedContributionMap[_token][_user];
+    }
+
+    function increaseUserSeedContributionList(
         IERC20 _token, //
         uint _cursor,
         address _depositor,
@@ -27,35 +33,47 @@ contract CugarStore is BankStore {
         if (_valueListLength != _valueList.length) revert CugarStore__InvalidLength();
 
         for (uint i = 0; i < _valueListLength; i++) {
-            seedContributionMap[_token][_userList[i]] += _valueList[i];
+            userSeedContributionMap[_token][_userList[i]] += _valueList[i];
             _totalAmount += _valueList[i];
         }
 
         cursorBalanceMap[_token][_cursor] += _totalAmount;
-        transferIn(_token, _depositor, _totalAmount);
+        _transferIn(_token, _depositor, _totalAmount);
     }
 
-    function increaseSeedContribution(IERC20 _token, uint _cursor, address _depositor, address _user, uint _value) external isSetter {
-        seedContributionMap[_token][_user] += _value;
+    function increaseUserSeedContribution(IERC20 _token, uint _cursor, address _depositor, address _user, uint _value) external isSetter {
+        userSeedContributionMap[_token][_user] += _value;
         cursorBalanceMap[_token][_cursor] += _value;
-        transferIn(_token, _depositor, _value);
+        _transferIn(_token, _depositor, _value);
     }
 
-    function setSeedContribution(IERC20 _token, address _user, uint _value) external isSetter {
-        seedContributionMap[_token][_user] = _value;
+    function decreaseUserSeedContribution(IERC20 _token, address _user, uint _value) external isSetter {
+        userSeedContributionMap[_token][_user] -= _value;
     }
 
-    function getSeedContribution(IERC20 _token, address _user) external view returns (uint) {
-        return seedContributionMap[_token][_user];
+    function setCursorBalance(IERC20 _token, uint _cursor, uint _value) external isSetter {
+        cursorBalanceMap[_token][_cursor] = _value;
     }
 
     function getCursorBalance(IERC20 _token, uint _cursor) external view returns (uint) {
         return cursorBalanceMap[_token][_cursor];
     }
 
-    function decreaseCursorBalance(IERC20 _token, uint _cursor, address _receiver, uint _value) external isSetter {
-        cursorBalanceMap[_token][_cursor] -= _value;
-        transferOut(_token, _receiver, _value);
+    function getCursorVeSupply(IERC20 _token, uint _cursor) external view returns (uint) {
+        return cursorVeSupplyMap[_token][_cursor];
+    }
+
+    function getCursorVeSupplyAndBalance(IERC20 _token, uint _cursor) external view returns (uint _veSupply, uint _cursorBalance) {
+        _veSupply = cursorVeSupplyMap[_token][_cursor];
+        _cursorBalance = cursorBalanceMap[_token][_cursor];
+    }
+
+    function setVeSupply(IERC20 _token, uint _cursor, uint _value) external isSetter {
+        cursorVeSupplyMap[_token][_cursor] = _value;
+    }
+
+    function transferOut(IERC20 _token, address _receiver, uint _value) external isSetter {
+        _transferOut(_token, _receiver, _value);
     }
 
     function getSeedContributionList(
@@ -68,7 +86,7 @@ contract CugarStore is BankStore {
         _totalAmount = 0;
 
         for (uint i = 0; i < _userListLength; i++) {
-            _valueList[i] = seedContributionMap[_token][_userList[i]];
+            _valueList[i] = userSeedContributionMap[_token][_userList[i]];
             _totalAmount += _valueList[i];
         }
     }

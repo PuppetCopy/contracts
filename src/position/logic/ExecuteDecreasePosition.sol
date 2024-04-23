@@ -123,7 +123,7 @@ library ExecuteDecreasePosition {
 
         if (callParams.profit > 0) {
             callConfig.cugar.increaseSeedContributionList(callParams.outputToken, callParams.mirrorPosition.puppetList, contributionList);
-            callConfig.cugar.increaseSeedContribution(callParams.outputToken, address(this), callParams.mirrorPosition.trader, traderPerformanceCutoffFee);
+            callConfig.cugar.increaseSeedContribution(callParams.outputToken, callParams.mirrorPosition.trader, traderPerformanceCutoffFee);
         }
 
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
