@@ -18,9 +18,10 @@ import {Dictator} from "./../utils/Dictator.sol";
  */
 contract PuppetToken is Auth, ERC20 {
     event PuppetToken__SetConfig(Config config);
-    event PuppetToken__ReleaseCore(address operator, address receiver, uint timestamp, uint amount, uint releasedAmount);
+    event PuppetToken__MintCore(address operator, address receiver, uint timestamp, uint amount, uint share);
 
-    uint private constant CORE_RELEASE_DIVISOR = 31540000; // 1 year
+    uint private constant CORE_SHARE_MULTIPLIER = 0.5e30; // 50%, starting power factor for core minting
+    uint private constant CORE_RELEASE_DURATION_DIVISOR = 31540000; // 1 year
     uint private constant GENESIS_MINT_AMOUNT = 100_000e18;
 
     struct Config {
@@ -30,10 +31,10 @@ contract PuppetToken is Auth, ERC20 {
 
     Config public config;
 
-    uint deployTimestamp = block.timestamp; // used to calculate the deminishing mint rate for core minting
-    uint mintWindowCount = 0; // Current mint count for the rate limit window
+    uint windowCount = 0; // Current mint count for the rate limit window
     uint epoch = 0; // Current epoch for rate limit calculation
 
+    uint public deployTimestamp = block.timestamp; // used to calculate the deminishing mint rate for core minting
     uint public mineMintCount = 0; // the amount of tokens minted through protocol use
     uint public coreMintCount = 0; // the  amount of tokens released to the core
 
@@ -47,7 +48,13 @@ contract PuppetToken is Auth, ERC20 {
     }
 
     function getMarginAmount() public view returns (uint) {
-        return getLimitAmount() - mintWindowCount;
+        return getLimitAmount() - windowCount;
+    }
+
+    function getCoreShare() public view returns (uint) {
+        uint _timeElapsed = block.timestamp - deployTimestamp;
+        uint _diminishFactor = Precision.toFactor(CORE_RELEASE_DURATION_DIVISOR + _timeElapsed, CORE_RELEASE_DURATION_DIVISOR);
+        return Precision.toFactor(CORE_SHARE_MULTIPLIER, _diminishFactor);
     }
 
     /**
@@ -57,21 +64,21 @@ contract PuppetToken is Auth, ERC20 {
      * @return The amount of tokens minted.
      */
     function mint(address _receiver, uint _amount) external requiresAuth returns (uint) {
-        uint nextEpoch = block.timestamp / config.durationWindow;
+        uint _nextEpoch = block.timestamp / config.durationWindow;
 
         // Reset mint count and update epoch at the start of a new window
-        if (nextEpoch > epoch) {
-            mintWindowCount = 0;
-            epoch = nextEpoch;
+        if (_nextEpoch > epoch) {
+            windowCount = 0;
+            epoch = _nextEpoch;
         }
 
         // Add the requested mint amount to the window's mint count
-        mintWindowCount += _amount;
+        windowCount += _amount;
         mineMintCount += _amount;
 
         // Enforce the mint rate limit based on total emitted tokens
-        if (mintWindowCount > getLimitAmount()) {
-            revert PuppetToken__ExceededRateLimit(config, getLimitAmount());
+        if (windowCount > getLimitAmount()) {
+            revert PuppetToken__ExceededRateLimit(getLimitAmount() - (windowCount - _amount));
         }
 
         _mint(_receiver, _amount);
@@ -84,18 +91,17 @@ contract PuppetToken is Auth, ERC20 {
      * @return The amount of tokens minted.
      */
     function mintCore(address _receiver) external requiresAuth returns (uint) {
-        uint timeElapsed = block.timestamp - deployTimestamp;
-        uint releaseFactor = Precision.toFactor(timeElapsed - CORE_RELEASE_DIVISOR, CORE_RELEASE_DIVISOR);
-        uint maxMintableAmount = Precision.applyFactor(releaseFactor, mineMintCount);
-        uint mintableAmount = maxMintableAmount - coreMintCount;
+        uint _mintShare = getCoreShare();
+        uint _maxMintable = mineMintCount * _mintShare / Precision.FLOAT_PRECISION;
+        uint _mintable = _maxMintable - coreMintCount;
 
-        _mint(_receiver, mintableAmount);
+        _mint(_receiver, _mintable);
 
-        coreMintCount += mintableAmount;
+        coreMintCount += _mintable;
 
-        emit PuppetToken__ReleaseCore(msg.sender, _receiver, block.timestamp, mintableAmount, coreMintCount);
+        emit PuppetToken__MintCore(msg.sender, _receiver, block.timestamp, _mintable, _mintShare);
 
-        return mintableAmount;
+        return _mintable;
     }
 
     /**
@@ -110,11 +116,11 @@ contract PuppetToken is Auth, ERC20 {
         if (_config.limitFactor == 0) revert PuppetToken__InvalidRate();
 
         config = _config;
-        mintWindowCount = 0; // Reset the mint count window on rate limit change
+        windowCount = 0; // Reset the mint count window on rate limit change
 
         emit PuppetToken__SetConfig(_config);
     }
 
     error PuppetToken__InvalidRate();
-    error PuppetToken__ExceededRateLimit(Config config, uint maxMintAmount);
+    error PuppetToken__ExceededRateLimit(uint maxMintableAmount);
 }
