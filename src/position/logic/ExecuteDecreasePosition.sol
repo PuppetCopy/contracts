@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IGmxEventUtils} from "./../interface/IGmxEventUtils.sol";
 
-import {Router} from "src/utils/Router.sol";
+import {Router} from "src/shared/Router.sol";
 import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
 import {Precision} from "./../../utils/Precision.sol";
 
@@ -14,6 +14,7 @@ import {PuppetStore} from "../store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
 
 import {Cugar} from "./../../shared/Cugar.sol";
+import {CugarStore} from "./../../shared/store/CugarStore.sol";
 
 library ExecuteDecreasePosition {
     event ExecuteDecreasePosition__DecreasePosition(
@@ -25,6 +26,7 @@ library ExecuteDecreasePosition {
         PositionStore positionStore;
         PuppetStore puppetStore;
         Cugar cugar;
+        CugarStore cugarStore;
         address gmxOrderReciever;
         uint tokenTransferGasLimit;
         uint performanceFeeRate;
@@ -122,8 +124,12 @@ library ExecuteDecreasePosition {
         callConfig.puppetStore.increaseBalanceList(callParams.outputToken, address(this), callParams.mirrorPosition.puppetList, outputAmountList);
 
         if (callParams.profit > 0) {
-            callConfig.cugar.increaseSeedContributionList(callParams.outputToken, callParams.mirrorPosition.puppetList, contributionList);
-            callConfig.cugar.increaseSeedContribution(callParams.outputToken, callParams.mirrorPosition.trader, traderPerformanceCutoffFee);
+            callConfig.cugar.increaseSeedContributionList(
+                callConfig.cugarStore, callParams.outputToken, callParams.mirrorPosition.puppetList, contributionList
+            );
+            callConfig.cugar.increaseSeedContribution(
+                callConfig.cugarStore, callParams.outputToken, callParams.mirrorPosition.trader, traderPerformanceCutoffFee
+            );
         }
 
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91

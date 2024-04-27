@@ -6,7 +6,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Precision} from "./../utils/Precision.sol";
-import {Dictator} from "./../utils/Dictator.sol";
+import {Dictator} from "./../shared/Dictator.sol";
 
 /**
  * @title PuppetToken
@@ -20,7 +20,6 @@ contract PuppetToken is Auth, ERC20 {
     event PuppetToken__SetConfig(Config config);
     event PuppetToken__MintCore(address operator, address receiver, uint timestamp, uint amount, uint share);
 
-    uint private constant CORE_SHARE_MULTIPLIER = 0.5e30; // 50%, starting power factor for core minting
     uint private constant CORE_RELEASE_DURATION_DIVISOR = 31540000; // 1 year
     uint private constant GENESIS_MINT_AMOUNT = 100_000e18;
 
@@ -54,7 +53,7 @@ contract PuppetToken is Auth, ERC20 {
     function getCoreShare() public view returns (uint) {
         uint _timeElapsed = block.timestamp - deployTimestamp;
         uint _diminishFactor = Precision.toFactor(CORE_RELEASE_DURATION_DIVISOR + _timeElapsed, CORE_RELEASE_DURATION_DIVISOR);
-        return Precision.toFactor(CORE_SHARE_MULTIPLIER, _diminishFactor);
+        return Precision.toFactor(Precision.FLOAT_PRECISION, _diminishFactor);
     }
 
     /**
@@ -95,9 +94,9 @@ contract PuppetToken is Auth, ERC20 {
         uint _maxMintable = mineMintCount * _mintShare / Precision.FLOAT_PRECISION;
         uint _mintable = _maxMintable - coreMintCount;
 
-        _mint(_receiver, _mintable);
-
         coreMintCount += _mintable;
+
+        _mint(_receiver, _mintable);
 
         emit PuppetToken__MintCore(msg.sender, _receiver, block.timestamp, _mintable, _mintShare);
 

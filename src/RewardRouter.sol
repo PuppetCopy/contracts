@@ -6,10 +6,12 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-import {Router} from "./utils/Router.sol";
+import {Router} from "./shared/Router.sol";
 import {Precision} from "./utils/Precision.sol";
 
 import {Cugar} from "./shared/Cugar.sol";
+import {CugarStore} from "./shared/store/CugarStore.sol";
+
 import {RewardLogic} from "./tokenomics/logic/RewardLogic.sol";
 import {VotingEscrow} from "./tokenomics/VotingEscrow.sol";
 
@@ -36,20 +38,22 @@ contract RewardRouter is Auth, EIP712, ReentrancyGuard {
         callConfig.lock.puppetToken.approve(address(_router), type(uint).max);
     }
 
-    function lock(IERC20 revenueToken, uint unlockTime, uint acceptableTokenPrice, uint cugarAmount) public nonReentrant {
-        RewardLogic.lock(callConfig.lock, revenueToken, msg.sender, acceptableTokenPrice, unlockTime, cugarAmount);
+    function lock(
+        CugarStore cugarStore, //
+        IERC20 revenueToken,
+        uint unlockTime,
+        uint acceptableTokenPrice,
+        uint cugarAmount
+    ) public nonReentrant returns (uint) {
+        return RewardLogic.lock(callConfig.lock, cugarStore, revenueToken, msg.sender, acceptableTokenPrice, unlockTime, cugarAmount);
     }
 
-    function exit(IERC20 revenueToken, uint acceptableTokenPrice, uint cugarAmount) public nonReentrant {
-        RewardLogic.exit(callConfig.exit, revenueToken, msg.sender, acceptableTokenPrice, cugarAmount);
+    function exit(CugarStore cugarStore, IERC20 revenueToken, uint acceptableTokenPrice, uint cugarAmount) public nonReentrant returns (uint) {
+        return RewardLogic.exit(callConfig.exit, cugarStore, revenueToken, msg.sender, acceptableTokenPrice, cugarAmount);
     }
 
-    function claim(IERC20 revenueToken) external nonReentrant returns (uint) {
-        return claim(revenueToken, msg.sender);
-    }
-
-    function claim(IERC20 revenueToken, address receiver) public nonReentrant returns (uint) {
-        return cugar.claim(revenueToken, msg.sender, receiver);
+    function claim(CugarStore cugarStore, IERC20 revenueToken, address receiver) public nonReentrant returns (uint) {
+        return cugar.claim(cugarStore, revenueToken, msg.sender, receiver);
     }
 
     function veLock(uint _tokenAmount, uint unlockTime) external nonReentrant {

@@ -4,17 +4,15 @@ pragma solidity 0.8.24;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
-import {StoreController} from "./../../utils/StoreController.sol";
+import {StoreController} from "./StoreController.sol";
 import {Subaccount} from "../Subaccount.sol";
 
 contract SubaccountStore is StoreController {
     mapping(address => Subaccount) public subaccountMap;
 
-    address public logicOperator;
+    address public operator;
 
-    constructor(Authority _authority, address _logicOperator, address _initSetter) StoreController(_authority, _initSetter) {
-        logicOperator = _logicOperator;
-    }
+    constructor(Authority _authority, address _setter) StoreController(_authority, _setter) {}
 
     function getSubaccount(address _address) external view returns (Subaccount) {
         return subaccountMap[_address];
@@ -28,7 +26,7 @@ contract SubaccountStore is StoreController {
         delete subaccountMap[_address];
     }
 
-    function setLogicOperator(address _address) external isSetter {
-        logicOperator = _address;
+    function setOperator(address _address) external isSetter {
+        operator = _address;
     }
 }

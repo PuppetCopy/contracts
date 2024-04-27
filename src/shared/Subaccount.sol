@@ -12,12 +12,12 @@ contract Subaccount {
         account = _account;
     }
 
-    modifier onlyLogicOperator() {
-        if (msg.sender != store.logicOperator()) revert Subaccount__NotCallbackCaller();
+    modifier onlyOperator() {
+        if (msg.sender != store.operator()) revert Subaccount__NotCallbackCaller();
         _;
     }
 
-    function execute(address _contract, bytes calldata _data) external payable onlyLogicOperator returns (bool _success, bytes memory _returnData) {
+    function execute(address _contract, bytes calldata _data) external payable onlyOperator returns (bool _success, bytes memory _returnData) {
         return _contract.call{value: msg.value, gas: gasleft()}(_data);
     }
 

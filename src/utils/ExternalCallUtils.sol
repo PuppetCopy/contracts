@@ -2,8 +2,8 @@
 pragma solidity 0.8.24;
 
 /**
- * @title TokenUtils
- * @dev Library for token functions, helps with transferring of tokens and
+ * @title ExternalCallUtils
+ * @dev Various utility functions for external calls, including checks for contract existence and call success
  * native token functions
  */
 library ExternalCallUtils {

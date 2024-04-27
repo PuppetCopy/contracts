@@ -61,11 +61,11 @@ contract PositionRouter is Auth, EIP712, ReentrancyGuard, IGmxOrderCallbackRecei
         }
     }
 
-    function afterOrderCancellation(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData)
-        external
-        nonReentrant
-        requiresAuth
-    {
+    function afterOrderCancellation(
+        bytes32 key, //
+        GmxPositionUtils.Props calldata order,
+        bytes calldata eventData
+    ) external nonReentrant requiresAuth {
         try ExecuteRejectedAdjustment.handleCancelled(key, order) {}
         catch {
             storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.Cancelled, order, key, eventData);
@@ -79,11 +79,10 @@ contract PositionRouter is Auth, EIP712, ReentrancyGuard, IGmxOrderCallbackRecei
         }
     }
 
-    function proxyRequestIncrease(PositionUtils.TraderCallParams calldata traderCallParams, address[] calldata puppetList)
-        external
-        payable
-        requiresAuth
-    {
+    function proxyRequestIncrease(
+        PositionUtils.TraderCallParams calldata traderCallParams, //
+        address[] calldata puppetList
+    ) external payable requiresAuth {
         RequestIncreasePosition.proxyIncrease(callConfig.increase, traderCallParams, puppetList);
     }
 

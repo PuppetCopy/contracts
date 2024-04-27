@@ -2,10 +2,12 @@
 pragma solidity 0.8.24;
 
 import {VotingEscrow} from "src/tokenomics/VotingEscrow.sol";
-import {Dictator} from "src/utils/Dictator.sol";
-import {Router} from "src/utils/Router.sol";
+import {Dictator} from "src/shared/Dictator.sol";
+import {Router} from "src/shared/Router.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
+
+import {Role} from "script/Const.sol";
 
 contract VotingEscrowTest is BasicSetup {
     uint private constant MAXTIME = 2 * 365 * 86400; // 4 years
@@ -15,7 +17,7 @@ contract VotingEscrowTest is BasicSetup {
     function setUp() public override {
         BasicSetup.setUp();
 
-        dictator.setUserRole(users.owner, MINT_PUPPET_ROLE, true);
+        dictator.setUserRole(users.owner, Role.MINT_PUPPET, true);
 
         votingEscrow = new VotingEscrow(dictator, router, puppetToken);
 

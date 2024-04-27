@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
-import {StoreController} from "../../utils/StoreController.sol";
+import {StoreController} from "../../shared/store/StoreController.sol";
 
 uint8 constant SLOT_COUNT = 7;
 

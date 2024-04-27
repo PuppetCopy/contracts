@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Router} from "./Router.sol";
+import {Router} from "../Router.sol";
 import {StoreController} from "./StoreController.sol";
 
 // @title Bank
@@ -31,7 +31,6 @@ abstract contract BankStore is StoreController {
     }
 
     function _transferOut(IERC20 _token, address _receiver, uint _value) internal {
-        // router.transfer(_token, address(this), _receiver, _amount);
         _token.transfer(_receiver, _value);
         tokenBalanceMap[_token] -= _value;
     }

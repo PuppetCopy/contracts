@@ -7,7 +7,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-import {Router} from "../utils/Router.sol";
+import {Router} from "../shared/Router.sol";
 
 uint constant MAXTIME = 2 * 365 * 86400; // 2 years
 

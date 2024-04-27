@@ -4,8 +4,8 @@ pragma solidity 0.8.24;
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Router} from "./../../utils/Router.sol";
-import {BankStore} from "./../../utils/BankStore.sol";
+import {Router} from "./../../shared/Router.sol";
+import {BankStore} from "./../../shared/store/BankStore.sol";
 import {PositionUtils} from "./../util/PositionUtils.sol";
 
 contract PuppetStore is BankStore {
@@ -26,30 +26,12 @@ contract PuppetStore is BankStore {
         return tokenAllowanceCapMap[_token];
     }
 
-    function setTokenAllowanceCap(IERC20 _token, uint _amount) external isSetter {
-        tokenAllowanceCapMap[_token] = _amount;
+    function setTokenAllowanceCap(IERC20 _token, uint _value) external isSetter {
+        tokenAllowanceCapMap[_token] = _value;
     }
 
     function getBalance(IERC20 _token, address _account) external view returns (uint) {
         return balanceMap[_account][_token];
-    }
-
-    function increaseBalance(IERC20 _token, address _user, uint _amount) external isSetter {
-        balanceMap[_user][_token] += _amount;
-        router.transfer(_token, _user, address(this), _amount);
-    }
-
-    function decreaseBalance(IERC20 _token, address _user, address _receiver, uint _amount) public isSetter {
-        balanceMap[_user][_token] -= _amount;
-        _transferOut(_token, _receiver, _amount);
-    }
-
-    function getRule(bytes32 _key) external view returns (Rule memory) {
-        return ruleMap[_key];
-    }
-
-    function setRule(bytes32 _key, Rule calldata _rule) external isSetter {
-        ruleMap[_key] = _rule;
     }
 
     function getBalanceList(IERC20 _token, address[] calldata _accountList) external view returns (uint[] memory) {
@@ -61,29 +43,48 @@ contract PuppetStore is BankStore {
         return _balanceList;
     }
 
-    function increaseBalanceList(IERC20 _token, address _depositor, address[] calldata _accountList, uint[] calldata _amountList) external isSetter {
+    function increaseBalance(IERC20 _token, address _user, uint _value) external isSetter {
+        balanceMap[_user][_token] += _value;
+
+        _transferIn(_token, _user, _value);
+    }
+
+    function increaseBalanceList(IERC20 _token, address _depositor, address[] calldata _accountList, uint[] calldata _valueList) external isSetter {
         uint _accountListLength = _accountList.length;
         uint totalAmountIn;
 
-        if (_accountListLength != _amountList.length) revert PuppetStore__InvalidLength();
+        if (_accountListLength != _valueList.length) revert PuppetStore__InvalidLength();
 
         for (uint i = 0; i < _accountListLength; i++) {
-            balanceMap[_accountList[i]][_token] += _amountList[i];
-            totalAmountIn += _amountList[i];
+            balanceMap[_accountList[i]][_token] += _valueList[i];
+            totalAmountIn += _valueList[i];
         }
 
         _transferIn(_token, _depositor, totalAmountIn);
     }
 
-    function decreaseBalanceList(IERC20 _token, address _receiver, address[] calldata _accountList, uint[] calldata _amountList) external isSetter {
+    function decreaseBalance(IERC20 _token, address _user, address _receiver, uint _value) public isSetter {
+        balanceMap[_user][_token] -= _value;
+        _transferOut(_token, _receiver, _value);
+    }
+
+    function getRule(bytes32 _key) external view returns (Rule memory) {
+        return ruleMap[_key];
+    }
+
+    function setRule(bytes32 _key, Rule calldata _rule) external isSetter {
+        ruleMap[_key] = _rule;
+    }
+
+    function decreaseBalanceList(IERC20 _token, address _receiver, address[] calldata _accountList, uint[] calldata _valueList) external isSetter {
         uint _accountListLength = _accountList.length;
         uint totalAmountOut;
 
-        if (_accountListLength != _amountList.length) revert PuppetStore__InvalidLength();
+        if (_accountListLength != _valueList.length) revert PuppetStore__InvalidLength();
 
         for (uint i = 0; i < _accountListLength; i++) {
-            balanceMap[_accountList[i]][_token] -= _amountList[i];
-            totalAmountOut -= _amountList[i];
+            balanceMap[_accountList[i]][_token] -= _valueList[i];
+            totalAmountOut -= _valueList[i];
         }
 
         _transferOut(_token, _receiver, totalAmountOut);
@@ -139,40 +140,44 @@ contract PuppetStore is BankStore {
     function getBalanceAndActivityList(IERC20 collateralToken, address trader, address[] calldata _puppetList)
         external
         view
-        returns (Rule[] memory _ruleList, uint[] memory _fundingActivityList, uint[] memory _balanceList)
+        returns (Rule[] memory _ruleList, uint[] memory _fundingActivityList, uint[] memory _valueList)
     {
         uint _puppetListLength = _puppetList.length;
 
         _ruleList = new Rule[](_puppetListLength);
         _fundingActivityList = new uint[](_puppetListLength);
-        _balanceList = new uint[](_puppetListLength);
+        _valueList = new uint[](_puppetListLength);
 
         for (uint i = 0; i < _puppetListLength; i++) {
             _ruleList[i] = ruleMap[PositionUtils.getRuleKey(collateralToken, _puppetList[i], trader)];
             _fundingActivityList[i] = fundingActivityMap[_puppetList[i]][trader];
-            _balanceList[i] = balanceMap[_puppetList[i]][collateralToken];
+            _valueList[i] = balanceMap[_puppetList[i]][collateralToken];
         }
-        return (_ruleList, _fundingActivityList, _balanceList);
+        return (_ruleList, _fundingActivityList, _valueList);
     }
 
     function decreaseBalanceAndSetActivityList(
         IERC20 _token,
         address _receiver,
         address _trader,
+        uint _activityTime,
         address[] calldata _puppetList,
-        uint[] calldata _activityList,
-        uint[] calldata _balanceList
+        uint[] calldata _valueList
     ) external isSetter {
         uint _puppetListLength = _puppetList.length;
         uint totalAmountOut;
 
-        if (_puppetListLength != _activityList.length || _puppetListLength != _balanceList.length) revert PuppetStore__InvalidLength();
+        if (_puppetListLength != _valueList.length) revert PuppetStore__InvalidLength();
 
         for (uint i = 0; i < _puppetListLength; i++) {
-            address puppet = _puppetList[i];
-            fundingActivityMap[puppet][_trader] = _activityList[i];
-            balanceMap[puppet][_token] += _balanceList[i];
-            totalAmountOut += _balanceList[i];
+            uint _amount = _valueList[i];
+
+            if (_amount == 0) continue;
+
+            address _puppet = _puppetList[i];
+            fundingActivityMap[_puppet][_trader] = _activityTime;
+            balanceMap[_puppet][_token] -= _amount;
+            totalAmountOut += _amount;
         }
 
         _transferOut(_token, _receiver, totalAmountOut);

@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SubaccountFactory} from "./../../shared/SubaccountFactory.sol";
 import {SubaccountStore} from "./../../shared/store/SubaccountStore.sol";
 
-import {Router} from "./../../utils/Router.sol";
+import {Router} from "./../../shared/Router.sol";
 import {PositionUtils} from "../util/PositionUtils.sol";
 import {PuppetStore} from "../store/PuppetStore.sol";
 

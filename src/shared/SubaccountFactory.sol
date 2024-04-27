@@ -21,5 +21,9 @@ contract SubaccountFactory is Auth, ReentrancyGuard {
         emit PositionLogic__CreateSubaccount(user, address(subaccount));
     }
 
+    function setOperator(SubaccountStore store, address operator) external requiresAuth {
+        store.setOperator(operator);
+    }
+
     error SubaccountFactory__AlreadyExists();
 }

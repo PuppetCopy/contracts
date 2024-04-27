@@ -4,8 +4,8 @@ pragma solidity 0.8.24;
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {BankStore} from "./../../utils/BankStore.sol";
-import {Router} from "./../../utils/Router.sol";
+import {BankStore} from "./../../shared/store/BankStore.sol";
+import {Router} from "./../../shared/Router.sol";
 
 contract CugarStore is BankStore {
     mapping(IERC20 => mapping(uint cursorTime => uint)) cursorBalanceMap;

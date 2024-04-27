@@ -11,8 +11,8 @@ import {IBasePool} from "@balancer-labs/v2-interfaces/vault/IBasePool.sol";
 
 import {PositionStore} from "./../src/position/store/PositionStore.sol";
 
-import {Dictator} from "src/utils/Dictator.sol";
-import {Router} from "src/utils/Router.sol";
+import {Dictator} from "src/shared/Dictator.sol";
+import {Router} from "src/shared/Router.sol";
 import {IWNT} from "./../src/utils/interfaces/IWNT.sol";
 
 import {Oracle} from "./../src/tokenomics/Oracle.sol";
@@ -23,41 +23,32 @@ import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {VotingEscrow} from "src/tokenomics/VotingEscrow.sol";
 // import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
 
-import {Const} from "script/Const.s.sol";
+import {Address} from "script/Const.sol";
 
-contract DeployTokenomics is PRBTest {
-    uint8 constant TOKEN_ROUTER_ROLE = 0;
-    uint8 constant PUPPET_MINTER = 1;
-    uint8 constant ORACLE_LOGIC_ROLE = 2;
-    uint8 constant REWARD_LOGIC_ROLE = 3;
-    uint8 constant ROUTER_ROLE = 4;
-    uint8 constant REWARD_DISTRIBUTOR_ROLE = 5;
+contract DeployRewardRouter is PRBTest {
+    uint8 constant ADMIN_ROLE = 0;
+    uint8 constant TRANSFER_TOKEN_ROLE = 1;
+    uint8 constant MINT_PUPPET_ROLE = 2;
+    uint8 constant MINT_CORE_RELEASE_ROLE = 3;
 
     function run() public {
         vm.startBroadcast(vm.envUint("GBC_DEPLOYER_PRIVATE_KEY"));
-        _deployContracts();
+        deployContracts();
         vm.stopBroadcast();
     }
 
-    function _deployContracts() internal {
-        // PositionStore datastore = PositionStore(DeployerEnv.datastore);
+    function deployContracts() internal {
+        PositionStore datastore = PositionStore(Address.datastore);
+        Dictator dictator = Dictator(Address.Dictator);
+        PuppetToken puppetToken = PuppetToken(Address.PuppetToken);
+        Router router = Router(Address.Router);
 
-        // Dictator dictator = Dictator(DeployerEnv.Dictator);
-        // PuppetToken puppetToken = PuppetToken(DeployerEnv.PuppetToken);
-        // OracleLogic oracleLogic = OracleLogic(DeployerEnv.OracleLogic);
-        // Router router = Router(DeployerEnv.Router);
-        // OracleStore priceStore = OracleStore(DeployerEnv.OracleStore);
-        // RewardLogic rewardLogic = RewardLogic(DeployerEnv.RewardLogic);
-        // VotingEscrow votingEscrow = VotingEscrow(DeployerEnv.VotingEscrow);
-        // VeRevenueDistributor revenueDistributor = VeRevenueDistributor(DeployerEnv.VeRevenueDistributor);
-        // RewardRouter rewardRouter = RewardRouter(DeployerEnv.RewardRouter);
-
-        // Dictator dictator = new Dictator(DeployerEnv.governance);
-        // PuppetToken puppetToken = new PuppetToken(dictator, dictator.owner());
-        // dictator.setRoleCapability(PUPPET_MINTER, address(puppetToken), puppetToken.mint.selector, true);
-
-        // Router router = new Router(dictator);
-        // dictator.setRoleCapability(TOKEN_ROUTER_ROLE, address(router), router.pluginTransfer.selector, true);
+        // OracleLogic oracleLogic = OracleLogic(Address.OracleLogic);
+        // OracleStore priceStore = OracleStore(Address.OracleStore);
+        // RewardLogic rewardLogic = RewardLogic(Address.RewardLogic);
+        // VotingEscrow votingEscrow = VotingEscrow(Address.VotingEscrow);
+        // VeRevenueDistributor revenueDistributor = VeRevenueDistributor(Address.VeRevenueDistributor);
+        // RewardRouter rewardRouter = RewardRouter(Address.RewardRouter);
 
         // OracleLogic oracleLogic = new OracleLogic(dictator);
         // dictator.setRoleCapability(ORACLE_LOGIC_ROLE, address(oracleLogic), oracleLogic.syncTokenPrice.selector, true);
@@ -71,7 +62,7 @@ contract DeployTokenomics is PRBTest {
         // wntUsdPoolList[2] = IUniswapV3Pool(0x641C00A822e8b671738d32a431a4Fb6074E5c79d); //
         // https://arbiscan.io/address/0x641c00a822e8b671738d32a431a4fb6074e5c79d
 
-        // IBasePoolErc20 lpPool = IBasePoolErc20(DeployerEnv.BasePool);
+        // IBasePoolErc20 lpPool = IBasePoolErc20(Address.BasePool);
         // IVault vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
 
         // oracleLogic.getMedianWntPriceInUsd(wntUsdPoolList, 20);
@@ -97,7 +88,6 @@ contract DeployTokenomics is PRBTest {
         // VeRevenueDistributor revenueDistributor = new VeRevenueDistributor(dictator, votingEscrow, router, block.timestamp + 1 weeks);
         // dictator.setUserRole(address(revenueDistributor), TRANSFER_TOKEN, true);
         // dictator.setRoleCapability(REWARD_LOGIC_ROLE, address(revenueDistributor), revenueDistributor.claim.selector, true);
-        // dictator.setRoleCapability(REWARD_DISTRIBUTOR_ROLE, address(revenueDistributor), revenueDistributor.depositToken.selector, true);
 
         // RewardRouter rewardRouter = new RewardRouter(
         //     RewardRouter.RewardRouterParams({
@@ -107,7 +97,7 @@ contract DeployTokenomics is PRBTest {
         //         router: router,
         //         priceStore: priceStore,
         //         votingEscrow: votingEscrow,
-        //         wnt: WNT(DeployerEnv.wnt)
+        //         wnt: WNT(Address.wnt)
         //     }),
         //     RewardRouter.RewardRouterConfigParams({
         //         revenueDistributor: revenueDistributor,
@@ -117,7 +107,7 @@ contract DeployTokenomics is PRBTest {
         //         rewardLogic: rewardLogic,
         //         oracleLogic: oracleLogic,
         //         dao: dictator.owner(),
-        //         revenueInToken: IERC20(DeployerEnv.usdc),
+        //         revenueInToken: IERC20(Address.usdc),
         //         poolId: lpPool.getPoolId(),
         //         lockRate: 6000,
         //         exitRate: 3000,
@@ -127,6 +117,6 @@ contract DeployTokenomics is PRBTest {
         // );
         // dictator.setUserRole(address(rewardRouter), ROUTER_ROLE, true);
 
-        // datastore.updateOwnership(DeployerEnv.governance, true);
+        // datastore.updateOwnership(Address.governance, true);
     }
 }

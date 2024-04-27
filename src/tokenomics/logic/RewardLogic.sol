@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Precision} from "./../../utils/Precision.sol";
 
+import {CugarStore} from "./../../shared/store/CugarStore.sol";
 import {Cugar} from "./../../shared/Cugar.sol";
 import {Oracle} from "./../Oracle.sol";
 import {PuppetToken} from "../PuppetToken.sol";
@@ -51,12 +52,13 @@ library RewardLogic {
 
     function lock(
         CallLockConfig memory callLockConfig,
+        CugarStore cugarStore,
         IERC20 revenueToken,
         address user,
         uint acceptableTokenPrice,
         uint unlockTime,
         uint cugarAmount
-    ) internal {
+    ) internal returns (uint) {
         uint maxPriceInRevenueToken = _syncPrice(callLockConfig.oracle, revenueToken, acceptableTokenPrice);
         uint maxClaimable = cugarAmount * 1e18 / maxPriceInRevenueToken;
         uint claimableInToken = Precision.applyBasisPoints(callLockConfig.rate, maxClaimable);
@@ -68,21 +70,24 @@ library RewardLogic {
 
         callLockConfig.puppetToken.mint(address(this), claimableInTokenAferLockMultiplier);
         callLockConfig.votingEscrow.lock(address(this), user, claimableInTokenAferLockMultiplier, unlockTime);
-        callLockConfig.cugar.contribute(revenueToken, user, cugarAmount);
+        callLockConfig.cugar.contribute(cugarStore, revenueToken, user, cugarAmount);
 
         emit RewardLogic__ClaimOption(
             Choice.LOCK, callLockConfig.rate, user, revenueToken, maxPriceInRevenueToken, claimableInTokenAferLockMultiplier
         );
+
+        return claimableInTokenAferLockMultiplier;
     }
 
     function exit(
         CallExitConfig memory callExitConfig, //
+        CugarStore cugarStore,
         IERC20 revenueToken,
         address user,
         uint acceptableTokenPrice,
         uint cugarAmount
-    ) internal {
-        callExitConfig.cugar.contribute(revenueToken, user, cugarAmount);
+    ) internal returns (uint) {
+        callExitConfig.cugar.contribute(cugarStore, revenueToken, user, cugarAmount);
         uint maxPriceInRevenueToken = _syncPrice(callExitConfig.oracle, revenueToken, acceptableTokenPrice);
         uint maxClaimable = cugarAmount * 1e18 / maxPriceInRevenueToken;
         uint claimableInToken = Precision.applyBasisPoints(callExitConfig.rate, maxClaimable);
@@ -90,6 +95,8 @@ library RewardLogic {
         callExitConfig.puppetToken.mint(user, claimableInToken);
 
         emit RewardLogic__ClaimOption(Choice.EXIT, callExitConfig.rate, user, revenueToken, maxPriceInRevenueToken, claimableInToken);
+
+        return claimableInToken;
     }
 
     function _syncPrice(Oracle oracle, IERC20 token, uint acceptableTokenPrice) internal returns (uint maxPrice) {

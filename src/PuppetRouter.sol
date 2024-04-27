@@ -6,9 +6,6 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-import {Router} from "./utils/Router.sol";
-import {Router} from "./utils/Router.sol";
-
 import {PuppetStore} from "./position/store/PuppetStore.sol";
 import {PuppetLogic} from "./position/logic/PuppetLogic.sol";
 
@@ -23,8 +20,13 @@ contract PuppetRouter is Auth, EIP712, ReentrancyGuard {
 
     CallConfig callConfig;
 
-    constructor(Authority _authority, CallConfig memory _callConfig) Auth(address(0), _authority) EIP712("Puppet Router", "1") {
-        _setConfig(_callConfig);
+    constructor(
+        Authority _authority,
+        CallConfig memory _callConfig,
+        IERC20[] memory _tokenAllowanceCapList,
+        uint[] memory _tokenAllowanceCapAmountList
+    ) Auth(address(0), _authority) EIP712("Puppet Router", "1") {
+        _setConfig(_callConfig, _tokenAllowanceCapList, _tokenAllowanceCapAmountList);
     }
 
     function deposit(IERC20 token, uint amount) external nonReentrant {
@@ -57,12 +59,12 @@ contract PuppetRouter is Auth, EIP712, ReentrancyGuard {
 
     // governance
 
-    function setConfig(CallConfig memory _callConfig) external requiresAuth {
-        _setConfig(_callConfig);
-    }
-
-    function setTokenAllowanceCap(IERC20 token, uint amount) external requiresAuth {
-        callConfig.setRule.store.setTokenAllowanceCap(token, amount);
+    function setConfig(
+        CallConfig memory _callConfig, //
+        IERC20[] memory _tokenAllowanceCapList,
+        uint[] memory _tokenAllowanceCapAmountList
+    ) external requiresAuth {
+        _setConfig(_callConfig, _tokenAllowanceCapList, _tokenAllowanceCapAmountList);
     }
 
     // integration
@@ -72,16 +74,23 @@ contract PuppetRouter is Auth, EIP712, ReentrancyGuard {
         IERC20 token,
         address receiver,
         address trader,
+        uint _activityTime,
         address[] calldata _puppetList,
-        uint[] calldata _activityList,
         uint[] calldata _balanceList
     ) external requiresAuth {
-        store.decreaseBalanceAndSetActivityList(token, receiver, trader, _puppetList, _activityList, _balanceList);
+        store.decreaseBalanceAndSetActivityList(token, receiver, trader, _activityTime, _puppetList, _balanceList);
     }
 
     // internal
 
-    function _setConfig(CallConfig memory _callConfig) internal {
+    function _setConfig(CallConfig memory _callConfig, IERC20[] memory _tokenAllowanceCapList, uint[] memory _tokenAllowanceCapAmountList) internal {
+        if (_tokenAllowanceCapList.length != _tokenAllowanceCapAmountList.length) revert PuppetRouter__InvalidListLength();
+
+        for (uint i; i < _tokenAllowanceCapList.length; i++) {
+            IERC20 _token = _tokenAllowanceCapList[i];
+            _callConfig.setRule.store.setTokenAllowanceCap(_token, _tokenAllowanceCapAmountList[i]);
+        }
+
         callConfig = _callConfig;
 
         emit PuppetRouter__SetConfig(block.timestamp, _callConfig);
@@ -89,4 +98,5 @@ contract PuppetRouter is Auth, EIP712, ReentrancyGuard {
 
     error PuppetRouter__InvalidPuppet();
     error PuppetRouter__InvalidAllowance();
+    error PuppetRouter__InvalidListLength();
 }

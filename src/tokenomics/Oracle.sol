@@ -27,7 +27,7 @@ contract Oracle is Auth, EIP712, ReentrancyGuard {
     }
 
     struct CallConfig {
-        IERC20 primaryPoolToken1;
+        IERC20 token1;
         IVault vault;
         bytes32 poolId;
         uint updateInterval;
@@ -47,7 +47,7 @@ contract Oracle is Auth, EIP712, ReentrancyGuard {
 
     function getMaxPrice(IERC20 token, uint poolPrice) public view returns (uint) {
         uint maxPrimaryPrice = Math.max(store.medianMax(), poolPrice);
-        if (callConfig.primaryPoolToken1 == token) {
+        if (callConfig.token1 == token) {
             return maxPrimaryPrice;
         }
 
@@ -56,7 +56,7 @@ contract Oracle is Auth, EIP712, ReentrancyGuard {
 
     function getMinPrice(IERC20 token, uint poolPrice) public view returns (uint) {
         uint minPrimaryPrice = Math.min(store.medianMin(), poolPrice);
-        if (callConfig.primaryPoolToken1 == token) {
+        if (callConfig.token1 == token) {
             return minPrimaryPrice;
         }
 
@@ -138,10 +138,11 @@ contract Oracle is Auth, EIP712, ReentrancyGuard {
 
     // governance
 
-    function setConfig(CallConfig memory _callConfig, IERC20[] memory _tokenList, SecondaryPriceConfig[] memory _exchangePriceSourceList)
-        external
-        requiresAuth
-    {
+    function setConfig(
+        CallConfig memory _callConfig, //
+        IERC20[] memory _tokenList,
+        SecondaryPriceConfig[] memory _exchangePriceSourceList
+    ) external requiresAuth {
         if (_callConfig.poolId == bytes32(0)) revert Oracle__InvalidPoolId();
 
         _setConfig(_callConfig, _tokenList, _exchangePriceSourceList);
@@ -149,7 +150,11 @@ contract Oracle is Auth, EIP712, ReentrancyGuard {
 
     // internal
 
-    function _setConfig(CallConfig memory _callConfig, IERC20[] memory _tokenList, SecondaryPriceConfig[] memory _exchangePriceSourceList) internal {
+    function _setConfig(
+        CallConfig memory _callConfig, //
+        IERC20[] memory _tokenList,
+        SecondaryPriceConfig[] memory _exchangePriceSourceList
+    ) internal {
         callConfig = _callConfig;
 
         if (_tokenList.length != _exchangePriceSourceList.length) revert Oracle__TokenSourceListLengthMismatch();
@@ -162,7 +167,7 @@ contract Oracle is Auth, EIP712, ReentrancyGuard {
             secondarySourceConfigMap[_tokenList[i]] = _config;
         }
 
-        emit Oracle__SetConfig(block.timestamp, callConfig, _exchangePriceSourceList);
+        emit Oracle__SetConfig(block.timestamp, _callConfig, _exchangePriceSourceList);
     }
 
     // state
@@ -181,31 +186,32 @@ contract Oracle is Auth, EIP712, ReentrancyGuard {
     }
 
     function setPrimaryMinMax(uint price) internal {
+        OracleStore _store = store;
         OracleStore.SeedSlot memory seed = store.getLatestSeed();
 
         if (price == 0) revert Oracle__NonZeroPrice();
 
         uint8 slot = uint8(block.timestamp / callConfig.updateInterval % SLOT_COUNT);
-        uint storedSlot = store.slot();
+        uint storedSlot = _store.slot();
 
-        store.setLatestSeed(OracleStore.SeedSlot({price: price, blockNumber: block.number, timestamp: block.timestamp}));
+        _store.setLatestSeed(OracleStore.SeedSlot({price: price, blockNumber: block.number, timestamp: block.timestamp}));
 
-        uint max = store.slotMax(slot);
+        uint max = _store.slotMax(slot);
 
         if (slot == storedSlot) {
             if (price > max) {
-                store.setSlotMax(slot, price);
-            } else if (price < store.slotMin(slot)) {
-                store.setSlotMin(slot, price);
+                _store.setSlotMax(slot, price);
+            } else if (price < _store.slotMin(slot)) {
+                _store.setSlotMin(slot, price);
             }
         } else {
-            store.setSlot(slot);
+            _store.setSlot(slot);
 
-            store.setSlotMin(slot, price);
-            store.setMedianMin(_getMedian(store.getSlotArrMin()));
+            _store.setSlotMin(slot, price);
+            _store.setMedianMin(_getMedian(_store.getSlotArrMin()));
 
-            store.setSlotMax(slot, price);
-            store.setMedianMax(_getMedian(store.getSlotArrMax()));
+            _store.setSlotMax(slot, price);
+            _store.setMedianMax(_getMedian(_store.getSlotArrMax()));
 
             // in case previous slots are outdated, we need to update them with the current price
             uint timeDelta = block.timestamp - seed.timestamp;
@@ -215,10 +221,10 @@ contract Oracle is Auth, EIP712, ReentrancyGuard {
                 for (uint8 i = 0; i <= delayedUpdateCount; i++) {
                     uint8 prevSlot = (slot + SLOT_COUNT - i) % SLOT_COUNT;
 
-                    if (price > store.slotMax(prevSlot)) {
-                        store.setSlotMax(prevSlot, price);
-                    } else if (price < store.slotMin(prevSlot)) {
-                        store.setSlotMin(prevSlot, price);
+                    if (price > _store.slotMax(prevSlot)) {
+                        _store.setSlotMax(prevSlot, price);
+                    } else if (price < _store.slotMin(prevSlot)) {
+                        _store.setSlotMin(prevSlot, price);
                     }
                 }
 

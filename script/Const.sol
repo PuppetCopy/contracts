@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-library Const {
+library Address {
     address constant dao = 0x189b21eda0cff16461913D616a0A4F711Cd986cB;
 
-    address constant Dictator = 0xA12a6281c1773F267C274c3BE1B71DB2BACE06Cb;
-    address constant PuppetToken = 0x5C7E34292ac14008D8B15C0402CA9657501B949C;
-    address constant BasePool = 0xC6295e969Be65560D1CB8cE06b1B20e62337625C;
+    address constant Dictator = 0xeC4B2FEB1C314744D55f5b280A8C632015774dcd;
+    address constant PuppetToken = 0x4F489Ef21E74E6736F4e5929Dc9865E4C5fe4040;
+    address constant Router = 0xdC42a2f75a7000007C683Cb076EC5c805211F210;
 
-    address constant Router = 0xAde65c4baD5F13643bE1e8A439e078eaB453750f;
+    address constant BasePool = 0xF2658f994C882237d3612099cae541d50348FCf9;
+
     address constant OracleLogic = 0x412979f3210d8cf121971B0176cA3704b8bE0945;
     address constant PriceStore = 0xe9e9ce24275Ec23257551Cbb62D79A4e9cfE2428;
     address constant RewardLogic = 0x356Df7BE8a48d514c3A24A4b4cC0CB4AAd45B617;
@@ -32,4 +33,22 @@ library Const {
     address constant gmxEthUsdcMarket = 0x70d95587d40A2caf56bd97485aB3Eec10Bee6336;
 
     bytes32 constant referralCode = 0x5055505045540000000000000000000000000000000000000000000000000000;
+}
+
+library Role {
+    uint8 constant ADMIN = 0;
+    uint8 constant TOKEN_TRANSFER = 1;
+    uint8 constant MINT_PUPPET = 2;
+    uint8 constant MINT_CORE_RELEASE = 3;
+
+    uint8 constant SET_ORACLE_PRICE = 4;
+    uint8 constant CLAIM = 5;
+    uint8 constant INCREASE_CONTRIBUTION = 6;
+    uint8 constant CONTRIBUTE = 7;
+    uint8 constant VEST = 8;
+
+    uint8 constant SUBACCOUNT_CREATE = 9;
+    uint8 constant SUBACCOUNT_SET_OPERATOR = 10;
+    uint8 constant EXECUTE_ORDER = 11;
+    uint8 constant PUPPET_DECREASE_BALANCE_AND_SET_ACTIVITY = 12;
 }

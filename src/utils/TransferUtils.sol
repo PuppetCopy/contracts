@@ -7,7 +7,7 @@ import {ErrorUtils} from "./ErrorUtils.sol";
 import {ExternalCallUtils} from "./ExternalCallUtils.sol";
 
 /**
- * @title TokenUtils
+ * @title TransferUtils
  * @dev Library for token functions, helps with transferring of tokens and
  * native token functions
  */

@@ -3,19 +3,15 @@ pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {IWNT} from "src/utils/interfaces/IWNT.sol";
-import {BasicSetup} from "test/base/BasicSetup.t.sol";
+import {SharedSetup} from "test/base/SharedSetup.t.sol";
 
 import {PositionUtils} from "src/position/util/PositionUtils.sol";
 
-import {SubaccountFactory} from "src/shared/SubaccountFactory.sol";
 import {Cugar} from "src/shared/Cugar.sol";
 import {CugarStore} from "src/shared/store/CugarStore.sol";
-import {SubaccountStore} from "src/shared/store/SubaccountStore.sol";
-import {Subaccount} from "src/shared/Subaccount.sol";
-
-import {VotingEscrow} from "src/tokenomics/VotingEscrow.sol";
 
 import {PuppetLogic} from "src/position/logic/PuppetLogic.sol";
 import {PositionRouter} from "src/PositionRouter.sol";
@@ -32,59 +28,74 @@ import {ExecuteDecreasePosition} from "src/position/logic/ExecuteDecreasePositio
 import {PuppetStore} from "src/position/store/PuppetStore.sol";
 import {PuppetRouter} from "src/PuppetRouter.sol";
 
-import {Const} from "script/Const.s.sol";
+import {Address, Role} from "script/Const.sol";
 
-contract PositionRouterTest is BasicSetup {
+import {GmxPositionUtils} from "./../../src/position/util/GmxPositionUtils.sol";
+
+contract PositionRouterTest is SharedSetup {
     uint arbitrumFork;
-    uint8 SUBACCOUNT_LOGIC = 2;
-    uint8 SET_MATCHING_ACTIVITY = 3;
-    uint8 EXECUTE_ORDER = 4;
 
-    SubaccountFactory subaccountFactory;
-
-    SubaccountStore subaccountStore;
     PuppetStore puppetStore;
     PositionStore positionStore;
 
     PuppetRouter puppetRouter;
     PositionRouter positionRouter;
     IGmxExchangeRouter gmxExchangeRouter;
-    CugarStore cugarStore;
-    Cugar cugar;
-    VotingEscrow votingEscrow;
 
-    PositionRouter.CallConfig callConfig;
+    IGmxOracle gmxOracle = IGmxOracle(Address.gmxOracle);
 
     function setUp() public override {
-        // arbitrumFork = vm.createFork(vm.envString("ARBITRUM_RPC_URL"));
-        // vm.selectFork(arbitrumFork);
-        // vm.rollFork(192052508);
-        // assertEq(vm.activeFork(), arbitrumFork, "arbitrum fork not selected");
-        // assertEq(block.number, 192052508);
+        // IGmxExchangeRouter(Address.gmxExchangeRouter).createOrder(
+        //     GmxPositionUtils.CreateOrderParams({
+        //         addresses: GmxPositionUtils.CreateOrderParamsAddresses({
+        //             receiver: 0x722cf21E7f95dA140B05157387547722c1Dd1553,
+        //             callbackContract: address(0),
+        //             uiFeeReceiver: address(0),
+        //             market: 0x70d95587d40A2caf56bd97485aB3Eec10Bee6336,
+        //             initialCollateralToken: IERC20(0xaf88d065e77c8cC2239327C5EDb3A432268e5831),
+        //             swapPath: new address[](0)
+        //         }),
+        //         numbers: GmxPositionUtils.CreateOrderParamsNumbers({
+        //             sizeDeltaUsd: 9090456191220250795000000000000000,
+        //             initialCollateralDeltaAmount: 0,
+        //             triggerPrice: 0,
+        //             acceptablePrice: 3176985489719901,
+        //             executionFee: 73485302000000,
+        //             callbackGasLimit: 0,
+        //             minOutputAmount: 0
+        //         }),
+        //         orderType: GmxPositionUtils.OrderType.MarketIncrease,
+        //         decreasePositionSwapType: GmxPositionUtils.DecreasePositionSwapType.NoSwap,
+        //         isLong: true,
+        //         shouldUnwrapNativeToken: false,
+        //         referralCode: bytes32(0)
+        //     })
+        // );
+
+        usdc = IERC20(Address.usdc);
+        wnt = IWNT(Address.wnt);
 
         super.setUp();
 
-        subaccountFactory = new SubaccountFactory(dictator);
-        dictator.setRoleCapability(SUBACCOUNT_LOGIC, address(subaccountFactory), subaccountFactory.createSubaccount.selector, true);
+        address positionRouterAddress = computeCreateAddress(users.owner, vm.getNonce(users.owner) + 7);
+        address puppetRouterAddress = computeCreateAddress(users.owner, vm.getNonce(users.owner) + 6);
 
-        address positionRouterAddress = computeCreateAddress(users.owner, vm.getNonce(users.owner) + 5);
-        address puppetRouterAddress = computeCreateAddress(users.owner, vm.getNonce(users.owner) + 4);
-
-        subaccountStore = new SubaccountStore(dictator, positionRouterAddress, address(subaccountFactory));
         puppetStore = new PuppetStore(dictator, router, puppetRouterAddress);
         positionStore = new PositionStore(dictator, router, positionRouterAddress);
 
-        votingEscrow = new VotingEscrow(dictator, router, puppetToken);
+        IERC20[] memory _tokenAllowanceCapList = new IERC20[](2);
+        _tokenAllowanceCapList[0] = wnt;
+        _tokenAllowanceCapList[1] = usdc;
 
-        cugarStore = new CugarStore(dictator, router, computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1));
-        cugar = new Cugar(dictator, cugarStore, votingEscrow);
+        uint[] memory _tokenAllowanceCapAmountList = new uint[](2);
+        _tokenAllowanceCapAmountList[0] = 0.2e18;
+        _tokenAllowanceCapAmountList[1] = 500e30;
 
         puppetRouter = new PuppetRouter(
             dictator,
             PuppetRouter.CallConfig({
                 setRule: PuppetLogic.CallSetRuleConfig({
                     router: router,
-                    // positionRouterAddress: positionRouterAddress,
                     store: puppetStore,
                     minExpiryDuration: 0,
                     minAllowanceRate: 100,
@@ -92,125 +103,94 @@ contract PositionRouterTest is BasicSetup {
                 }),
                 createSubaccount: PuppetLogic.CallCreateSubaccountConfig({factory: subaccountFactory, store: subaccountStore}),
                 setBalance: PuppetLogic.CallSetBalanceConfig({router: router, store: puppetStore})
+            }),
+            _tokenAllowanceCapList,
+            _tokenAllowanceCapAmountList
+        );
+        dictator.setRoleCapability(
+            Role.PUPPET_DECREASE_BALANCE_AND_SET_ACTIVITY, address(puppetRouter), puppetRouter.decreaseBalanceAndSetActivityList.selector, true
+        );
+
+        positionRouter = new PositionRouter(
+            dictator,
+            PositionRouter.CallConfig({
+                increase: RequestIncreasePosition.CallConfig({
+                    wnt: wnt,
+                    router: router,
+                    positionStore: positionStore,
+                    gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
+                    subaccountStore: subaccountStore,
+                    subaccountFactory: subaccountFactory,
+                    gmxOrderCallbackHandler: positionRouterAddress,
+                    gmxOrderReciever: address(positionStore),
+                    gmxOrderVault: Address.gmxOrderVault,
+                    referralCode: Address.referralCode,
+                    callbackGasLimit: 2_000_000,
+                    puppetStore: puppetStore,
+                    puppetRouter: puppetRouter,
+                    limitPuppetList: 20,
+                    minimumMatchAmount: 100e30,
+                    tokenTransferGasLimit: 200_000
+                }),
+                decrease: RequestDecreasePosition.CallConfig({
+                    wnt: IWNT(Address.wnt),
+                    gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
+                    positionStore: positionStore,
+                    subaccountStore: subaccountStore,
+                    gmxOrderCallbackHandler: positionRouterAddress,
+                    gmxOrderReciever: address(positionStore),
+                    gmxOrderVault: Address.gmxOrderVault,
+                    referralCode: Address.referralCode,
+                    callbackGasLimit: 2_000_000,
+                    tokenTransferGasLimit: 200_000
+                }),
+                executeIncrease: ExecuteIncreasePosition.CallConfig({
+                    positionStore: positionStore, //
+                    gmxOrderHandler: Address.gmxOrderHandler
+                }),
+                executeDecrease: ExecuteDecreasePosition.CallConfig({
+                    router: router,
+                    positionStore: positionStore,
+                    puppetStore: puppetStore,
+                    cugar: cugar,
+                    cugarStore: cugarStore,
+                    gmxOrderReciever: address(positionStore),
+                    tokenTransferGasLimit: 200_000,
+                    performanceFeeRate: 0.1e30, // 10%
+                    traderPerformanceFeeShare: 0.5e30 // shared between trader and platform
+                })
             })
         );
-        dictator.setRoleCapability(ADMIN_ROLE, address(puppetRouter), puppetRouter.setTokenAllowanceCap.selector, true);
-        dictator.setRoleCapability(SET_MATCHING_ACTIVITY, address(puppetRouter), puppetRouter.decreaseBalanceAndSetActivityList.selector, true);
+        dictator.setRoleCapability(Role.EXECUTE_ORDER, address(positionRouter), positionRouter.afterOrderExecution.selector, true);
+        dictator.setRoleCapability(Role.EXECUTE_ORDER, address(positionRouter), positionRouter.afterOrderCancellation.selector, true);
+        dictator.setRoleCapability(Role.EXECUTE_ORDER, address(positionRouter), positionRouter.afterOrderFrozen.selector, true);
 
-        callConfig = PositionRouter.CallConfig({
-            increase: RequestIncreasePosition.CallConfig({
-                wnt: wnt,
-                router: router,
-                positionStore: positionStore,
-                gmxExchangeRouter: IGmxExchangeRouter(Const.gmxExchangeRouter),
-                gmxOracle: IGmxOracle(Const.gmxOracle),
-                subaccountStore: subaccountStore,
-                subaccountFactory: subaccountFactory,
-                gmxOrderCallbackHandler: positionRouterAddress,
-                gmxOrderReciever: address(positionStore),
-                gmxOrderVault: Const.gmxOrderVault,
-                referralCode: Const.referralCode,
-                callbackGasLimit: 2_000_000,
-                puppetStore: puppetStore,
-                puppetRouter: puppetRouter,
-                limitPuppetList: 100,
-                minimumMatchAmount: 100e30,
-                tokenTransferGasLimit: 200_000
-            }),
-            decrease: RequestDecreasePosition.CallConfig({
-                wnt: IWNT(Const.wnt),
-                gmxExchangeRouter: IGmxExchangeRouter(Const.gmxExchangeRouter),
-                positionStore: positionStore,
-                subaccountStore: subaccountStore,
-                gmxOrderCallbackHandler: positionRouterAddress,
-                gmxOrderReciever: address(positionStore),
-                gmxOrderVault: Const.gmxOrderVault,
-                referralCode: Const.referralCode,
-                callbackGasLimit: 2_000_000,
-                tokenTransferGasLimit: 200_000
-            }),
-            executeIncrease: ExecuteIncreasePosition.CallConfig({
-                positionStore: positionStore, //
-                gmxOrderHandler: Const.gmxOrderHandler
-            }),
-            executeDecrease: ExecuteDecreasePosition.CallConfig({
-                router: router,
-                positionStore: positionStore,
-                puppetStore: puppetStore,
-                cugar: cugar,
-                gmxOrderReciever: address(positionStore),
-                tokenTransferGasLimit: 200_000,
-                performanceFeeRate: 0.1e30, // 10%
-                traderPerformanceFeeShare: 0.5e30 // shared between trader and platform
-            })
-        });
-
-        positionRouter = new PositionRouter(dictator, callConfig);
-        dictator.setRoleCapability(EXECUTE_ORDER, address(positionRouter), positionRouter.afterOrderExecution.selector, true);
-        dictator.setRoleCapability(EXECUTE_ORDER, address(positionRouter), positionRouter.afterOrderCancellation.selector, true);
-        dictator.setRoleCapability(EXECUTE_ORDER, address(positionRouter), positionRouter.afterOrderFrozen.selector, true);
-
-        dictator.setUserRole(address(positionRouter), TRANSFER_TOKEN_ROLE, true);
-        dictator.setUserRole(address(positionRouter), SUBACCOUNT_LOGIC, true);
-        dictator.setUserRole(address(positionRouter), SET_MATCHING_ACTIVITY, true);
-
-        puppetRouter.setTokenAllowanceCap(wnt, 100e30);
-        puppetRouter.setTokenAllowanceCap(usdc, 100e30);
+        dictator.setUserRole(address(puppetStore), Role.TOKEN_TRANSFER, true);
+        dictator.setUserRole(address(positionRouter), Role.TOKEN_TRANSFER, true);
+        dictator.setUserRole(address(positionRouter), Role.SUBACCOUNT_CREATE, true);
+        dictator.setUserRole(address(positionRouter), Role.PUPPET_DECREASE_BALANCE_AND_SET_ACTIVITY, true);
     }
 
-    function testIncreaseRequest() public {
-        address puppet = users.alice;
+    function testIncreaseRequestInUsdc() public {
         address trader = users.bob;
-
-        IERC20 collateralToken = usdc;
-        // _dealERC20(Const.usdc, msg.sender, 1_000e6);
-        // usdc.approve(Const.gmxOrderVault, type(uint).max);
-        // usdc.approve(Const.gmxExchangeRouter, type(uint).max);
-        // IGmxExchangeRouter(Const.gmxExchangeRouter).sendWnt{value: tx.gasprice}(Const.gmxOrderVault, tx.gasprice);
-        // IGdmxExchangeRouter(Const.gmxExchangeRouter).sendTokens(collateralToken, Const.gmxOrderVault, 1e6);
-
-        // _dealERC20(Const.usdc, msg.sender, 100e6);
-        // Subaccount subaccount = new Subaccount(subaccountStore, msg.sender);
-
-        // vm.deal(address(subaccount), 100 ether);
-
-        // (bool _success, bytes memory _returnData) = subaccount.execute{value: tx.gasprice}(
-        //     address(Const.gmxExchangeRouter),
-        //     abi.encodeWithSelector(IGmxExchangeRouter(Const.gmxExchangeRouter).sendWnt.selector, Const.gmxOrderVault, 1e6)
-        // );
-
-        vm.startPrank(puppet);
-        _dealERC20(address(collateralToken), puppet, 100e6);
-        IERC20(collateralToken).approve(address(router), 100e6);
-
-        puppetRouter.deposit(collateralToken, 100e6);
-
-        puppetRouter.setRule(
-            collateralToken, //
-            trader,
-            PuppetStore.Rule({throttleActivity: 0, allowanceRate: 100, expiry: block.timestamp + 28 days})
-        );
-
-        vm.startPrank(trader);
-        _dealERC20(address(collateralToken), trader, 100e6);
-        collateralToken.approve(address(router), 100e6);
 
         uint estimatedGasLimit = 5_000_000;
         uint executionFee = tx.gasprice * estimatedGasLimit;
 
-        address[] memory puppetList = new address[](3);
-        puppetList[0] = users.bob;
-        puppetList[1] = users.yossi;
-        puppetList[2] = puppet;
+        address[] memory puppetList = getGeneratePuppetList(usdc, trader, 10);
 
-        callConfig.increase.gmxOracle.getStablePrice(Const.gmxDatastore, address(collateralToken));
-        callConfig.increase.gmxOracle.getStablePrice(Const.gmxDatastore, Const.wnt);
+        gmxOracle.getStablePrice(Address.gmxDatastore, address(usdc));
+        gmxOracle.getStablePrice(Address.gmxDatastore, Address.wnt);
+
+        vm.startPrank(trader);
+        _dealERC20(address(usdc), trader, 100e6);
+        usdc.approve(address(router), 100e6);
 
         positionRouter.requestIncrease{value: executionFee}(
             PositionUtils.TraderCallParams({
                 account: trader,
-                market: Const.gmxEthUsdcMarket,
-                collateralToken: collateralToken,
+                market: Address.gmxEthUsdcMarket,
+                collateralToken: usdc,
                 isLong: true,
                 executionFee: executionFee,
                 collateralDelta: 100e6,
@@ -220,5 +200,44 @@ contract PositionRouterTest is BasicSetup {
             }),
             puppetList
         );
+    }
+
+    function getGeneratePuppetList(IERC20 collateralToken, address trader, uint _length) internal returns (address[] memory) {
+        address[] memory puppetList = new address[](_length);
+        for (uint i; i < _length; i++) {
+            puppetList[i] = createPuppet(collateralToken, trader, string(abi.encodePacked("puppet:", Strings.toString(i))), 100e6);
+        }
+        return sortAddresses(puppetList);
+    }
+
+    function createPuppet(IERC20 collateralToken, address trader, string memory name, uint fundValue) internal returns (address payable) {
+        address payable user = payable(makeAddr(name));
+        _dealERC20(address(collateralToken), user, fundValue);
+        vm.startPrank(user);
+
+        IERC20(collateralToken).approve(address(router), fundValue);
+
+        puppetRouter.deposit(collateralToken, fundValue);
+
+        puppetRouter.setRule(
+            collateralToken, //
+            trader,
+            PuppetStore.Rule({throttleActivity: 0, allowanceRate: 1000, expiry: block.timestamp + 28 days})
+        );
+
+        return user;
+    }
+
+    function sortAddresses(address[] memory addresses) public pure returns (address[] memory) {
+        uint length = addresses.length;
+        for (uint i = 0; i < length; i++) {
+            for (uint j = 0; j < length - i - 1; j++) {
+                if (addresses[j] > addresses[j + 1]) {
+                    // Swap addresses[j] and addresses[j + 1]
+                    (addresses[j], addresses[j + 1]) = (addresses[j + 1], addresses[j]);
+                }
+            }
+        }
+        return addresses;
     }
 }

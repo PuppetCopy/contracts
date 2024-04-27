@@ -8,10 +8,13 @@ import {StdCheats} from "forge-std/src/StdCheats.sol";
 import {StdUtils} from "forge-std/src/StdUtils.sol";
 import {PRBTest} from "@prb/test/src/PRBTest.sol";
 
-import {Dictator} from "src/utils/Dictator.sol";
+import {Dictator} from "src/shared/Dictator.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
-import {Router} from "src/utils/Router.sol";
+import {Router} from "src/shared/Router.sol";
 import {IWNT} from "./../../src/utils/interfaces/IWNT.sol";
+
+import {Role} from "script/Const.sol";
+
 
 contract BasicSetup is PRBTest, StdCheats, StdUtils {
     struct Users {
@@ -21,11 +24,6 @@ contract BasicSetup is PRBTest, StdCheats, StdUtils {
         address payable yossi;
     }
 
-    uint8 constant ADMIN_ROLE = 0;
-    uint8 constant TRANSFER_TOKEN_ROLE = 1;
-    uint8 constant MINT_PUPPET_ROLE = 2;
-
-    uint internal constant BASIS_POINTS_DIVISOR = 10_000;
 
     Users users;
 
@@ -49,13 +47,14 @@ contract BasicSetup is PRBTest, StdCheats, StdUtils {
 
         dictator = new Dictator(users.owner);
 
-        puppetToken = new PuppetToken(dictator, PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}));
         router = new Router(dictator, 200_000);
+        dictator.setRoleCapability(Role.TOKEN_TRANSFER, address(router), router.transfer.selector, true);
 
-        dictator.setRoleCapability(MINT_PUPPET_ROLE, address(puppetToken), puppetToken.mint.selector, true);
-        dictator.setRoleCapability(TRANSFER_TOKEN_ROLE, address(router), router.transfer.selector, true);
+        puppetToken = new PuppetToken(dictator, PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}));
+        dictator.setRoleCapability(Role.MINT_PUPPET, address(puppetToken), puppetToken.mint.selector, true);
+        dictator.setRoleCapability(Role.MINT_CORE_RELEASE, address(puppetToken), puppetToken.mintCore.selector, true);
 
-        dictator.setUserRole(users.owner, ADMIN_ROLE, true);
+        dictator.setUserRole(users.owner, Role.ADMIN, true);
     }
 
     /// @dev Generates a user, labels its address, and funds it with test assets

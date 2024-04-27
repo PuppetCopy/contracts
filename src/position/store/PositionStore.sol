@@ -3,8 +3,8 @@ pragma solidity 0.8.24;
 
 import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 
-import {Router} from "./../../utils/Router.sol";
-import {BankStore} from "./../../utils/BankStore.sol";
+import {Router} from "./../../shared/Router.sol";
+import {BankStore} from "./../../shared/store/BankStore.sol";
 import {GmxPositionUtils} from "./../util/GmxPositionUtils.sol";
 
 contract PositionStore is BankStore {
