@@ -10,11 +10,10 @@ import {Router} from "src/shared/Router.sol";
 import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
 import {Precision} from "./../../utils/Precision.sol";
 
-import {PuppetStore} from "../store/PuppetStore.sol";
+import {PuppetStore} from "./../../puppet/store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
 
-import {Cugar} from "./../../shared/Cugar.sol";
-import {CugarStore} from "./../../shared/store/CugarStore.sol";
+import {RewardStore, CURSOR_INTERVAL} from "./../../token/store/RewardStore.sol";
 
 library ExecuteDecreasePosition {
     event ExecuteDecreasePosition__DecreasePosition(
@@ -25,8 +24,7 @@ library ExecuteDecreasePosition {
         Router router;
         PositionStore positionStore;
         PuppetStore puppetStore;
-        Cugar cugar;
-        CugarStore cugarStore;
+        RewardStore rewardStore;
         address gmxOrderReciever;
         uint tokenTransferGasLimit;
         uint performanceFeeRate;
@@ -124,11 +122,13 @@ library ExecuteDecreasePosition {
         callConfig.puppetStore.increaseBalanceList(callParams.outputToken, address(this), callParams.mirrorPosition.puppetList, outputAmountList);
 
         if (callParams.profit > 0) {
-            callConfig.cugar.increaseSeedContributionList(
-                callConfig.cugarStore, callParams.outputToken, callParams.mirrorPosition.puppetList, contributionList
+            uint cursor = _getCursor(block.timestamp);
+
+            callConfig.rewardStore.increaseUserSeedContributionList(
+                callParams.outputToken, cursor, address(this), callParams.mirrorPosition.puppetList, contributionList
             );
-            callConfig.cugar.increaseSeedContribution(
-                callConfig.cugarStore, callParams.outputToken, callParams.mirrorPosition.trader, traderPerformanceCutoffFee
+            callConfig.rewardStore.increaseUserSeedContribution(
+                callParams.outputToken, cursor, address(this), callParams.mirrorPosition.trader, traderPerformanceCutoffFee
             );
         }
 
@@ -177,6 +177,10 @@ library ExecuteDecreasePosition {
         performanceFee -= traderPerformanceCutoffFee;
 
         return (performanceFee, traderPerformanceCutoffFee, amountOutAfterFee);
+    }
+
+    function _getCursor(uint _time) internal pure returns (uint) {
+        return (_time / CURSOR_INTERVAL) * CURSOR_INTERVAL;
     }
 
     error ExecutePosition__InvalidRequest(bytes32 positionKey, bytes32 key);

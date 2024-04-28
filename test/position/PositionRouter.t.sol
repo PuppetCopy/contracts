@@ -6,17 +6,15 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {IWNT} from "src/utils/interfaces/IWNT.sol";
-import {SharedSetup} from "test/base/SharedSetup.t.sol";
 
 import {PositionUtils} from "src/position/util/PositionUtils.sol";
 
-import {Cugar} from "src/shared/Cugar.sol";
-import {CugarStore} from "src/shared/store/CugarStore.sol";
+import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
-import {PuppetLogic} from "src/position/logic/PuppetLogic.sol";
-import {PositionRouter} from "src/PositionRouter.sol";
+import {RewardStore} from "src/token/store/RewardStore.sol";
 
-import {PositionStore} from "src/position/store/PositionStore.sol";
+import {PuppetLogic} from "src/puppet/logic/PuppetLogic.sol";
+
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxOracle} from "src/position/interface/IGmxOracle.sol";
 
@@ -25,14 +23,17 @@ import {RequestDecreasePosition} from "src/position/logic/RequestDecreasePositio
 import {ExecuteIncreasePosition} from "src/position/logic/ExecuteIncreasePosition.sol";
 import {ExecuteDecreasePosition} from "src/position/logic/ExecuteDecreasePosition.sol";
 
-import {PuppetStore} from "src/position/store/PuppetStore.sol";
-import {PuppetRouter} from "src/PuppetRouter.sol";
+import {SubaccountStore} from "src/shared/store/SubaccountStore.sol";
 
-import {Address, Role} from "script/Const.sol";
+import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
+import {PuppetRouter} from "src/puppet/PuppetRouter.sol";
 
-import {GmxPositionUtils} from "./../../src/position/util/GmxPositionUtils.sol";
+import {PositionStore} from "src/position/store/PositionStore.sol";
+import {PositionRouter} from "src/position/PositionRouter.sol";
 
-contract PositionRouterTest is SharedSetup {
+import {Address} from "script/Const.sol";
+
+contract PositionRouterTest is BasicSetup {
     uint arbitrumFork;
 
     PuppetStore puppetStore;
@@ -42,46 +43,17 @@ contract PositionRouterTest is SharedSetup {
     PositionRouter positionRouter;
     IGmxExchangeRouter gmxExchangeRouter;
 
+    RewardStore rewardStore;
+
+    SubaccountStore subaccountStore;
+
     IGmxOracle gmxOracle = IGmxOracle(Address.gmxOracle);
 
     function setUp() public override {
-        // IGmxExchangeRouter(Address.gmxExchangeRouter).createOrder(
-        //     GmxPositionUtils.CreateOrderParams({
-        //         addresses: GmxPositionUtils.CreateOrderParamsAddresses({
-        //             receiver: 0x722cf21E7f95dA140B05157387547722c1Dd1553,
-        //             callbackContract: address(0),
-        //             uiFeeReceiver: address(0),
-        //             market: 0x70d95587d40A2caf56bd97485aB3Eec10Bee6336,
-        //             initialCollateralToken: IERC20(0xaf88d065e77c8cC2239327C5EDb3A432268e5831),
-        //             swapPath: new address[](0)
-        //         }),
-        //         numbers: GmxPositionUtils.CreateOrderParamsNumbers({
-        //             sizeDeltaUsd: 9090456191220250795000000000000000,
-        //             initialCollateralDeltaAmount: 0,
-        //             triggerPrice: 0,
-        //             acceptablePrice: 3176985489719901,
-        //             executionFee: 73485302000000,
-        //             callbackGasLimit: 0,
-        //             minOutputAmount: 0
-        //         }),
-        //         orderType: GmxPositionUtils.OrderType.MarketIncrease,
-        //         decreasePositionSwapType: GmxPositionUtils.DecreasePositionSwapType.NoSwap,
-        //         isLong: true,
-        //         shouldUnwrapNativeToken: false,
-        //         referralCode: bytes32(0)
-        //     })
-        // );
-
         usdc = IERC20(Address.usdc);
         wnt = IWNT(Address.wnt);
 
         super.setUp();
-
-        address positionRouterAddress = computeCreateAddress(users.owner, vm.getNonce(users.owner) + 7);
-        address puppetRouterAddress = computeCreateAddress(users.owner, vm.getNonce(users.owner) + 6);
-
-        puppetStore = new PuppetStore(dictator, router, puppetRouterAddress);
-        positionStore = new PositionStore(dictator, router, positionRouterAddress);
 
         IERC20[] memory _tokenAllowanceCapList = new IERC20[](2);
         _tokenAllowanceCapList[0] = wnt;
@@ -91,26 +63,26 @@ contract PositionRouterTest is SharedSetup {
         _tokenAllowanceCapAmountList[0] = 0.2e18;
         _tokenAllowanceCapAmountList[1] = 500e30;
 
+        rewardStore = new RewardStore(dictator, router);
+
+        puppetStore = new PuppetStore(dictator, router, _tokenAllowanceCapList, _tokenAllowanceCapAmountList);
         puppetRouter = new PuppetRouter(
             dictator,
+            puppetStore,
             PuppetRouter.CallConfig({
                 setRule: PuppetLogic.CallSetRuleConfig({
-                    router: router,
-                    store: puppetStore,
+                    router: router, //
                     minExpiryDuration: 0,
                     minAllowanceRate: 100,
                     maxAllowanceRate: 5000
-                }),
-                createSubaccount: PuppetLogic.CallCreateSubaccountConfig({factory: subaccountFactory, store: subaccountStore}),
-                setBalance: PuppetLogic.CallSetBalanceConfig({router: router, store: puppetStore})
-            }),
-            _tokenAllowanceCapList,
-            _tokenAllowanceCapAmountList
+                })
+            })
         );
-        dictator.setRoleCapability(
-            Role.PUPPET_DECREASE_BALANCE_AND_SET_ACTIVITY, address(puppetRouter), puppetRouter.decreaseBalanceAndSetActivityList.selector, true
-        );
+        dictator.setAccess(puppetStore, address(puppetRouter));
+        dictator.setPermission(router, address(puppetStore), router.transfer.selector);
 
+        subaccountStore = new SubaccountStore(dictator, computeCreateAddress(users.owner, vm.getNonce(users.owner) + 2));
+        positionStore = new PositionStore(dictator, router);
         positionRouter = new PositionRouter(
             dictator,
             PositionRouter.CallConfig({
@@ -120,14 +92,11 @@ contract PositionRouterTest is SharedSetup {
                     positionStore: positionStore,
                     gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
                     subaccountStore: subaccountStore,
-                    subaccountFactory: subaccountFactory,
-                    gmxOrderCallbackHandler: positionRouterAddress,
                     gmxOrderReciever: address(positionStore),
                     gmxOrderVault: Address.gmxOrderVault,
                     referralCode: Address.referralCode,
                     callbackGasLimit: 2_000_000,
                     puppetStore: puppetStore,
-                    puppetRouter: puppetRouter,
                     limitPuppetList: 20,
                     minimumMatchAmount: 100e30,
                     tokenTransferGasLimit: 200_000
@@ -137,7 +106,6 @@ contract PositionRouterTest is SharedSetup {
                     gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
                     positionStore: positionStore,
                     subaccountStore: subaccountStore,
-                    gmxOrderCallbackHandler: positionRouterAddress,
                     gmxOrderReciever: address(positionStore),
                     gmxOrderVault: Address.gmxOrderVault,
                     referralCode: Address.referralCode,
@@ -152,8 +120,7 @@ contract PositionRouterTest is SharedSetup {
                     router: router,
                     positionStore: positionStore,
                     puppetStore: puppetStore,
-                    cugar: cugar,
-                    cugarStore: cugarStore,
+                    rewardStore: rewardStore,
                     gmxOrderReciever: address(positionStore),
                     tokenTransferGasLimit: 200_000,
                     performanceFeeRate: 0.1e30, // 10%
@@ -161,14 +128,16 @@ contract PositionRouterTest is SharedSetup {
                 })
             })
         );
-        dictator.setRoleCapability(Role.EXECUTE_ORDER, address(positionRouter), positionRouter.afterOrderExecution.selector, true);
-        dictator.setRoleCapability(Role.EXECUTE_ORDER, address(positionRouter), positionRouter.afterOrderCancellation.selector, true);
-        dictator.setRoleCapability(Role.EXECUTE_ORDER, address(positionRouter), positionRouter.afterOrderFrozen.selector, true);
 
-        dictator.setUserRole(address(puppetStore), Role.TOKEN_TRANSFER, true);
-        dictator.setUserRole(address(positionRouter), Role.TOKEN_TRANSFER, true);
-        dictator.setUserRole(address(positionRouter), Role.SUBACCOUNT_CREATE, true);
-        dictator.setUserRole(address(positionRouter), Role.PUPPET_DECREASE_BALANCE_AND_SET_ACTIVITY, true);
+        dictator.setAccess(subaccountStore, address(positionRouter));
+        dictator.setAccess(positionStore, address(positionRouter));
+        dictator.setAccess(rewardStore, address(positionRouter));
+        dictator.setAccess(puppetStore, address(positionRouter));
+        dictator.setPermission(router, address(positionRouter), router.transfer.selector);
+
+        dictator.setPermission(positionRouter, Address.gmxOrderHandler, positionRouter.afterOrderExecution.selector);
+        dictator.setPermission(positionRouter, Address.gmxOrderHandler, positionRouter.afterOrderCancellation.selector);
+        dictator.setPermission(positionRouter, Address.gmxOrderHandler, positionRouter.afterOrderFrozen.selector);
     }
 
     function testIncreaseRequestInUsdc() public {

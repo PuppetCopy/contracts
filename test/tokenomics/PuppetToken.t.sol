@@ -3,11 +3,8 @@ pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+import {PuppetToken} from "src/token/PuppetToken.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
-
-import {Role} from "script/Const.sol";
-
 
 contract PuppetTokenTest is BasicSetup {
     uint YEAR = 31540000;
@@ -15,8 +12,7 @@ contract PuppetTokenTest is BasicSetup {
     function setUp() public override {
         super.setUp();
 
-        dictator.setUserRole(users.owner, Role.MINT_PUPPET, true);
-        dictator.setUserRole(users.owner, Role.MINT_CORE_RELEASE, true);
+        dictator.setPermission(puppetToken, users.owner, puppetToken.mint.selector);
     }
 
     function testMintLimit() public {

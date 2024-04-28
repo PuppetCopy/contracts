@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 
 import {Router} from "./../../shared/Router.sol";
 import {BankStore} from "./../../shared/store/BankStore.sol";
-import {PositionUtils} from "./../util/PositionUtils.sol";
+import {PositionUtils} from "../../position/util/PositionUtils.sol";
+
+import {Auth} from "./../../utils/auth/Auth.sol";
+
 
 contract PuppetStore is BankStore {
     struct Rule {
@@ -20,13 +24,22 @@ contract PuppetStore is BankStore {
     mapping(bytes32 ruleKey => Rule) public ruleMap; // ruleKey = keccak256(collateralToken, puppet, trader)
     mapping(address puppet => mapping(address trader => uint) name) public fundingActivityMap;
 
-    constructor(Authority _authority, Router _router, address _initSetter) BankStore(_authority, _router, _initSetter) {}
+    constructor(IAuthority _authority, Router _router, IERC20[] memory _tokenAllowanceCapList, uint[] memory _tokenAllowanceConfigList)
+        BankStore(_authority, _router)
+    {
+        if (_tokenAllowanceCapList.length != _tokenAllowanceConfigList.length) revert PuppetStore__InvalidLength();
+
+        for (uint i; i < _tokenAllowanceCapList.length; i++) {
+            IERC20 _token = _tokenAllowanceCapList[i];
+            tokenAllowanceCapMap[_token] = _tokenAllowanceConfigList[i];
+        }
+    }
 
     function getTokenAllowanceCap(IERC20 _token) external view returns (uint) {
         return tokenAllowanceCapMap[_token];
     }
 
-    function setTokenAllowanceCap(IERC20 _token, uint _value) external isSetter {
+    function setTokenAllowanceCap(IERC20 _token, uint _value) external auth {
         tokenAllowanceCapMap[_token] = _value;
     }
 
@@ -43,13 +56,13 @@ contract PuppetStore is BankStore {
         return _balanceList;
     }
 
-    function increaseBalance(IERC20 _token, address _user, uint _value) external isSetter {
-        balanceMap[_user][_token] += _value;
+    function increaseBalance(IERC20 _token, address _depositor, uint _value) external auth {
+        balanceMap[_depositor][_token] += _value;
 
-        _transferIn(_token, _user, _value);
+        _transferIn(_token, _depositor, _value);
     }
 
-    function increaseBalanceList(IERC20 _token, address _depositor, address[] calldata _accountList, uint[] calldata _valueList) external isSetter {
+    function increaseBalanceList(IERC20 _token, address _depositor, address[] calldata _accountList, uint[] calldata _valueList) external auth {
         uint _accountListLength = _accountList.length;
         uint totalAmountIn;
 
@@ -63,7 +76,7 @@ contract PuppetStore is BankStore {
         _transferIn(_token, _depositor, totalAmountIn);
     }
 
-    function decreaseBalance(IERC20 _token, address _user, address _receiver, uint _value) public isSetter {
+    function decreaseBalance(IERC20 _token, address _user, address _receiver, uint _value) public auth {
         balanceMap[_user][_token] -= _value;
         _transferOut(_token, _receiver, _value);
     }
@@ -72,11 +85,11 @@ contract PuppetStore is BankStore {
         return ruleMap[_key];
     }
 
-    function setRule(bytes32 _key, Rule calldata _rule) external isSetter {
+    function setRule(bytes32 _key, Rule calldata _rule) external auth {
         ruleMap[_key] = _rule;
     }
 
-    function decreaseBalanceList(IERC20 _token, address _receiver, address[] calldata _accountList, uint[] calldata _valueList) external isSetter {
+    function decreaseBalanceList(IERC20 _token, address _receiver, address[] calldata _accountList, uint[] calldata _valueList) external auth {
         uint _accountListLength = _accountList.length;
         uint totalAmountOut;
 
@@ -99,7 +112,7 @@ contract PuppetStore is BankStore {
         return _rules;
     }
 
-    function setRuleList(bytes32[] calldata _keyList, Rule[] calldata _rules) external isSetter {
+    function setRuleList(bytes32[] calldata _keyList, Rule[] calldata _rules) external auth {
         uint _keyListLength = _keyList.length;
         uint _ruleLength = _rules.length;
 
@@ -119,7 +132,7 @@ contract PuppetStore is BankStore {
         return fundingActivityList;
     }
 
-    function setFundingActivityList(address trader, address[] calldata puppetList, uint[] calldata _timeList) external isSetter {
+    function setFundingActivityList(address trader, address[] calldata puppetList, uint[] calldata _timeList) external auth {
         uint _puppetListLength = puppetList.length;
 
         if (_puppetListLength != _timeList.length) revert PuppetStore__InvalidLength();
@@ -129,7 +142,7 @@ contract PuppetStore is BankStore {
         }
     }
 
-    function setFundingActivity(address puppet, address trader, uint _time) external isSetter {
+    function setFundingActivity(address puppet, address trader, uint _time) external auth {
         fundingActivityMap[puppet][trader] = _time;
     }
 
@@ -163,7 +176,7 @@ contract PuppetStore is BankStore {
         uint _activityTime,
         address[] calldata _puppetList,
         uint[] calldata _valueList
-    ) external isSetter {
+    ) external auth {
         uint _puppetListLength = _puppetList.length;
         uint totalAmountOut;
 

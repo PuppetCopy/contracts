@@ -7,21 +7,17 @@ import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {PRBTest} from "@prb/test/src/PRBTest.sol";
 import {IBasePool} from "@balancer-labs/v2-interfaces/vault/IBasePool.sol";
 
-// import {IDataStore} from "./../src/integrations/utils/interfaces/IDataStore.sol";
-
+import {IWNT} from "./../src/utils/interfaces/IWNT.sol";
 import {PositionStore} from "./../src/position/store/PositionStore.sol";
 
 import {Dictator} from "src/shared/Dictator.sol";
 import {Router} from "src/shared/Router.sol";
-import {IWNT} from "./../src/utils/interfaces/IWNT.sol";
 
-import {Oracle} from "./../src/tokenomics/Oracle.sol";
-import {OracleStore} from "src/tokenomics/store/OracleStore.sol";
-import {RewardRouter} from "src/RewardRouter.sol";
-// import {DataStore} from "src/integrations/utils/DataStore.sol";
-import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
-import {VotingEscrow} from "src/tokenomics/VotingEscrow.sol";
-// import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
+import {Oracle} from "./../src/token/Oracle.sol";
+import {OracleStore} from "src/token/store/OracleStore.sol";
+import {RewardRouter} from "src/token/RewardRouter.sol";
+import {PuppetToken} from "src/token/PuppetToken.sol";
+import {VotingEscrow} from "src/token/VotingEscrow.sol";
 
 import {Address} from "script/Const.sol";
 

@@ -12,7 +12,7 @@ import {Address} from "script/Const.sol";
 
 import {Dictator} from "src/shared/Dictator.sol";
 import {IWNT} from "./../src/utils/interfaces/IWNT.sol";
-import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+import {PuppetToken} from "src/token/PuppetToken.sol";
 
 contract ManagePool is PRBTest {
     address internal DEPLOYER_ADDRESS = vm.envAddress("GBC_DEPLOYER_ADDRESS");

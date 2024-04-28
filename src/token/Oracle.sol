@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -9,11 +8,14 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
+import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
+import {Permission} from "./../utils/auth/Permission.sol";
+
 import {UniV3Prelude} from "../utils/UniV3Prelude.sol";
 
 import {OracleStore, SLOT_COUNT} from "./store/OracleStore.sol";
 
-contract Oracle is Auth, EIP712, ReentrancyGuard {
+contract Oracle is Permission, EIP712, ReentrancyGuard {
     event Oracle__SetConfig(uint timestmap, CallConfig callConfig, SecondaryPriceConfig[] exchangePriceSourceList);
     event Oracle__SyncDelayedSlot(uint updateInterval, uint seedTimestamp, uint currentTimestamp, uint delayedUpdateCount, uint price);
     event Oracle__SlotSettled(uint updateInterval, uint seedTimestamp, uint seedPrice, uint maxPrice);
@@ -126,12 +128,12 @@ contract Oracle is Auth, EIP712, ReentrancyGuard {
     }
 
     constructor(
-        Authority _authority,
+        IAuthority _authority,
         OracleStore _store,
         CallConfig memory _callConfig,
         IERC20[] memory _tokenList,
         SecondaryPriceConfig[] memory _exchangePriceSourceList
-    ) Auth(address(0), _authority) EIP712("Oracle", "1") {
+    ) Permission(_authority) EIP712("Oracle", "1") {
         store = _store;
         _setConfig(_callConfig, _tokenList, _exchangePriceSourceList);
     }
@@ -142,7 +144,7 @@ contract Oracle is Auth, EIP712, ReentrancyGuard {
         CallConfig memory _callConfig, //
         IERC20[] memory _tokenList,
         SecondaryPriceConfig[] memory _exchangePriceSourceList
-    ) external requiresAuth {
+    ) external auth {
         if (_callConfig.poolId == bytes32(0)) revert Oracle__InvalidPoolId();
 
         _setConfig(_callConfig, _tokenList, _exchangePriceSourceList);
@@ -171,7 +173,7 @@ contract Oracle is Auth, EIP712, ReentrancyGuard {
     }
 
     // state
-    function setPrimaryPrice() external requiresAuth nonReentrant returns (uint) {
+    function setPrimaryPrice() external auth nonReentrant returns (uint) {
         uint currentPrice = getPrimaryPoolPrice();
 
         OracleStore.SeedSlot memory seed = store.getLatestSeed();

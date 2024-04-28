@@ -26,6 +26,8 @@
     "build:dev": "FOUNDRY_PROFILE=dev forge build --sizes",
     "script:ManagePool": "FOUNDRY_PROFILE=dev forge script script/ManagePool.s.sol:ManagePool --rpc-url $ARBITRUM_RPC_URL --broadcast --verify -vvvv",
     "script:DeployToken": "FOUNDRY_PROFILE=dev forge script script/DeployToken.s.sol:DeployToken --rpc-url $ARBITRUM_RPC_URL --broadcast --verify -vvvv",
+    "script:DeployShared": "FOUNDRY_PROFILE=dev forge script script/DeployShared.s.sol:DeployShared --rpc-url $ARBITRUM_RPC_URL --broadcast --verify -vvvv",
+    "script:DeployPuppetRouter": "FOUNDRY_PROFILE=dev forge script script/DeployPuppetRouter.s.sol:DeployPuppetRouter --rpc-url $ARBITRUM_RPC_URL --broadcast --verify -vvvv",
     "gas-report": "FOUNDRY_PROFILE=dev forge test --gas-report",
     "size-contracts": "bun hardhat size-contracts",
     "lint": "bun run lint:sol",

@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+
+import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
+import {Auth} from "./../utils/auth/Auth.sol";
 
 import {Router} from "../shared/Router.sol";
 
@@ -72,7 +74,7 @@ contract VotingEscrow is Auth, EIP712 {
     /// @notice Contract constructor
     /// @param _authority Aragon authority address
     /// @param _token `ERC20CRV` token address
-    constructor(Authority _authority, Router _router, IERC20 _token) Auth(address(0), _authority) EIP712("Puppet Voting Escrow", "1") {
+    constructor(IAuthority _authority, Router _router, IERC20 _token) Auth(_authority) EIP712("Puppet Voting Escrow", "1") {
         router = _router;
         token = _token;
 
@@ -100,6 +102,7 @@ contract VotingEscrow is Auth, EIP712 {
     function getPointHistory(uint _idx) external view returns (Point memory) {
         return pointHistory[_idx];
     }
+
     function getLastPointHistory() external view returns (Point memory) {
         return pointHistory[epoch];
     }
@@ -192,15 +195,34 @@ contract VotingEscrow is Auth, EIP712 {
         return _supplyAt(_point, _point.ts + _dt);
     }
 
-
-    // state
+    // public
 
     function checkpoint() external returns (Point memory) {
         LockedBalance memory empty;
         return _checkpoint(ZERO_ADDRESS, empty, empty);
     }
 
-    function lock(address _depositor, address _user, uint _value, uint _unlockTime) external requiresAuth returns (Point memory _point) {
+    function lock(uint _value, uint _unlockTime) external returns (Point memory _point) {
+        return _lock(msg.sender, msg.sender, _value, _unlockTime);
+    }
+
+    function withdraw(address _receiver) external returns (Point memory _point) {
+        return _withdraw(msg.sender, _receiver);
+    }
+
+    // integration
+
+    function lockFor(address _depositor, address _user, uint _value, uint _unlockTime) public auth returns (Point memory _point) {
+        return _lock(_depositor, _user, _value, _unlockTime);
+    }
+
+    function withdrawFor(address _user, address _receiver) public auth returns (Point memory _point) {
+        return _withdraw(_user, _receiver);
+    }
+
+    // internal
+
+    function _lock(address _depositor, address _user, uint _value, uint _unlockTime) internal returns (Point memory _point) {
         LockedBalance memory _newLock = locked[_user];
 
         if (_value == 0 && _unlockTime == 0 || _newLock.amount == 0 && _value == 0) revert VotingEscrow__InvalidLockValue();
@@ -230,7 +252,7 @@ contract VotingEscrow is Auth, EIP712 {
         emit VotingEscrow__Point(block.timestamp, _supply, _point);
     }
 
-    function withdraw(address _user, address _receiver) external requiresAuth returns (Point memory _point) {
+    function _withdraw(address _user, address _receiver) internal returns (Point memory _point) {
         LockedBalance memory _oldLock = locked[_user];
 
         if (_oldLock.end > block.timestamp) revert VotingEscrow__LockNotExpired();
@@ -250,83 +272,6 @@ contract VotingEscrow is Auth, EIP712 {
 
         emit VotingEscrow__Withdraw(_user, _receiver, block.timestamp, _value);
         emit VotingEscrow__Point(block.timestamp, _supply, _point);
-    }
-
-    // internal
-
-    /// @notice Binary search to estimate timestamp for block number
-    /// @param _block Block to find
-    /// @param _min Minimum epoch to search
-    /// @param _max Maximum epoch to search
-    /// @return Approximate timestamp for block
-    function _findBlockEpoch(uint _block, uint _min, uint _max) internal view returns (uint) {
-        // Binary search
-        for (uint i = 0; i < 128; i++) {
-            // Will always be enough for 128-bit numbers
-            if (_min >= _max) {
-                break;
-            }
-            uint _mid = (_min + _max + 1) / 2;
-            if (pointHistory[_mid].blk <= _block) {
-                _min = _mid;
-            } else {
-                _max = _mid - 1;
-            }
-        }
-        return _min;
-    }
-
-    function _totalSupply(uint _time) internal view returns (uint) {
-        return _supplyAt(pointHistory[epoch], _time);
-    }
-
-    /// @notice Calculate total supply of voting power at a given time _t
-    /// @param _point Most recent point before time _t
-    /// @param _time Time at which to calculate supply
-    /// @return totalSupply at given point in time
-    function _supplyAt(Point memory _point, uint _time) internal view returns (uint) {
-        Point memory _lastPoint = _point;
-        uint _ti = _roundWeekTime(_lastPoint.ts);
-
-        for (uint i; i < 255;) {
-            _ti += WEEK;
-            int128 _dSlope = 0;
-            if (_ti > _time) {
-                _ti = _time;
-            } else {
-                _dSlope = slopeChanges[_ti];
-            }
-            _lastPoint.bias -= _lastPoint.slope * int128(int(_ti) - int(_lastPoint.ts));
-            if (_ti == _time) {
-                break;
-            }
-            _lastPoint.slope += _dSlope;
-            _lastPoint.ts = _ti;
-            unchecked {
-                ++i;
-            }
-        }
-
-        if (_lastPoint.bias < 0) {
-            _lastPoint.bias = 0;
-        }
-        return _nonNegative(_lastPoint.bias);
-    }
-
-    /// @notice Get an address voting power
-    /// @dev Adheres to the ERC20 `balanceOf` interface
-    /// @param _user User wallet address
-    /// @param _time Epoch time to return voting power at
-    /// @return User voting power
-    function _balanceOf(address _user, uint _time) internal view returns (uint) {
-        uint _epoch = userPointEpoch[_user];
-        if (_epoch == 0) return 0;
-
-        Point memory _lastPoint = userPointHistory[_user][_epoch];
-        int128 _dt = int128(int(_time) - int(_lastPoint.ts));
-        int128 _bias = _lastPoint.bias - _lastPoint.slope * _dt;
-
-        return _nonNegative(_bias);
     }
 
     /// @notice Record global and per-user data to checkpoint
@@ -469,6 +414,81 @@ contract VotingEscrow is Auth, EIP712 {
         }
 
         return _lastPoint;
+    }
+
+    /// @notice Binary search to estimate timestamp for block number
+    /// @param _block Block to find
+    /// @param _min Minimum epoch to search
+    /// @param _max Maximum epoch to search
+    /// @return Approximate timestamp for block
+    function _findBlockEpoch(uint _block, uint _min, uint _max) internal view returns (uint) {
+        // Binary search
+        for (uint i = 0; i < 128; i++) {
+            // Will always be enough for 128-bit numbers
+            if (_min >= _max) {
+                break;
+            }
+            uint _mid = (_min + _max + 1) / 2;
+            if (pointHistory[_mid].blk <= _block) {
+                _min = _mid;
+            } else {
+                _max = _mid - 1;
+            }
+        }
+        return _min;
+    }
+
+    function _totalSupply(uint _time) internal view returns (uint) {
+        return _supplyAt(pointHistory[epoch], _time);
+    }
+
+    /// @notice Calculate total supply of voting power at a given time _t
+    /// @param _point Most recent point before time _t
+    /// @param _time Time at which to calculate supply
+    /// @return totalSupply at given point in time
+    function _supplyAt(Point memory _point, uint _time) internal view returns (uint) {
+        Point memory _lastPoint = _point;
+        uint _ti = _roundWeekTime(_lastPoint.ts);
+
+        for (uint i; i < 255;) {
+            _ti += WEEK;
+            int128 _dSlope = 0;
+            if (_ti > _time) {
+                _ti = _time;
+            } else {
+                _dSlope = slopeChanges[_ti];
+            }
+            _lastPoint.bias -= _lastPoint.slope * int128(int(_ti) - int(_lastPoint.ts));
+            if (_ti == _time) {
+                break;
+            }
+            _lastPoint.slope += _dSlope;
+            _lastPoint.ts = _ti;
+            unchecked {
+                ++i;
+            }
+        }
+
+        if (_lastPoint.bias < 0) {
+            _lastPoint.bias = 0;
+        }
+        return _nonNegative(_lastPoint.bias);
+    }
+
+    /// @notice Get an address voting power
+    /// @dev Adheres to the ERC20 `balanceOf` interface
+    /// @param _user User wallet address
+    /// @param _time Epoch time to return voting power at
+    /// @return User voting power
+    function _balanceOf(address _user, uint _time) internal view returns (uint) {
+        uint _epoch = userPointEpoch[_user];
+        if (_epoch == 0) return 0;
+
+        Point memory _lastPoint = userPointHistory[_user][_epoch];
+        int128 _dt = int128(int(_time) - int(_lastPoint.ts));
+        int128 _bias = _lastPoint.bias - _lastPoint.slope * _dt;
+
+        return _nonNegative(_bias);
     }
 
     function _roundWeekTime(uint timestamp) private pure returns (uint) {

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {Auth} from "@solmate/contracts/auth/Auth.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+
+import {Permission} from "./../utils/auth/Permission.sol";
 
 import {Precision} from "./../utils/Precision.sol";
 import {Dictator} from "./../shared/Dictator.sol";
@@ -16,7 +17,7 @@ import {Dictator} from "./../shared/Dictator.sol";
  * The mintCore function in the contract is designed to allocate tokens to the core contributors over time, with the allocation amount decreasing
  * as more time passes from the deployment of the contract. This is intended to gradually transfer governance power and incentivises broader ownership
  */
-contract PuppetToken is Auth, ERC20 {
+contract PuppetToken is Permission, ERC20 {
     event PuppetToken__SetConfig(Config config);
     event PuppetToken__MintCore(address operator, address receiver, uint timestamp, uint amount, uint share);
 
@@ -37,7 +38,7 @@ contract PuppetToken is Auth, ERC20 {
     uint public mineMintCount = 0; // the amount of tokens minted through protocol use
     uint public coreMintCount = 0; // the  amount of tokens released to the core
 
-    constructor(Dictator _authority, Config memory _config) Auth(address(0), _authority) ERC20("Puppet Test", "PUPPET-TEST") {
+    constructor(Dictator _authority, Config memory _config) Permission(_authority) ERC20("Puppet Test", "PUPPET-TEST") {
         _setConfig(_config); // init at 1% of circulating supply per hour
         _mint(_authority.owner(), GENESIS_MINT_AMOUNT);
     }
@@ -62,7 +63,7 @@ contract PuppetToken is Auth, ERC20 {
      * @param _amount The amount of tokens to mint.
      * @return The amount of tokens minted.
      */
-    function mint(address _receiver, uint _amount) external requiresAuth returns (uint) {
+    function mint(address _receiver, uint _amount) external auth returns (uint) {
         uint _nextEpoch = block.timestamp / config.durationWindow;
 
         // Reset mint count and update epoch at the start of a new window
@@ -89,7 +90,7 @@ contract PuppetToken is Auth, ERC20 {
      * @param _receiver The address to mint tokens to.
      * @return The amount of tokens minted.
      */
-    function mintCore(address _receiver) external requiresAuth returns (uint) {
+    function mintCore(address _receiver) external auth returns (uint) {
         uint _mintShare = getCoreShare();
         uint _maxMintable = mineMintCount * _mintShare / Precision.FLOAT_PRECISION;
         uint _mintable = _maxMintable - coreMintCount;
@@ -107,7 +108,7 @@ contract PuppetToken is Auth, ERC20 {
      * @dev Set the mint rate limit for the token.
      * @param _config The new rate limit configuration.
      */
-    function setConfig(Config calldata _config) external requiresAuth {
+    function setConfig(Config calldata _config) external auth {
         _setConfig(_config);
     }
 

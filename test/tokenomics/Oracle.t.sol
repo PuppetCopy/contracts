@@ -5,14 +5,12 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {OracleStore} from "src/tokenomics/store/OracleStore.sol";
-import {Oracle} from "./../../src/tokenomics/Oracle.sol";
+import {OracleStore} from "src/token/store/OracleStore.sol";
+import {Oracle} from "./../../src/token/Oracle.sol";
 
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockUniswapV3Pool} from "test/mocks/MockUniswapV3Pool.sol";
-
-import {Role} from "script/Const.sol";
 
 contract OracleTest is BasicSetup {
     OracleStore usdPerWntStore;
@@ -47,10 +45,7 @@ contract OracleTest is BasicSetup {
         poolVault = new MockWeightedPoolVault();
         poolVault.initPool(address(puppetToken), address(wnt), 20e18, 80e18);
 
-        address oracleAddress = computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1);
-
-        oracleStore = new OracleStore(dictator, oracleAddress, 1e18);
-
+        oracleStore = new OracleStore(dictator, 1e18);
         oracle = new Oracle(
             dictator,
             oracleStore,
@@ -58,7 +53,7 @@ contract OracleTest is BasicSetup {
             revenueTokenList,
             exchangePriceSourceList
         );
-        dictator.setRoleCapability(Role.SET_ORACLE_PRICE, address(oracle), oracle.setPrimaryPrice.selector, true);
+        dictator.setAccess(oracleStore, address(oracle));
 
         uint primaryPoolPrice = oracle.getPrimaryPoolPrice();
         uint secondaryTwapMedianPrice = oracle.getSecondaryTwapMedianPrice(wntUsdPoolList, 0);
@@ -70,7 +65,8 @@ contract OracleTest is BasicSetup {
 
         assertEq(oracle.getPrimaryPoolPrice(), 1e18, "1-1 pool price with 30 decimals precision");
 
-        dictator.setUserRole(users.owner, Role.SET_ORACLE_PRICE, true);
+        // permissions for testing purposes
+        dictator.setPermission(oracle, users.owner, oracle.setPrimaryPrice.selector);
     }
 
     function testMedianWntPriceInUsd() public {

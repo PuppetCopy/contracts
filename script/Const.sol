@@ -10,11 +10,17 @@ library Address {
 
     address constant BasePool = 0xF2658f994C882237d3612099cae541d50348FCf9;
 
+    address constant VotingEscrow = 0xE0aa1551575d2ed4b5AD473a11065406f285eB13;
+
     address constant OracleLogic = 0x412979f3210d8cf121971B0176cA3704b8bE0945;
     address constant PriceStore = 0xe9e9ce24275Ec23257551Cbb62D79A4e9cfE2428;
     address constant RewardLogic = 0x356Df7BE8a48d514c3A24A4b4cC0CB4AAd45B617;
-    address constant VotingEscrow = 0xd6D057D0b2f16a9bcdca4b8A7EF3532386cB3058;
+    address constant RewardStore = 0x8242D1541f53B6CB5801C8Ff38168B4b4e044039;
     address constant RewardRouter = 0xeBE43819468Bc0B167Baa5224Fe46A9EaDCA67Ce;
+
+    address constant PuppetStore = 0x1eC471E44C863c355ea22b98993ecCD63E2BCDfb;
+    address constant PuppetRouter = 0xA9Bb45baA076056528e4eA78ccdeF9A587138111;
+    address constant SubaccountStore = 0xBbF470a2ad3eE91305f06704109D3bB7C1858F03;
 
     address constant nt = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     address constant wnt = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
@@ -33,22 +39,4 @@ library Address {
     address constant gmxEthUsdcMarket = 0x70d95587d40A2caf56bd97485aB3Eec10Bee6336;
 
     bytes32 constant referralCode = 0x5055505045540000000000000000000000000000000000000000000000000000;
-}
-
-library Role {
-    uint8 constant ADMIN = 0;
-    uint8 constant TOKEN_TRANSFER = 1;
-    uint8 constant MINT_PUPPET = 2;
-    uint8 constant MINT_CORE_RELEASE = 3;
-
-    uint8 constant SET_ORACLE_PRICE = 4;
-    uint8 constant CLAIM = 5;
-    uint8 constant INCREASE_CONTRIBUTION = 6;
-    uint8 constant CONTRIBUTE = 7;
-    uint8 constant VEST = 8;
-
-    uint8 constant SUBACCOUNT_CREATE = 9;
-    uint8 constant SUBACCOUNT_SET_OPERATOR = 10;
-    uint8 constant EXECUTE_ORDER = 11;
-    uint8 constant PUPPET_DECREASE_BALANCE_AND_SET_ACTIVITY = 12;
 }

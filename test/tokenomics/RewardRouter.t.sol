@@ -5,27 +5,27 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {RewardRouter} from "src/RewardRouter.sol";
-import {OracleStore} from "src/tokenomics/store/OracleStore.sol";
-import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
-import {VotingEscrow, MAXTIME} from "src/tokenomics/VotingEscrow.sol";
-import {RewardLogic} from "src/tokenomics/logic/RewardLogic.sol";
-import {Oracle} from "src/tokenomics/Oracle.sol";
+import {RewardRouter} from "src/token/RewardRouter.sol";
+import {OracleStore} from "src/token/store/OracleStore.sol";
+import {PuppetToken} from "src/token/PuppetToken.sol";
+import {VotingEscrow, MAXTIME} from "src/token/VotingEscrow.sol";
+import {RewardLogic} from "src/token/logic/RewardLogic.sol";
+import {Oracle} from "src/token/Oracle.sol";
+
+import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
 import {Precision} from "src/utils/Precision.sol";
-import {CugarStore} from "src/shared/store/CugarStore.sol";
-import {Cugar} from "src/shared/Cugar.sol";
+import {RewardStore, CURSOR_INTERVAL} from "./../../src/token/store/RewardStore.sol";
 
-import {SharedSetup} from "test/base/SharedSetup.t.sol";
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 import {MockUniswapV3Pool} from "test/mocks/MockUniswapV3Pool.sol";
 
-import {Role} from "script/Const.sol";
-
-contract RewardRouterTest is SharedSetup {
+contract RewardRouterTest is BasicSetup {
+    VotingEscrow votingEscrow;
     MockWeightedPoolVault primaryVaultPool;
     OracleStore oracleStore;
     RewardRouter rewardRouter;
+    RewardStore rewardStore;
     Oracle oracle;
 
     IUniswapV3Pool[] wntUsdPoolList;
@@ -39,6 +39,9 @@ contract RewardRouterTest is SharedSetup {
 
     function setUp() public override {
         super.setUp();
+
+        votingEscrow = new VotingEscrow(dictator, router, puppetToken);
+        dictator.setPermission(router, address(votingEscrow), router.transfer.selector);
 
         wntUsdPoolList = new MockUniswapV3Pool[](3);
 
@@ -60,9 +63,7 @@ contract RewardRouterTest is SharedSetup {
         primaryVaultPool = new MockWeightedPoolVault();
         primaryVaultPool.initPool(address(puppetToken), address(wnt), 20e18, 80e18);
 
-        address rewardRouterAddress = computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1);
-
-        oracleStore = new OracleStore(dictator, rewardRouterAddress, 1e18);
+        oracleStore = new OracleStore(dictator, 1e18);
         oracle = new Oracle(
             dictator,
             oracleStore,
@@ -70,36 +71,33 @@ contract RewardRouterTest is SharedSetup {
             revenueInTokenList,
             exchangePriceSourceList
         );
-        dictator.setRoleCapability(Role.SET_ORACLE_PRICE, address(oracle), oracle.setPrimaryPrice.selector, true);
+        dictator.setAccess(oracleStore, address(oracle));
 
+        rewardStore = new RewardStore(dictator, router);
+        dictator.setPermission(router, address(rewardStore), router.transfer.selector);
         rewardRouter = new RewardRouter(
             dictator,
             router,
             votingEscrow,
-            cugar,
+            rewardStore,
             RewardRouter.CallConfig({
-                lock: RewardLogic.CallLockConfig({
-                    votingEscrow: votingEscrow,
-                    oracle: oracle,
-                    cugar: cugar,
+                lock: RewardLogic.CallLockConfig({oracle: oracle, puppetToken: puppetToken, revenueSource: users.owner, rate: 6000}),
+                exit: RewardLogic.CallExitConfig({
+                    oracle: oracle, //
                     puppetToken: puppetToken,
                     revenueSource: users.owner,
-                    rate: 6000
-                }),
-                exit: RewardLogic.CallExitConfig({oracle: oracle, cugar: cugar, puppetToken: puppetToken, revenueSource: users.owner, rate: 3000})
+                    rate: 3000
+                })
             })
         );
+        dictator.setAccess(rewardStore, address(rewardRouter));
 
-        dictator.setUserRole(address(rewardRouter), Role.MINT_PUPPET, true);
-        dictator.setUserRole(address(rewardRouter), Role.VEST, true);
-        dictator.setUserRole(address(rewardRouter), Role.CONTRIBUTE, true);
+        dictator.setAccess(votingEscrow, address(rewardRouter));
+        dictator.setPermission(oracle, address(rewardRouter), oracle.setPrimaryPrice.selector);
+        dictator.setPermission(puppetToken, address(rewardRouter), puppetToken.mint.selector);
 
-        dictator.setUserRole(address(rewardRouter), Role.SET_ORACLE_PRICE, true);
-        dictator.setUserRole(address(rewardRouter), Role.CLAIM, true);
-
-        // roles & permissions used for testing
-        dictator.setUserRole(users.owner, Role.INCREASE_CONTRIBUTION, true);
-
+        // permissions used for testing
+        dictator.setAccess(rewardStore, users.owner);
         wnt.approve(address(router), type(uint).max - 1);
         revenueInTokenList[0].approve(address(router), type(uint).max - 1);
     }
@@ -136,7 +134,7 @@ contract RewardRouterTest is SharedSetup {
         skip(1 weeks);
         vm.startPrank(users.alice);
         assertEq(claim(wnt, users.alice), 2e18);
-        assertEq(cugar.getClaimable(cugarStore, wnt, users.yossi), 0);
+        assertEq(rewardRouter.getClaimable(wnt, users.yossi), 0);
     }
 
     function testLockOption() public {
@@ -159,17 +157,17 @@ contract RewardRouterTest is SharedSetup {
 
         skip(1 weeks);
         assertEq(claim(wnt, users.alice), 1e18);
-        assertEq(wnt.balanceOf(address(cugarStore)), 1e18);
+        assertEq(wnt.balanceOf(address(rewardStore)), 1e18);
         skip(2 weeks);
-        assertEq(cugar.getClaimable(cugarStore, wnt, users.yossi), 1e18);
+        assertEq(rewardRouter.getClaimable(wnt, users.yossi), 1e18);
 
         generateUserRevenueInWnt(users.bob, 1e18);
         lock(wnt, getMaxTime(), 1e18, 1e18);
 
         skip(1 weeks);
-        cugar.getClaimable(cugarStore, wnt, users.alice);
-        assertEq(cugar.getClaimableCursor(cugarStore, wnt, users.yossi, 1 weeks), 1e18);
-        assertAlmostEq(cugar.getClaimable(cugarStore, wnt, users.yossi), 1.33e18, 0.005e18);
+        rewardRouter.getClaimable(wnt, users.alice);
+        assertEq(rewardRouter.getClaimableCursor(wnt, users.yossi, 1 weeks), 1e18);
+        assertAlmostEq(rewardRouter.getClaimable(wnt, users.yossi), 1.33e18, 0.005e18);
     }
 
     function testOptionDecay() public {
@@ -181,7 +179,7 @@ contract RewardRouterTest is SharedSetup {
         skip(1 days);
         lock(wnt, getMaxTime(), 1e18, 1e18);
 
-        assertEq(cugar.getClaimableCursor(cugarStore, wnt, users.yossi, 1 weeks), 1e18);
+        assertEq(rewardRouter.getClaimableCursor(wnt, users.yossi, 1 weeks), 1e18);
 
         skip(1 weeks);
 
@@ -189,25 +187,25 @@ contract RewardRouterTest is SharedSetup {
         lock(wnt, getMaxTime(), 1e18, 1e18);
         skip(1 weeks);
 
-        assertEq(cugar.getClaimableCursor(cugarStore, wnt, users.yossi, 1 weeks), 1e18);
-        assertEq(cugar.getClaimableCursor(cugarStore, wnt, users.alice, 1 weeks), 1e18);
-        assertAlmostEq(cugar.getClaimable(cugarStore, wnt, users.alice), 1.333e18, 0.005e18);
-        assertAlmostEq(cugar.getClaimable(cugarStore, wnt, users.yossi), 1.333e18, 0.005e18);
-        assertAlmostEq(cugar.getClaimable(cugarStore, wnt, users.bob), 0.333e18, 0.005e18);
+        assertEq(rewardRouter.getClaimableCursor(wnt, users.yossi, 1 weeks), 1e18);
+        assertEq(rewardRouter.getClaimableCursor(wnt, users.alice, 1 weeks), 1e18);
+        assertAlmostEq(rewardRouter.getClaimable(wnt, users.alice), 1.333e18, 0.005e18);
+        assertAlmostEq(rewardRouter.getClaimable(wnt, users.yossi), 1.333e18, 0.005e18);
+        assertAlmostEq(rewardRouter.getClaimable(wnt, users.bob), 0.333e18, 0.005e18);
 
         skip(getMaxTime() / 2);
-        assertEq(cugar.getClaimableCursor(cugarStore, wnt, users.yossi, 1 weeks), 1e18);
-        assertEq(cugar.getClaimableCursor(cugarStore, wnt, users.alice, 1 weeks), 1e18);
-        assertAlmostEq(cugar.getClaimable(cugarStore, wnt, users.alice), 1.333e18, 0.005e18);
-        assertAlmostEq(cugar.getClaimable(cugarStore, wnt, users.yossi), 1.333e18, 0.005e18);
+        assertEq(rewardRouter.getClaimableCursor(wnt, users.yossi, 1 weeks), 1e18);
+        assertEq(rewardRouter.getClaimableCursor(wnt, users.alice, 1 weeks), 1e18);
+        assertAlmostEq(rewardRouter.getClaimable(wnt, users.alice), 1.333e18, 0.005e18);
+        assertAlmostEq(rewardRouter.getClaimable(wnt, users.yossi), 1.333e18, 0.005e18);
         assertAlmostEq(claim(wnt, users.bob), 0.333e18, 0.005e18);
-        assertEq(cugar.getClaimable(cugarStore, wnt, users.bob), 0);
+        assertEq(rewardRouter.getClaimable(wnt, users.bob), 0);
 
         generateUserRevenueInWnt(users.bob, 2e18);
         lock(wnt, getMaxTime(), 1e18, 2e18);
         skip(1 weeks);
 
-        assertAlmostEq(cugar.getClaimable(cugarStore, wnt, users.bob), 1.525e18, 0.005e18);
+        assertAlmostEq(rewardRouter.getClaimable(wnt, users.bob), 1.525e18, 0.005e18);
     }
 
     function testCrossedFlow() public {
@@ -230,19 +228,19 @@ contract RewardRouterTest is SharedSetup {
     }
 
     function lock(IERC20 token, uint unlockTime, uint acceptableTokenPrice, uint cugarAmount) public returns (uint) {
-        return rewardRouter.lock(cugarStore, token, unlockTime, acceptableTokenPrice, cugarAmount);
+        return rewardRouter.lock(token, unlockTime, acceptableTokenPrice, cugarAmount);
     }
 
     function exit(IERC20 token, uint acceptableTokenPrice, uint cugarAmount) public returns (uint) {
-        return rewardRouter.exit(cugarStore, token, acceptableTokenPrice, cugarAmount);
+        return rewardRouter.exit(token, acceptableTokenPrice, cugarAmount);
     }
 
     function claim(IERC20 token, address receiver) public returns (uint) {
-        return rewardRouter.claim(cugarStore, token, receiver);
+        return rewardRouter.claim(token, receiver);
     }
 
     function getMaxClaimableAmount(IERC20 token, address user) public view returns (uint) {
-        uint contribution = cugarStore.getSeedContribution(token, user);
+        uint contribution = rewardStore.getSeedContribution(token, user);
         uint maxPrice = oracle.getMaxPrice(token, oracle.getPrimaryPoolPrice());
         uint maxClaimable = contribution * 1e18 / maxPrice;
 
@@ -273,7 +271,7 @@ contract RewardRouterTest is SharedSetup {
         vm.startPrank(users.owner);
 
         _dealERC20(address(token), users.owner, amount);
-        cugar.increaseSeedContribution(cugarStore, token, user, amount);
+        rewardStore.increaseUserSeedContribution(token, _getCursor(block.timestamp), users.owner, user, amount);
 
         skip(10);
 
@@ -288,5 +286,9 @@ contract RewardRouterTest is SharedSetup {
 
     function fromPriceToSqrt(uint usdcPerWeth) public pure returns (uint160) {
         return uint160(Math.sqrt(usdcPerWeth * 1e12) << 96) / 1e12 + 1;
+    }
+
+    function _getCursor(uint _time) internal pure returns (uint) {
+        return (_time / CURSOR_INTERVAL) * CURSOR_INTERVAL;
     }
 }

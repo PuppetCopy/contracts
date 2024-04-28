@@ -10,17 +10,12 @@ import {IWNT} from "./../../utils/interfaces/IWNT.sol";
 import {ErrorUtils} from "./../../utils/ErrorUtils.sol";
 import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
 import {PositionUtils} from "./../util/PositionUtils.sol";
-import {Router} from "./../../shared/Router.sol";
-
 import {TransferUtils} from "./../../utils/TransferUtils.sol";
 
+import {Router} from "./../../shared/Router.sol";
 import {Subaccount} from "./../../shared/Subaccount.sol";
-import {SubaccountFactory} from "./../../shared/SubaccountFactory.sol";
 import {SubaccountStore} from "./../../shared/store/SubaccountStore.sol";
-
-import {PuppetStore} from "./../store/PuppetStore.sol";
-
-import {PuppetRouter} from "./../../PuppetRouter.sol";
+import {PuppetStore} from "./../../puppet/store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
 
 library RequestIncreasePosition {
@@ -43,12 +38,9 @@ library RequestIncreasePosition {
         IWNT wnt;
         IGmxExchangeRouter gmxExchangeRouter;
         Router router;
-        SubaccountFactory subaccountFactory;
         SubaccountStore subaccountStore;
         PositionStore positionStore;
-        PuppetRouter puppetRouter;
         PuppetStore puppetStore;
-        address gmxOrderCallbackHandler;
         address gmxOrderReciever;
         address gmxOrderVault;
         bytes32 referralCode;
@@ -149,7 +141,7 @@ library RequestIncreasePosition {
         address subaccountAddress = address(callConfig.subaccountStore.getSubaccount(traderCallParams.account));
 
         if (subaccountAddress == address(0)) {
-            subaccountAddress = address(callConfig.subaccountFactory.createSubaccount(callConfig.subaccountStore, traderCallParams.account));
+            subaccountAddress = address(callConfig.subaccountStore.setSubaccount(traderCallParams.account));
         }
 
         bytes32 positionKey =
@@ -236,14 +228,8 @@ library RequestIncreasePosition {
             }
         }
 
-        callConfig.puppetRouter.decreaseBalanceAndSetActivityList(
-            callConfig.puppetStore,
-            traderCallParams.collateralToken,
-            callConfig.gmxOrderVault,
-            traderCallParams.account,
-            block.timestamp,
-            puppetList,
-            callParams.balanceList
+        callConfig.puppetStore.decreaseBalanceAndSetActivityList(
+            traderCallParams.collateralToken, callConfig.gmxOrderVault, traderCallParams.account, block.timestamp, puppetList, callParams.balanceList
         );
         callConfig.positionStore.setRequestMatch(callParams.positionKey, requestMatch);
 
@@ -291,8 +277,7 @@ library RequestIncreasePosition {
 
         bytes32 requestKey;
 
-        callConfig.puppetRouter.decreaseBalanceAndSetActivityList(
-            callConfig.puppetStore,
+        callConfig.puppetStore.decreaseBalanceAndSetActivityList(
             traderCallParams.collateralToken,
             callConfig.gmxOrderVault,
             traderCallParams.account,
@@ -327,7 +312,7 @@ library RequestIncreasePosition {
         GmxPositionUtils.CreateOrderParams memory orderParams = GmxPositionUtils.CreateOrderParams({
             addresses: GmxPositionUtils.CreateOrderParamsAddresses({
                 receiver: callConfig.gmxOrderReciever,
-                callbackContract: callConfig.gmxOrderCallbackHandler,
+                callbackContract: address(this),
                 uiFeeReceiver: address(0),
                 market: traderCallParams.market,
                 initialCollateralToken: traderCallParams.collateralToken,
@@ -382,7 +367,7 @@ library RequestIncreasePosition {
         GmxPositionUtils.CreateOrderParams memory params = GmxPositionUtils.CreateOrderParams({
             addresses: GmxPositionUtils.CreateOrderParamsAddresses({
                 receiver: callConfig.gmxOrderReciever,
-                callbackContract: callConfig.gmxOrderCallbackHandler,
+                callbackContract: address(this),
                 uiFeeReceiver: address(0),
                 market: traderCallParams.market,
                 initialCollateralToken: traderCallParams.collateralToken,

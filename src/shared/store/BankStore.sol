@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
+import {Auth} from "./../../utils/auth/Auth.sol";
+
 import {Router} from "../Router.sol";
-import {StoreController} from "./StoreController.sol";
 
 // @title Bank
 // @dev Contract to handle storing and transferring of tokens
-abstract contract BankStore is StoreController {
+abstract contract BankStore is Auth {
     mapping(IERC20 => uint) public tokenBalanceMap;
 
     Router router;
 
-    constructor(Authority _authority, Router _router, address _initSetter) StoreController(_authority, _initSetter) {
+    constructor(IAuthority _authority, Router _router) Auth(_authority) {
         router = _router;
     }
 
@@ -26,7 +27,7 @@ abstract contract BankStore is StoreController {
         return _recordTransferIn(_token);
     }
 
-    function syncTokenBalance(IERC20 _token) external isSetter {
+    function syncTokenBalance(IERC20 _token) external auth {
         tokenBalanceMap[_token] = _token.balanceOf(address(this));
     }
 
@@ -35,8 +36,8 @@ abstract contract BankStore is StoreController {
         tokenBalanceMap[_token] -= _value;
     }
 
-    function _transferIn(IERC20 _token, address _user, uint _value) internal {
-        router.transfer(_token, _user, address(this), _value);
+    function _transferIn(IERC20 _token, address _depositor, uint _value) internal {
+        router.transfer(_token, _depositor, address(this), _value);
         tokenBalanceMap[_token] += _value;
     }
 

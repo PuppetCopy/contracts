@@ -13,7 +13,7 @@ import {TransferUtils} from "./../../utils/TransferUtils.sol";
 import {IWNT} from "./../../utils/interfaces/IWNT.sol";
 
 import {PositionStore} from "../store/PositionStore.sol";
-import {SubaccountStore} from "../../shared/store/SubaccountStore.sol";
+import {SubaccountStore} from "./../../shared/store/SubaccountStore.sol";
 
 library RequestDecreasePosition {
     event RequestDecreasePosition__Request(
@@ -25,7 +25,6 @@ library RequestDecreasePosition {
         IGmxExchangeRouter gmxExchangeRouter;
         PositionStore positionStore;
         SubaccountStore subaccountStore;
-        address gmxOrderCallbackHandler;
         address gmxOrderReciever;
         address gmxOrderVault;
         bytes32 referralCode;

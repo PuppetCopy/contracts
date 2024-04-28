@@ -5,10 +5,10 @@ import {PRBTest} from "@prb/test/src/PRBTest.sol";
 
 import {Dictator} from "src/shared/Dictator.sol";
 import {Router} from "src/shared/Router.sol";
-import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+import {PuppetToken} from "src/token/PuppetToken.sol";
+import {VotingEscrow} from "src/token/VotingEscrow.sol";
 
-import {Address, Role} from "script/Const.sol";
-
+import {Address} from "script/Const.sol";
 
 contract DeployToken is PRBTest {
     function run() public {
@@ -22,10 +22,7 @@ contract DeployToken is PRBTest {
     function deployContracts() internal {
         Dictator dictator = Dictator(Address.Dictator);
         PuppetToken puppetToken = new PuppetToken(dictator, PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}));
-        dictator.setRoleCapability(Role.MINT_PUPPET, address(puppetToken), puppetToken.mint.selector, true);
-        dictator.setRoleCapability(Role.MINT_CORE_RELEASE, address(puppetToken), puppetToken.mintCore.selector, true);
-
         Router router = new Router(dictator, 200_000);
-        dictator.setRoleCapability(Role.TOKEN_TRANSFER, address(router), router.transfer.selector, true);
+        VotingEscrow votingEscrow = new VotingEscrow(dictator, router, puppetToken);
     }
 }

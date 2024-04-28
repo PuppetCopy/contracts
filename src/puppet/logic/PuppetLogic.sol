@@ -3,11 +3,8 @@ pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {SubaccountFactory} from "./../../shared/SubaccountFactory.sol";
-import {SubaccountStore} from "./../../shared/store/SubaccountStore.sol";
-
 import {Router} from "./../../shared/Router.sol";
-import {PositionUtils} from "../util/PositionUtils.sol";
+import {PositionUtils} from "../../position/util/PositionUtils.sol";
 import {PuppetStore} from "../store/PuppetStore.sol";
 
 library PuppetLogic {
@@ -17,46 +14,32 @@ library PuppetLogic {
 
     struct CallSetRuleConfig {
         Router router;
-        PuppetStore store;
         uint minExpiryDuration;
         uint minAllowanceRate;
         uint maxAllowanceRate;
     }
 
-    struct CallCreateSubaccountConfig {
-        SubaccountFactory factory;
-        SubaccountStore store;
-    }
-
-    struct CallSetBalanceConfig {
-        Router router;
-        PuppetStore store;
-    }
-
-    function createSubaccount(CallCreateSubaccountConfig memory callConfig, address user) internal {
-        callConfig.factory.createSubaccount(callConfig.store, user);
-    }
-
-    function deposit(CallSetBalanceConfig memory callConfig, IERC20 token, address user, uint amount) internal {
+    function deposit(PuppetStore store, IERC20 token, address user, uint amount) internal {
         if (amount == 0) revert PuppetLogic__InvalidAmount();
 
-        callConfig.store.increaseBalance(token, user, amount);
+        store.increaseBalance(token, user, amount);
 
         emit PuppetLogic__Deposit(token, user, amount);
     }
 
-    function withdraw(CallSetBalanceConfig memory callConfig, IERC20 token, address user, address receiver, uint amount) internal {
+    function withdraw(PuppetStore store, IERC20 token, address user, address receiver, uint amount) internal {
         if (amount == 0) revert PuppetLogic__InvalidAmount();
 
-        uint balance = callConfig.store.getBalance(token, user);
+        uint balance = store.getBalance(token, user);
         if (amount > balance) revert PuppetLogic__InsufficientBalance();
 
-        callConfig.store.decreaseBalance(token, user, receiver, amount);
+        store.decreaseBalance(token, user, receiver, amount);
 
         emit PuppetLogic__Withdraw(token, user, amount);
     }
 
     function setRule(
+        PuppetStore store,
         CallSetRuleConfig memory callConfig,
         IERC20 collateralToken,
         address puppet,
@@ -64,17 +47,18 @@ library PuppetLogic {
         PuppetStore.Rule calldata ruleParams
     ) internal {
         bytes32 ruleKey = PositionUtils.getRuleKey(collateralToken, puppet, trader);
-        _validatePuppetTokenAllowance(callConfig.store, collateralToken, puppet);
+        _validatePuppetTokenAllowance(store, collateralToken, puppet);
 
-        PuppetStore.Rule memory storedRule = callConfig.store.getRule(ruleKey);
+        PuppetStore.Rule memory storedRule = store.getRule(ruleKey);
         PuppetStore.Rule memory rule = _setRule(callConfig, storedRule, ruleParams);
 
-        callConfig.store.setRule(ruleKey, rule);
+        store.setRule(ruleKey, rule);
 
         emit PuppetLogic__SetRule(ruleKey, rule);
     }
 
     function setRuleList(
+        PuppetStore store,
         CallSetRuleConfig memory callConfig,
         address puppet,
         address[] calldata traderList,
@@ -89,7 +73,7 @@ library PuppetLogic {
             keyList[i] = PositionUtils.getRuleKey(collateralTokenList[i], puppet, traderList[i]);
         }
 
-        PuppetStore.Rule[] memory storedRuleList = callConfig.store.getRuleList(keyList);
+        PuppetStore.Rule[] memory storedRuleList = store.getRuleList(keyList);
 
         for (uint i = 0; i < length; i++) {
             storedRuleList[i] = _setRule(callConfig, storedRuleList[i], ruleParams[i]);
@@ -101,9 +85,9 @@ library PuppetLogic {
             emit PuppetLogic__SetRule(keyList[i], storedRuleList[i]);
         }
 
-        callConfig.store.setRuleList(keyList, storedRuleList);
+        store.setRuleList(keyList, storedRuleList);
 
-        _validatePuppetTokenAllowanceList(callConfig.store, verifyAllowanceTokenList, puppet);
+        _validatePuppetTokenAllowanceList(store, verifyAllowanceTokenList, puppet);
     }
 
     function _setRule(

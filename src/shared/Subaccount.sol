@@ -13,7 +13,7 @@ contract Subaccount {
     }
 
     modifier onlyOperator() {
-        if (msg.sender != store.operator()) revert Subaccount__NotCallbackCaller();
+        if (msg.sender != store.operator()) revert Subaccount__UnauthorizedOperator();
         _;
     }
 
@@ -21,5 +21,5 @@ contract Subaccount {
         return _contract.call{value: msg.value, gas: gasleft()}(_data);
     }
 
-    error Subaccount__NotCallbackCaller();
+    error Subaccount__UnauthorizedOperator();
 }

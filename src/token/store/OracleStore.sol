@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {Auth, Authority} from "@solmate/contracts/auth/Auth.sol";
-
-import {StoreController} from "../../shared/store/StoreController.sol";
+import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
+import {Auth} from "./../../utils/auth/Auth.sol";
 
 uint8 constant SLOT_COUNT = 7;
 
-contract OracleStore is StoreController {
+contract OracleStore is Auth {
     struct SeedSlot {
         uint price;
         uint blockNumber;
@@ -24,7 +23,7 @@ contract OracleStore is StoreController {
     uint[SLOT_COUNT] public slotMax;
     uint public medianMax;
 
-    constructor(Authority _authority, address _initSetter, uint _seedPrice) StoreController(_authority, _initSetter) {
+    constructor(IAuthority _authority, uint _seedPrice) Auth(_authority) {
         require(_seedPrice > 0, "Seed price cannot be 0");
 
         seed = SeedSlot({price: _seedPrice, blockNumber: block.number, timestamp: block.timestamp});
@@ -43,7 +42,7 @@ contract OracleStore is StoreController {
         return seed;
     }
 
-    function setLatestSeed(SeedSlot memory _seed) external isSetter {
+    function setLatestSeed(SeedSlot memory _seed) external auth {
         seed = _seed;
     }
 
@@ -51,7 +50,7 @@ contract OracleStore is StoreController {
         return slotMin;
     }
 
-    function setSlotMin(uint8 _slot, uint _price) external isSetter {
+    function setSlotMin(uint8 _slot, uint _price) external auth {
         slotMin[_slot] = _price;
     }
 
@@ -59,19 +58,19 @@ contract OracleStore is StoreController {
         return slotMax;
     }
 
-    function setSlotMax(uint8 _slot, uint _price) external isSetter {
+    function setSlotMax(uint8 _slot, uint _price) external auth {
         slotMax[_slot] = _price;
     }
 
-    function setSlot(uint8 _slot) external isSetter {
+    function setSlot(uint8 _slot) external auth {
         slot = _slot;
     }
 
-    function setMedianMin(uint _medianMin) external isSetter {
+    function setMedianMin(uint _medianMin) external auth {
         medianMin = _medianMin;
     }
 
-    function setMedianMax(uint _medianMax) external isSetter {
+    function setMedianMax(uint _medianMax) external auth {
         medianMax = _medianMax;
     }
 }
