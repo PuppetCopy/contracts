@@ -4,13 +4,12 @@ pragma solidity 0.8.24;
 library Address {
     address constant dao = 0x189b21eda0cff16461913D616a0A4F711Cd986cB;
 
-    address constant Dictator = 0xeC4B2FEB1C314744D55f5b280A8C632015774dcd;
-    address constant PuppetToken = 0x4F489Ef21E74E6736F4e5929Dc9865E4C5fe4040;
-    address constant Router = 0xdC42a2f75a7000007C683Cb076EC5c805211F210;
+    address constant Dictator = 0x406945E0BF3c6D3998d7A8E090B1D71960f55D36;
+    address constant PuppetToken = 0xD3f7bD9dA85AD2c985A16eFCE50b97942AD05094;
+    address constant Router = 0x3E00C677Ac69b68a21871b9EE0888EaA6046d37D;
+    address constant VotingEscrow = 0xA5648F9E5ee3a1aA5037fc529EC988AD813AAcf1;
 
     address constant BasePool = 0xF2658f994C882237d3612099cae541d50348FCf9;
-
-    address constant VotingEscrow = 0xE0aa1551575d2ed4b5AD473a11065406f285eB13;
 
     address constant OracleLogic = 0x412979f3210d8cf121971B0176cA3704b8bE0945;
     address constant PriceStore = 0xe9e9ce24275Ec23257551Cbb62D79A4e9cfE2428;

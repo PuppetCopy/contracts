@@ -2,7 +2,6 @@
 pragma solidity 0.8.24;
 
 import {VotingEscrow} from "src/token/VotingEscrow.sol";
-import {Dictator} from "src/shared/Dictator.sol";
 import {Router} from "src/shared/Router.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";

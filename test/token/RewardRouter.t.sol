@@ -35,7 +35,7 @@ contract RewardRouterTest is BasicSetup {
     uint public lockRate = 6000;
     uint public exitRate = 3000;
 
-    IERC20[] revenueInTokenList;
+    IERC20[] secondaryPriceConfigList;
 
     function setUp() public override {
         super.setUp();
@@ -49,15 +49,15 @@ contract RewardRouterTest is BasicSetup {
         wntUsdPoolList[1] = new MockUniswapV3Pool(fromPriceToSqrt(100));
         wntUsdPoolList[2] = new MockUniswapV3Pool(fromPriceToSqrt(100));
 
-        revenueInTokenList = new IERC20[](1);
-        revenueInTokenList[0] = usdc;
+        secondaryPriceConfigList = new IERC20[](1);
+        secondaryPriceConfigList[0] = usdc;
 
         Oracle.SecondaryPriceConfig[] memory exchangePriceSourceList = new Oracle.SecondaryPriceConfig[](1);
         exchangePriceSourceList[0] = Oracle.SecondaryPriceConfig({
             enabled: true, //
             sourceList: wntUsdPoolList,
             twapInterval: 0,
-            sourceTokenDeicmals: 6
+            token1Deicmals: 6
         });
 
         primaryVaultPool = new MockWeightedPoolVault();
@@ -67,8 +67,8 @@ contract RewardRouterTest is BasicSetup {
         oracle = new Oracle(
             dictator,
             oracleStore,
-            Oracle.CallConfig({token1: wnt, vault: primaryVaultPool, poolId: 0, updateInterval: 1 days}),
-            revenueInTokenList,
+            Oracle.CallConfig({token: wnt, vault: primaryVaultPool, poolId: 0, updateInterval: 1 days}),
+            secondaryPriceConfigList,
             exchangePriceSourceList
         );
         dictator.setAccess(oracleStore, address(oracle));
@@ -81,13 +81,8 @@ contract RewardRouterTest is BasicSetup {
             votingEscrow,
             rewardStore,
             RewardRouter.CallConfig({
-                lock: RewardLogic.CallLockConfig({oracle: oracle, puppetToken: puppetToken, revenueSource: users.owner, rate: 6000}),
-                exit: RewardLogic.CallExitConfig({
-                    oracle: oracle, //
-                    puppetToken: puppetToken,
-                    revenueSource: users.owner,
-                    rate: 3000
-                })
+                lock: RewardLogic.CallLockConfig({oracle: oracle, puppetToken: puppetToken, rate: 6000}),
+                exit: RewardLogic.CallExitConfig({oracle: oracle, puppetToken: puppetToken, rate: 3000})
             })
         );
         dictator.setAccess(rewardStore, address(rewardRouter));
@@ -99,7 +94,7 @@ contract RewardRouterTest is BasicSetup {
         // permissions used for testing
         dictator.setAccess(rewardStore, users.owner);
         wnt.approve(address(router), type(uint).max - 1);
-        revenueInTokenList[0].approve(address(router), type(uint).max - 1);
+        secondaryPriceConfigList[0].approve(address(router), type(uint).max - 1);
     }
 
     function testOptionRevert() public {

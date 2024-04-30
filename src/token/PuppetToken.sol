@@ -7,7 +7,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Permission} from "./../utils/auth/Permission.sol";
 
 import {Precision} from "./../utils/Precision.sol";
-import {Dictator} from "./../shared/Dictator.sol";
+import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 
 /**
  * @title PuppetToken
@@ -25,7 +25,7 @@ contract PuppetToken is Permission, ERC20 {
     uint private constant GENESIS_MINT_AMOUNT = 100_000e18;
 
     struct Config {
-        uint limitFactor; // Rate limit for minting new tokens in basis points
+        uint limitFactor; // Rate limit for minting new tokens in percentage of total supply
         uint durationWindow; // Time window for minting rate limit in seconds
     }
 
@@ -38,9 +38,9 @@ contract PuppetToken is Permission, ERC20 {
     uint public mineMintCount = 0; // the amount of tokens minted through protocol use
     uint public coreMintCount = 0; // the  amount of tokens released to the core
 
-    constructor(Dictator _authority, Config memory _config) Permission(_authority) ERC20("Puppet Test", "PUPPET-TEST") {
+    constructor(IAuthority _authority, Config memory _config, address receiver) Permission(_authority) ERC20("Puppet Test", "PUPPET-TEST") {
         _setConfig(_config); // init at 1% of circulating supply per hour
-        _mint(_authority.owner(), GENESIS_MINT_AMOUNT);
+        _mint(receiver, GENESIS_MINT_AMOUNT);
     }
 
     function getLimitAmount() public view returns (uint) {
@@ -58,7 +58,7 @@ contract PuppetToken is Permission, ERC20 {
     }
 
     /**
-     * @dev Mints new tokens with a governance-controlled rate limit.
+     * @dev Mints new tokens with a governance-configured rate limit.
      * @param _receiver The address to mint tokens to.
      * @param _amount The amount of tokens to mint.
      * @return The amount of tokens minted.

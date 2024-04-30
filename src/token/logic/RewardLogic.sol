@@ -25,14 +25,12 @@ library RewardLogic {
     struct CallLockConfig {
         Oracle oracle;
         PuppetToken puppetToken;
-        address revenueSource;
         uint rate;
     }
 
     struct CallExitConfig {
         Oracle oracle;
         PuppetToken puppetToken;
-        address revenueSource;
         uint rate;
     }
 

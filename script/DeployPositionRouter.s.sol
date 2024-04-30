@@ -31,13 +31,13 @@
 
 // contract DeployPuppetRouter is PRBTest, StdUtils {
 //     function run() public {
-//         vm.startBroadcast(vm.envUint("GBC_DEPLOYER_PRIVATE_KEY"));
+//         vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
 //         deployContracts();
 //         vm.stopBroadcast();
 //     }
 
 //     function deployContracts() internal {
-//         address deployer = vm.envAddress("GBC_DEPLOYER_ADDRESS");
+//         address deployer = vm.envAddress("DEPLOYER_ADDRESS");
 
 //         IERC20 usdc = IERC20(Address.usdc);
 //         IWNT wnt = IWNT(Address.wnt);

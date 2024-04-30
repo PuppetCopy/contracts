@@ -144,8 +144,12 @@ library RequestIncreasePosition {
             subaccountAddress = address(callConfig.subaccountStore.setSubaccount(traderCallParams.account));
         }
 
-        bytes32 positionKey =
-            GmxPositionUtils.getPositionKey(subaccountAddress, traderCallParams.market, traderCallParams.collateralToken, traderCallParams.isLong);
+        bytes32 positionKey = GmxPositionUtils.getPositionKey(
+            subaccountAddress, //
+            traderCallParams.market,
+            traderCallParams.collateralToken,
+            traderCallParams.isLong
+        );
 
         PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
 

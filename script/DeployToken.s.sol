@@ -12,7 +12,7 @@ import {Address} from "script/Const.sol";
 
 contract DeployToken is PRBTest {
     function run() public {
-        vm.startBroadcast(vm.envUint("GBC_DEPLOYER_PRIVATE_KEY"));
+        vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
 
         // deployContracts();
 
@@ -20,8 +20,8 @@ contract DeployToken is PRBTest {
     }
 
     function deployContracts() internal {
-        Dictator dictator = Dictator(Address.Dictator);
-        PuppetToken puppetToken = new PuppetToken(dictator, PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}));
+        Dictator dictator = new Dictator(Address.dao);
+        PuppetToken puppetToken = new PuppetToken(dictator, PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}), Address.dao);
         Router router = new Router(dictator, 200_000);
         VotingEscrow votingEscrow = new VotingEscrow(dictator, router, puppetToken);
     }

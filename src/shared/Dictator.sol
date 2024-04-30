@@ -8,10 +8,17 @@ import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 import {Auth} from "./../utils/auth/Auth.sol";
 import {Permission} from "./../utils/auth/Permission.sol";
 
-
 contract Dictator is Ownable, IAuthority {
     event UpdateAccess(address target, bool enabled);
     event UpdatePermission(address target, bytes4 functionSig, bool enabled);
+
+    function hasAccess(Auth target, address user) external view returns (bool) {
+        return target.canCall(user);
+    }
+
+    function hasPermission(Permission target, address user, bytes4 functionSig) external view returns (bool) {
+        return target.canCall(user, functionSig);
+    }
 
     constructor(address _owner) Ownable(_owner) {}
 
@@ -36,6 +43,6 @@ contract Dictator is Ownable, IAuthority {
     function removePermission(Permission target, address user, bytes4 functionSig) public virtual onlyOwner {
         target.removePermission(user, functionSig);
 
-        emit UpdateAccess(user, false);
+        emit UpdatePermission(user, functionSig, false);
     }
 }

@@ -20,7 +20,7 @@
 
 // contract DeployPuppetRouter is PRBTest, StdUtils {
 //     function run() public {
-//         vm.startBroadcast(vm.envUint("GBC_DEPLOYER_PRIVATE_KEY"));
+//         vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
 //         deployContracts();
 //         vm.stopBroadcast();
 //     }
@@ -41,8 +41,8 @@
 //         _tokenAllowanceCapAmountList[1] = 500e30;
 
 //         address puppetRouterAddress = computeCreateAddress(
-//             vm.envAddress("GBC_DEPLOYER_ADDRESS"), //
-//             vm.getNonce(vm.envAddress("GBC_DEPLOYER_ADDRESS")) + 1
+//             vm.envAddress("DEPLOYER_ADDRESS"), //
+//             vm.getNonce(vm.envAddress("DEPLOYER_ADDRESS")) + 1
 //         );
 
 //         StoreController.SetterConfig[] memory setterList = new StoreController.SetterConfig[](1);

@@ -7,14 +7,13 @@ import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {PRBTest} from "@prb/test/src/PRBTest.sol";
 import {IBasePool} from "@balancer-labs/v2-interfaces/vault/IBasePool.sol";
 
-import {IWNT} from "./../src/utils/interfaces/IWNT.sol";
-import {PositionStore} from "./../src/position/store/PositionStore.sol";
-
 import {Dictator} from "src/shared/Dictator.sol";
 import {Router} from "src/shared/Router.sol";
 
-import {Oracle} from "./../src/token/Oracle.sol";
+import {Oracle} from "src/token/Oracle.sol";
 import {OracleStore} from "src/token/store/OracleStore.sol";
+import {RewardLogic} from "./../src/token/logic/RewardLogic.sol";
+import {RewardStore} from "./../src/token/store/RewardStore.sol";
 import {RewardRouter} from "src/token/RewardRouter.sol";
 import {PuppetToken} from "src/token/PuppetToken.sol";
 import {VotingEscrow} from "src/token/VotingEscrow.sol";
@@ -22,97 +21,66 @@ import {VotingEscrow} from "src/token/VotingEscrow.sol";
 import {Address} from "script/Const.sol";
 
 contract DeployRewardRouter is PRBTest {
-    uint8 constant ADMIN_ROLE = 0;
-    uint8 constant TRANSFER_TOKEN_ROLE = 1;
-    uint8 constant MINT_PUPPET_ROLE = 2;
-    uint8 constant MINT_CORE_RELEASE_ROLE = 3;
+    Dictator dictator = Dictator(Address.Dictator);
+    PuppetToken puppetToken = PuppetToken(Address.PuppetToken);
+    Router router = Router(Address.Router);
+    VotingEscrow votingEscrow = VotingEscrow(Address.VotingEscrow);
 
     function run() public {
-        vm.startBroadcast(vm.envUint("GBC_DEPLOYER_PRIVATE_KEY"));
+        // vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
         deployContracts();
-        vm.stopBroadcast();
+        // vm.stopBroadcast();
     }
 
     function deployContracts() internal {
-        PositionStore datastore = PositionStore(Address.datastore);
-        Dictator dictator = Dictator(Address.Dictator);
-        PuppetToken puppetToken = PuppetToken(Address.PuppetToken);
-        Router router = Router(Address.Router);
+        IUniswapV3Pool[] memory wntUsdPoolList = new IUniswapV3Pool[](3);
 
-        // OracleLogic oracleLogic = OracleLogic(Address.OracleLogic);
-        // OracleStore priceStore = OracleStore(Address.OracleStore);
-        // RewardLogic rewardLogic = RewardLogic(Address.RewardLogic);
-        // VotingEscrow votingEscrow = VotingEscrow(Address.VotingEscrow);
-        // VeRevenueDistributor revenueDistributor = VeRevenueDistributor(Address.VeRevenueDistributor);
-        // RewardRouter rewardRouter = RewardRouter(Address.RewardRouter);
+        wntUsdPoolList[0] = IUniswapV3Pool(0xC6962004f452bE9203591991D15f6b388e09E8D0); // https://arbiscan.io/address/0xc6962004f452be9203591991d15f6b388e09e8d0
+        wntUsdPoolList[1] = IUniswapV3Pool(0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443); // https://arbiscan.io/address/0xc31e54c7a869b9fcbecc14363cf510d1c41fa443
+        wntUsdPoolList[2] = IUniswapV3Pool(0x641C00A822e8b671738d32a431a4Fb6074E5c79d); // https://arbiscan.io/address/0x641c00a822e8b671738d32a431a4fb6074e5c79d
 
-        // OracleLogic oracleLogic = new OracleLogic(dictator);
-        // dictator.setRoleCapability(ORACLE_LOGIC_ROLE, address(oracleLogic), oracleLogic.syncTokenPrice.selector, true);
+        IERC20[] memory secondaryPriceConfigList = new IERC20[](1);
+        secondaryPriceConfigList[0] = IERC20(Address.usdc);
 
-        // IUniswapV3Pool[] memory wntUsdPoolList = new IUniswapV3Pool[](3);
+        IBasePoolErc20 lpPool = IBasePoolErc20(Address.BasePool);
+        IVault vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
 
-        // wntUsdPoolList[0] = IUniswapV3Pool(0xC6962004f452bE9203591991D15f6b388e09E8D0); //
-        // https://arbiscan.io/address/0xc6962004f452be9203591991d15f6b388e09e8d0
-        // wntUsdPoolList[1] = IUniswapV3Pool(0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443); //
-        // https://arbiscan.io/address/0xc31e54c7a869b9fcbecc14363cf510d1c41fa443
-        // wntUsdPoolList[2] = IUniswapV3Pool(0x641C00A822e8b671738d32a431a4Fb6074E5c79d); //
-        // https://arbiscan.io/address/0x641c00a822e8b671738d32a431a4fb6074e5c79d
+        Oracle.SecondaryPriceConfig[] memory exchangePriceSourceList = new Oracle.SecondaryPriceConfig[](1);
+        exchangePriceSourceList[0] = Oracle.SecondaryPriceConfig({
+            enabled: true, //
+            sourceList: wntUsdPoolList,
+            twapInterval: 0,
+            token1Deicmals: 6
+        });
 
-        // IBasePoolErc20 lpPool = IBasePoolErc20(Address.BasePool);
-        // IVault vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
+        OracleStore oracleStore = new OracleStore(dictator, 1e18);
+        Oracle oracle = new Oracle(
+            dictator,
+            oracleStore,
+            Oracle.CallConfig({token: IERC20(Address.wnt), vault: vault, poolId: lpPool.getPoolId(), updateInterval: 1 days}),
+            secondaryPriceConfigList,
+            exchangePriceSourceList
+        );
+        dictator.setAccess(oracleStore, address(oracle));
 
-        // oracleLogic.getMedianWntPriceInUsd(wntUsdPoolList, 20);
-        // oracleLogic.getPuppetPriceInWnt(vault, lpPool.getPoolId());
-        // uint puppetExchangeRateInUsdc = oracleLogic.getPuppetExchangeRateInUsdc(wntUsdPoolList, vault, lpPool.getPoolId(), 20);
+        RewardStore rewardStore = new RewardStore(dictator, router);
+        dictator.setPermission(router, address(rewardStore), router.transfer.selector);
+        RewardRouter rewardRouter = new RewardRouter(
+            dictator,
+            router,
+            votingEscrow,
+            rewardStore,
+            RewardRouter.CallConfig({
+                lock: RewardLogic.CallLockConfig({oracle: oracle, puppetToken: puppetToken, rate: 6000}),
+                exit: RewardLogic.CallExitConfig({oracle: oracle, puppetToken: puppetToken, rate: 3000})
+            })
+        );
+        dictator.setAccess(rewardStore, address(rewardRouter));
 
-        // OracleStore priceStore = new OracleStore(dictator, address(oracleLogic), puppetExchangeRateInUsdc, 1 days);
-
-        // RewardLogic rewardLogic = new RewardLogic(dictator);
-        // dictator.setUserRole(address(rewardLogic), PUPPET_MINTER, true);
-        // dictator.setUserRole(address(rewardLogic), REWARD_LOGIC_ROLE, true);
-        // dictator.setRoleCapability(ROUTER_ROLE, address(rewardLogic), rewardLogic.lock.selector, true);
-        // dictator.setRoleCapability(ROUTER_ROLE, address(rewardLogic), rewardLogic.exit.selector, true);
-        // dictator.setRoleCapability(ROUTER_ROLE, address(rewardLogic), rewardLogic.claim.selector, true);
-
-        // VotingEscrow votingEscrow = new VotingEscrow(dictator, router, puppetToken);
-        // dictator.setUserRole(address(votingEscrow), TRANSFER_TOKEN, true);
-        // dictator.setRoleCapability(ROUTER_ROLE, address(votingEscrow), votingEscrow.lock.selector, true);
-        // dictator.setRoleCapability(ROUTER_ROLE, address(votingEscrow), votingEscrow.depositFor.selector, true);
-        // dictator.setRoleCapability(ROUTER_ROLE, address(votingEscrow), votingEscrow.withdraw.selector, true);
-        // dictator.setRoleCapability(REWARD_LOGIC_ROLE, address(votingEscrow), votingEscrow.lock.selector, true);
-
-        // VeRevenueDistributor revenueDistributor = new VeRevenueDistributor(dictator, votingEscrow, router, block.timestamp + 1 weeks);
-        // dictator.setUserRole(address(revenueDistributor), TRANSFER_TOKEN, true);
-        // dictator.setRoleCapability(REWARD_LOGIC_ROLE, address(revenueDistributor), revenueDistributor.claim.selector, true);
-
-        // RewardRouter rewardRouter = new RewardRouter(
-        //     RewardRouter.RewardRouterParams({
-        //         dictator: dictator,
-        //         puppetToken: puppetToken,
-        //         lp: vault,
-        //         router: router,
-        //         priceStore: priceStore,
-        //         votingEscrow: votingEscrow,
-        //         wnt: WNT(Address.wnt)
-        //     }),
-        //     RewardRouter.RewardRouterConfigParams({
-        //         revenueDistributor: revenueDistributor,
-        //         wntUsdPoolList: wntUsdPoolList,
-        //         wntUsdTwapInterval: 20,
-        //         dataStore: datastore,
-        //         rewardLogic: rewardLogic,
-        //         oracleLogic: oracleLogic,
-        //         dao: dictator.owner(),
-        //         revenueInToken: IERC20(Address.usdc),
-        //         poolId: lpPool.getPoolId(),
-        //         lockRate: 6000,
-        //         exitRate: 3000,
-        //         treasuryLockRate: 667,
-        //         treasuryExitRate: 333
-        //     })
-        // );
-        // dictator.setUserRole(address(rewardRouter), ROUTER_ROLE, true);
-
-        // datastore.updateOwnership(Address.governance, true);
+        dictator.setAccess(votingEscrow, address(rewardRouter));
+        dictator.setPermission(oracle, address(rewardRouter), oracle.setPrimaryPrice.selector);
+        dictator.setPermission(puppetToken, address(rewardRouter), puppetToken.mint.selector);
     }
 }
+
+interface IBasePoolErc20 is IBasePool, IERC20 {}

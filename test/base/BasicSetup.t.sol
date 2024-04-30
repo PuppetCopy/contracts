@@ -43,7 +43,7 @@ contract BasicSetup is PRBTest, StdCheats, StdUtils {
 
         dictator = new Dictator(users.owner);
         router = new Router(dictator, 200_000);
-        puppetToken = new PuppetToken(dictator, PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}));
+        puppetToken = new PuppetToken(dictator, PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}), users.owner);
     }
 
     /// @dev Generates a user, labels its address, and funds it with test assets

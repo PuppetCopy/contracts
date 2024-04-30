@@ -39,31 +39,33 @@ contract OracleTest is BasicSetup {
             enabled: true, //
             sourceList: wntUsdPoolList,
             twapInterval: 0,
-            sourceTokenDeicmals: 6
+            token1Deicmals: 6
         });
 
         poolVault = new MockWeightedPoolVault();
-        poolVault.initPool(address(puppetToken), address(wnt), 20e18, 80e18);
+        poolVault.initPool(address(wnt), address(puppetToken), 20e18, 8000e18);
 
-        oracleStore = new OracleStore(dictator, 1e18);
+        (, uint[] memory balances,) = poolVault.getPoolTokens(0);
+
+        uint tokenBalance = balances[1];
+        uint primaryBalance = balances[0];
+
+        uint initalPrice = (primaryBalance * 1e18 * 80) / (tokenBalance * 20);
+
+        oracleStore = new OracleStore(dictator, initalPrice);
         oracle = new Oracle(
             dictator,
             oracleStore,
-            Oracle.CallConfig({token1: wnt, vault: poolVault, poolId: 0, updateInterval: 1 days}),
+            Oracle.CallConfig({token: wnt, vault: poolVault, poolId: 0, updateInterval: 1 days}),
             revenueTokenList,
             exchangePriceSourceList
         );
         dictator.setAccess(oracleStore, address(oracle));
 
-        uint primaryPoolPrice = oracle.getPrimaryPoolPrice();
-        uint secondaryTwapMedianPrice = oracle.getSecondaryTwapMedianPrice(wntUsdPoolList, 0);
-        uint secondaryPriceInUsdc = oracle.getSecondaryPrice(usdc);
-
-        assertEq(primaryPoolPrice, 1e18, "1 puppet per wnt");
-        assertEq(secondaryTwapMedianPrice, 100e6, "100 usd per wnt");
-        assertEq(secondaryPriceInUsdc, 100e6, "100 usd per puppet");
-
-        assertEq(oracle.getPrimaryPoolPrice(), 1e18, "1-1 pool price with 30 decimals precision");
+        assertEq(oracle.getPrimaryPoolPrice(), 0.01e18, "0.01 wnt per puppet");
+        assertEq(oracle.getSecondaryTwapMedianPrice(wntUsdPoolList, 0), 100e6, "100 usd per wnt");
+        assertEq(oracle.getSecondaryPrice(usdc), 1e6, "1 usd per puppet");
+        assertEq(oracle.getMaxPrice(usdc), 1e6, "1 max usd per puppet");
 
         // permissions for testing purposes
         dictator.setPermission(oracle, users.owner, oracle.setPrimaryPrice.selector);
@@ -85,22 +87,22 @@ contract OracleTest is BasicSetup {
         // (80 * 0.2) / (20 * 0.80)
         poolVault.setPoolBalances(20e18, 80e18);
         assertEq(oracle.getSecondaryPrice(usdc), 100e6);
-        poolVault.setPoolBalances(20e18, 160e18);
-        assertEq(oracle.getSecondaryPrice(usdc), 200e6);
-        poolVault.setPoolBalances(5e18, 40e18);
-        assertEq(oracle.getSecondaryPrice(usdc), 200e6);
         poolVault.setPoolBalances(40e18, 80e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 200e6);
+        poolVault.setPoolBalances(20e18, 40e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 200e6);
+        poolVault.setPoolBalances(20e18, 160e18);
         assertEq(oracle.getSecondaryPrice(usdc), 50e6);
-        poolVault.setPoolBalances(400e18, 80e18);
-        assertEq(oracle.getSecondaryPrice(usdc), 5e6, "$.5 as 4000 PUPPET / 80 WETH");
-        poolVault.setPoolBalances(40_000e18, 80e18);
+        poolVault.setPoolBalances(20e18, 16000e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 0.5e6, "$.5 as 4000 PUPPET / 80 WETH");
+        poolVault.setPoolBalances(20e18, 160000e18);
         assertEq(oracle.getSecondaryPrice(usdc), 0.05e6, "$.05 as 40,000 PUPPET / 80 WETH");
-        poolVault.setPoolBalances(2e18, 80e18);
-        assertEq(oracle.getSecondaryPrice(usdc), 1_000e6, "$1000 as 2 PUPPET / 80 WETH");
-        poolVault.setPoolBalances(20e18, 80_000_000e18);
-        assertEq(oracle.getSecondaryPrice(usdc), 100_000_000e6, "$100,000,000 as 20 PUPPET / 80,000,000 WETH");
+        poolVault.setPoolBalances(40e18, 160000000e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 0.0001e6, "$0.1 as 20,000,000 PUPPET / 80 WETH");
         poolVault.setPoolBalances(20_000_000e18, 80e18);
-        assertEq(oracle.getSecondaryPrice(usdc), 0.0001e6, "$0000.1 as 20,000,000 PUPPET / 80 WETH");
+        assertEq(oracle.getSecondaryPrice(usdc), 100_000_000e6, "$100,000,000 as 20 PUPPET / 80,000,000 WETH");
+        poolVault.setPoolBalances(20e18, 8e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 1_000e6, "$1000 as 2 PUPPET / 80 WETH");
 
         poolVault.setPoolBalances(2_000e18, 0);
         vm.expectRevert();
@@ -113,14 +115,17 @@ contract OracleTest is BasicSetup {
     function testSlotMinMaxPrice() public {
         _stepSlot();
 
-        assertEq(_storeStepInUsdc(160e18), 200e6);
-        assertEq(_storeStepInUsdc(160e18), 200e6);
-        assertEq(_storeStepInUsdc(160e18), 200e6);
-        assertEq(_storeStepInUsdc(160e18), 200e6);
-        assertEq(_storeStepInUsdc(80e18), 200e6);
+        _storeStepInUsdc(20e18);
 
-        _storeStepInUsdc(40e18);
-        assertEq(oracle.getMinPrice(usdc), 50e6);
+        assertEq(_storeStepInUsdc(4000e18), 200e6);
+        assertEq(_storeStepInUsdc(4000e18), 200e6);
+        assertEq(_storeStepInUsdc(4000e18), 200e6);
+        assertEq(_storeStepInUsdc(4000e18), 200e6);
+        assertEq(_storeStepInUsdc(2000e18), 200e6);
+        assertEq(_storeStepInUsdc(2000e18), 200e6);
+
+        _storeStepInUsdc(200e18);
+        assertEq(oracle.getMinPrice(usdc), 10e6);
     }
 
     function testMedianHigh() public {
@@ -132,12 +137,12 @@ contract OracleTest is BasicSetup {
         _storeStepInWnt(32e18);
         _storeStepInWnt(64e18);
 
-        assertEq(oracleStore.medianMax(), 0.1e18);
+        assertEq(oracleStore.medianMax(), 0.004e18);
 
-        _storeStepInWnt(64e18);
-        assertEq(oracleStore.medianMax(), 0.2e18);
-        _storeStepInWnt(64e18);
-        assertEq(oracleStore.medianMax(), 0.4e18);
+        _storeStepInWnt(128e18);
+        assertEq(oracleStore.medianMax(), 0.008e18);
+        _storeStepInWnt(256e18);
+        assertEq(oracleStore.medianMax(), 0.016e18);
     }
 
     function _storeStepInUsdc(uint balanceInWnt) internal returns (uint) {
@@ -163,7 +168,7 @@ contract OracleTest is BasicSetup {
     function _setPoolBalance(uint balanceInWnt) internal {
         OracleStore.SeedSlot memory seed = oracleStore.getLatestSeed();
         vm.roll(seed.blockNumber + 1);
-        poolVault.setPoolBalances(20e18, balanceInWnt);
+        poolVault.setPoolBalances(balanceInWnt, 8000e18);
     }
 
     function fromPriceToSqrt(uint usdcPerWeth) public pure returns (uint160) {

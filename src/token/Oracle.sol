@@ -25,11 +25,11 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
         bool enabled;
         IUniswapV3Pool[] sourceList;
         uint32 twapInterval;
-        uint8 sourceTokenDeicmals;
+        uint8 token1Deicmals;
     }
 
     struct CallConfig {
-        IERC20 token1;
+        IERC20 token;
         IVault vault;
         bytes32 poolId;
         uint updateInterval;
@@ -49,7 +49,7 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
 
     function getMaxPrice(IERC20 token, uint poolPrice) public view returns (uint) {
         uint maxPrimaryPrice = Math.max(store.medianMax(), poolPrice);
-        if (callConfig.token1 == token) {
+        if (callConfig.token == token) {
             return maxPrimaryPrice;
         }
 
@@ -58,7 +58,7 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
 
     function getMinPrice(IERC20 token, uint poolPrice) public view returns (uint) {
         uint minPrimaryPrice = Math.min(store.medianMin(), poolPrice);
-        if (callConfig.token1 == token) {
+        if (callConfig.token == token) {
             return minPrimaryPrice;
         }
 
@@ -66,14 +66,9 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
     }
 
     function getSecondaryPrice(IERC20 token, uint primaryPrice) public view returns (uint usdPerToken) {
-        SecondaryPriceConfig memory tokenPerWntConfig = secondarySourceConfigMap[token];
+        uint secondaryPrice = getSecondaryPoolPrice(token);
 
-        if (tokenPerWntConfig.enabled == false) revert Oracle__UnavailableSecondaryPrice();
-
-        uint adjForDecimals = 10 ** (18 - tokenPerWntConfig.sourceTokenDeicmals);
-        uint secondaryPrice = getSecondaryTwapMedianPrice(tokenPerWntConfig.sourceList, tokenPerWntConfig.twapInterval);
-
-        usdPerToken = secondaryPrice * adjForDecimals * primaryPrice / 1e30;
+        usdPerToken = (secondaryPrice * primaryPrice) / 1e18;
     }
 
     function getSecondaryPrice(IERC20 token) external view returns (uint usdPerToken) {
@@ -83,10 +78,10 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
     function getPrimaryPoolPrice() public view returns (uint price) {
         (, uint[] memory balances,) = callConfig.vault.getPoolTokens(callConfig.poolId);
 
-        uint tokenBalance = balances[0];
-        uint primaryBalance = balances[1];
+        uint tokenBalance = balances[1];
+        uint primaryBalance = balances[0];
 
-        uint balanceRatio = (primaryBalance * 20e18) / (tokenBalance * 80);
+        uint balanceRatio = (primaryBalance * 1e18 * 80) / (tokenBalance * 20);
         price = balanceRatio;
 
         if (price == 0) revert Oracle__NonZeroPrice();
@@ -97,10 +92,9 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
 
         if (tokenPerWntConfig.enabled == false) revert Oracle__UnavailableSecondaryPrice();
 
-        uint adjForDecimals = 10 ** (18 - tokenPerWntConfig.sourceTokenDeicmals);
         uint secondaryPrice = getSecondaryTwapMedianPrice(tokenPerWntConfig.sourceList, tokenPerWntConfig.twapInterval);
 
-        usdPerToken = secondaryPrice * adjForDecimals;
+        usdPerToken = secondaryPrice;
     }
 
     function getSecondaryTwapMedianPrice(IUniswapV3Pool[] memory sourceList, uint32 twapInterval) public view returns (uint medianPrice) {
@@ -132,10 +126,10 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
         OracleStore _store,
         CallConfig memory _callConfig,
         IERC20[] memory _tokenList,
-        SecondaryPriceConfig[] memory _exchangePriceSourceList
+        SecondaryPriceConfig[] memory _secondaryPriceConfigList
     ) Permission(_authority) EIP712("Oracle", "1") {
         store = _store;
-        _setConfig(_callConfig, _tokenList, _exchangePriceSourceList);
+        _setConfig(_callConfig, _tokenList, _secondaryPriceConfigList);
     }
 
     // governance
@@ -143,11 +137,11 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
     function setConfig(
         CallConfig memory _callConfig, //
         IERC20[] memory _tokenList,
-        SecondaryPriceConfig[] memory _exchangePriceSourceList
+        SecondaryPriceConfig[] memory _secondaryPriceConfigList
     ) external auth {
         if (_callConfig.poolId == bytes32(0)) revert Oracle__InvalidPoolId();
 
-        _setConfig(_callConfig, _tokenList, _exchangePriceSourceList);
+        _setConfig(_callConfig, _tokenList, _secondaryPriceConfigList);
     }
 
     // internal
@@ -155,24 +149,25 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
     function _setConfig(
         CallConfig memory _callConfig, //
         IERC20[] memory _tokenList,
-        SecondaryPriceConfig[] memory _exchangePriceSourceList
+        SecondaryPriceConfig[] memory _secondaryPriceConfigList
     ) internal {
         callConfig = _callConfig;
 
-        if (_tokenList.length != _exchangePriceSourceList.length) revert Oracle__TokenSourceListLengthMismatch();
+        if (_tokenList.length != _secondaryPriceConfigList.length) revert Oracle__TokenSourceListLengthMismatch();
 
-        for (uint i; i < _exchangePriceSourceList.length; i++) {
-            SecondaryPriceConfig memory _config = _exchangePriceSourceList[i];
+        for (uint i; i < _secondaryPriceConfigList.length; i++) {
+            SecondaryPriceConfig memory _config = _secondaryPriceConfigList[i];
             if (_config.sourceList.length % 2 == 0) revert Oracle__SourceCountNotOdd();
             if (_config.sourceList.length < 3) revert Oracle__NotEnoughSources();
 
             secondarySourceConfigMap[_tokenList[i]] = _config;
         }
 
-        emit Oracle__SetConfig(block.timestamp, _callConfig, _exchangePriceSourceList);
+        emit Oracle__SetConfig(block.timestamp, _callConfig, _secondaryPriceConfigList);
     }
 
     // state
+
     function setPrimaryPrice() external auth nonReentrant returns (uint) {
         uint currentPrice = getPrimaryPoolPrice();
 

@@ -8,15 +8,15 @@ import {IVault, IAsset} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {WeightedPoolUserData} from "@balancer-labs/v2-interfaces/pool-weighted/WeightedPoolUserData.sol";
 import {IBasePool} from "@balancer-labs/v2-interfaces/vault/IBasePool.sol";
 import {IERC20 as IBERC20} from "@balancer-labs/v2-interfaces/solidity-utils/openzeppelin/IERC20.sol";
-import {Address} from "script/Const.sol";
 
 import {Dictator} from "src/shared/Dictator.sol";
 import {IWNT} from "./../src/utils/interfaces/IWNT.sol";
 import {PuppetToken} from "src/token/PuppetToken.sol";
 
+import {Address} from "script/Const.sol";
+
 contract ManagePool is PRBTest {
-    address internal DEPLOYER_ADDRESS = vm.envAddress("GBC_DEPLOYER_ADDRESS");
-    uint internal DEPLOYER_KEY = vm.envUint("GBC_DEPLOYER_PRIVATE_KEY");
+    address internal DEPLOYER_ADDRESS = vm.envAddress("DEPLOYER_ADDRESS");
 
     IWNT wnt;
     Dictator dictator = Dictator(Address.Dictator);
@@ -27,34 +27,32 @@ contract ManagePool is PRBTest {
     IWeightedPoolFactory poolFactory = IWeightedPoolFactory(0xc7E5ED1054A24Ef31D827E6F86caA58B3Bc168d7);
 
     function run() public {
-        vm.startBroadcast(DEPLOYER_KEY);
-
+        vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
         // initPool();
         // exitPool();
-
         vm.stopBroadcast();
     }
 
     function initPool() public {
         IERC20[] memory tokens = new IERC20[](2);
-        tokens[0] = IERC20(address(puppetToken));
-        tokens[1] = IERC20(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
+        tokens[0] = IERC20(Address.wnt);
+        tokens[1] = IERC20(Address.PuppetToken);
 
         uint[] memory normalizedWeights = new uint[](2);
-        normalizedWeights[0] = 0.8e18;
-        normalizedWeights[1] = 0.2e18;
+        normalizedWeights[0] = 0.2e18;
+        normalizedWeights[1] = 0.8e18;
 
         address[] memory rateProviders = new address[](2);
         rateProviders[0] = address(0);
         rateProviders[1] = address(0);
 
         IBasePoolErc20 pool = IBasePoolErc20(
-            poolFactory.create("PUPPET-WETH", "PUPPET-WETH", tokens, normalizedWeights, rateProviders, 0.01e18, dictator.owner(), bytes32(0))
+            poolFactory.create("PUPPET-WETH", "PUPPET-WETH", tokens, normalizedWeights, rateProviders, 0.01e18, Address.dao, bytes32(0))
         );
 
         uint[] memory amounts = new uint[](2);
-        amounts[0] = 100_000e18 / 10;
-        amounts[1] = 0.1e18;
+        amounts[0] = 0.1e18;
+        amounts[1] = 10_000e18;
 
         IAsset[] memory assets = new IAsset[](tokens.length);
 
@@ -98,7 +96,7 @@ contract ManagePool is PRBTest {
         uint bptBalance = pool.balanceOf(DEPLOYER_ADDRESS);
 
         // IERC20(Const.BasePool).allowance(DEPLOYER_ADDRESS, address(this));
-        IERC20(Address.BasePool).approve(address(this), bptBalance);
+        // IERC20(Address.BasePool).approve(address(this), bptBalance);
 
         uint[] memory _amounts = new uint[](tokens.length);
 
