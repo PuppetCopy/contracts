@@ -7,12 +7,13 @@ import {PuppetToken} from "src/token/PuppetToken.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
 contract PuppetTokenTest is BasicSetup {
-    uint YEAR = 31540000;
+    uint YEAR = 31560000;
 
     function setUp() public override {
         super.setUp();
 
         dictator.setPermission(puppetToken, users.owner, puppetToken.mint.selector);
+        dictator.setPermission(puppetToken, users.owner, puppetToken.mintCore.selector);
     }
 
     function testMintLimit() public {

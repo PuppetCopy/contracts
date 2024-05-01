@@ -21,7 +21,7 @@ contract PuppetToken is Permission, ERC20 {
     event PuppetToken__SetConfig(Config config);
     event PuppetToken__MintCore(address operator, address receiver, uint timestamp, uint amount, uint share);
 
-    uint private constant CORE_RELEASE_DURATION_DIVISOR = 31540000; // 1 year
+    uint private constant CORE_RELEASE_DURATION_DIVISOR = 31560000; // 1 year
     uint private constant GENESIS_MINT_AMOUNT = 100_000e18;
 
     struct Config {
