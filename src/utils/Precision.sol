@@ -7,10 +7,6 @@ library Precision {
     uint internal constant BASIS_POINT_DIVISOR = 10000;
     uint public constant FLOAT_PRECISION = 10 ** 30;
 
-    function diff(uint a, uint b) internal pure returns (uint) {
-        return a > b ? a - b : b - a;
-    }
-
     function applyBasisPoints(uint bps, uint value) internal pure returns (uint) {
         return Math.mulDiv(value, bps, BASIS_POINT_DIVISOR);
     }

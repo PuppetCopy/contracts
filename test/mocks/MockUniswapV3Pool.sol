@@ -10,9 +10,15 @@ contract MockUniswapV3Pool is IUniswapV3Pool {
     uint160 public sqrtPriceX96;
     bool public unlocked = true;
 
+    address token0_;
+    address token1_;
+
     // Constructor to initialize the mock with specific values
-    constructor(uint160 initialSqrtPriceX96) {
+    constructor(uint160 initialSqrtPriceX96, address _token0, address _token1) {
         sqrtPriceX96 = initialSqrtPriceX96;
+        token0_ = _token0;
+        token1_ = _token1;
+
         emit PoolInitialized(sqrtPriceX96);
     }
 
@@ -52,9 +58,13 @@ contract MockUniswapV3Pool is IUniswapV3Pool {
     // Add other necessary mock functions or variables here
     function factory() external view override returns (address) {}
 
-    function token0() external view override returns (address) {}
+    function token0() external view override returns (address) {
+        return token0_;
+    }
 
-    function token1() external view override returns (address) {}
+    function token1() external view override returns (address) {
+        return token1_;
+    }
 
     function fee() external view override returns (uint24) {}
 

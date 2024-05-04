@@ -30,12 +30,10 @@ contract RewardRouterTest is BasicSetup {
 
     IUniswapV3Pool[] wntUsdPoolList;
 
-    Oracle.CallConfig callOracleConfig;
+    Oracle.PrimaryPriceConfig callOracleConfig;
 
     uint public lockRate = 6000;
     uint public exitRate = 3000;
-
-    IERC20[] secondaryPriceConfigList;
 
     function setUp() public override {
         super.setUp();
@@ -45,19 +43,16 @@ contract RewardRouterTest is BasicSetup {
 
         wntUsdPoolList = new MockUniswapV3Pool[](3);
 
-        wntUsdPoolList[0] = new MockUniswapV3Pool(fromPriceToSqrt(100));
-        wntUsdPoolList[1] = new MockUniswapV3Pool(fromPriceToSqrt(100));
-        wntUsdPoolList[2] = new MockUniswapV3Pool(fromPriceToSqrt(100));
-
-        secondaryPriceConfigList = new IERC20[](1);
-        secondaryPriceConfigList[0] = usdc;
+        wntUsdPoolList[0] = new MockUniswapV3Pool(fromPriceToSqrt(100), address(wnt), address(usdc));
+        wntUsdPoolList[1] = new MockUniswapV3Pool(fromPriceToSqrt(100), address(wnt), address(usdc));
+        wntUsdPoolList[2] = new MockUniswapV3Pool(fromPriceToSqrt(100), address(wnt), address(usdc));
 
         Oracle.SecondaryPriceConfig[] memory exchangePriceSourceList = new Oracle.SecondaryPriceConfig[](1);
         exchangePriceSourceList[0] = Oracle.SecondaryPriceConfig({
             enabled: true, //
             sourceList: wntUsdPoolList,
             twapInterval: 0,
-            token1Deicmals: 6
+            token: usdc
         });
 
         primaryVaultPool = new MockWeightedPoolVault();
@@ -67,8 +62,7 @@ contract RewardRouterTest is BasicSetup {
         oracle = new Oracle(
             dictator,
             oracleStore,
-            Oracle.CallConfig({token: wnt, vault: primaryVaultPool, poolId: 0, updateInterval: 1 days}),
-            secondaryPriceConfigList,
+            Oracle.PrimaryPriceConfig({token: wnt, vault: primaryVaultPool, poolId: 0, updateInterval: 1 days}),
             exchangePriceSourceList
         );
         dictator.setAccess(oracleStore, address(oracle));
@@ -94,7 +88,9 @@ contract RewardRouterTest is BasicSetup {
         // permissions used for testing
         dictator.setAccess(rewardStore, users.owner);
         wnt.approve(address(router), type(uint).max - 1);
-        secondaryPriceConfigList[0].approve(address(router), type(uint).max - 1);
+        for (uint i = 0; i < exchangePriceSourceList.length; i++) {
+            exchangePriceSourceList[i].token.approve(address(router), type(uint).max - 1);
+        }
     }
 
     function testOptionRevert() public {
@@ -162,7 +158,7 @@ contract RewardRouterTest is BasicSetup {
         skip(1 weeks);
         rewardRouter.getClaimable(wnt, users.alice);
         assertEq(rewardRouter.getClaimableCursor(wnt, users.yossi, 1 weeks), 1e18);
-        assertAlmostEq(rewardRouter.getClaimable(wnt, users.yossi), 1.33e18, 0.005e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.33e18, 0.005e18);
     }
 
     function testOptionDecay() public {
@@ -184,23 +180,23 @@ contract RewardRouterTest is BasicSetup {
 
         assertEq(rewardRouter.getClaimableCursor(wnt, users.yossi, 1 weeks), 1e18);
         assertEq(rewardRouter.getClaimableCursor(wnt, users.alice, 1 weeks), 1e18);
-        assertAlmostEq(rewardRouter.getClaimable(wnt, users.alice), 1.333e18, 0.005e18);
-        assertAlmostEq(rewardRouter.getClaimable(wnt, users.yossi), 1.333e18, 0.005e18);
-        assertAlmostEq(rewardRouter.getClaimable(wnt, users.bob), 0.333e18, 0.005e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 1.333e18, 0.005e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.333e18, 0.005e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 0.333e18, 0.005e18);
 
         skip(getMaxTime() / 2);
         assertEq(rewardRouter.getClaimableCursor(wnt, users.yossi, 1 weeks), 1e18);
         assertEq(rewardRouter.getClaimableCursor(wnt, users.alice, 1 weeks), 1e18);
-        assertAlmostEq(rewardRouter.getClaimable(wnt, users.alice), 1.333e18, 0.005e18);
-        assertAlmostEq(rewardRouter.getClaimable(wnt, users.yossi), 1.333e18, 0.005e18);
-        assertAlmostEq(claim(wnt, users.bob), 0.333e18, 0.005e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 1.333e18, 0.005e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.333e18, 0.005e18);
+        assertApproxEqAbs(claim(wnt, users.bob), 0.333e18, 0.005e18);
         assertEq(rewardRouter.getClaimable(wnt, users.bob), 0);
 
         generateUserRevenueInWnt(users.bob, 2e18);
         lock(wnt, getMaxTime(), 1e18, 2e18);
         skip(1 weeks);
 
-        assertAlmostEq(rewardRouter.getClaimable(wnt, users.bob), 1.525e18, 0.005e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 1.525e18, 0.005e18);
     }
 
     function testCrossedFlow() public {
@@ -219,7 +215,7 @@ contract RewardRouterTest is BasicSetup {
         generateUserRevenueInUsdc(users.bob, 100e6);
         assertEq(getLockClaimableAmount(usdc, users.bob), 0.6e18);
         lock(usdc, getMaxTime() / 2, 100e6, 100e6);
-        assertAlmostEq(votingEscrow.balanceOf(users.bob), Precision.applyBasisPoints(lockRate, 1e18) / 4, 0.01e18);
+        assertApproxEqAbs(votingEscrow.balanceOf(users.bob), Precision.applyBasisPoints(lockRate, 1e18) / 4, 0.01e18);
     }
 
     function lock(IERC20 token, uint unlockTime, uint acceptableTokenPrice, uint cugarAmount) public returns (uint) {

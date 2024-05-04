@@ -18,8 +18,6 @@ library RewardLogic {
     }
 
     event RewardLogic__ClaimOption(Choice choice, uint rate, address user, IERC20 revenueToken, uint maxPriceInRevenueToken, uint rewardInToken);
-    event RewardLogic__ReferralOwnershipTransferred(address referralStorage, bytes32 code, address newOwner, uint timestamp);
-    event RewardLogic__CheckpointToken(uint time, uint tokens);
     event RewardLogic__Claimed(address user, address receiver, uint fromCursor, uint toCursor, uint amount);
 
     struct CallLockConfig {
@@ -142,8 +140,7 @@ library RewardLogic {
 
         uint cursor = getCursor(block.timestamp);
         uint veSupply = votingEscrow.totalSupply(cursor);
-        votingEscrow.getLastPointHistory();
-        store.setVeSupply(token, cursor, veSupply);
+        store.setCursorVeSupply(token, cursor, veSupply);
     }
 
     function claim(VotingEscrow votingEscrow, RewardStore store, IERC20 token, address user, address receiver) internal returns (uint amount) {

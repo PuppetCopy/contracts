@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
+import {IVault, IERC20 as IBalIERC20} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
@@ -10,13 +10,12 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 import {Permission} from "./../utils/auth/Permission.sol";
-
-import {UniV3Prelude} from "../utils/UniV3Prelude.sol";
+import {PoolUtils} from "../utils/PoolUtils.sol";
 
 import {OracleStore, SLOT_COUNT} from "./store/OracleStore.sol";
 
 contract Oracle is Permission, EIP712, ReentrancyGuard {
-    event Oracle__SetConfig(uint timestmap, CallConfig callConfig, SecondaryPriceConfig[] exchangePriceSourceList);
+    event Oracle__SetConfig(uint timestmap, PrimaryPriceConfig callConfig, SecondaryPriceConfig[] exchangePriceSourceList);
     event Oracle__SyncDelayedSlot(uint updateInterval, uint seedTimestamp, uint currentTimestamp, uint delayedUpdateCount, uint price);
     event Oracle__SlotSettled(uint updateInterval, uint seedTimestamp, uint seedPrice, uint maxPrice);
     event Oracle__PriceUpdate(uint timestamp, uint price);
@@ -25,10 +24,10 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
         bool enabled;
         IUniswapV3Pool[] sourceList;
         uint32 twapInterval;
-        uint8 token1Deicmals;
+        IERC20 token;
     }
 
-    struct CallConfig {
+    struct PrimaryPriceConfig {
         IERC20 token;
         IVault vault;
         bytes32 poolId;
@@ -36,7 +35,7 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
     }
 
     OracleStore store;
-    CallConfig callConfig;
+    PrimaryPriceConfig callConfig;
     mapping(IERC20 token => SecondaryPriceConfig) secondarySourceConfigMap;
 
     function getMaxPrice(IERC20 token) public view returns (uint) {
@@ -68,7 +67,7 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
     function getSecondaryPrice(IERC20 token, uint primaryPrice) public view returns (uint usdPerToken) {
         uint secondaryPrice = getSecondaryPoolPrice(token);
 
-        usdPerToken = (secondaryPrice * primaryPrice) / 1e18;
+        usdPerToken = secondaryPrice * 1e18 / primaryPrice;
     }
 
     function getSecondaryPrice(IERC20 token) external view returns (uint usdPerToken) {
@@ -78,98 +77,84 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
     function getPrimaryPoolPrice() public view returns (uint price) {
         (, uint[] memory balances,) = callConfig.vault.getPoolTokens(callConfig.poolId);
 
-        uint tokenBalance = balances[1];
-        uint primaryBalance = balances[0];
-
-        uint balanceRatio = (primaryBalance * 1e18 * 80) / (tokenBalance * 20);
-        price = balanceRatio;
+        // price = (balances[0] * 80e18) / (balances[1] * 20); // token/wnt
+        price = (balances[1] * 20e18) / (balances[0] * 80); // wnt/token
 
         if (price == 0) revert Oracle__NonZeroPrice();
     }
 
-    function getSecondaryPoolPrice(IERC20 token) public view returns (uint usdPerToken) {
+    function getSecondaryPoolPrice(IERC20 token) public view returns (uint) {
         SecondaryPriceConfig memory tokenPerWntConfig = secondarySourceConfigMap[token];
 
         if (tokenPerWntConfig.enabled == false) revert Oracle__UnavailableSecondaryPrice();
+        // if (callConfig.primaryToken)
 
-        uint secondaryPrice = getSecondaryTwapMedianPrice(tokenPerWntConfig.sourceList, tokenPerWntConfig.twapInterval);
-
-        usdPerToken = secondaryPrice;
-    }
-
-    function getSecondaryTwapMedianPrice(IUniswapV3Pool[] memory sourceList, uint32 twapInterval) public view returns (uint medianPrice) {
-        uint sourceListLength = sourceList.length;
-        if (sourceListLength < 3) revert Oracle__NotEnoughSources();
-
-        uint[] memory priceList = new uint[](sourceListLength);
-
-        // Initialize the first element
-        priceList[0] = UniV3Prelude.getTwapPrice(sourceList[0], 18, twapInterval);
-
-        for (uint i = 1; i < sourceListLength; i++) {
-            uint currentPrice = UniV3Prelude.getTwapPrice(sourceList[i], 18, twapInterval);
-
-            uint j = i;
-            while (j > 0 && priceList[j - 1] > currentPrice) {
-                priceList[j] = priceList[j - 1];
-                j--;
-            }
-            priceList[j] = currentPrice;
-        }
-
-        uint medianIndex = (sourceListLength - 1) / 2; // Index of the median after the array is sorted
-        medianPrice = priceList[medianIndex];
+        return PoolUtils.getTwapMedianPrice(tokenPerWntConfig.sourceList, tokenPerWntConfig.twapInterval);
     }
 
     constructor(
         IAuthority _authority,
         OracleStore _store,
-        CallConfig memory _callConfig,
-        IERC20[] memory _tokenList,
+        PrimaryPriceConfig memory _primaryPriceConfig,
         SecondaryPriceConfig[] memory _secondaryPriceConfigList
     ) Permission(_authority) EIP712("Oracle", "1") {
         store = _store;
-        _setConfig(_callConfig, _tokenList, _secondaryPriceConfigList);
+        _setConfig(_primaryPriceConfig, _secondaryPriceConfigList);
     }
 
     // governance
 
     function setConfig(
-        CallConfig memory _callConfig, //
-        IERC20[] memory _tokenList,
+        PrimaryPriceConfig memory _primaryPriceConfig, //
         SecondaryPriceConfig[] memory _secondaryPriceConfigList
     ) external auth {
-        if (_callConfig.poolId == bytes32(0)) revert Oracle__InvalidPoolId();
+        if (_primaryPriceConfig.poolId == bytes32(0)) revert Oracle__InvalidPoolId();
 
-        _setConfig(_callConfig, _tokenList, _secondaryPriceConfigList);
+        _setConfig(_primaryPriceConfig, _secondaryPriceConfigList);
     }
 
     // internal
 
     function _setConfig(
-        CallConfig memory _callConfig, //
-        IERC20[] memory _tokenList,
+        PrimaryPriceConfig memory _primaryPriceConfig, //
         SecondaryPriceConfig[] memory _secondaryPriceConfigList
     ) internal {
-        callConfig = _callConfig;
+        (IBalIERC20[] memory _tokens,,) = _primaryPriceConfig.vault.getPoolTokens(_primaryPriceConfig.poolId);
 
-        if (_tokenList.length != _secondaryPriceConfigList.length) revert Oracle__TokenSourceListLengthMismatch();
+        address _primaryTokenAddress = address(_primaryPriceConfig.token);
+
+        if (address(_tokens[0]) != _primaryTokenAddress) revert Oracle__MisconfiguredPrimaryPool();
 
         for (uint i; i < _secondaryPriceConfigList.length; i++) {
             SecondaryPriceConfig memory _config = _secondaryPriceConfigList[i];
-            if (_config.sourceList.length % 2 == 0) revert Oracle__SourceCountNotOdd();
-            if (_config.sourceList.length < 3) revert Oracle__NotEnoughSources();
 
-            secondarySourceConfigMap[_tokenList[i]] = _config;
+            if (_config.sourceList.length % 2 == 0) revert Oracle__MisconfiguredSecondaryPool();
+            if (_config.sourceList.length < 3) revert Oracle__MisconfiguredSecondaryPool();
+
+            // validate secondary pool sources
+            for (uint j; j < _config.sourceList.length; j++) {
+                if (
+                    _config.sourceList[j].token0() != _primaryTokenAddress && _config.sourceList[j].token1() != _primaryTokenAddress
+                        || _config.sourceList[j].token0() != address(_config.token) && _config.sourceList[j].token1() != address(_config.token)
+                ) {
+                    revert Oracle__MisconfiguredSecondaryPool();
+                }
+            }
+
+            secondarySourceConfigMap[_config.token] = _config;
         }
 
-        emit Oracle__SetConfig(block.timestamp, _callConfig, _secondaryPriceConfigList);
+        callConfig = _primaryPriceConfig;
+
+        emit Oracle__SetConfig(block.timestamp, _primaryPriceConfig, _secondaryPriceConfigList);
     }
 
     // state
 
     function setPrimaryPrice() external auth nonReentrant returns (uint) {
         uint currentPrice = getPrimaryPoolPrice();
+        IVault.UserBalanceOp[] memory noop = new IVault.UserBalanceOp[](0);
+        callConfig.vault.manageUserBalance(noop);
 
         OracleStore.SeedSlot memory seed = store.getLatestSeed();
 
@@ -204,29 +189,25 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
         } else {
             _store.setSlot(slot);
 
+            uint timeElapsed = block.timestamp - seed.timestamp;
+
+            if (timeElapsed > callConfig.updateInterval) {
+                uint delayedSlotCount = Math.min(timeElapsed / callConfig.updateInterval, 6);
+                for (uint8 i = 0; i <= delayedSlotCount; i++) {
+                    uint8 prevSlot = (slot + SLOT_COUNT - i) % SLOT_COUNT;
+
+                    _store.setSlotMax(prevSlot, price);
+                    _store.setSlotMin(prevSlot, price);
+                }
+
+                emit Oracle__SyncDelayedSlot(callConfig.updateInterval, seed.timestamp, block.timestamp, delayedSlotCount, price);
+            }
+
             _store.setSlotMin(slot, price);
             _store.setMedianMin(_getMedian(_store.getSlotArrMin()));
 
             _store.setSlotMax(slot, price);
             _store.setMedianMax(_getMedian(_store.getSlotArrMax()));
-
-            // in case previous slots are outdated, we need to update them with the current price
-            uint timeDelta = block.timestamp - seed.timestamp;
-            uint delayedUpdateCount = timeDelta > callConfig.updateInterval ? Math.min(timeDelta / callConfig.updateInterval, 6) : 0;
-
-            if (delayedUpdateCount > 0) {
-                for (uint8 i = 0; i <= delayedUpdateCount; i++) {
-                    uint8 prevSlot = (slot + SLOT_COUNT - i) % SLOT_COUNT;
-
-                    if (price > _store.slotMax(prevSlot)) {
-                        _store.setSlotMax(prevSlot, price);
-                    } else if (price < _store.slotMin(prevSlot)) {
-                        _store.setSlotMin(prevSlot, price);
-                    }
-                }
-
-                emit Oracle__SyncDelayedSlot(callConfig.updateInterval, seed.timestamp, block.timestamp, delayedUpdateCount, price);
-            }
 
             emit Oracle__SlotSettled(callConfig.updateInterval, seed.timestamp, seed.price, max);
         }
@@ -249,9 +230,9 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
     }
 
     error Oracle__InvalidPoolId();
-    error Oracle__SourceCountNotOdd();
-    error Oracle__NotEnoughSources();
     error Oracle__TokenSourceListLengthMismatch();
     error Oracle__NonZeroPrice();
     error Oracle__UnavailableSecondaryPrice();
+    error Oracle__MisconfiguredPrimaryPool();
+    error Oracle__MisconfiguredSecondaryPool();
 }

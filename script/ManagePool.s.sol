@@ -84,7 +84,7 @@ contract ManagePool is PRBTest {
         IBasePoolErc20 pool = IBasePoolErc20(Address.BasePool);
         bytes32 poolId = pool.getPoolId();
 
-        (IBERC20[] memory tokens, uint[] memory balances,) = vault.getPoolTokens(poolId);
+        (IBERC20[] memory tokens,,) = vault.getPoolTokens(poolId);
 
         IAsset[] memory assets = new IAsset[](tokens.length);
 
@@ -94,9 +94,6 @@ contract ManagePool is PRBTest {
 
         vault.getPoolTokens(poolId);
         uint bptBalance = pool.balanceOf(DEPLOYER_ADDRESS);
-
-        // IERC20(Const.BasePool).allowance(DEPLOYER_ADDRESS, address(this));
-        // IERC20(Address.BasePool).approve(address(this), bptBalance);
 
         uint[] memory _amounts = new uint[](tokens.length);
 

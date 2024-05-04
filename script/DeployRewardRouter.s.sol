@@ -39,9 +39,6 @@ contract DeployRewardRouter is PRBTest {
         wntUsdPoolList[1] = IUniswapV3Pool(0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443); // https://arbiscan.io/address/0xc31e54c7a869b9fcbecc14363cf510d1c41fa443
         wntUsdPoolList[2] = IUniswapV3Pool(0x641C00A822e8b671738d32a431a4Fb6074E5c79d); // https://arbiscan.io/address/0x641c00a822e8b671738d32a431a4fb6074e5c79d
 
-        IERC20[] memory secondaryPriceConfigList = new IERC20[](1);
-        secondaryPriceConfigList[0] = IERC20(Address.usdc);
-
         IBasePoolErc20 lpPool = IBasePoolErc20(Address.BasePool);
         IVault vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
 
@@ -50,15 +47,14 @@ contract DeployRewardRouter is PRBTest {
             enabled: true, //
             sourceList: wntUsdPoolList,
             twapInterval: 0,
-            token1Deicmals: 6
+            token: IERC20(Address.usdc)
         });
 
         OracleStore oracleStore = new OracleStore(dictator, 1e18);
         Oracle oracle = new Oracle(
             dictator,
             oracleStore,
-            Oracle.CallConfig({token: IERC20(Address.wnt), vault: vault, poolId: lpPool.getPoolId(), updateInterval: 1 days}),
-            secondaryPriceConfigList,
+            Oracle.PrimaryPriceConfig({token: IERC20(Address.wnt), vault: vault, poolId: lpPool.getPoolId(), updateInterval: 1 days}),
             exchangePriceSourceList
         );
         dictator.setAccess(oracleStore, address(oracle));

@@ -6,7 +6,7 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 
 // https://github.com/Uniswap/v3-core/blob/d8b1c635c275d2a9450bd6a78f3fa2484fef73eb/contracts/libraries/TickMath.sol#L15
-library UniV3Prelude {
+library PoolUtils {
     int24 internal constant MIN_TICK = -887272;
     int24 internal constant MAX_TICK = -MIN_TICK;
 
@@ -43,7 +43,7 @@ library UniV3Prelude {
         sqrtPriceX96 = uint160((ratio >> 32) + (ratio % (1 << 32) == 0 ? 0 : 1));
     }
 
-    function calcSqrtTwapX96(IUniswapV3Pool pool, uint32 twapInterval) public view returns (uint160 sqrtPriceX96) {
+    function calcSqrtTwapX96(IUniswapV3Pool pool, uint32 twapInterval) internal view returns (uint160 sqrtPriceX96) {
         if (twapInterval == 0) {
             (sqrtPriceX96,,,,,,) = pool.slot0();
         } else {
@@ -65,15 +65,38 @@ library UniV3Prelude {
         }
     }
 
-    function calcSqrtPriceX96ToUint(uint160 sqrtPriceX96, uint8 token0Decimals) public pure returns (uint priceX96) {
+    function calcSqrtPriceX96ToUint(uint160 sqrtPriceX96, uint8 token0Decimals) internal pure returns (uint priceX96) {
         uint numerator1 = uint(sqrtPriceX96) ** 2;
         uint numerator2 = 10 ** token0Decimals;
         return Math.mulDiv(numerator1, numerator2, 1 << 192);
     }
 
-    function getTwapPrice(IUniswapV3Pool pool, uint8 token0Decimals, uint32 twapInterval) public view returns (uint priceX96) {
+    function getTwapPrice(IUniswapV3Pool pool, uint8 token0Decimals, uint32 twapInterval) internal view returns (uint priceX96) {
         uint160 sqrtPriceX96 = calcSqrtTwapX96(pool, twapInterval);
 
         return calcSqrtPriceX96ToUint(sqrtPriceX96, token0Decimals);
+    }
+
+    function getTwapMedianPrice(IUniswapV3Pool[] memory poolList, uint32 twapInterval) internal view returns (uint medianPrice) {
+        uint sourceListLength = poolList.length;
+
+        uint[] memory priceList = new uint[](sourceListLength);
+
+        // Initialize the first element
+        priceList[0] = getTwapPrice(poolList[0], 18, twapInterval);
+
+        for (uint i = 1; i < sourceListLength; i++) {
+            uint currentPrice = getTwapPrice(poolList[i], 18, twapInterval);
+
+            uint j = i;
+            while (j > 0 && priceList[j - 1] > currentPrice) {
+                priceList[j] = priceList[j - 1];
+                j--;
+            }
+            priceList[j] = currentPrice;
+        }
+
+        uint medianIndex = (sourceListLength - 1) / 2; // Index of the median after the array is sorted
+        medianPrice = priceList[medianIndex];
     }
 }

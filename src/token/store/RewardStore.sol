@@ -67,13 +67,13 @@ contract RewardStore is BankStore {
         return cursorVeSupplyMap[_token][_cursor];
     }
 
+    function setCursorVeSupply(IERC20 _token, uint _cursor, uint _value) external auth {
+        cursorVeSupplyMap[_token][_cursor] = _value;
+    }
+
     function getCursorVeSupplyAndBalance(IERC20 _token, uint _cursor) external view returns (uint _veSupply, uint _cursorBalance) {
         _veSupply = cursorVeSupplyMap[_token][_cursor];
         _cursorBalance = cursorBalanceMap[_token][_cursor];
-    }
-
-    function setVeSupply(IERC20 _token, uint _cursor, uint _value) external auth {
-        cursorVeSupplyMap[_token][_cursor] = _value;
     }
 
     function transferOut(IERC20 _token, address _receiver, uint _value) external auth {
