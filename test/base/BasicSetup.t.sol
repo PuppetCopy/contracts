@@ -4,16 +4,14 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import {StdCheats} from "forge-std/src/StdCheats.sol";
-import {StdUtils} from "forge-std/src/StdUtils.sol";
-import {PRBTest} from "@prb/test/src/PRBTest.sol";
+import { Test } from "forge-std/src/Test.sol";
 
 import {Dictator} from "src/shared/Dictator.sol";
 import {PuppetToken} from "src/token/PuppetToken.sol";
 import {Router} from "src/shared/Router.sol";
 import {IWNT} from "./../../src/utils/interfaces/IWNT.sol";
 
-contract BasicSetup is PRBTest, StdCheats, StdUtils {
+contract BasicSetup is Test {
     struct Users {
         address payable owner;
         address payable alice;

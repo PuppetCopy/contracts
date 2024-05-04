@@ -76,9 +76,9 @@ contract PuppetTokenTest is BasicSetup {
 
         assertEq(puppetToken.balanceOf(users.alice), 6000e18);
 
-        assertAlmostEq(puppetToken.getCoreShare(), 0.333e30, 0.001e30);
+        assertApproxEqAbs(puppetToken.getCoreShare(), 0.333e30, 0.001e30);
 
         puppetToken.mintCore(users.bob);
-        assertAlmostEq(puppetToken.balanceOf(users.bob), 2000e18, 0.001e18);
+        assertApproxEqAbs(puppetToken.balanceOf(users.bob), 2000e18, 0.001e18);
     }
 }

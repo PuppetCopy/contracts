@@ -92,7 +92,7 @@ contract PuppetToken is Permission, ERC20 {
      */
     function mintCore(address _receiver) external auth returns (uint) {
         uint _mintShare = getCoreShare();
-        uint _maxMintable = mineMintCount * _mintShare / Precision.FLOAT_PRECISION;
+        uint _maxMintable = Precision.applyFactor(_mintShare, mineMintCount);
         uint _mintable = _maxMintable - coreMintCount;
 
         coreMintCount += _mintable;

@@ -21,12 +21,11 @@ library ExecuteDecreasePosition {
     );
 
     struct CallConfig {
-        Router router;
+        Router router;  
         PositionStore positionStore;
         PuppetStore puppetStore;
         RewardStore rewardStore;
         address gmxOrderReciever;
-        uint tokenTransferGasLimit;
         uint performanceFeeRate;
         uint traderPerformanceFeeShare;
     }

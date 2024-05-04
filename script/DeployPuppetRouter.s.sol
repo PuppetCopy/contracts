@@ -64,11 +64,5 @@
 //             })
 //         );
 
-//         dictator.setRoleCapability(
-//             Role.PUPPET_DECREASE_BALANCE_AND_SET_ACTIVITY, //
-//             address(puppetRouter),
-//             puppetRouter.decreaseBalanceAndSetActivityList.selector,
-//             true
-//         );
 //     }
 // }

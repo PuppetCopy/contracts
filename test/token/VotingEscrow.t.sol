@@ -256,12 +256,12 @@ contract VotingEscrowTest is BasicSetup {
 
         assertTrue(votingEscrow.getLastUserSlope(_user) != 0, "_checkUserVotingDataAfterCreateLock: E0");
         assertTrue(votingEscrow.userPointHistoryTs(_user, 1) != 0, "_checkUserVotingDataAfterCreateLock: E1");
-        assertAlmostEq(votingEscrow.lockedEnd(_user), block.timestamp + MAXTIME, 1e10, "_checkUserVotingDataAfterCreateLock: E2");
-        assertAlmostEq(votingEscrow.balanceOf(_user), _amountLocked, 1e23, "_checkUserVotingDataAfterCreateLock: E3");
-        assertAlmostEq(votingEscrow.balanceOf(_user, block.timestamp), _amountLocked, 1e23, "_checkUserVotingDataAfterCreateLock: E4");
+        assertApproxEqAbs(votingEscrow.lockedEnd(_user), block.timestamp + MAXTIME, 1e10, "_checkUserVotingDataAfterCreateLock: E2");
+        assertApproxEqAbs(votingEscrow.balanceOf(_user), _amountLocked, 1e23, "_checkUserVotingDataAfterCreateLock: E3");
+        assertApproxEqAbs(votingEscrow.balanceOf(_user, block.timestamp), _amountLocked, 1e23, "_checkUserVotingDataAfterCreateLock: E4");
 
-        assertAlmostEq(votingEscrow.totalSupply(), _totalSupplyBefore + _amountLocked, 1e23, "_checkUserVotingDataAfterCreateLock: E6");
-        assertAlmostEq(votingEscrow.totalSupplyAt(block.number), _totalSupplyBefore + _amountLocked, 1e23, "_checkUserVotingDataAfterCreateLock: E7");
+        assertApproxEqAbs(votingEscrow.totalSupply(), _totalSupplyBefore + _amountLocked, 1e23, "_checkUserVotingDataAfterCreateLock: E6");
+        assertApproxEqAbs(votingEscrow.totalSupplyAt(block.number), _totalSupplyBefore + _amountLocked, 1e23, "_checkUserVotingDataAfterCreateLock: E7");
         assertEq(_votingEscrowBalanceBefore, puppetToken.balanceOf(address(votingEscrow)) - _amountLocked, "_checkUserVotingDataAfterCreateLock: E8");
         assertTrue(puppetToken.balanceOf(address(votingEscrow)) > 0, "_checkUserVotingDataAfterCreateLock: E9");
         assertEq(_votingEscrowBalanceBefore + _amountLocked, puppetToken.balanceOf(address(votingEscrow)), "_checkUserVotingDataAfterCreateLock: E10");
@@ -291,28 +291,28 @@ contract VotingEscrowTest is BasicSetup {
         uint _lockedAmountBefore
     ) internal {
         assertEq(votingEscrow.balanceOf(_user), _userBalanceBefore, "_checkUserBalancesAfterDepositFor: E0");
-        assertAlmostEq(votingEscrow.balanceOf(_receiver), _receiverBalanceBefore + _amount, 1e23, "_checkUserBalancesAfterDepositFor: E1");
+        assertApproxEqAbs(votingEscrow.balanceOf(_receiver), _receiverBalanceBefore + _amount, 1e23, "_checkUserBalancesAfterDepositFor: E1");
         assertEq(votingEscrow.balanceOf(_user, block.timestamp), _userBalanceBefore, "_checkUserBalancesAfterDepositFor: E2");
-        assertAlmostEq(
+        assertApproxEqAbs(
             votingEscrow.balanceOf(_receiver, block.timestamp), _receiverBalanceBefore + _amount, 1e23, "_checkUserBalancesAfterDepositFor: E3"
         );
-        assertAlmostEq(votingEscrow.totalSupply(), _totalSupplyBefore + _amount, 1e23, "_checkUserBalancesAfterDepositFor: E6");
-        assertAlmostEq(votingEscrow.totalSupplyAt(block.number), _totalSupplyBefore + _amount, 1e23, "_checkUserBalancesAfterDepositFor: E7");
+        assertApproxEqAbs(votingEscrow.totalSupply(), _totalSupplyBefore + _amount, 1e23, "_checkUserBalancesAfterDepositFor: E6");
+        assertApproxEqAbs(votingEscrow.totalSupplyAt(block.number), _totalSupplyBefore + _amount, 1e23, "_checkUserBalancesAfterDepositFor: E7");
         assertEq(puppetToken.balanceOf(address(votingEscrow)), _votingEscrowBalanceBefore + _amount, "_checkUserBalancesAfterDepositFor: E8");
         assertEq(votingEscrow.lockedAmount(_receiver), _lockedAmountBefore + _amount, "_checkUserBalancesAfterDepositFor: E9");
     }
 
     function _checkLockTimesBeforeSkip() internal {
-        assertAlmostEq(votingEscrow.lockedEnd(users.alice), block.timestamp + MAXTIME, 1e6, "_checkLockTimesBeforeSkip: E0");
-        assertAlmostEq(votingEscrow.lockedEnd(users.bob), block.timestamp + MAXTIME, 1e6, "_checkLockTimesBeforeSkip: E1");
+        assertApproxEqAbs(votingEscrow.lockedEnd(users.alice), block.timestamp + MAXTIME, 1e6, "_checkLockTimesBeforeSkip: E0");
+        assertApproxEqAbs(votingEscrow.lockedEnd(users.bob), block.timestamp + MAXTIME, 1e6, "_checkLockTimesBeforeSkip: E1");
     }
 
     function _checkLockTimesAfterSkipHalf(uint _aliceBalanceBefore, uint _bobBalanceBefore, uint _totalSupplyBefore) internal {
-        assertAlmostEq(votingEscrow.balanceOf(users.alice), _aliceBalanceBefore / 2, 1e21, "_checkLockTimesAfterSkipHalf: E0");
-        assertAlmostEq(votingEscrow.balanceOf(users.bob), _bobBalanceBefore / 2, 1e21, "_checkLockTimesAfterSkipHalf: E1");
+        assertApproxEqAbs(votingEscrow.balanceOf(users.alice), _aliceBalanceBefore / 2, 1e21, "_checkLockTimesAfterSkipHalf: E0");
+        assertApproxEqAbs(votingEscrow.balanceOf(users.bob), _bobBalanceBefore / 2, 1e21, "_checkLockTimesAfterSkipHalf: E1");
         assertEq(votingEscrow.balanceOf(users.alice, block.timestamp - MAXTIME / 2), _aliceBalanceBefore, "_checkLockTimesAfterSkipHalf: E2");
         assertEq(votingEscrow.balanceOf(users.bob, block.timestamp - MAXTIME / 2), _bobBalanceBefore, "_checkLockTimesAfterSkipHalf: E3");
-        assertAlmostEq(votingEscrow.totalSupply(), _totalSupplyBefore / 2, 1e21, "_checkLockTimesAfterSkipHalf: E4");
+        assertApproxEqAbs(votingEscrow.totalSupply(), _totalSupplyBefore / 2, 1e21, "_checkLockTimesAfterSkipHalf: E4");
         assertEq(votingEscrow.totalSupply(block.timestamp - MAXTIME / 2), _totalSupplyBefore, "_checkLockTimesAfterSkipHalf: E5");
     }
 
@@ -338,17 +338,17 @@ contract VotingEscrowTest is BasicSetup {
         uint _totalSupplyBefore,
         address _user
     ) internal {
-        assertAlmostEq(votingEscrow.lockedEnd(_user), block.timestamp + MAXTIME, 1e6, "_checkUserLockTimesAfterIncreaseUnlockTime: E0");
-        assertAlmostEq(votingEscrow.balanceOf(_user), _userBalanceBeforeUnlock * 2, 1e21, "_checkUserLockTimesAfterIncreaseUnlockTime: E1");
-        assertAlmostEq(
+        assertApproxEqAbs(votingEscrow.lockedEnd(_user), block.timestamp + MAXTIME, 1e6, "_checkUserLockTimesAfterIncreaseUnlockTime: E0");
+        assertApproxEqAbs(votingEscrow.balanceOf(_user), _userBalanceBeforeUnlock * 2, 1e21, "_checkUserLockTimesAfterIncreaseUnlockTime: E1");
+        assertApproxEqAbs(
             votingEscrow.balanceOf(_user, block.timestamp), _userBalanceBeforeUnlock * 2, 1e21, "_checkUserLockTimesAfterIncreaseUnlockTime: E2"
         );
 
         // assertEq(_votingEscrow.balanceOfAtT(_user, block.timestamp - _MAXTIME / 2),
         // _votingEscrow.balanceOf(_user), "_checkUserLockTimesAfterIncreaseUnlockTime: E3");
         assertTrue(votingEscrow.totalSupply() > _totalSupplyBeforeUnlock, "_checkUserLockTimesAfterIncreaseUnlockTime: E4");
-        assertAlmostEq(votingEscrow.totalSupply(), _totalSupplyBefore, 1e21, "_checkUserLockTimesAfterIncreaseUnlockTime: E5");
-        assertAlmostEq(_userBalanceBefore, votingEscrow.balanceOf(_user), 1e21, "_checkUserLockTimesAfterIncreaseUnlockTime: E6");
+        assertApproxEqAbs(votingEscrow.totalSupply(), _totalSupplyBefore, 1e21, "_checkUserLockTimesAfterIncreaseUnlockTime: E5");
+        assertApproxEqAbs(_userBalanceBefore, votingEscrow.balanceOf(_user), 1e21, "_checkUserLockTimesAfterIncreaseUnlockTime: E6");
     }
 
     function _checkIncreaseAmountWrongFlows(address _user) internal {
@@ -366,8 +366,8 @@ contract VotingEscrowTest is BasicSetup {
         uint _votingEscrowBalanceBefore,
         uint _lockedAmountBefore
     ) internal {
-        assertAlmostEq(votingEscrow.balanceOf(_user), _balanceBefore + _amountLocked, 1e21, "_checkUserBalancesAfterIncreaseAmount: E0");
-        assertAlmostEq(votingEscrow.totalSupply(), _totalSupplyBefore + _amountLocked, 1e21, "_checkUserBalancesAfterIncreaseAmount: E1");
+        assertApproxEqAbs(votingEscrow.balanceOf(_user), _balanceBefore + _amountLocked, 1e21, "_checkUserBalancesAfterIncreaseAmount: E0");
+        assertApproxEqAbs(votingEscrow.totalSupply(), _totalSupplyBefore + _amountLocked, 1e21, "_checkUserBalancesAfterIncreaseAmount: E1");
         assertEq(
             puppetToken.balanceOf(address(votingEscrow)), _votingEscrowBalanceBefore + _amountLocked, "_checkUserBalancesAfterIncreaseAmount: E2"
         );

@@ -6,7 +6,6 @@
   "exclude_high": false,
   "solc_remaps": [
     "@balancer-labs/v2-interfaces/=node_modules/@balancer-labs/v2-interfaces/contracts/",
-    "@solmate/contracts/=node_modules/@solmate/contracts/src/",
     "@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
     "@automate/contracts/=node_modules/@automate/contracts/",
     "forge-std/=node_modules/forge-std/",

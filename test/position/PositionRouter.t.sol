@@ -109,8 +109,7 @@ contract PositionRouterTest is BasicSetup {
                     gmxOrderReciever: address(positionStore),
                     gmxOrderVault: Address.gmxOrderVault,
                     referralCode: Address.referralCode,
-                    callbackGasLimit: 2_000_000,
-                    tokenTransferGasLimit: 200_000
+                    callbackGasLimit: 2_000_000
                 }),
                 executeIncrease: ExecuteIncreasePosition.CallConfig({
                     positionStore: positionStore, //
@@ -122,7 +121,6 @@ contract PositionRouterTest is BasicSetup {
                     puppetStore: puppetStore,
                     rewardStore: rewardStore,
                     gmxOrderReciever: address(positionStore),
-                    tokenTransferGasLimit: 200_000,
                     performanceFeeRate: 0.1e30, // 10%
                     traderPerformanceFeeShare: 0.5e30 // shared between trader and platform
                 })

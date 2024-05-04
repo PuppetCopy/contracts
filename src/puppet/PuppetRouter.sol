@@ -56,23 +56,6 @@ contract PuppetRouter is Auth, EIP712, ReentrancyGuard {
         _setConfig(_callConfig);
     }
 
-    // integration
-
-    function increaseBalanceList(IERC20 token, address[] calldata receiverList, uint[] calldata amountList) external auth {
-        store.increaseBalanceList(token, msg.sender, receiverList, amountList);
-    }
-
-    function decreaseBalanceAndSetActivityList(
-        IERC20 token,
-        address receiver,
-        address trader,
-        uint _activityTime,
-        address[] calldata _puppetList,
-        uint[] calldata _balanceList
-    ) external auth {
-        store.decreaseBalanceAndSetActivityList(token, receiver, trader, _activityTime, _puppetList, _balanceList);
-    }
-
     // internal
 
     function _setConfig(CallConfig memory _callConfig) internal {

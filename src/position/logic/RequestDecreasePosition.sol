@@ -29,7 +29,6 @@ library RequestDecreasePosition {
         address gmxOrderVault;
         bytes32 referralCode;
         uint callbackGasLimit;
-        uint tokenTransferGasLimit;
     }
 
     function traderDecrease(CallConfig memory callConfig, PositionUtils.TraderCallParams calldata traderCallParams) internal {
@@ -39,14 +38,6 @@ library RequestDecreasePosition {
         address subaccountAddress = address(subaccount);
 
         if (subaccountAddress == address(0)) revert RequestDecreasePosition__SubaccountNotFound(traderCallParams.account);
-
-        TransferUtils.depositAndSendWnt(
-            callConfig.wnt,
-            address(callConfig.positionStore),
-            callConfig.tokenTransferGasLimit,
-            callConfig.gmxOrderVault,
-            traderCallParams.executionFee + traderCallParams.collateralDelta
-        );
 
         bytes32 positionKey = GmxPositionUtils.getPositionKey(
             subaccountAddress, //
