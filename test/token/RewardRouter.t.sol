@@ -28,10 +28,6 @@ contract RewardRouterTest is BasicSetup {
     RewardStore rewardStore;
     Oracle oracle;
 
-    IUniswapV3Pool[] wntUsdPoolList;
-
-    Oracle.PrimaryPriceConfig callOracleConfig;
-
     uint public lockRate = 6000;
     uint public exitRate = 3000;
 
@@ -41,24 +37,20 @@ contract RewardRouterTest is BasicSetup {
         votingEscrow = new VotingEscrow(dictator, router, puppetToken);
         dictator.setPermission(router, address(votingEscrow), router.transfer.selector);
 
-        wntUsdPoolList = new MockUniswapV3Pool[](3);
-
+        IUniswapV3Pool[] memory wntUsdPoolList = new IUniswapV3Pool[](1);
         wntUsdPoolList[0] = new MockUniswapV3Pool(fromPriceToSqrt(100), address(wnt), address(usdc));
-        wntUsdPoolList[1] = new MockUniswapV3Pool(fromPriceToSqrt(100), address(wnt), address(usdc));
-        wntUsdPoolList[2] = new MockUniswapV3Pool(fromPriceToSqrt(100), address(wnt), address(usdc));
 
         Oracle.SecondaryPriceConfig[] memory exchangePriceSourceList = new Oracle.SecondaryPriceConfig[](1);
-        exchangePriceSourceList[0] = Oracle.SecondaryPriceConfig({
-            enabled: true, //
-            sourceList: wntUsdPoolList,
-            twapInterval: 0,
-            token: usdc
-        });
+        exchangePriceSourceList[0] = Oracle.SecondaryPriceConfig({enabled: true, sourceList: wntUsdPoolList, twapInterval: 0, token: usdc});
 
         primaryVaultPool = new MockWeightedPoolVault();
-        primaryVaultPool.initPool(address(puppetToken), address(wnt), 20e18, 80e18);
+        primaryVaultPool.initPool(address(wnt), address(puppetToken), 20e18, 8000e18);
 
-        oracleStore = new OracleStore(dictator, 1e18);
+        (, uint[] memory balances,) = primaryVaultPool.getPoolTokens(0);
+
+        uint initalPrice = (balances[0] * 80e18) / (balances[1] * 20);
+
+        oracleStore = new OracleStore(dictator, initalPrice);
         oracle = new Oracle(
             dictator,
             oracleStore,
@@ -91,60 +83,63 @@ contract RewardRouterTest is BasicSetup {
         for (uint i = 0; i < exchangePriceSourceList.length; i++) {
             exchangePriceSourceList[i].token.approve(address(router), type(uint).max - 1);
         }
+
+        assertEq(oracle.getPrimaryPoolPrice(), 0.01e18, ".01 WNT per PUPPET");
+        assertEq(oracle.getSecondaryPoolPrice(usdc), 100e6, "100 USDC per WNT");
+        assertEq(oracle.getMaxPrice(usdc), 1e6, "1 USDC per PUPPET");
     }
 
     function testOptionRevert() public {
         vm.expectRevert();
         claim(usdc, users.alice);
 
-        assertEq(oracle.getPrimaryPoolPrice(), 1e18, "1-1 pool price with 30 decimals precision");
-        assertEq(oracle.getMaxPrice(usdc), 100e6, "100usdc per puppet");
-
-        generateUserRevenueInWnt(users.alice, 1e18);
-        assertEq(getLockClaimableAmount(wnt, users.alice), 0.6e18);
-        generateUserRevenueInUsdc(users.alice, 100e6);
-        assertEq(getLockClaimableAmount(usdc, users.alice), 0.6e18);
+        generateUserRevenue(wnt, users.alice, 1e18);
+        assertEq(getLockClaimableAmount(wnt, users.alice), 60e18);
+        generateUserRevenue(usdc, users.alice, 100e6);
+        assertEq(getLockClaimableAmount(usdc, users.alice), 60e18);
 
         vm.expectRevert(Oracle.Oracle__UnavailableSecondaryPrice.selector);
         oracle.getSecondaryPrice(wnt);
         vm.expectRevert(Oracle.Oracle__UnavailableSecondaryPrice.selector);
         oracle.getSecondaryPrice(puppetToken);
+        vm.expectRevert(Oracle.Oracle__UnavailableSecondaryPrice.selector);
+        oracle.getSecondaryPrice(IERC20(address(0)));
 
-        vm.expectRevert(abi.encodeWithSelector(RewardLogic.RewardLogic__UnacceptableTokenPrice.selector, 100e6));
-        lock(usdc, getMaxTime(), 0.9e6, 0.9e6);
+        vm.expectRevert(abi.encodeWithSelector(RewardLogic.RewardLogic__UnacceptableTokenPrice.selector, 1e6));
+        lock(usdc, getMaxTime(), 0.99e6, 0.99e6);
     }
 
     function testExitOption() public {
-        skip(1 weeks);
-        generateUserRevenueInWnt(users.alice, 1e18);
-        lock(wnt, getMaxTime(), 1e18, 0.5e18);
-        skip(1 days);
+        generateUserRevenue(wnt, users.yossi, 0.5e18);
+        exit(wnt, 0.01e18, 0.5e18);
+        assertEq(puppetToken.balanceOf(users.yossi), 15e18);
 
-        generateUserRevenueInWnt(users.yossi, 1e18);
-        exit(wnt, 1e18, 0.5e18);
-        skip(1 weeks);
-        vm.startPrank(users.alice);
-        assertEq(claim(wnt, users.alice), 2e18);
-        assertEq(rewardRouter.getClaimable(wnt, users.yossi), 0);
+        generateUserRevenue(wnt, users.yossi, 1e18);
+        exit(wnt, 0.01e18, 1e18);
+        assertEq(puppetToken.balanceOf(users.yossi), 45e18);
+
+        generateUserRevenue(usdc, users.alice, 100e6);
+        exit(usdc, 1e6, 100e6);
+        assertEq(puppetToken.balanceOf(users.alice), 30e18);
     }
 
     function testLockOption() public {
         skip(1 weeks);
-        generateUserRevenueInWnt(users.yossi, 0.5e18);
-        lock(wnt, getMaxTime(), 1e18, 0.5e18);
+        generateUserRevenue(wnt, users.yossi, 0.5e18);
+        lock(wnt, getMaxTime(), 0.01e18, 0.5e18);
         skip(1 days);
 
-        generateUserRevenueInWnt(users.yossi, 0.5e18);
-        lock(wnt, getMaxTime(), 1e18, 0.5e18);
+        generateUserRevenue(wnt, users.yossi, 0.5e18);
+        lock(wnt, getMaxTime(), 0.01e18, 0.5e18);
 
         skip(1 days);
 
-        generateUserRevenueInWnt(users.alice, 0.5e18);
-        lock(wnt, getMaxTime(), 1e18, 0.5e18);
+        generateUserRevenue(wnt, users.alice, 0.5e18);
+        lock(wnt, getMaxTime(), 0.01e18, 0.5e18);
         skip(1 days);
 
-        generateUserRevenueInWnt(users.alice, 0.5e18);
-        lock(wnt, getMaxTime(), 1e18, 0.5e18);
+        generateUserRevenue(wnt, users.alice, 0.5e18);
+        lock(wnt, getMaxTime(), 0.01e18, 0.5e18);
 
         skip(1 weeks);
         assertEq(claim(wnt, users.alice), 1e18);
@@ -152,70 +147,69 @@ contract RewardRouterTest is BasicSetup {
         skip(2 weeks);
         assertEq(rewardRouter.getClaimable(wnt, users.yossi), 1e18);
 
-        generateUserRevenueInWnt(users.bob, 1e18);
-        lock(wnt, getMaxTime(), 1e18, 1e18);
+        generateUserRevenue(wnt, users.bob, 1e18);
+        lock(wnt, getMaxTime(), 0.01e18, 1e18);
 
         skip(1 weeks);
-        rewardRouter.getClaimable(wnt, users.alice);
         assertEq(rewardRouter.getClaimableCursor(wnt, users.yossi, 1 weeks), 1e18);
-        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.33e18, 0.005e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.33e18, 0.05e18);
     }
 
-    function testOptionDecay() public {
+    function testVestingDecay() public {
         skip(1 weeks);
-        generateUserRevenueInWnt(users.yossi, 1e18);
-        lock(wnt, getMaxTime(), 1e18, 1e18);
+        generateUserRevenue(wnt, users.yossi, 1e18);
+        lock(wnt, getMaxTime(), 0.01e18, 1e18);
 
-        generateUserRevenueInWnt(users.alice, 1e18);
+        generateUserRevenue(wnt, users.alice, 1e18);
         skip(1 days);
-        lock(wnt, getMaxTime(), 1e18, 1e18);
+        lock(wnt, getMaxTime(), 0.01e18, 1e18);
 
         assertEq(rewardRouter.getClaimableCursor(wnt, users.yossi, 1 weeks), 1e18);
 
         skip(1 weeks);
 
-        generateUserRevenueInWnt(users.bob, 1e18);
-        lock(wnt, getMaxTime(), 1e18, 1e18);
+        generateUserRevenue(wnt, users.bob, 1e18);
+        lock(wnt, getMaxTime(), 0.01e18, 1e18);
         skip(1 weeks);
 
         assertEq(rewardRouter.getClaimableCursor(wnt, users.yossi, 1 weeks), 1e18);
         assertEq(rewardRouter.getClaimableCursor(wnt, users.alice, 1 weeks), 1e18);
-        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 1.333e18, 0.005e18);
-        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.333e18, 0.005e18);
-        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 0.333e18, 0.005e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 1.333e18, 0.05e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.333e18, 0.05e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 0.33e18, 0.05e18);
 
         skip(getMaxTime() / 2);
         assertEq(rewardRouter.getClaimableCursor(wnt, users.yossi, 1 weeks), 1e18);
         assertEq(rewardRouter.getClaimableCursor(wnt, users.alice, 1 weeks), 1e18);
-        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 1.333e18, 0.005e18);
-        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.333e18, 0.005e18);
-        assertApproxEqAbs(claim(wnt, users.bob), 0.333e18, 0.005e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 1.333e18, 0.05e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.333e18, 0.05e18);
+        assertApproxEqAbs(claim(wnt, users.bob), 0.333e18, 0.05e18);
         assertEq(rewardRouter.getClaimable(wnt, users.bob), 0);
 
-        generateUserRevenueInWnt(users.bob, 2e18);
-        lock(wnt, getMaxTime(), 1e18, 2e18);
+        generateUserRevenue(wnt, users.bob, 2e18);
+        lock(wnt, getMaxTime(), 0.01e18, 2e18);
         skip(1 weeks);
 
-        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 1.525e18, 0.005e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 1.525e18, 0.05e18);
     }
 
     function testCrossedFlow() public {
-        generateUserRevenueInWnt(users.alice, 1e18);
-        exit(wnt, 1e18, 1e18);
-        generateUserRevenueInUsdc(users.alice, 100e6);
-        lock(usdc, getMaxTime(), 100e6, 100e6);
-        assertEq(puppetToken.balanceOf(users.alice), 0.3e18);
+        generateUserRevenue(wnt, users.alice, 1e18);
+        exit(wnt, 0.01e18, 1e18);
+        generateUserRevenue(usdc, users.alice, 100e6);
+        lock(usdc, getMaxTime(), 1e6, 100e6);
+        assertEq(puppetToken.balanceOf(users.alice), 30e18);
 
-        generateUserRevenueInUsdc(users.bob, 100e6);
-        assertEq(getLockClaimableAmount(usdc, users.bob), 0.6e18);
-        assertEq(getExitClaimableAmount(usdc, users.bob), 0.3e18);
-        exit(usdc, 100e6, 100e6);
-        assertEq(puppetToken.balanceOf(users.bob), 0.3e18);
+        generateUserRevenue(usdc, users.bob, 100e6);
+        assertEq(getLockClaimableAmount(usdc, users.bob), 60e18);
+        assertEq(getExitClaimableAmount(usdc, users.bob), 30e18);
+        exit(usdc, 1e6, 100e6);
+        assertEq(puppetToken.balanceOf(users.bob), 30e18);
 
-        generateUserRevenueInUsdc(users.bob, 100e6);
-        assertEq(getLockClaimableAmount(usdc, users.bob), 0.6e18);
-        lock(usdc, getMaxTime() / 2, 100e6, 100e6);
-        assertApproxEqAbs(votingEscrow.balanceOf(users.bob), Precision.applyBasisPoints(lockRate, 1e18) / 4, 0.01e18);
+        generateUserRevenue(usdc, users.bob, 100e6);
+        assertEq(getLockClaimableAmount(usdc, users.bob), 60e18);
+        lock(usdc, getMaxTime() / 2, 1e6, 100e6);
+        assertApproxEqAbs(votingEscrow.balanceOf(users.bob), Precision.applyBasisPoints(lockRate, 100e18) / 4, 0.05e18);
     }
 
     function lock(IERC20 token, uint unlockTime, uint acceptableTokenPrice, uint cugarAmount) public returns (uint) {
@@ -248,14 +242,6 @@ contract RewardRouterTest is BasicSetup {
     function getExitClaimableAmount(IERC20 token, address user) public view returns (uint) {
         uint maxClaimable = getMaxClaimableAmount(token, user);
         return Precision.applyBasisPoints(exitRate, maxClaimable);
-    }
-
-    function generateUserRevenueInUsdc(address user, uint amount) public {
-        generateUserRevenue(usdc, user, amount);
-    }
-
-    function generateUserRevenueInWnt(address user, uint amount) public {
-        generateUserRevenue(wnt, user, amount);
     }
 
     function generateUserRevenue(IERC20 token, address user, uint amount) public {

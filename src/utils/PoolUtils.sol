@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 
 // https://github.com/Uniswap/v3-core/blob/d8b1c635c275d2a9450bd6a78f3fa2484fef73eb/contracts/libraries/TickMath.sol#L15
 library PoolUtils {
-    int24 internal constant MIN_TICK = -887272;
-    int24 internal constant MAX_TICK = -MIN_TICK;
+    int24 constant MIN_TICK = -887272;
+    int24 constant MAX_TICK = -MIN_TICK;
+    uint constant SCALE_FACTOR = 1 << 192;
 
     function calcSqrtRatioAtTick(int24 tick) internal pure returns (uint160 sqrtPriceX96) {
         uint absTick = tick < 0 ? uint(-int(tick)) : uint(int(tick));
@@ -68,7 +68,7 @@ library PoolUtils {
     function calcSqrtPriceX96ToUint(uint160 sqrtPriceX96, uint8 token0Decimals) internal pure returns (uint priceX96) {
         uint numerator1 = uint(sqrtPriceX96) ** 2;
         uint numerator2 = 10 ** token0Decimals;
-        return Math.mulDiv(numerator1, numerator2, 1 << 192);
+        return numerator1 * numerator2 / SCALE_FACTOR;
     }
 
     function getTwapPrice(IUniswapV3Pool pool, uint8 token0Decimals, uint32 twapInterval) internal view returns (uint priceX96) {

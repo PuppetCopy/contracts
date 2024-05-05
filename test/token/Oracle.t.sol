@@ -18,35 +18,26 @@ contract OracleTest is BasicSetup {
     OracleStore oracleStore;
 
     MockWeightedPoolVault poolVault;
-    IUniswapV3Pool[] wntUsdPoolList;
 
     Oracle oracle;
 
     function setUp() public override {
         super.setUp();
 
-        wntUsdPoolList = new MockUniswapV3Pool[](3);
+        IUniswapV3Pool[] memory wntUsdPoolList = new IUniswapV3Pool[](3);
         wntUsdPoolList[0] = new MockUniswapV3Pool(fromPriceToSqrt(100), address(wnt), address(usdc));
         wntUsdPoolList[1] = new MockUniswapV3Pool(fromPriceToSqrt(100), address(wnt), address(usdc));
         wntUsdPoolList[2] = new MockUniswapV3Pool(fromPriceToSqrt(100), address(usdc), address(wnt));
 
         Oracle.SecondaryPriceConfig[] memory exchangePriceSourceList = new Oracle.SecondaryPriceConfig[](1);
-        exchangePriceSourceList[0] = Oracle.SecondaryPriceConfig({
-            enabled: true, //
-            token: usdc,
-            twapInterval: 0,
-            sourceList: wntUsdPoolList
-        });
+        exchangePriceSourceList[0] = Oracle.SecondaryPriceConfig({enabled: true, token: usdc, twapInterval: 0, sourceList: wntUsdPoolList});
 
         poolVault = new MockWeightedPoolVault();
         poolVault.initPool(address(wnt), address(puppetToken), 20e18, 8000e18);
 
         (, uint[] memory balances,) = poolVault.getPoolTokens(0);
 
-        uint tokenBalance = balances[1];
-        uint primaryBalance = balances[0];
-
-        uint initalPrice = (tokenBalance * 20e18) / (primaryBalance * 80);
+        uint initalPrice = (balances[0] * 80e18) / (balances[1] * 20);
 
         oracleStore = new OracleStore(dictator, initalPrice);
         oracle = new Oracle(
@@ -57,10 +48,10 @@ contract OracleTest is BasicSetup {
         );
         dictator.setAccess(oracleStore, address(oracle));
 
-        assertEq(oracle.getPrimaryPoolPrice(), 100e18, "0.01 wnt per puppet");
-        assertEq(oracle.getSecondaryPoolPrice(usdc), 100e6, "100 usd per wnt");
-        assertEq(oracle.getSecondaryPrice(usdc), 1e6, "1 usd per puppet");
-        assertEq(oracle.getMaxPrice(usdc), 1e6, "1 max usd per puppet");
+        assertEq(oracle.getPrimaryPoolPrice(), 0.01e18, ".01 WNT per PUPPET");
+        assertEq(oracle.getMaxPrice(wnt), 0.01e18, "max .01 WNT per PUPPET");
+        assertEq(oracle.getSecondaryPoolPrice(usdc), 100e6, "100 USDC per WNT");
+        assertEq(oracle.getMaxPrice(usdc), 1e6, "max 100 USDC per PUPPET");
 
         // permissions for testing purposes
         dictator.setPermission(oracle, users.owner, oracle.setPrimaryPrice.selector);
@@ -75,80 +66,77 @@ contract OracleTest is BasicSetup {
         mockedPools[3] = new MockUniswapV3Pool(fromPriceToSqrt(1), address(wnt), address(usdc));
         mockedPools[4] = new MockUniswapV3Pool(fromPriceToSqrt(1), address(wnt), address(usdc));
 
-        assertApproxEqAbs(PoolUtils.getTwapMedianPrice(mockedPools, 0), 3307.76e6, 0.05e6, "5 sources, 2 anomalies");
+        assertApproxEqAbs(PoolUtils.getTwapMedianPrice(mockedPools, 2), 3125.97e6, 0.05e6, "5 sources, 2 anomalies");
+
+        IUniswapV3Pool[] memory mockedPools2 = new IUniswapV3Pool[](5);
+
+        mockedPools2[0] = new MockUniswapV3Pool(4557304554737852013346413, address(wnt), address(usdc));
+        mockedPools2[1] = new MockUniswapV3Pool(4557550662160151886594493, address(wnt), address(usdc));
+        mockedPools2[2] = new MockUniswapV3Pool(fromPriceToSqrt(1), address(wnt), address(usdc));
+        mockedPools2[3] = new MockUniswapV3Pool(fromPriceToSqrt(1), address(wnt), address(usdc));
+        mockedPools2[4] = new MockUniswapV3Pool(fromPriceToSqrt(1), address(wnt), address(usdc));
+
+        assertApproxEqAbs(PoolUtils.getTwapMedianPrice(mockedPools2, 0), 1e6, 0.05e6, "5 sources, 2 anomalies");
     }
 
-    // function testUsdcPrice() public {
-    //     // (80 * 0.2) / (20 * 0.80)
-    //     poolVault.setPoolBalances(20e18, 80e18);
-    //     assertEq(oracle.getSecondaryPrice(usdc), 100e6);
-    //     poolVault.setPoolBalances(40e18, 80e18);
-    //     assertEq(oracle.getSecondaryPrice(usdc), 200e6);
-    //     poolVault.setPoolBalances(20e18, 40e18);
-    //     assertEq(oracle.getSecondaryPrice(usdc), 200e6);
-    //     poolVault.setPoolBalances(20e18, 160e18);
-    //     assertEq(oracle.getSecondaryPrice(usdc), 50e6);
-    //     poolVault.setPoolBalances(20e18, 16000e18);
-    //     assertEq(oracle.getSecondaryPrice(usdc), 0.5e6);
-    //     poolVault.setPoolBalances(20e18, 160000e18);
-    //     assertEq(oracle.getSecondaryPrice(usdc), 0.05e6);
-    //     poolVault.setPoolBalances(40e18, 160000000e18);
-    //     assertEq(oracle.getSecondaryPrice(usdc), 0.0001e6);
-    //     poolVault.setPoolBalances(20_000_000e18, 80e18);
-    //     assertEq(oracle.getSecondaryPrice(usdc), 100_000_000e6);
-    //     poolVault.setPoolBalances(20e18, 8e18);
-    //     assertEq(oracle.getSecondaryPrice(usdc), 1_000e6);
+    function testUsdcPrice() public {
+        poolVault.setPoolBalances(20e18, 80e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 100e6);
+        poolVault.setPoolBalances(40e18, 80e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 200e6);
+        poolVault.setPoolBalances(20e18, 40e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 200e6);
+        poolVault.setPoolBalances(20e18, 160e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 50e6);
+        poolVault.setPoolBalances(20e18, 16000e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 0.5e6);
+        poolVault.setPoolBalances(20e18, 160000e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 0.05e6);
+        poolVault.setPoolBalances(40e18, 160000000e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 0.0001e6);
+        poolVault.setPoolBalances(20_000_000e18, 80e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 100_000_000e6);
+        poolVault.setPoolBalances(20e18, 8e18);
+        assertEq(oracle.getSecondaryPrice(usdc), 1_000e6);
 
-    //     poolVault.setPoolBalances(2_000e18, 0);
-    //     vm.expectRevert();
-    //     oracle.getSecondaryPrice(usdc);
-    //     poolVault.setPoolBalances(0, 2_000e18);
-    //     vm.expectRevert();
-    //     oracle.getSecondaryPrice(usdc);
-    // }
+        poolVault.setPoolBalances(2_000e18, 0);
+        vm.expectRevert();
+        oracle.getSecondaryPrice(usdc);
+        poolVault.setPoolBalances(0, 2_000e18);
+        vm.expectRevert();
+        oracle.getSecondaryPrice(usdc);
+    }
 
     function testSlotMinMaxPrice() public {
-        _stepSlot();
+        _storeStep(usdc, 40e18);
+        _storeStep(wnt, 40e18);
+        _storeStep(usdc, 40e18);
+        _storeStep(usdc, 40e18);
+        _storeStep(usdc, 80e18);
+        _storeStep(wnt, 80e18);
 
-        _storeStepInUsdc(20e18);
-
-        // assertEq(_storeStepInUsdc(4000e18), 200e6);
-        // assertEq(_storeStepInUsdc(4000e18), 200e6);
-        // assertEq(_storeStepInUsdc(4000e18), 200e6);
-        // assertEq(_storeStepInUsdc(4000e18), 200e6);
-        // assertEq(_storeStepInUsdc(4000e18), 200e6);
-        // assertEq(_storeStepInUsdc(4000e18), 200e6);
-
-        // _storeStepInUsdc(200e18);
-        // assertEq(oracle.getMinPrice(usdc), 10e6);
+        assertEq(oracle.getMinPrice(usdc), 2e6);
+        assertEq(oracle.getMaxPrice(usdc), 4e6);
     }
 
-    // function testMedianHigh() public {
-    //     _storeStepInWnt(1e18);
-    //     _storeStepInWnt(2e18);
-    //     _storeStepInWnt(4e18);
-    //     _storeStepInWnt(8e18);
-    //     _storeStepInWnt(16e18);
-    //     _storeStepInWnt(32e18);
-    //     _storeStepInWnt(64e18);
+    function testMedian() public {
+        _storeStep(wnt, 2.5e18);
+        _storeStep(wnt, 5e18);
+        _storeStep(wnt, 10e18);
+        _storeStep(wnt, 20e18);
+        _storeStep(wnt, 40e18);
+        _storeStep(wnt, 80e18);
+        _storeStep(wnt, 160e18);
 
-    //     assertEq(oracleStore.medianMax(), 0.004e18);
+        assertEq(oracleStore.medianMin(), 0.01e18);
 
-    //     _storeStepInWnt(128e18);
-    //     assertEq(oracleStore.medianMax(), 0.008e18);
-    //     _storeStepInWnt(256e18);
-    //     assertEq(oracleStore.medianMax(), 0.016e18);
-    // }
-
-    function _storeStepInUsdc(uint balanceInWnt) internal returns (uint) {
-        return _storeStep(balanceInWnt, usdc);
+        _storeStep(wnt, 640e18);
+        assertEq(oracleStore.medianMin(), 0.02e18);
+        _storeStep(wnt, 640e18);
+        assertEq(oracleStore.medianMin(), 0.04e18);
     }
 
-    function _storeStepInWnt(uint balanceInWnt) internal returns (uint) {
-        return _storeStep(balanceInWnt, wnt);
-    }
-
-    function _storeStep(uint balanceInWnt, IERC20 token) internal returns (uint) {
+    function _storeStep(IERC20 token, uint balanceInWnt) internal returns (uint) {
         _stepSlot();
         _setPoolBalance(balanceInWnt);
         oracle.setPrimaryPrice();

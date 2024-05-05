@@ -15,9 +15,9 @@ import {PoolUtils} from "../utils/PoolUtils.sol";
 import {OracleStore, SLOT_COUNT} from "./store/OracleStore.sol";
 
 contract Oracle is Permission, EIP712, ReentrancyGuard {
-    event Oracle__SetConfig(uint timestmap, PrimaryPriceConfig callConfig, SecondaryPriceConfig[] exchangePriceSourceList);
+    event Oracle__SetConfig(uint timestmap, PrimaryPriceConfig primaryConfig, SecondaryPriceConfig[] exchangePriceSourceList);
     event Oracle__SyncDelayedSlot(uint updateInterval, uint seedTimestamp, uint currentTimestamp, uint delayedUpdateCount, uint price);
-    event Oracle__SlotSettled(uint updateInterval, uint seedTimestamp, uint seedPrice, uint maxPrice);
+    event Oracle__SlotSettled(uint updateInterval, uint seedTimestamp, uint seedPrice);
     event Oracle__PriceUpdate(uint timestamp, uint price);
 
     struct SecondaryPriceConfig {
@@ -35,7 +35,7 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
     }
 
     OracleStore store;
-    PrimaryPriceConfig callConfig;
+    PrimaryPriceConfig primaryConfig;
     mapping(IERC20 token => SecondaryPriceConfig) secondarySourceConfigMap;
 
     function getMaxPrice(IERC20 token) public view returns (uint) {
@@ -48,7 +48,7 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
 
     function getMaxPrice(IERC20 token, uint poolPrice) public view returns (uint) {
         uint maxPrimaryPrice = Math.max(store.medianMax(), poolPrice);
-        if (callConfig.token == token) {
+        if (primaryConfig.token == token) {
             return maxPrimaryPrice;
         }
 
@@ -57,7 +57,7 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
 
     function getMinPrice(IERC20 token, uint poolPrice) public view returns (uint) {
         uint minPrimaryPrice = Math.min(store.medianMin(), poolPrice);
-        if (callConfig.token == token) {
+        if (primaryConfig.token == token) {
             return minPrimaryPrice;
         }
 
@@ -67,7 +67,7 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
     function getSecondaryPrice(IERC20 token, uint primaryPrice) public view returns (uint usdPerToken) {
         uint secondaryPrice = getSecondaryPoolPrice(token);
 
-        usdPerToken = secondaryPrice * 1e18 / primaryPrice;
+        usdPerToken = secondaryPrice * primaryPrice / 1e18;
     }
 
     function getSecondaryPrice(IERC20 token) external view returns (uint usdPerToken) {
@@ -75,10 +75,10 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
     }
 
     function getPrimaryPoolPrice() public view returns (uint price) {
-        (, uint[] memory balances,) = callConfig.vault.getPoolTokens(callConfig.poolId);
+        (, uint[] memory balances,) = primaryConfig.vault.getPoolTokens(primaryConfig.poolId);
 
         // price = (balances[0] * 80e18) / (balances[1] * 20); // token/wnt
-        price = (balances[1] * 20e18) / (balances[0] * 80); // wnt/token
+        price = (balances[0] * 80e18) / (balances[1] * 20); // wnt/token
 
         if (price == 0) revert Oracle__NonZeroPrice();
     }
@@ -87,7 +87,10 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
         SecondaryPriceConfig memory tokenPerWntConfig = secondarySourceConfigMap[token];
 
         if (tokenPerWntConfig.enabled == false) revert Oracle__UnavailableSecondaryPrice();
-        // if (callConfig.primaryToken)
+
+        if (tokenPerWntConfig.sourceList.length == 1) {
+            return PoolUtils.getTwapPrice(tokenPerWntConfig.sourceList[0], 18, tokenPerWntConfig.twapInterval);
+        }
 
         return PoolUtils.getTwapMedianPrice(tokenPerWntConfig.sourceList, tokenPerWntConfig.twapInterval);
     }
@@ -123,13 +126,12 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
 
         address _primaryTokenAddress = address(_primaryPriceConfig.token);
 
-        if (address(_tokens[0]) != _primaryTokenAddress) revert Oracle__MisconfiguredPrimaryPool();
+        if (address(_tokens[0]) != _primaryTokenAddress && address(_tokens[1]) != _primaryTokenAddress) revert Oracle__MisconfiguredPrimaryPool();
 
         for (uint i; i < _secondaryPriceConfigList.length; i++) {
             SecondaryPriceConfig memory _config = _secondaryPriceConfigList[i];
 
             if (_config.sourceList.length % 2 == 0) revert Oracle__MisconfiguredSecondaryPool();
-            if (_config.sourceList.length < 3) revert Oracle__MisconfiguredSecondaryPool();
 
             // validate secondary pool sources
             for (uint j; j < _config.sourceList.length; j++) {
@@ -144,7 +146,7 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
             secondarySourceConfigMap[_config.token] = _config;
         }
 
-        callConfig = _primaryPriceConfig;
+        primaryConfig = _primaryPriceConfig;
 
         emit Oracle__SetConfig(block.timestamp, _primaryPriceConfig, _secondaryPriceConfigList);
     }
@@ -154,7 +156,7 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
     function setPrimaryPrice() external auth nonReentrant returns (uint) {
         uint currentPrice = getPrimaryPoolPrice();
         IVault.UserBalanceOp[] memory noop = new IVault.UserBalanceOp[](0);
-        callConfig.vault.manageUserBalance(noop);
+        primaryConfig.vault.manageUserBalance(noop);
 
         OracleStore.SeedSlot memory seed = store.getLatestSeed();
 
@@ -173,7 +175,7 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
 
         if (price == 0) revert Oracle__NonZeroPrice();
 
-        uint8 slot = uint8(block.timestamp / callConfig.updateInterval % SLOT_COUNT);
+        uint8 slot = uint8(block.timestamp / primaryConfig.updateInterval % SLOT_COUNT);
         uint storedSlot = _store.slot();
 
         _store.setLatestSeed(OracleStore.SeedSlot({price: price, blockNumber: block.number, timestamp: block.timestamp}));
@@ -189,10 +191,16 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
         } else {
             _store.setSlot(slot);
 
+            _store.setSlotMin(slot, price);
+            _store.setMedianMin(_getMedian(_store.getSlotArrMin()));
+
+            _store.setSlotMax(slot, price);
+            _store.setMedianMax(_getMedian(_store.getSlotArrMax()));
+
             uint timeElapsed = block.timestamp - seed.timestamp;
 
-            if (timeElapsed > callConfig.updateInterval) {
-                uint delayedSlotCount = Math.min(timeElapsed / callConfig.updateInterval, 6);
+            if (timeElapsed > primaryConfig.updateInterval) {
+                uint delayedSlotCount = Math.min(timeElapsed / primaryConfig.updateInterval, 6);
                 for (uint8 i = 0; i <= delayedSlotCount; i++) {
                     uint8 prevSlot = (slot + SLOT_COUNT - i) % SLOT_COUNT;
 
@@ -200,16 +208,10 @@ contract Oracle is Permission, EIP712, ReentrancyGuard {
                     _store.setSlotMin(prevSlot, price);
                 }
 
-                emit Oracle__SyncDelayedSlot(callConfig.updateInterval, seed.timestamp, block.timestamp, delayedSlotCount, price);
+                emit Oracle__SyncDelayedSlot(primaryConfig.updateInterval, seed.timestamp, block.timestamp, delayedSlotCount, price);
             }
 
-            _store.setSlotMin(slot, price);
-            _store.setMedianMin(_getMedian(_store.getSlotArrMin()));
-
-            _store.setSlotMax(slot, price);
-            _store.setMedianMax(_getMedian(_store.getSlotArrMax()));
-
-            emit Oracle__SlotSettled(callConfig.updateInterval, seed.timestamp, seed.price, max);
+            emit Oracle__SlotSettled(primaryConfig.updateInterval, seed.timestamp, seed.price);
         }
 
         emit Oracle__PriceUpdate(block.timestamp, price);
