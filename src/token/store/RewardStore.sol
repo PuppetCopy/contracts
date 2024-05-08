@@ -12,11 +12,19 @@ import {Router} from "./../../shared/Router.sol";
 uint constant CURSOR_INTERVAL = 1 weeks; // all future times are rounded by week
 
 contract RewardStore is BankStore {
-    mapping(IERC20 => mapping(uint cursorTime => uint)) cursorBalanceMap;
-    mapping(IERC20 => mapping(uint cursorTime => uint)) cursorVeSupplyMap;
+    struct UserTokenCursor {
+        uint veSupply;
+        uint cursorBalance;
+        uint balance;
+        uint claimed;
+    }
 
+    mapping(IERC20 => mapping(uint cursorTime => uint)) cursorBalanceMap;
+    mapping(uint cursorTime => uint) cursorVeSupplyMap;
+
+    mapping(address => mapping(uint cursorTime => uint)) userCursorBalanceMap;
     mapping(IERC20 => mapping(address => uint)) userSeedContributionMap;
-    mapping(IERC20 => mapping(address => uint)) public userTokenCursorMap;
+    mapping(IERC20 => mapping(address => UserTokenCursor)) public userTokenCursorMap;
 
     constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
 
@@ -63,17 +71,30 @@ contract RewardStore is BankStore {
         return cursorBalanceMap[_token][_cursor];
     }
 
-    function getCursorVeSupply(IERC20 _token, uint _cursor) external view returns (uint) {
-        return cursorVeSupplyMap[_token][_cursor];
+    function getCursorVeSupply(uint _cursor) external view returns (uint) {
+        return cursorVeSupplyMap[_cursor];
     }
 
-    function setCursorVeSupply(IERC20 _token, uint _cursor, uint _value) external auth {
-        cursorVeSupplyMap[_token][_cursor] = _value;
+    function setCursorVeSupply(uint _cursor, uint _value) external auth {
+        cursorVeSupplyMap[_cursor] = _value;
     }
 
-    function getCursorVeSupplyAndBalance(IERC20 _token, uint _cursor) external view returns (uint _veSupply, uint _cursorBalance) {
-        _veSupply = cursorVeSupplyMap[_token][_cursor];
+    function getUserCursorBalance(uint _cursor, address _user) external view returns (uint) {
+        return userCursorBalanceMap[_user][_cursor];
+    }
+
+    function setUserCursorBalance(uint _cursor, address _user, uint _value) external auth {
+        userCursorBalanceMap[_user][_cursor] = _value;
+    }
+
+    function getUserCursorInfo(IERC20 _token, uint _cursor, address _user)
+        external
+        view
+        returns (uint _veSupply, uint _cursorBalance, uint _balance)
+    {
+        _veSupply = cursorVeSupplyMap[_cursor];
         _cursorBalance = cursorBalanceMap[_token][_cursor];
+        _balance = userCursorBalanceMap[_user][_cursor];
     }
 
     function transferOut(IERC20 _token, address _receiver, uint _value) external auth {

@@ -62,14 +62,7 @@ contract DeployRewardRouter is PRBTest {
         RewardStore rewardStore = new RewardStore(dictator, router);
         dictator.setPermission(router, address(rewardStore), router.transfer.selector);
         RewardRouter rewardRouter = new RewardRouter(
-            dictator,
-            router,
-            votingEscrow,
-            rewardStore,
-            RewardRouter.CallConfig({
-                lock: RewardLogic.CallLockConfig({oracle: oracle, puppetToken: puppetToken, rate: 6000}),
-                exit: RewardLogic.CallExitConfig({oracle: oracle, puppetToken: puppetToken, rate: 3000})
-            })
+            dictator, router, votingEscrow, puppetToken, rewardStore, RewardRouter.CallConfig({oracle: oracle, lockRate: 6000, exitRate: 3000})
         );
         dictator.setAccess(rewardStore, address(rewardRouter));
 
