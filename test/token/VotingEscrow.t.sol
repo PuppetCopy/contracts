@@ -10,11 +10,13 @@ contract VotingEscrowTest is BasicSetup {
     uint private constant MAXTIME = 2 * 365 * 86400; // 4 years
 
     VotingEscrow votingEscrow;
+    VotingEscrowLocker votingEscrowLocker;
 
     function setUp() public override {
         BasicSetup.setUp();
 
         votingEscrow = new VotingEscrow(dictator, router, puppetToken);
+        votingEscrowLocker = new VotingEscrowLocker(votingEscrow);
 
         dictator.setPermission(puppetToken, users.owner, puppetToken.mint.selector);
 
@@ -24,6 +26,8 @@ contract VotingEscrowTest is BasicSetup {
 
         dictator.setPermission(router, address(votingEscrow), router.transfer.selector);
         dictator.setPermission(router, users.owner, router.setTransferGasLimit.selector);
+
+        dictator.setAccess(votingEscrow, address(votingEscrowLocker));
 
         vm.stopPrank();
     }
@@ -46,9 +50,9 @@ contract VotingEscrowTest is BasicSetup {
         vm.startPrank(users.alice);
         _totalSupplyBefore = votingEscrow.totalSupply();
         _votingEscrowBalanceBefore = puppetToken.balanceOf(address(votingEscrow));
-        _lockedAmountBefore = votingEscrow.lockedAmount(users.alice);
+        _lockedAmountBefore = votingEscrow.getLock(users.alice).amount;
         puppetToken.approve(address(router), _aliceAmountLocked);
-        votingEscrow.lock(_aliceAmountLocked, block.timestamp + MAXTIME);
+        votingEscrowLocker.lock(_aliceAmountLocked, block.timestamp + MAXTIME);
         _totalSupplyBefore = votingEscrow.totalSupply();
 
         vm.stopPrank();
@@ -59,11 +63,11 @@ contract VotingEscrowTest is BasicSetup {
         vm.startPrank(users.bob);
         _totalSupplyBefore = votingEscrow.totalSupply();
         _votingEscrowBalanceBefore = puppetToken.balanceOf(address(votingEscrow));
-        _lockedAmountBefore = votingEscrow.lockedAmount(users.bob);
+        _lockedAmountBefore = votingEscrow.getLock(users.bob).amount;
         puppetToken.approve(address(router), _bobAmountLocked);
-        votingEscrow.lock(_bobAmountLocked, block.timestamp + MAXTIME);
+        votingEscrowLocker.lock(_bobAmountLocked, block.timestamp + MAXTIME);
         // vm.expectRevert(VotingEscrow.VotingEscrow__InvaidLockingSchedule.selector);
-        // votingEscrow.lock(users.bob, users.bob, _bobAmountLocked, block.timestamp + 8 * 86400);
+        // votingEscrowLocker.lock(users.bob, users.bob, _bobAmountLocked, block.timestamp + 8 * 86400);
         vm.stopPrank();
         _checkUserVotingDataAfterCreateLock(users.bob, _bobAmountLocked, _totalSupplyBefore, _votingEscrowBalanceBefore, _lockedAmountBefore);
 
@@ -79,7 +83,7 @@ contract VotingEscrowTest is BasicSetup {
         vm.startPrank(users.alice);
         _totalSupplyBefore = votingEscrow.totalSupply();
         _votingEscrowBalanceBefore = puppetToken.balanceOf(address(votingEscrow));
-        _lockedAmountBefore = votingEscrow.lockedAmount(users.bob);
+        _lockedAmountBefore = votingEscrow.getLock(users.bob).amount;
         uint _aliceBalanceBefore = votingEscrow.balanceOf(users.alice);
         uint _bobBalanceBefore = votingEscrow.balanceOf(users.bob);
         votingEscrow.lockFor(users.alice, users.bob, _aliceAmountLocked, 0);
@@ -108,7 +112,7 @@ contract VotingEscrowTest is BasicSetup {
         vm.startPrank(users.bob);
         _totalSupplyBefore = votingEscrow.totalSupply();
         _votingEscrowBalanceBefore = puppetToken.balanceOf(address(votingEscrow));
-        _lockedAmountBefore = votingEscrow.lockedAmount(users.alice);
+        _lockedAmountBefore = votingEscrow.getLock(users.alice).amount;
         _aliceBalanceBefore = votingEscrow.balanceOf(users.alice);
         _bobBalanceBefore = votingEscrow.balanceOf(users.bob);
         votingEscrow.lockFor(users.bob, users.alice, _bobAmountLocked, 0);
@@ -142,12 +146,12 @@ contract VotingEscrowTest is BasicSetup {
         vm.startPrank(users.alice);
         uint _aliceBalanceBeforeUnlock = votingEscrow.balanceOf(users.alice);
         uint _totalSupplyBeforeUnlock = votingEscrow.totalSupply();
-        votingEscrow.lock(0, block.timestamp + MAXTIME);
+        votingEscrowLocker.lock(0, block.timestamp + MAXTIME);
         vm.stopPrank();
 
         vm.startPrank(users.bob);
         uint _bobBalanceBeforeUnlock = votingEscrow.balanceOf(users.bob);
-        votingEscrow.lock(0, block.timestamp + MAXTIME);
+        votingEscrowLocker.lock(0, block.timestamp + MAXTIME);
         vm.stopPrank();
 
         _checkUserLockTimesAfterIncreaseUnlockTime(
@@ -164,9 +168,9 @@ contract VotingEscrowTest is BasicSetup {
         _aliceBalanceBefore = votingEscrow.balanceOf(users.alice);
         _totalSupplyBefore = votingEscrow.totalSupply();
         _votingEscrowBalanceBefore = puppetToken.balanceOf(address(votingEscrow));
-        _lockedAmountBefore = votingEscrow.lockedAmount(users.alice);
+        _lockedAmountBefore = votingEscrow.getLock(users.alice).amount;
         puppetToken.approve(address(router), _aliceAmountLocked);
-        votingEscrow.lock(_aliceAmountLocked, 0);
+        votingEscrowLocker.lock(_aliceAmountLocked, 0);
         vm.stopPrank();
         _checkUserBalancesAfterIncreaseAmount(
             users.alice, _aliceBalanceBefore, _totalSupplyBefore, _aliceAmountLocked, _votingEscrowBalanceBefore, _lockedAmountBefore
@@ -177,9 +181,9 @@ contract VotingEscrowTest is BasicSetup {
         _bobBalanceBefore = votingEscrow.balanceOf(users.bob);
         _totalSupplyBefore = votingEscrow.totalSupply();
         _votingEscrowBalanceBefore = puppetToken.balanceOf(address(votingEscrow));
-        _lockedAmountBefore = votingEscrow.lockedAmount(users.bob);
+        _lockedAmountBefore = votingEscrow.getLock(users.bob).amount;
         puppetToken.approve(address(router), _bobAmountLocked);
-        votingEscrow.lock(_bobAmountLocked, 0);
+        votingEscrowLocker.lock(_bobAmountLocked, 0);
         vm.stopPrank();
         _checkUserBalancesAfterIncreaseAmount(
             users.bob, _bobBalanceBefore, _totalSupplyBefore, _bobAmountLocked, _votingEscrowBalanceBefore, _lockedAmountBefore
@@ -195,8 +199,8 @@ contract VotingEscrowTest is BasicSetup {
 
         vm.startPrank(users.alice);
         _aliceBalanceBefore = puppetToken.balanceOf(users.alice);
-        votingEscrow.withdraw(users.alice);
-        (int128 amount, uint end) = votingEscrow.locked(users.alice);
+        votingEscrowLocker.withdraw();
+        (uint amount, uint end) = votingEscrow.locked(users.alice);
         assertEq(amount, 0);
         assertEq(end, 0);
         vm.stopPrank();
@@ -204,7 +208,7 @@ contract VotingEscrowTest is BasicSetup {
 
         vm.startPrank(users.bob);
         _bobBalanceBefore = puppetToken.balanceOf(users.bob);
-        votingEscrow.withdraw(users.bob);
+        votingEscrowLocker.withdraw();
         vm.stopPrank();
         _checkUserBalancesAfterWithdraw(users.bob, _totalSupplyBefore, _bobBalanceBefore);
         assertEq(puppetToken.balanceOf(address(votingEscrow)), 0, "testMutated: E0");
@@ -222,16 +226,16 @@ contract VotingEscrowTest is BasicSetup {
         vm.startPrank(_user);
 
         vm.expectRevert(); // ```"Arithmetic over/underflow"``` (NO ALLOWANCE)
-        votingEscrow.lock(_puppetBalance, block.timestamp + _maxTime);
+        votingEscrowLocker.lock(_puppetBalance, block.timestamp + _maxTime);
 
         puppetToken.approve(address(router), _puppetBalance);
 
         vm.expectRevert(VotingEscrow.VotingEscrow__InvalidLockValue.selector);
-        votingEscrow.lock(0, 0);
+        votingEscrowLocker.lock(0, 0);
 
         vm.warp(2);
         vm.expectRevert(VotingEscrow.VotingEscrow__InvaidLockingSchedule.selector);
-        votingEscrow.lock(_puppetBalance, 3);
+        votingEscrowLocker.lock(_puppetBalance, 3);
 
         puppetToken.approve(address(router), 0);
 
@@ -251,31 +255,33 @@ contract VotingEscrowTest is BasicSetup {
         // uint256 _maxTime = MAXTIME;
         puppetToken.approve(address(router), _puppetBalance);
         // vm.expectRevert(bytes4(keccak256("WithdrawOldTokensFirst()")));
-        // votingEscrow.lock(_user, _puppetBalance, block.timestamp + _maxTime);
+        // votingEscrowLocker.lock(_user, _puppetBalance, block.timestamp + _maxTime);
         puppetToken.approve(address(router), 0);
 
-        assertTrue(votingEscrow.getLastUserSlope(_user) != 0, "_checkUserVotingDataAfterCreateLock: E0");
-        assertTrue(votingEscrow.userPointHistoryTs(_user, 1) != 0, "_checkUserVotingDataAfterCreateLock: E1");
-        assertApproxEqAbs(votingEscrow.lockedEnd(_user), block.timestamp + MAXTIME, 1e10, "_checkUserVotingDataAfterCreateLock: E2");
+        assertTrue(votingEscrow.getUserPoint(_user).slope != 0, "_checkUserVotingDataAfterCreateLock: E0");
+        assertTrue(votingEscrow.getUserPoint(_user).ts != 0, "_checkUserVotingDataAfterCreateLock: E1");
+        assertApproxEqAbs(votingEscrow.getLock(_user).end, block.timestamp + MAXTIME, 1e10, "_checkUserVotingDataAfterCreateLock: E2");
         assertApproxEqAbs(votingEscrow.balanceOf(_user), _amountLocked, 1e23, "_checkUserVotingDataAfterCreateLock: E3");
         assertApproxEqAbs(votingEscrow.balanceOf(_user, block.timestamp), _amountLocked, 1e23, "_checkUserVotingDataAfterCreateLock: E4");
 
         assertApproxEqAbs(votingEscrow.totalSupply(), _totalSupplyBefore + _amountLocked, 1e23, "_checkUserVotingDataAfterCreateLock: E6");
-        assertApproxEqAbs(votingEscrow.totalSupplyAt(block.number), _totalSupplyBefore + _amountLocked, 1e23, "_checkUserVotingDataAfterCreateLock: E7");
+        assertApproxEqAbs(
+            votingEscrow.totalSupplyAt(block.number), _totalSupplyBefore + _amountLocked, 1e23, "_checkUserVotingDataAfterCreateLock: E7"
+        );
         assertEq(_votingEscrowBalanceBefore, puppetToken.balanceOf(address(votingEscrow)) - _amountLocked, "_checkUserVotingDataAfterCreateLock: E8");
         assertTrue(puppetToken.balanceOf(address(votingEscrow)) > 0, "_checkUserVotingDataAfterCreateLock: E9");
         assertEq(_votingEscrowBalanceBefore + _amountLocked, puppetToken.balanceOf(address(votingEscrow)), "_checkUserVotingDataAfterCreateLock: E10");
-        assertEq(votingEscrow.lockedAmount(_user), _lockedAmountBefore + _amountLocked, "_checkUserVotingDataAfterCreateLock: E11");
+        assertEq(votingEscrow.getLock(_user).amount, _lockedAmountBefore + _amountLocked, "_checkUserVotingDataAfterCreateLock: E11");
     }
 
     function _checkDepositForWrongFlows(uint _amount, address _user, address _receiver) internal {
         vm.startPrank(_user);
 
         vm.expectRevert(VotingEscrow.VotingEscrow__InvalidLockValue.selector);
-        votingEscrow.lock(0, 0);
+        votingEscrowLocker.lock(0, 0);
 
         vm.expectRevert(); // ```"Arithmetic over/underflow"``` (NO ALLOWANCE)
-        votingEscrow.lock(_amount, 0);
+        votingEscrowLocker.lock(_amount, 0);
 
         vm.stopPrank();
     }
@@ -299,12 +305,12 @@ contract VotingEscrowTest is BasicSetup {
         assertApproxEqAbs(votingEscrow.totalSupply(), _totalSupplyBefore + _amount, 1e23, "_checkUserBalancesAfterDepositFor: E6");
         assertApproxEqAbs(votingEscrow.totalSupplyAt(block.number), _totalSupplyBefore + _amount, 1e23, "_checkUserBalancesAfterDepositFor: E7");
         assertEq(puppetToken.balanceOf(address(votingEscrow)), _votingEscrowBalanceBefore + _amount, "_checkUserBalancesAfterDepositFor: E8");
-        assertEq(votingEscrow.lockedAmount(_receiver), _lockedAmountBefore + _amount, "_checkUserBalancesAfterDepositFor: E9");
+        assertEq(votingEscrow.getLock(_receiver).amount, _lockedAmountBefore + _amount, "_checkUserBalancesAfterDepositFor: E9");
     }
 
     function _checkLockTimesBeforeSkip() internal {
-        assertApproxEqAbs(votingEscrow.lockedEnd(users.alice), block.timestamp + MAXTIME, 1e6, "_checkLockTimesBeforeSkip: E0");
-        assertApproxEqAbs(votingEscrow.lockedEnd(users.bob), block.timestamp + MAXTIME, 1e6, "_checkLockTimesBeforeSkip: E1");
+        assertApproxEqAbs(votingEscrow.getLock(users.alice).end, block.timestamp + MAXTIME, 1e6, "_checkLockTimesBeforeSkip: E0");
+        assertApproxEqAbs(votingEscrow.getLock(users.bob).end, block.timestamp + MAXTIME, 1e6, "_checkLockTimesBeforeSkip: E1");
     }
 
     function _checkLockTimesAfterSkipHalf(uint _aliceBalanceBefore, uint _bobBalanceBefore, uint _totalSupplyBefore) internal {
@@ -322,7 +328,7 @@ contract VotingEscrowTest is BasicSetup {
 
         vm.startPrank(users.yossi);
         vm.expectRevert(VotingEscrow.VotingEscrow__InvalidLockValue.selector);
-        votingEscrow.lock(0, block.timestamp + _maxTime);
+        votingEscrowLocker.lock(0, block.timestamp + _maxTime);
         vm.stopPrank();
 
         // vm.startPrank(_user);
@@ -338,7 +344,7 @@ contract VotingEscrowTest is BasicSetup {
         uint _totalSupplyBefore,
         address _user
     ) internal {
-        assertApproxEqAbs(votingEscrow.lockedEnd(_user), block.timestamp + MAXTIME, 1e6, "_checkUserLockTimesAfterIncreaseUnlockTime: E0");
+        assertApproxEqAbs(votingEscrow.getLock(_user).end, block.timestamp + MAXTIME, 1e6, "_checkUserLockTimesAfterIncreaseUnlockTime: E0");
         assertApproxEqAbs(votingEscrow.balanceOf(_user), _userBalanceBeforeUnlock * 2, 1e21, "_checkUserLockTimesAfterIncreaseUnlockTime: E1");
         assertApproxEqAbs(
             votingEscrow.balanceOf(_user, block.timestamp), _userBalanceBeforeUnlock * 2, 1e21, "_checkUserLockTimesAfterIncreaseUnlockTime: E2"
@@ -354,7 +360,7 @@ contract VotingEscrowTest is BasicSetup {
     function _checkIncreaseAmountWrongFlows(address _user) internal {
         vm.startPrank(_user);
         vm.expectRevert();
-        votingEscrow.lock(0, 0);
+        votingEscrowLocker.lock(0, 0);
         vm.stopPrank();
     }
 
@@ -371,13 +377,13 @@ contract VotingEscrowTest is BasicSetup {
         assertEq(
             puppetToken.balanceOf(address(votingEscrow)), _votingEscrowBalanceBefore + _amountLocked, "_checkUserBalancesAfterIncreaseAmount: E2"
         );
-        assertEq(votingEscrow.lockedAmount(_user), _lockedAmountBefore + _amountLocked, "_checkUserBalancesAfterIncreaseAmount: E3");
+        assertEq(votingEscrow.getLock(_user).amount, _lockedAmountBefore + _amountLocked, "_checkUserBalancesAfterIncreaseAmount: E3");
     }
 
     function _checkWithdrawWrongFlows(address _user) internal {
         vm.startPrank(_user);
         vm.expectRevert(); // reverts with ```The lock didn't expire```
-        votingEscrow.withdraw(_user);
+        votingEscrowLocker.withdraw();
         vm.stopPrank();
     }
 
@@ -385,5 +391,21 @@ contract VotingEscrowTest is BasicSetup {
         assertEq(votingEscrow.balanceOf(_user), 0, "_checkUserBalancesAfterWithdraw: E0");
         assertTrue(votingEscrow.totalSupply() < _totalSupplyBefore, "_checkUserBalancesAfterWithdraw: E1");
         assertTrue(puppetToken.balanceOf(_user) > _puppetBalanceBefore, "_checkUserBalancesAfterWithdraw: E2");
+    }
+}
+
+contract VotingEscrowLocker {
+    VotingEscrow votingEscrow;
+
+    constructor(VotingEscrow _votingEscrow) {
+        votingEscrow = _votingEscrow;
+    }
+
+    function lock(uint _amount, uint _unlockTime) public {
+        votingEscrow.lockFor(msg.sender, msg.sender, _amount, _unlockTime);
+    }
+
+    function withdraw() public {
+        votingEscrow.withdrawFor(msg.sender, msg.sender);
     }
 }
