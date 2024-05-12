@@ -21,7 +21,7 @@ library ExecuteDecreasePosition {
     );
 
     struct CallConfig {
-        Router router;  
+        Router router;
         PositionStore positionStore;
         PuppetStore puppetStore;
         RewardStore rewardStore;
@@ -121,14 +121,8 @@ library ExecuteDecreasePosition {
         callConfig.puppetStore.increaseBalanceList(callParams.outputToken, address(this), callParams.mirrorPosition.puppetList, outputAmountList);
 
         if (callParams.profit > 0) {
-            uint cursor = _getCursor(block.timestamp);
-
-            callConfig.rewardStore.increaseUserSeedContributionList(
-                callParams.outputToken, cursor, address(this), callParams.mirrorPosition.puppetList, contributionList
-            );
-            callConfig.rewardStore.increaseUserSeedContribution(
-                callParams.outputToken, cursor, address(this), callParams.mirrorPosition.trader, traderPerformanceCutoffFee
-            );
+            callConfig.rewardStore.commitRewardList(callParams.outputToken, callParams.mirrorPosition.puppetList, contributionList);
+            callConfig.rewardStore.commitReward(callParams.outputToken, callParams.mirrorPosition.trader, totalPerformanceFee);
         }
 
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91

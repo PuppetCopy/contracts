@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Auth} from "./../../utils/auth/Auth.sol";
 import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
@@ -13,18 +14,19 @@ uint constant CURSOR_INTERVAL = 1 weeks; // all future times are rounded by week
 
 contract RewardStore is BankStore {
     struct UserTokenCursor {
-        uint veSupply;
-        uint cursorBalance;
-        uint balance;
-        uint claimed;
+        uint rewardPerToken;
+        uint accruedReward;
     }
 
-    mapping(IERC20 => mapping(uint cursorTime => uint)) cursorBalanceMap;
-    mapping(uint cursorTime => uint) cursorVeSupplyMap;
+    mapping(IERC20 => uint) rewardPerTokenCursorMap;
+    mapping(IERC20 => mapping(address => uint)) tokenEmissionRate;
+    mapping(IERC20 => mapping(address => uint)) tokenEmissionTimestamp;
+    mapping(IERC20 => mapping(address => uint)) sourceCommitMap;
 
-    mapping(address => mapping(uint cursorTime => uint)) userCursorBalanceMap;
+    mapping(address => uint) userBiasCursor;
+    mapping(IERC20 token => mapping(address user => UserTokenCursor)) userTokenCursorMap;
+
     mapping(IERC20 => mapping(address => uint)) userSeedContributionMap;
-    mapping(IERC20 => mapping(address => UserTokenCursor)) public userTokenCursorMap;
 
     constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
 
@@ -32,10 +34,8 @@ contract RewardStore is BankStore {
         return userSeedContributionMap[_token][_user];
     }
 
-    function increaseUserSeedContributionList(
+    function commitRewardList(
         IERC20 _token, //
-        uint _cursor,
-        address _depositor,
         address[] calldata _userList,
         uint[] calldata _valueList
     ) external auth {
@@ -49,79 +49,104 @@ contract RewardStore is BankStore {
             _totalAmount += _valueList[i];
         }
 
-        cursorBalanceMap[_token][_cursor] += _totalAmount;
-        _transferIn(_token, _depositor, _totalAmount);
+        sourceCommitMap[_token][msg.sender] += _totalAmount;
     }
 
-    function increaseUserSeedContribution(IERC20 _token, uint _cursor, address _depositor, address _user, uint _value) external auth {
+    function commitReward(IERC20 _token, address _user, uint _value) external auth {
         userSeedContributionMap[_token][_user] += _value;
-        cursorBalanceMap[_token][_cursor] += _value;
-        _transferIn(_token, _depositor, _value);
+        sourceCommitMap[_token][msg.sender] += _value;
+    }
+
+    function getRewardPerTokenCursor(IERC20 _token) external view returns (uint) {
+        return rewardPerTokenCursorMap[_token];
+    }
+
+    function setRewardPerTokenCursor(IERC20 _token, uint _value) external auth {
+        rewardPerTokenCursorMap[_token] = _value;
+    }
+
+    function getTokenEmissionRate(IERC20 _token, address _source) external view returns (uint) {
+        return tokenEmissionRate[_token][_source];
+    }
+
+    function setTokenEmissionRate(IERC20 _token, address _source, uint _value) external auth {
+        tokenEmissionRate[_token][_source] = _value;
+    }
+
+    function getTokenEmissionTimestamp(IERC20 _token, address _source) external view returns (uint) {
+        return tokenEmissionTimestamp[_token][_source];
+    }
+
+    function setTokenEmissionTimestamp(IERC20 _token, address _source, uint _value) external auth {
+        tokenEmissionTimestamp[_token][_source] = _value;
+    }
+
+    function getSourceCommit(IERC20 _token, address _source) external view returns (uint) {
+        return sourceCommitMap[_token][_source];
+    }
+
+    function increaseSourceCommit(IERC20 _token, uint _value) external auth {
+        sourceCommitMap[_token][msg.sender] += _value;
+    }
+
+    function decreaseSourceCommit(IERC20 _token, uint _value) external auth {
+        sourceCommitMap[_token][msg.sender] -= _value;
+    }
+
+    function getUserBiasCursor(address _user) external view returns (uint) {
+        return userBiasCursor[_user];
+    }
+
+    function setUserBiasCursor(address _user, uint _value) external auth {
+        userBiasCursor[_user] = _value;
+    }
+
+    function getUserTokenCursor(IERC20 _token, address _user) external view returns (UserTokenCursor memory) {
+        return userTokenCursorMap[_token][_user];
+    }
+
+    function setUserTokenCursor(IERC20 _token, address _user, uint _rewardPerToken, uint _accruedReward) external auth {
+        userTokenCursorMap[_token][_user] = UserTokenCursor(_rewardPerToken, _accruedReward);
+    }
+
+    function increaseUserSeedContribution(IERC20 _token, address _user, uint _value) external auth {
+        userSeedContributionMap[_token][_user] += _value;
     }
 
     function decreaseUserSeedContribution(IERC20 _token, address _user, uint _value) external auth {
         userSeedContributionMap[_token][_user] -= _value;
     }
 
-    function setCursorBalance(IERC20 _token, uint _cursor, uint _value) external auth {
-        cursorBalanceMap[_token][_cursor] = _value;
-    }
-
-    function getCursorBalance(IERC20 _token, uint _cursor) external view returns (uint) {
-        return cursorBalanceMap[_token][_cursor];
-    }
-
-    function getCursorVeSupply(uint _cursor) external view returns (uint) {
-        return cursorVeSupplyMap[_cursor];
-    }
-
-    function setCursorVeSupply(uint _cursor, uint _value) external auth {
-        cursorVeSupplyMap[_cursor] = _value;
-    }
-
-    function getUserCursorBalance(uint _cursor, address _user) external view returns (uint) {
-        return userCursorBalanceMap[_user][_cursor];
-    }
-
-    function setUserCursorBalance(uint _cursor, address _user, uint _value) external auth {
-        userCursorBalanceMap[_user][_cursor] = _value;
-    }
-
-    function getUserCursorInfo(IERC20 _token, uint _cursor, address _user)
-        external
-        view
-        returns (uint _veSupply, uint _cursorBalance, uint _balance)
-    {
-        _veSupply = cursorVeSupplyMap[_cursor];
-        _cursorBalance = cursorBalanceMap[_token][_cursor];
-        _balance = userCursorBalanceMap[_user][_cursor];
-    }
-
     function transferOut(IERC20 _token, address _receiver, uint _value) external auth {
         _transferOut(_token, _receiver, _value);
     }
 
-    function getSeedContributionList(
-        IERC20 _token, //
-        address[] calldata _userList
-    ) external view returns (uint _totalAmount, uint[] memory _valueList) {
-        uint _userListLength = _userList.length;
+    function transferIn(IERC20 _token, address _depositor, uint _value) external auth {
+        _transferIn(_token, _depositor, _value);
+    }
 
-        _valueList = new uint[](_userListLength);
-        _totalAmount = 0;
+    function emitReward(IERC20 _token, uint _distributionTimeframe, address _source) external auth returns (uint) {
+        uint _lastTimestamp = tokenEmissionTimestamp[_token][_source];
+        uint _rate = tokenEmissionRate[_token][_source];
 
-        for (uint i = 0; i < _userListLength; i++) {
-            _valueList[i] = userSeedContributionMap[_token][_userList[i]];
-            _totalAmount += _valueList[i];
+        uint _sourceCommit = sourceCommitMap[_token][_source];
+        uint _nextRate = _sourceCommit / _distributionTimeframe;
+        uint _timeElapsed = block.timestamp - _lastTimestamp;
+
+        if (_timeElapsed > _distributionTimeframe) {
+            tokenEmissionTimestamp[_token][_source] = block.timestamp;
+            tokenEmissionRate[_token][_source] = _nextRate;
+        } else if (_nextRate > _rate) {
+            _rate = _nextRate;
+            tokenEmissionRate[_token][_source] = _nextRate;
         }
-    }
 
-    function getUserTokenCursor(IERC20 _token, address _account) external view returns (uint) {
-        return userTokenCursorMap[_token][_account];
-    }
+        uint _emission = Math.min(_timeElapsed * _nextRate, _sourceCommit);
 
-    function setUserTokenCursor(IERC20 _token, address _account, uint _cursor) external auth {
-        userTokenCursorMap[_token][_account] = _cursor;
+        _transferIn(_token, _source, _emission);
+        sourceCommitMap[_token][_source] -= _emission;
+
+        return _emission;
     }
 
     error RewardStore__InvalidLength();

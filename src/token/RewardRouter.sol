@@ -26,6 +26,8 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuard {
         Oracle oracle;
         uint lockRate;
         uint exitRate;
+        uint distributionTimeframe;
+        address revenueSource;
     }
 
     CallConfig callConfig;
@@ -34,16 +36,8 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuard {
     RewardStore immutable store;
     PuppetToken immutable puppetToken;
 
-    function getClaimableCursor(IERC20 token, address user, uint cursor) public view returns (uint) {
-        return RewardLogic.getClaimableCursor(store, token, user, cursor);
-    }
-
     function getClaimable(IERC20 token, address user) public view returns (uint) {
-        return RewardLogic.getClaimable(votingEscrow, store, token, user);
-    }
-
-    function getClaimable(IERC20 token, address user, uint fromCursor, uint toCursor) public view returns (uint) {
-        return RewardLogic.getClaimable(store, token, user, fromCursor, toCursor);
+        return RewardLogic.getClaimable(votingEscrow, store, token, callConfig.revenueSource, callConfig.distributionTimeframe, user);
     }
 
     constructor(
@@ -66,6 +60,8 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuard {
         RewardLogic.CallOptionParmas memory lockParams = RewardLogic.CallOptionParmas({
             revenueToken: revenueToken,
             user: msg.sender,
+            revenueSource: callConfig.revenueSource,
+            distributionTimeframe: callConfig.distributionTimeframe,
             rate: callConfig.lockRate,
             acceptableTokenPrice: acceptableTokenPrice,
             cugarAmount: cugarAmount
@@ -78,24 +74,30 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuard {
         RewardLogic.CallOptionParmas memory exitParams = RewardLogic.CallOptionParmas({
             revenueToken: revenueToken,
             user: msg.sender,
+            revenueSource: callConfig.revenueSource,
+            distributionTimeframe: callConfig.distributionTimeframe,
             rate: callConfig.exitRate,
             acceptableTokenPrice: acceptableTokenPrice,
             cugarAmount: cugarAmount
         });
 
-        return RewardLogic.exit(store, callConfig.oracle, puppetToken, exitParams, receiver);
+        return RewardLogic.exit(votingEscrow, store, callConfig.oracle, puppetToken, exitParams, receiver);
     }
 
     function claim(IERC20 revenueToken, address receiver) public nonReentrant returns (uint) {
-        return RewardLogic.claim(votingEscrow, store, revenueToken, msg.sender, receiver);
+        return RewardLogic.claim(votingEscrow, store, revenueToken, callConfig.distributionTimeframe, callConfig.revenueSource, msg.sender, receiver);
     }
 
     function veLock(uint _tokenAmount, uint unlockTime) external nonReentrant {
-        RewardLogic.veLock(votingEscrow, store, msg.sender, msg.sender, _tokenAmount, unlockTime);
+        // RewardLogic.veLock(votingEscrow, store, msg.sender, msg.sender, _tokenAmount, unlockTime);
     }
 
     function veWithdraw(address receiver) external nonReentrant {
         RewardLogic.veWithdraw(votingEscrow, store, msg.sender, receiver);
+    }
+
+    function distribute(IERC20 token) external nonReentrant returns (uint rewardPerTokenCursor) {
+        rewardPerTokenCursor = RewardLogic.distribute(votingEscrow, store, token, callConfig.distributionTimeframe, callConfig.revenueSource);
     }
 
     // governance

@@ -73,7 +73,7 @@ contract VotingEscrow is Auth, EIP712 {
         token = _token;
 
         pointHistory[0] = Point({
-            bias: 0, //
+            bias: 1, //
             slope: 0,
             ts: block.timestamp,
             blk: block.number
@@ -82,19 +82,23 @@ contract VotingEscrow is Auth, EIP712 {
 
     // view
 
+    function getPoints(address _user) external view returns (Point memory, Point memory) {
+        return (pointHistory[epoch], userPointHistory[_user][userPointEpoch[_user]]);
+    }
+
     function getUserPoint(address _user) external view returns (Point memory) {
         return userPointHistory[_user][userPointEpoch[_user]];
     }
 
-    function getUserPointHistory(address _user, uint _idx) external view returns (Point memory) {
+    function getUserPoint(address _user, uint _idx) external view returns (Point memory) {
         return userPointHistory[_user][_idx];
     }
 
-    function getPointHistory(uint _idx) external view returns (Point memory) {
+    function getPoint(uint _idx) external view returns (Point memory) {
         return pointHistory[_idx];
     }
 
-    function getLastPointHistory() external view returns (Point memory) {
+    function getPoint() external view returns (Point memory) {
         return pointHistory[epoch];
     }
 
@@ -184,7 +188,7 @@ contract VotingEscrow is Auth, EIP712 {
         address _user,
         uint _value,
         uint _unlockTime
-    ) external auth returns (Point memory _lastPoint, Point memory _uNew) {
+    ) external auth returns (Point memory _lastPoint) {
         LockedBalance memory _newLock = locked[_user];
 
         if (_value == 0 && _unlockTime == 0 || _newLock.amount == 0 && _value == 0) revert VotingEscrow__InvalidLockValue();
@@ -206,7 +210,7 @@ contract VotingEscrow is Auth, EIP712 {
         locked[_user] = _newLock;
         uint _supply = supply + _value;
         supply = _supply;
-        (_lastPoint, _uNew) = _checkpoint(_user, _oldLock, _newLock);
+        _lastPoint = _checkpoint(_user, _oldLock, _newLock);
 
         if (_value > 0) router.transfer(token, _depositor, address(this), _value);
 
@@ -243,9 +247,10 @@ contract VotingEscrow is Auth, EIP712 {
     /// @param _newLocked New locked amount / end lock time for the user
     function _checkpoint(address _user, LockedBalance memory _oldLocked, LockedBalance memory _newLocked)
         internal
-        returns (Point memory _lastPoint, Point memory _uNew)
+        returns (Point memory _lastPoint)
     {
         Point memory _uOld;
+        Point memory _uNew;
         int _oldDslope = 0;
         int _newDslope = 0;
         uint _epoch = epoch;
@@ -364,13 +369,13 @@ contract VotingEscrow is Auth, EIP712 {
             // else: we recorded it already in _oldDslope
         }
         // Now handle user history
-        address addr = _user;
-        uint _userEpoch = userPointEpoch[addr] + 1;
+        address _userAddr = _user;
+        uint _userEpoch = userPointEpoch[_userAddr] + 1;
 
-        userPointEpoch[addr] = _userEpoch;
+        userPointEpoch[_userAddr] = _userEpoch;
         _uNew.ts = block.timestamp;
         _uNew.blk = block.number;
-        userPointHistory[addr][_userEpoch] = _uNew;
+        userPointHistory[_userAddr][_userEpoch] = _uNew;
     }
 
     /// @notice Binary search to estimate timestamp for block number
