@@ -188,7 +188,7 @@ contract VotingEscrow is Auth, EIP712 {
         address _user,
         uint _value,
         uint _unlockTime
-    ) external auth returns (Point memory _lastPoint) {
+    ) external auth returns (Point memory _lastPoint, Point memory _uNew) {
         LockedBalance memory _newLock = locked[_user];
 
         if (_value == 0 && _unlockTime == 0 || _newLock.amount == 0 && _value == 0) revert VotingEscrow__InvalidLockValue();
@@ -210,7 +210,7 @@ contract VotingEscrow is Auth, EIP712 {
         locked[_user] = _newLock;
         uint _supply = supply + _value;
         supply = _supply;
-        _lastPoint = _checkpoint(_user, _oldLock, _newLock);
+        (_lastPoint, _uNew) = _checkpoint(_user, _oldLock, _newLock);
 
         if (_value > 0) router.transfer(token, _depositor, address(this), _value);
 
@@ -247,10 +247,9 @@ contract VotingEscrow is Auth, EIP712 {
     /// @param _newLocked New locked amount / end lock time for the user
     function _checkpoint(address _user, LockedBalance memory _oldLocked, LockedBalance memory _newLocked)
         internal
-        returns (Point memory _lastPoint)
+        returns (Point memory _lastPoint, Point memory _uNew)
     {
         Point memory _uOld;
-        Point memory _uNew;
         int _oldDslope = 0;
         int _newDslope = 0;
         uint _epoch = epoch;

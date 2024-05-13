@@ -96,8 +96,9 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuard {
         RewardLogic.veWithdraw(votingEscrow, store, msg.sender, receiver);
     }
 
-    function distribute(IERC20 token) external nonReentrant returns (uint rewardPerTokenCursor) {
-        rewardPerTokenCursor = RewardLogic.distribute(votingEscrow, store, token, callConfig.distributionTimeframe, callConfig.revenueSource);
+    function distribute(IERC20 token) external nonReentrant returns (uint) {
+        VotingEscrow.Point memory point = votingEscrow.getPoint();
+        return RewardLogic.distribute(store, token, callConfig.distributionTimeframe, callConfig.revenueSource, point);
     }
 
     // governance

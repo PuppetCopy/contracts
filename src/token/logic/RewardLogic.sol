@@ -59,14 +59,23 @@ library RewardLogic {
         uint distributionTimeframe,
         address user
     ) internal view returns (uint) {
-        uint totalSupply = votingEscrow.totalSupply();
-        uint userBalance = getPointBias(votingEscrow.getUserPoint(user));
+        (VotingEscrow.Point memory point, VotingEscrow.Point memory userPoint) = votingEscrow.getPoints(user);
+
         uint pendingEmission = getPendingEmission(store, token, distributionTimeframe, source);
-        uint rewardPerTokenCursor = store.getRewardPerTokenCursor(token) + Precision.toFactor(pendingEmission, totalSupply);
+        uint rewardPerTokenCursor = store.getRewardPerTokenCursor(token) + Precision.toFactor(pendingEmission, getPointBias(point, block.timestamp));
 
+        return getUserAccuredRewards(store, token, rewardPerTokenCursor, user, userPoint);
+    }
+
+    function getUserAccuredRewards(RewardStore store, IERC20 token, uint rewardPerTokenCursor, address user, VotingEscrow.Point memory point)
+        internal
+        view
+        returns (uint)
+    {
         RewardStore.UserTokenCursor memory userCursor = store.getUserTokenCursor(token, user);
+        uint userDeltaCursor = rewardPerTokenCursor - userCursor.rewardPerToken;
 
-        return userCursor.accruedReward + (userBalance * (rewardPerTokenCursor - userCursor.rewardPerToken) / Precision.FLOAT_PRECISION);
+        return userCursor.accruedReward + getPointBias(point, block.timestamp) * userDeltaCursor / Precision.FLOAT_PRECISION;
     }
 
     function getPendingEmission(
@@ -78,6 +87,7 @@ library RewardLogic {
         uint lastTimestamp = store.getTokenEmissionTimestamp(token, source);
         uint rate = store.getTokenEmissionRate(token, source);
         uint sourceCommit = store.getSourceCommit(token, source);
+
         uint nextRate = sourceCommit / distributionTimeframe;
         uint timeElapsed = block.timestamp - lastTimestamp;
 
@@ -96,10 +106,7 @@ library RewardLogic {
         CallOptionParmas memory callParams,
         uint unlockTime
     ) internal returns (uint) {
-        store.decreaseUserSeedContribution(callParams.revenueToken, callParams.user, callParams.cugarAmount);
-
         uint maxPriceInRevenueToken = syncPrice(oracle, callParams.revenueToken, callParams.acceptableTokenPrice);
-
         uint claimableInTokenAferLockMultiplier = Precision.applyBasisPoints(
             getLockRewardTimeMultiplier(votingEscrow, callParams.user, unlockTime),
             Precision.applyBasisPoints(callParams.rate, callParams.cugarAmount * 1e18 / maxPriceInRevenueToken)
@@ -108,26 +115,27 @@ library RewardLogic {
         if (claimableInTokenAferLockMultiplier == 0) revert RewardLogic__NoClaimableAmount();
 
         puppetToken.mint(address(this), claimableInTokenAferLockMultiplier);
-
-        uint rewardPerTokenCursor = distribute(
-            votingEscrow, //
-            store,
-            callParams.revenueToken,
-            callParams.distributionTimeframe,
-            callParams.revenueSource
-        );
-
-        RewardStore.UserTokenCursor memory userCursor = store.getUserTokenCursor(callParams.revenueToken, callParams.user);
-        uint accruedReward = votingEscrow.balanceOf(callParams.user) * (rewardPerTokenCursor - userCursor.rewardPerToken) / Precision.FLOAT_PRECISION;
-
-        store.setUserTokenCursor(callParams.revenueToken, callParams.user, rewardPerTokenCursor, userCursor.accruedReward + accruedReward);
+        (VotingEscrow.Point memory point, VotingEscrow.Point memory userPoint) = votingEscrow.getPoints(callParams.user);
         votingEscrow.lockFor(address(this), callParams.user, claimableInTokenAferLockMultiplier, unlockTime);
+
+        // (VotingEscrow.Point memory point, VotingEscrow.Point memory userPoint) =
+        //     votingEscrow.lockFor(address(this), callParams.user, claimableInTokenAferLockMultiplier, unlockTime);
+
+        store.decreaseUserSeedContribution(callParams.revenueToken, callParams.user, callParams.cugarAmount);
+
+        uint nextRewardPerTokenCursor = distribute(store, callParams.revenueToken, callParams.distributionTimeframe, callParams.revenueSource, point);
+        uint accruedReward = getUserAccuredRewards(store, callParams.revenueToken, nextRewardPerTokenCursor, callParams.user, userPoint);
+
+        RewardStore.UserTokenCursor memory userCursor =
+            RewardStore.UserTokenCursor({rewardPerToken: nextRewardPerTokenCursor, accruedReward: accruedReward});
+
+        store.setUserTokenCursor(callParams.revenueToken, callParams.user, userCursor);
 
         emit RewardLogic__Lock(
             callParams.user,
             callParams.revenueToken,
             maxPriceInRevenueToken,
-            rewardPerTokenCursor,
+            nextRewardPerTokenCursor,
             claimableInTokenAferLockMultiplier,
             accruedReward,
             unlockTime
@@ -145,37 +153,45 @@ library RewardLogic {
         address receiver
     ) internal returns (uint) {
         store.decreaseUserSeedContribution(callParams.revenueToken, callParams.user, callParams.cugarAmount);
+        VotingEscrow.Point memory point = votingEscrow.getUserPoint(callParams.user);
 
+        uint nextRewardPerTokenCursor = distribute(store, callParams.revenueToken, callParams.distributionTimeframe, callParams.revenueSource, point);
         uint maxPriceInRevenueToken = syncPrice(oracle, callParams.revenueToken, callParams.acceptableTokenPrice);
         uint maxClaimable = callParams.cugarAmount * 1e18 / maxPriceInRevenueToken;
         uint claimableInToken = Precision.applyBasisPoints(callParams.rate, maxClaimable);
 
         puppetToken.mint(receiver, claimableInToken);
 
-        uint rewardPerTokenCursor = distribute(
-            votingEscrow, //
-            store,
-            callParams.revenueToken,
-            callParams.distributionTimeframe,
-            callParams.revenueSource
-        );
-
-        emit RewardLogic__Exit(callParams.user, callParams.revenueToken, maxPriceInRevenueToken, rewardPerTokenCursor, claimableInToken);
+        emit RewardLogic__Exit(callParams.user, callParams.revenueToken, maxPriceInRevenueToken, nextRewardPerTokenCursor, claimableInToken);
 
         return claimableInToken;
     }
 
-    function distribute(
-        VotingEscrow votingEscrow, //
-        RewardStore store,
-        IERC20 token,
-        uint distributionTimeframe,
-        address revenueSource
-    ) internal returns (uint nextRewardPerTokenCursor) {
-        uint totalSupply = votingEscrow.totalSupply();
-        uint pendingEmission = store.emitReward(token, distributionTimeframe, revenueSource);
-        nextRewardPerTokenCursor = store.getRewardPerTokenCursor(token) + Precision.toFactor(pendingEmission, totalSupply);
-        store.setRewardPerTokenCursor(token, nextRewardPerTokenCursor);
+    function distribute(RewardStore store, IERC20 token, uint distributionTimeframe, address source, VotingEscrow.Point memory point)
+        internal
+        returns (uint)
+    {
+        uint lastTimestamp = store.getTokenEmissionTimestamp(token, source);
+        uint rate = store.getTokenEmissionRate(token, source);
+        uint sourceCommit = store.getSourceCommit(token, source);
+
+        uint nextRate = sourceCommit / distributionTimeframe;
+        uint timeElapsed = block.timestamp - lastTimestamp;
+
+        if (timeElapsed > distributionTimeframe) {
+            store.setTokenEmissionTimestamp(token, source, block.timestamp);
+            store.setTokenEmissionRate(token, source, nextRate);
+        } else if (nextRate > rate) {
+            rate = nextRate;
+            store.setTokenEmissionRate(token, source, nextRate);
+        }
+
+        uint emission = Math.min(timeElapsed * rate, sourceCommit);
+
+        store.decreaseSourceCommit(token, source, emission);
+        store.transferIn(token, source, emission);
+
+        return store.increaseRewardPerTokenCursor(token, Precision.toFactor(emission, getPointBias(point, block.timestamp)));
     }
 
     function veWithdraw(VotingEscrow votingEscrow, RewardStore store, address user, address receiver) internal {
@@ -183,10 +199,14 @@ library RewardLogic {
     }
 
     function getPointBias(VotingEscrow.Point memory point) internal pure returns (uint) {
+        // int dt = int(block.timestamp) - int(point.ts);
+        // int bias = point.bias - point.slope * dt;
+        // return bias > 0 ? uint(bias) : 0;
         return point.bias > 0 ? uint(point.bias) : 0;
     }
 
     function getPointBias(VotingEscrow.Point memory point, uint time) internal pure returns (uint) {
+        // return getPointBias(point);
         int dt = int(time) - int(point.ts);
         int bias = point.bias - point.slope * dt;
         return bias > 0 ? uint(bias) : 0;
@@ -201,16 +221,16 @@ library RewardLogic {
         address user,
         address receiver
     ) internal returns (uint) {
-        uint rewardPerTokenCursor = distribute(votingEscrow, store, token, distributionTimeframe, revenueSource);
+        (VotingEscrow.Point memory point, VotingEscrow.Point memory userPoint) = votingEscrow.getPoints(user);
+        uint nextRewardPerTokenCursor = distribute(store, token, distributionTimeframe, revenueSource, point);
+        uint accruedReward = getUserAccuredRewards(store, token, nextRewardPerTokenCursor, user, userPoint);
 
-        RewardStore.UserTokenCursor memory userCursor = store.getUserTokenCursor(token, user);
-        uint userBalance = votingEscrow.balanceOf(user);
-        uint accruedReward = userCursor.accruedReward + (userBalance * (rewardPerTokenCursor - userCursor.rewardPerToken) / Precision.FLOAT_PRECISION);
+        RewardStore.UserTokenCursor memory userCursor = RewardStore.UserTokenCursor({rewardPerToken: nextRewardPerTokenCursor, accruedReward: 0});
 
-        store.setUserTokenCursor(token, user, rewardPerTokenCursor, 0);
+        store.setUserTokenCursor(token, user, userCursor);
         store.transferOut(token, receiver, accruedReward);
 
-        emit RewardLogic__Claimed(user, receiver, rewardPerTokenCursor, accruedReward);
+        emit RewardLogic__Claimed(user, receiver, nextRewardPerTokenCursor, accruedReward);
 
         return accruedReward;
     }
@@ -220,10 +240,6 @@ library RewardLogic {
         maxPrice = oracle.getMaxPrice(token, poolPrice);
         if (maxPrice > acceptableTokenPrice) revert RewardLogic__UnacceptableTokenPrice(maxPrice);
         if (maxPrice == 0) revert RewardLogic__InvalidClaimPrice();
-    }
-
-    function getCursor(uint _time) internal pure returns (uint) {
-        return (_time / CURSOR_INTERVAL) * CURSOR_INTERVAL;
     }
 
     error RewardLogic__NoClaimableAmount();

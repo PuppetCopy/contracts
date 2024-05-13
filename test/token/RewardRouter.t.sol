@@ -121,55 +121,59 @@ contract RewardRouterTest is BasicSetup {
     //     assertApproxEqAbs(rewardRouter.getClaimable(usdc, users.bob), 100e6, 0.01e6);
     // }
 
-    // function testLockOption() public {
-    //     lock(wnt, users.yossi, getMaxTime(), 0.01e18, 0.5e18);
-    //     skip(rewardRouterConfig.distributionTimeframe);
-    //     lock(wnt, users.yossi, getMaxTime(), 0.01e18, 0.5e18);
-    //     skip(rewardRouterConfig.distributionTimeframe);
-    //     assertApproxEqAbs(rewardRouter.claim(wnt, users.yossi), 1e18, 0.01e18);
+    function testLockOption() public {
+        lock(wnt, users.yossi, getMaxTime(), 0.01e18, 1e18);
+        skip(rewardRouterConfig.distributionTimeframe);
+        assertApproxEqAbs(claim(wnt, users.yossi), 1e18, 0.01e18);
+        assertEq(rewardRouter.getClaimable(wnt, users.yossi), 0);
 
-    //     lock(wnt, users.alice, getMaxTime(), 0.01e18, 1e18);
-    //     skip(rewardRouterConfig.distributionTimeframe);
+        lock(wnt, users.alice, getMaxTime(), 0.01e18, 1e18);
+        skip(rewardRouterConfig.distributionTimeframe);
 
-    //     assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 0.5e18, 0.01e18);
-    //     assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 0.5e18, 0.01e18);
-
-    //     rewardRouter.distribute(wnt);
-
-    //     vm.warp(getMaxTime() / 2);
-
-    //     rewardRouter.distribute(wnt);
-
-    //     lock(wnt, users.bob, getMaxTime(), 0.01e18, 1e18);
-    //     skip(rewardRouterConfig.distributionTimeframe);
-
-    //     assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 0.5e18, 0.01e18);
-
-    //     rewardRouter.distribute(wnt);
-
-    //     vm.warp(getMaxTime());
-
-    //     assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 0.5e18, 0.01e18);
-    // }
-
-    function testHistoricBalances() public {
-        skip(1 weeks);
-        lock(wnt, users.alice, getMaxTime(), 0.01e18, 0.5e18);
-        lock(wnt, users.bob, getMaxTime(), 0.01e18, 0.5e18);
-
-        skip(rewardRouterConfig.distributionTimeframe / 2);
+        // assertApproxEqAbs(claim(wnt, users.yossi), 0.5e18, 0.2e18);
         assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 0.5e18, 0.01e18);
-        skip(rewardRouterConfig.distributionTimeframe / 2);
-        assertApproxEqAbs(rewardRouter.claim(wnt, users.yossi), 1e18, 0.01e18);
+        // assertApproxEqAbs(claim(wnt, users.alice), 0.5e18, 0.2e18);
 
-        // dust case
-        lock(wnt, users.bob, getMaxTime(), 0.01e18, 1e18);
-        skip(rewardRouterConfig.distributionTimeframe / 2);
+        // vm.warp(getMaxTime() / 2);
+        // // rewardRouter.distribute(wnt);
 
-        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 0.5e18, 0.01e18);
+        // assertApproxEqAbs(claim(wnt, users.yossi), 0.5e18, 0.01e18);
 
-        // include withdraw flow
+
+
+
+        // skip(rewardRouterConfig.distributionTimeframe);
+
+        // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 0.5e18, 0.01e18);
+
+        // rewardRouter.distribute(wnt);
+
+        // vm.warp(getMaxTime());
+
+        // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 0.5e18, 0.01e18);
     }
+
+    // function testHistoricBalances() public {
+    //     skip(1 weeks);
+    //     lock(wnt, users.alice, getMaxTime(), 0.01e18, 0.5e18);
+    //     lock(wnt, users.bob, getMaxTime(), 0.01e18, 0.5e18);
+
+    //     skip(rewardRouterConfig.distributionTimeframe);
+
+    //     assertApproxEqAbs(claim(wnt, users.alice), 0.75e18, 0.01e18);
+    //     // assertApproxEqAbs(claim(wnt, users.bob), 0.25e18, 0.01e18);
+
+    //     // skip(rewardRouterConfig.distributionTimeframe / 2);
+    //     // assertApproxEqAbs(claim(wnt, users.yossi), 1e18, 0.01e18);
+
+    //     // // dust case
+    //     // lock(wnt, users.bob, getMaxTime(), 0.01e18, 1e18);
+    //     // skip(rewardRouterConfig.distributionTimeframe / 2);
+
+    //     // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 0.5e18, 0.01e18);
+
+    //     // include withdraw flow
+    // }
 
     // function testCrossedFlow() public {
 

@@ -61,8 +61,8 @@ contract RewardStore is BankStore {
         return rewardPerTokenCursorMap[_token];
     }
 
-    function setRewardPerTokenCursor(IERC20 _token, uint _value) external auth {
-        rewardPerTokenCursorMap[_token] = _value;
+    function increaseRewardPerTokenCursor(IERC20 _token, uint _amount) external auth returns (uint) {
+        return rewardPerTokenCursorMap[_token] += _amount;
     }
 
     function getTokenEmissionRate(IERC20 _token, address _source) external view returns (uint) {
@@ -85,12 +85,12 @@ contract RewardStore is BankStore {
         return sourceCommitMap[_token][_source];
     }
 
-    function increaseSourceCommit(IERC20 _token, uint _value) external auth {
-        sourceCommitMap[_token][msg.sender] += _value;
+    function increaseSourceCommit(IERC20 _token, uint _value) external auth returns (uint) {
+        return sourceCommitMap[_token][msg.sender] += _value;
     }
 
-    function decreaseSourceCommit(IERC20 _token, uint _value) external auth {
-        sourceCommitMap[_token][msg.sender] -= _value;
+    function decreaseSourceCommit(IERC20 _token, address _source, uint _value) external auth {
+        sourceCommitMap[_token][_source] -= _value;
     }
 
     function getUserBiasCursor(address _user) external view returns (uint) {
@@ -105,8 +105,8 @@ contract RewardStore is BankStore {
         return userTokenCursorMap[_token][_user];
     }
 
-    function setUserTokenCursor(IERC20 _token, address _user, uint _rewardPerToken, uint _accruedReward) external auth {
-        userTokenCursorMap[_token][_user] = UserTokenCursor(_rewardPerToken, _accruedReward);
+    function setUserTokenCursor(IERC20 _token, address _user, UserTokenCursor calldata cursor) external auth {
+        userTokenCursorMap[_token][_user] = cursor;
     }
 
     function increaseUserSeedContribution(IERC20 _token, address _user, uint _value) external auth {
@@ -123,30 +123,6 @@ contract RewardStore is BankStore {
 
     function transferIn(IERC20 _token, address _depositor, uint _value) external auth {
         _transferIn(_token, _depositor, _value);
-    }
-
-    function emitReward(IERC20 _token, uint _distributionTimeframe, address _source) external auth returns (uint) {
-        uint _lastTimestamp = tokenEmissionTimestamp[_token][_source];
-        uint _rate = tokenEmissionRate[_token][_source];
-
-        uint _sourceCommit = sourceCommitMap[_token][_source];
-        uint _nextRate = _sourceCommit / _distributionTimeframe;
-        uint _timeElapsed = block.timestamp - _lastTimestamp;
-
-        if (_timeElapsed > _distributionTimeframe) {
-            tokenEmissionTimestamp[_token][_source] = block.timestamp;
-            tokenEmissionRate[_token][_source] = _nextRate;
-        } else if (_nextRate > _rate) {
-            _rate = _nextRate;
-            tokenEmissionRate[_token][_source] = _nextRate;
-        }
-
-        uint _emission = Math.min(_timeElapsed * _nextRate, _sourceCommit);
-
-        _transferIn(_token, _source, _emission);
-        sourceCommitMap[_token][_source] -= _emission;
-
-        return _emission;
     }
 
     error RewardStore__InvalidLength();
