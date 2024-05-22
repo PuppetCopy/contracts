@@ -16,7 +16,7 @@ import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
 import {Precision} from "src/utils/Precision.sol";
 
-import {RewardStore, CURSOR_INTERVAL} from "./../../src/token/store/RewardStore.sol";
+import {RewardStore} from "./../../src/token/store/RewardStore.sol";
 
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 import {MockUniswapV3Pool} from "test/mocks/MockUniswapV3Pool.sol";
@@ -92,7 +92,7 @@ contract RewardRouterTest is BasicSetup {
     }
 
     // function testOptionRevert() public {
-    //     vm.expectRevert();
+    //     vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
     //     claim(usdc, users.alice);
 
     //     vm.expectRevert(Oracle.Oracle__UnavailableSecondaryPrice.selector);
@@ -124,33 +124,32 @@ contract RewardRouterTest is BasicSetup {
     function testLockOption() public {
         lock(wnt, users.yossi, getMaxTime(), 0.01e18, 1e18);
         skip(rewardRouterConfig.distributionTimeframe);
-        assertApproxEqAbs(claim(wnt, users.yossi), 1e18, 0.01e18);
-        assertEq(rewardRouter.getClaimable(wnt, users.yossi), 0);
 
         lock(wnt, users.alice, getMaxTime(), 0.01e18, 1e18);
-        skip(rewardRouterConfig.distributionTimeframe);
+        skip(getMaxTime() / 2);
 
-        // assertApproxEqAbs(claim(wnt, users.yossi), 0.5e18, 0.2e18);
-        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 0.5e18, 0.01e18);
-        // assertApproxEqAbs(claim(wnt, users.alice), 0.5e18, 0.2e18);
+        // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.5e18, 0.01e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 0.5e18, 0.01e18);
 
-        // vm.warp(getMaxTime() / 2);
-        // // rewardRouter.distribute(wnt);
+        // skip(rewardRouterConfig.distributionTimeframe / 2);
 
-        // assertApproxEqAbs(claim(wnt, users.yossi), 0.5e18, 0.01e18);
+        // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.5e18, 0.01e18);
+        // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 0.5e18, 0.01e18);
 
+        // assertApproxEqAbs(rewardRouter.claim(wnt, users.alice), 0.5e18, 0.01e18);
+        // assertEq(rewardRouter.getClaimable(wnt, users.alice), 0);
 
+        // // lock(wnt, users.alice, getMaxTime(), 0.01e18, 1e18);
+        // skip(rewardRouterConfig.distributionTimeframe / 2);
+        // lock(wnt, users.bob, getMaxTime(), 0.01e18, 1e18);
 
+        // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 0.125e18, 0.01e18);
 
-        // skip(rewardRouterConfig.distributionTimeframe);
+        // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 0.125e18, 0.01e18);
 
-        // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 0.5e18, 0.01e18);
+        // skip(rewardRouterConfig.distributionTimeframe / 2);
 
-        // rewardRouter.distribute(wnt);
-
-        // vm.warp(getMaxTime());
-
-        // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 0.5e18, 0.01e18);
+        // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 0.25e18, 0.01e18);
     }
 
     // function testHistoricBalances() public {
@@ -298,9 +297,5 @@ contract RewardRouterTest is BasicSetup {
 
     function fromPriceToSqrt(uint usdcPerWeth) public pure returns (uint160) {
         return uint160(Math.sqrt(usdcPerWeth * 1e12) << 96) / 1e12 + 1;
-    }
-
-    function _getCursor(uint _time) internal pure returns (uint) {
-        return (_time / CURSOR_INTERVAL) * CURSOR_INTERVAL;
     }
 }

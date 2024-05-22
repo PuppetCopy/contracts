@@ -10,8 +10,6 @@ import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 import {BankStore} from "./../../shared/store/BankStore.sol";
 import {Router} from "./../../shared/Router.sol";
 
-uint constant CURSOR_INTERVAL = 1 weeks; // all future times are rounded by week
-
 contract RewardStore is BankStore {
     struct UserTokenCursor {
         uint rewardPerToken;

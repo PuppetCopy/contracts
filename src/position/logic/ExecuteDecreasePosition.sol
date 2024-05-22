@@ -13,7 +13,7 @@ import {Precision} from "./../../utils/Precision.sol";
 import {PuppetStore} from "./../../puppet/store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
 
-import {RewardStore, CURSOR_INTERVAL} from "./../../token/store/RewardStore.sol";
+import {RewardStore} from "./../../token/store/RewardStore.sol";
 
 library ExecuteDecreasePosition {
     event ExecuteDecreasePosition__DecreasePosition(
@@ -170,10 +170,6 @@ library ExecuteDecreasePosition {
         performanceFee -= traderPerformanceCutoffFee;
 
         return (performanceFee, traderPerformanceCutoffFee, amountOutAfterFee);
-    }
-
-    function _getCursor(uint _time) internal pure returns (uint) {
-        return (_time / CURSOR_INTERVAL) * CURSOR_INTERVAL;
     }
 
     error ExecutePosition__InvalidRequest(bytes32 positionKey, bytes32 key);
