@@ -94,7 +94,7 @@ library RewardLogic {
         uint nextRate = sourceCommit / distributionTimeframe;
         uint timeElapsed = block.timestamp - lastTimestamp;
 
-        if (nextRate > rate || timeElapsed > distributionTimeframe) {
+        if (nextRate > rate) {
             rate = nextRate;
         }
 
@@ -121,10 +121,11 @@ library RewardLogic {
 
         puppetToken.mint(address(this), claimableInTokenAferLockMultiplier);
         (VotingEscrow.Point memory point, VotingEscrow.Point memory userPoint) = votingEscrow.getPoints(callParams.user);
-        votingEscrow.lockFor(address(this), callParams.user, claimableInTokenAferLockMultiplier, unlockTime);
 
         // VotingEscrow.Point memory userPoint = votingEscrow.getUserPoint(callParams.user);
         // (VotingEscrow.Point memory point,) = votingEscrow.lockFor(address(this), callParams.user, claimableInTokenAferLockMultiplier, unlockTime);
+        // (VotingEscrow.Point memory point, VotingEscrow.Point memory userPoint) =
+        //     votingEscrow.lockFor(address(this), callParams.user, claimableInTokenAferLockMultiplier, unlockTime);
 
         uint nextRewardPerTokenCursor = distribute(store, callParams.revenueToken, callParams.distributionTimeframe, callParams.revenueSource, point);
         uint accruedReward = getUserAccuredRewards(store, callParams.revenueToken, nextRewardPerTokenCursor, callParams.user, userPoint);
@@ -134,6 +135,8 @@ library RewardLogic {
             callParams.user,
             RewardStore.UserTokenCursor({rewardPerToken: nextRewardPerTokenCursor, accruedReward: accruedReward})
         );
+
+        votingEscrow.lockFor(address(this), callParams.user, claimableInTokenAferLockMultiplier, unlockTime);
 
         emit RewardLogic__Lock(
             callParams.user,
@@ -209,16 +212,18 @@ library RewardLogic {
         uint timeElapsed = block.timestamp - lastTimestamp;
 
         if (timeElapsed > distributionTimeframe) {
-            store.setTokenEmissionTimestamp(token, source, block.timestamp);
-            store.setTokenEmissionRate(token, source, nextRate);
+            store.setTokenEmissionRate(token, source, 0);
         } else if (nextRate > rate) {
             rate = nextRate;
             store.setTokenEmissionRate(token, source, nextRate);
         }
 
+        store.setTokenEmissionTimestamp(token, source, block.timestamp);
+
+        // uint emission = sourceCommit;
         uint emission = Math.min(timeElapsed * rate, sourceCommit);
 
-        if (emission == 0) {
+        if (emission == 0 || sourceCommit == 0 || rate == 0) {
             return store.getRewardPerTokenCursor(token);
         }
 
@@ -234,12 +239,8 @@ library RewardLogic {
         votingEscrow.withdrawFor(user, receiver);
     }
 
-    function getPointBias(VotingEscrow.Point memory point) internal pure returns (uint) {
-        return point.bias > 0 ? uint(point.bias) : 0;
-    }
-
     function getPointBias(VotingEscrow.Point memory point, uint time) internal pure returns (uint) {
-        // return getPointBias(point);
+        // return point.bias > 0 ? uint(point.bias) : 0;
         int dt = int(time) - int(point.ts);
         int bias = point.bias - point.slope * dt;
         return bias > 0 ? uint(bias) : 0;

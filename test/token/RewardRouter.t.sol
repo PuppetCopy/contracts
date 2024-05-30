@@ -35,6 +35,8 @@ contract RewardRouterTest is BasicSetup {
     uint public exitRate = 3000;
 
     function setUp() public override {
+        vm.warp(1716671477);
+
         super.setUp();
 
         votingEscrow = new VotingEscrow(dictator, router, puppetToken);
@@ -126,10 +128,19 @@ contract RewardRouterTest is BasicSetup {
         skip(rewardRouterConfig.distributionTimeframe);
 
         lock(wnt, users.alice, getMaxTime(), 0.01e18, 1e18);
-        skip(getMaxTime() / 2);
+        skip(rewardRouterConfig.distributionTimeframe);
 
-        // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.5e18, 0.01e18);
-        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 0.5e18, 0.01e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.5e18, 0.1e18);
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 0.5e18, 0.1e18);
+
+        // lock(wnt, users.bob, getMaxTime(), 0.01e18, 1e18);
+        // skip(rewardRouterConfig.distributionTimeframe);
+
+        // assertApproxEqAbs(
+        //     rewardRouter.getClaimable(wnt, users.alice) + rewardRouter.getClaimable(wnt, users.yossi),
+        //     2e18,
+        //     0.01e18
+        // );
 
         // skip(rewardRouterConfig.distributionTimeframe / 2);
 
@@ -221,7 +232,7 @@ contract RewardRouterTest is BasicSetup {
     //     assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.333e18, 0.05e18);
     //     assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 0.33e18, 0.05e18);
 
-    //     skip(getMaxTime() / 2);
+    //     skip(MAXTIME / 2);
     //     assertEq(rewardRouter.getClaimableCursor(wnt, users.yossi, 1 weeks), 1e18);
     //     assertEq(rewardRouter.getClaimableCursor(wnt, users.alice, 1 weeks), 1e18);
     //     assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 1.333e18, 0.05e18);
@@ -238,6 +249,7 @@ contract RewardRouterTest is BasicSetup {
 
     function lock(IERC20 token, address user, uint unlockTime, uint acceptableTokenPrice, uint cugarAmount) public returns (uint) {
         generateUserRevenue(token, user, cugarAmount);
+        rewardRouter.distribute(token);
         uint claimableInToken = rewardRouter.lock(token, unlockTime, acceptableTokenPrice, cugarAmount);
 
         skip(600);

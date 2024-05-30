@@ -17,11 +17,10 @@ contract RewardStore is BankStore {
     }
 
     mapping(IERC20 => uint) rewardPerTokenCursorMap;
-    mapping(IERC20 => mapping(address => uint)) tokenEmissionRate;
-    mapping(IERC20 => mapping(address => uint)) tokenEmissionTimestamp;
+    mapping(IERC20 => mapping(address => uint)) tokenEmissionRateMap;
+    mapping(IERC20 => mapping(address => uint)) tokenEmissionTimestampMap;
     mapping(IERC20 => mapping(address => uint)) sourceCommitMap;
 
-    mapping(address => uint) userBiasCursor;
     mapping(IERC20 token => mapping(address user => UserTokenCursor)) userTokenCursorMap;
 
     mapping(IERC20 => mapping(address => uint)) userSeedContributionMap;
@@ -64,19 +63,19 @@ contract RewardStore is BankStore {
     }
 
     function getTokenEmissionRate(IERC20 _token, address _source) external view returns (uint) {
-        return tokenEmissionRate[_token][_source];
+        return tokenEmissionRateMap[_token][_source];
     }
 
     function setTokenEmissionRate(IERC20 _token, address _source, uint _value) external auth {
-        tokenEmissionRate[_token][_source] = _value;
+        tokenEmissionRateMap[_token][_source] = _value;
     }
 
     function getTokenEmissionTimestamp(IERC20 _token, address _source) external view returns (uint) {
-        return tokenEmissionTimestamp[_token][_source];
+        return tokenEmissionTimestampMap[_token][_source];
     }
 
     function setTokenEmissionTimestamp(IERC20 _token, address _source, uint _value) external auth {
-        tokenEmissionTimestamp[_token][_source] = _value;
+        tokenEmissionTimestampMap[_token][_source] = _value;
     }
 
     function getSourceCommit(IERC20 _token, address _source) external view returns (uint) {
@@ -89,14 +88,6 @@ contract RewardStore is BankStore {
 
     function decreaseSourceCommit(IERC20 _token, address _source, uint _value) external auth {
         sourceCommitMap[_token][_source] -= _value;
-    }
-
-    function getUserBiasCursor(address _user) external view returns (uint) {
-        return userBiasCursor[_user];
-    }
-
-    function setUserBiasCursor(address _user, uint _value) external auth {
-        userBiasCursor[_user] = _value;
     }
 
     function getUserTokenCursor(IERC20 _token, address _user) external view returns (UserTokenCursor memory) {

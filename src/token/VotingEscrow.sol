@@ -73,7 +73,7 @@ contract VotingEscrow is Auth, EIP712 {
         token = _token;
 
         pointHistory[0] = Point({
-            bias: 1, //
+            bias: 0, //
             slope: 0,
             ts: block.timestamp,
             blk: block.number
