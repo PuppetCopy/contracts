@@ -95,14 +95,14 @@ contract PuppetToken is Permission, ERC20 {
      */
     function mintCore(address _receiver) external auth returns (uint) {
         uint _lastMintTime = lastMintTime;
-        uint mintableAmount = getMintableCoreAmount(_lastMintTime);
+        uint _mintableAmount = getMintableCoreAmount(_lastMintTime);
 
-        mintedCoreAmount += mintableAmount;
-        _mint(_receiver, mintableAmount);
+        mintedCoreAmount += _mintableAmount;
+        _mint(_receiver, _mintableAmount);
 
-        emit PuppetToken__MintCore(msg.sender, _receiver, mintableAmount);
+        emit PuppetToken__MintCore(msg.sender, _receiver, _mintableAmount);
 
-        return mintableAmount;
+        return _mintableAmount;
     }
 
     /**
