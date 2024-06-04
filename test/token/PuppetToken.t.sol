@@ -3,6 +3,8 @@ pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {Precision} from "src/utils/Precision.sol";
+
 import {PuppetToken} from "src/token/PuppetToken.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
@@ -16,12 +18,11 @@ contract PuppetTokenTest is BasicSetup {
         dictator.setPermission(puppetToken, users.owner, puppetToken.mintCore.selector);
     }
 
-    function testMintLimit() public {
+    function testMint() public {
         assertEq(puppetToken.mint(users.alice, 100e18), 100e18);
 
         vm.expectRevert(abi.encodeWithSelector(PuppetToken.PuppetToken__ExceededRateLimit.selector, 901e18));
         puppetToken.mint(users.alice, 1000e18);
-
         puppetToken.mint(users.alice, 500e18);
 
         skip(1 hours);
@@ -30,55 +31,34 @@ contract PuppetTokenTest is BasicSetup {
         skip(1 hours);
         puppetToken.mint(users.alice, 1000e18);
         assertEq(puppetToken.getLimitAmount(), 1026e18);
-
-        vm.warp(YEAR);
-
-        for (uint i = 0; i < 10; i++) {
-            skip(1 hours);
-            puppetToken.mint(users.alice, 1000e18);
-        }
-
-        assertEq(puppetToken.getLimitAmount(), 1126e18);
     }
 
-    function testMint() public {
-        assertEq(puppetToken.mintCore(users.owner), 0);
-        assertEq(puppetToken.mint(users.alice, 200e18), 200e18);
-        assertEq(puppetToken.mineMintCount(), 200e18);
-        assertEq(puppetToken.getCoreShare(), 1e30);
+    function testCoreDistribution() public {
+        for (uint i = 0; i < 200; i++) {
+            puppetToken.mint(users.alice, 500e18);
+            skip(1 hours / 2);
 
-        puppetToken.mintCore(users.bob);
-        assertEq(puppetToken.balanceOf(users.bob), 200e18);
+            puppetToken.mintCore(users.owner);
+        }
 
-        puppetToken.mint(users.alice, 800e18);
-        puppetToken.mintCore(users.bob);
-        assertEq(puppetToken.balanceOf(users.bob), 1000e18);
+        assertEq(
+            Precision.applyFactor(puppetToken.getCoreShare(), puppetToken.balanceOf(users.alice)), //
+            puppetToken.mintedCoreAmount()
+        );
 
-        skip(YEAR / 2);
-        puppetToken.mint(users.alice, 1000e18);
-        skip(YEAR / 2);
-        puppetToken.mint(users.alice, 1000e18);
+        // ±4 years, 10% of the core share
+        for (uint i = 0; i < 420; i++) {
+            puppetToken.mint(users.alice, 1000e18);
+            skip(1 weeks / 2);
+        }
 
-        assertEq(puppetToken.balanceOf(users.alice), 3000e18);
+        puppetToken.mintCore(users.owner);
 
-        assertEq(puppetToken.getCoreShare(), 0.5e30);
+        assertEq(
+            Precision.applyFactor(puppetToken.getCoreShare(), puppetToken.balanceOf(users.alice)), //
+            puppetToken.mintedCoreAmount()
+        );
 
-        puppetToken.mintCore(users.bob);
-        assertEq(puppetToken.balanceOf(users.bob), 1500e18);
-
-        skip(YEAR / 4);
-        puppetToken.mint(users.alice, 1000e18);
-        skip(YEAR / 4);
-        puppetToken.mint(users.alice, 1000e18);
-        skip(YEAR / 4);
-        puppetToken.mint(users.alice, 1000e18);
-        skip(YEAR / 4);
-
-        assertEq(puppetToken.balanceOf(users.alice), 6000e18);
-
-        assertApproxEqAbs(puppetToken.getCoreShare(), 0.333e30, 0.001e30);
-
-        puppetToken.mintCore(users.bob);
-        assertApproxEqAbs(puppetToken.balanceOf(users.bob), 2000e18, 0.001e18);
+        assertApproxEqAbs(puppetToken.getLimitAmount(), 7234e18, 6e18);
     }
 }
