@@ -19,7 +19,7 @@ import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
  */
 contract PuppetToken is Permission, ERC20 {
     event PuppetToken__SetConfig(Config config);
-    event PuppetToken__MintCore(address operator, address receiver, uint amount);
+    event PuppetToken__MintCore(address operator, address indexed receiver, uint amount);
 
     uint private constant CORE_RELEASE_DURATION_DIVISOR = 31560000; // 1 year
     uint private constant GENESIS_MINT_AMOUNT = 100_000e18;
