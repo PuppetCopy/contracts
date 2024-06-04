@@ -56,12 +56,12 @@ contract PuppetToken is Permission, ERC20 {
     }
 
     function getMintableCoreAmount(uint _lastMintTime) public view returns (uint) {
-        uint totalMinedAmount = totalSupply() -  mintedCoreAmount - GENESIS_MINT_AMOUNT;
-        uint maxMintableAmount = Precision.applyFactor(getCoreShare(_lastMintTime), totalMinedAmount);
+        uint _totalMinedAmount = totalSupply() -  mintedCoreAmount - GENESIS_MINT_AMOUNT;
+        uint _maxMintableAmount = Precision.applyFactor(getCoreShare(_lastMintTime), _totalMinedAmount);
 
-        if (maxMintableAmount < mintedCoreAmount) revert PuppetToken__CoreShareExceedsMining();
+        if (_maxMintableAmount < mintedCoreAmount) revert PuppetToken__CoreShareExceedsMining();
 
-        return maxMintableAmount - mintedCoreAmount;
+        return _maxMintableAmount - mintedCoreAmount;
     }
 
     /**
