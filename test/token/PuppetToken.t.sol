@@ -19,16 +19,22 @@ contract PuppetTokenTest is BasicSetup {
     }
 
     function testMint() public {
+        vm.expectRevert(abi.encodeWithSelector(PuppetToken.PuppetToken__ExceededRateLimit.selector, 1000e18, 1001e18));
+        puppetToken.mint(users.alice, 1001e18);
+
         assertEq(puppetToken.mint(users.alice, 100e18), 100e18);
 
-        vm.expectRevert(abi.encodeWithSelector(PuppetToken.PuppetToken__ExceededRateLimit.selector, 901e18));
+        vm.expectRevert(abi.encodeWithSelector(PuppetToken.PuppetToken__ExceededRateLimit.selector, 1001e18, 1100e18));
         puppetToken.mint(users.alice, 1000e18);
         puppetToken.mint(users.alice, 500e18);
 
         skip(1 hours);
         puppetToken.mint(users.alice, 1000e18);
         assertEq(puppetToken.getLimitAmount(), 1016e18);
-        skip(1 hours);
+        skip(1 hours / 2);
+        vm.expectRevert(abi.encodeWithSelector(PuppetToken.PuppetToken__ExceededRateLimit.selector, 1016e18, 1086e18));
+        puppetToken.mint(users.alice, 1000e18);
+        skip(1 hours / 2);
         puppetToken.mint(users.alice, 1000e18);
         assertEq(puppetToken.getLimitAmount(), 1026e18);
     }
