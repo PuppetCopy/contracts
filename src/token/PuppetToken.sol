@@ -52,8 +52,8 @@ contract PuppetToken is Permission, ERC20 {
     }
 
     function getMintableCoreAmount(uint _lastMintTime) public view returns (uint) {
-        uint _totalMinedAmount = totalSupply() - mintedCoreAmount - GENESIS_MINT_AMOUNT;
-        uint _maxMintableAmount = Precision.applyFactor(getCoreShare(_lastMintTime), _totalMinedAmount);
+        uint _totalMintedAmount = totalSupply() - mintedCoreAmount - GENESIS_MINT_AMOUNT;
+        uint _maxMintableAmount = Precision.applyFactor(getCoreShare(_lastMintTime), _totalMintedAmount);
 
         if (_maxMintableAmount < mintedCoreAmount) revert PuppetToken__CoreShareExceedsMining();
 
@@ -73,18 +73,14 @@ contract PuppetToken is Permission, ERC20 {
     function mint(address _receiver, uint _amount) external auth returns (uint) {
         uint _limitAmount = getLimitAmount();
         uint _timeElapsed = block.timestamp - lastMintTime;
-        uint _decayRate = _limitAmount * _timeElapsed / config.durationWindow;
+        uint _durationWindow = config.durationWindow;
+        uint _decayRate = _limitAmount * _timeElapsed / _durationWindow;
 
-        if (_decayRate > _amount) {
-            uint _nextRateDelta = _decayRate - _amount;
-            emissionRate = _nextRateDelta > emissionRate ? 0 : emissionRate - _nextRateDelta;
-        } else {
-            emissionRate += (_amount - _decayRate);
+        emissionRate = _decayRate > emissionRate ? _amount : emissionRate - _decayRate + _amount;
 
-            // Enforce the mint rate limit based on total emitted tokens
-            if (emissionRate > _limitAmount) {
-                revert PuppetToken__ExceededRateLimit(_limitAmount, emissionRate);
-            }
+        // Enforce the mint rate limit based on total emitted tokens
+        if (emissionRate > _limitAmount) {
+            revert PuppetToken__ExceededRateLimit(_limitAmount, emissionRate);
         }
 
         // Add the requested mint amount to the window's mint count
@@ -128,6 +124,6 @@ contract PuppetToken is Permission, ERC20 {
     }
 
     error PuppetToken__InvalidRate();
-    error PuppetToken__ExceededRateLimit(uint rateLimit, uint rate);
+    error PuppetToken__ExceededRateLimit(uint rateLimit, uint emissionRate);
     error PuppetToken__CoreShareExceedsMining();
 }
