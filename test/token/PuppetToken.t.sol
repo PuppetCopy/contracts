@@ -27,8 +27,7 @@ contract PuppetTokenTest is BasicSetup {
         // Normally Alice should be Able to mint up to 4 * getLimitAmount(). but it doesnt work since _decayRate is now equal to 0. Alice can only
         // mint a max equal to getLimitAmount() even after 3 epochs of nothing minted
         uint amountToMint = 2 * puppetToken.getLimitAmount();
-        vm.expectRevert(abi.encodeWithSelector(PuppetToken.PuppetToken__ExceededRateLimit.selector, 1000000000000000000000,
-    2000000000000000000000));
+        vm.expectRevert(abi.encodeWithSelector(PuppetToken.PuppetToken__ExceededRateLimit.selector, 1000000000000000000000, 2000000000000000000000));
         puppetToken.mint(users.alice, amountToMint);
         uint maxAmountToMint = puppetToken.getLimitAmount();
         puppetToken.mint(users.alice, maxAmountToMint);
@@ -37,6 +36,7 @@ contract PuppetTokenTest is BasicSetup {
     }
 
     function testMintSmallAmountContinuouslyGivesMoreTokens() public {
+        skip(1 hours);
         assertEq(puppetToken.getLimitAmount(), 1000e18); // Max amount that can be minted in one shot at time 0
 
         // Alice notices that by dividing the buys into smaller ones she can earn more tokens.
@@ -49,9 +49,15 @@ contract PuppetTokenTest is BasicSetup {
         assertLt(puppetToken.balanceOf(users.alice), puppetToken.getLimitAmount());
     }
 
-    function testCanMintMoreThanLimitAmount() public {
+    function testMintMoreThanLimitAmount() public {
         skip(1 hours / 2);
 
+        uint initialLimit = puppetToken.getLimitAmount();
+
+        vm.expectRevert();
+        puppetToken.mint(users.alice, initialLimit);
+
+        skip(1 hours / 2);
         puppetToken.mint(users.alice, puppetToken.getLimitAmount());
 
         uint halfAmount = puppetToken.getLimitAmount() / 2;
@@ -61,28 +67,8 @@ contract PuppetTokenTest is BasicSetup {
         puppetToken.mint(users.alice, puppetToken.getLimitAmount() / 2);
     }
 
-    function testCanMintMoreThan1PercentDuringFirstHour() public {
-        uint currentLimit = puppetToken.getLimitAmount();
-        assertEq(currentLimit, 1000e18); // Mints max mintable amount at first then the max amount for each period
-        puppetToken.mint(users.alice, puppetToken.getLimitAmount() / 2);
-        puppetToken.mint(users.alice, puppetToken.getLimitAmount() / 2);
-
-        skip(uint(1 hours / 4));
-        puppetToken.mint(users.alice, puppetToken.getLimitAmount() / 4);
-
-        skip(uint(1 hours / 4));
-        puppetToken.mint(users.alice, puppetToken.getLimitAmount() / 4);
-
-        skip(uint(1 hours / 4));
-        puppetToken.mint(users.alice, puppetToken.getLimitAmount() / 4);
-        skip(uint(1 hours / 4));
-        puppetToken.mint(users.alice, puppetToken.getLimitAmount() / 4);
-
-        puppetToken.getLimitAmount();
-        assertEq(puppetToken.balanceOf(users.alice), 2016318910351660156250);
-    }
-
     function testMint() public {
+        skip(1 hours);
         vm.expectRevert(abi.encodeWithSelector(PuppetToken.PuppetToken__ExceededRateLimit.selector, 1000e18, 1001e18));
         puppetToken.mint(users.alice, 1001e18);
 
@@ -104,6 +90,8 @@ contract PuppetTokenTest is BasicSetup {
     }
 
     function testCoreDistribution() public {
+        skip(1 hours / 2);
+
         for (uint i = 0; i < 200; i++) {
             puppetToken.mint(users.alice, 500e18);
             skip(1 hours / 2);

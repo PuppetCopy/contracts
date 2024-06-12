@@ -40,6 +40,8 @@ contract PuppetToken is Permission, ERC20 {
     constructor(IAuthority _authority, Config memory _config, address receiver) Permission(_authority) ERC20("Puppet Test", "PUPPET-TEST") {
         _setConfig(_config);
         _mint(receiver, GENESIS_MINT_AMOUNT);
+
+        emissionRate = getLimitAmount();
     }
 
     function getCoreShare() public view returns (uint) {
