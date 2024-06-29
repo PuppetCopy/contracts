@@ -9,7 +9,7 @@ library Address {
     address constant Router = 0x3E00C677Ac69b68a21871b9EE0888EaA6046d37D;
     address constant VotingEscrow = 0xA5648F9E5ee3a1aA5037fc529EC988AD813AAcf1;
 
-    address constant BasePool = 0xF2658f994C882237d3612099cae541d50348FCf9;
+    address constant BasePool = 0x19da41A2ccd0792b9b674777E72447903FE29074;
 
     address constant OracleLogic = 0x412979f3210d8cf121971B0176cA3704b8bE0945;
     address constant PriceStore = 0xe9e9ce24275Ec23257551Cbb62D79A4e9cfE2428;

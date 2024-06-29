@@ -10,9 +10,15 @@ contract MockUniswapV3Pool is IUniswapV3Pool {
     uint160 public sqrtPriceX96;
     bool public unlocked = true;
 
+    address token0_;
+    address token1_;
+
     // Constructor to initialize the mock with specific values
-    constructor(uint160 initialSqrtPriceX96) {
+    constructor(uint160 initialSqrtPriceX96, address _token0, address _token1) {
         sqrtPriceX96 = initialSqrtPriceX96;
+        token0_ = _token0;
+        token1_ = _token1;
+
         emit PoolInitialized(sqrtPriceX96);
     }
 
@@ -42,7 +48,15 @@ contract MockUniswapV3Pool is IUniswapV3Pool {
         pure
         returns (int56[] memory, /*_tickCumulatives*/ uint160[] memory /*_secondsPerLiquidityCumulativeX128s*/ )
     {
-        revert("Not implemented");
+        int56[] memory tickCumulatives = new int56[](2);
+        tickCumulatives[0] = -5701431791036;
+        tickCumulatives[1] = -5701432182726;
+
+        uint160[] memory secondsPerLiquidityCumulativeX128s = new uint160[](2);
+        secondsPerLiquidityCumulativeX128s[0] = 452089362560310761862133193188151;
+        secondsPerLiquidityCumulativeX128s[1] = 452089362560478510767711573672429;
+
+        return (tickCumulatives, secondsPerLiquidityCumulativeX128s);
     }
 
     function setSqrtPriceX96(uint _ratio) external {
@@ -52,9 +66,13 @@ contract MockUniswapV3Pool is IUniswapV3Pool {
     // Add other necessary mock functions or variables here
     function factory() external view override returns (address) {}
 
-    function token0() external view override returns (address) {}
+    function token0() external view override returns (address) {
+        return token0_;
+    }
 
-    function token1() external view override returns (address) {}
+    function token1() external view override returns (address) {
+        return token1_;
+    }
 
     function fee() external view override returns (uint24) {}
 
