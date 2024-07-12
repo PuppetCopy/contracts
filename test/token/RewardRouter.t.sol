@@ -12,12 +12,10 @@ import {VotingEscrow, MAXTIME} from "src/token/VotingEscrow.sol";
 import {RewardLogic} from "src/token/logic/RewardLogic.sol";
 import {Oracle} from "src/token/Oracle.sol";
 
-import {BasicSetup} from "test/base/BasicSetup.t.sol";
-
 import {Precision} from "src/utils/Precision.sol";
+import {RewardStore} from "src/token/store/RewardStore.sol";
 
-import {RewardStore} from "./../../src/token/store/RewardStore.sol";
-
+import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 import {MockUniswapV3Pool} from "test/mocks/MockUniswapV3Pool.sol";
 
@@ -126,20 +124,29 @@ contract RewardRouterTest is BasicSetup {
     function testLockOption() public {
         lock(wnt, users.yossi, getMaxTime(), 0.01e18, 1e18);
         skip(rewardRouterConfig.distributionTimeframe);
+        skip(rewardRouterConfig.distributionTimeframe);
+        // skip(rewardRouterConfig.distributionTimeframe / 3);
 
         lock(wnt, users.alice, getMaxTime(), 0.01e18, 1e18);
         skip(rewardRouterConfig.distributionTimeframe);
+        skip(getMaxTime() / 2);
 
         assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.5e18, 0.1e18);
         assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 0.5e18, 0.1e18);
 
+        // skip(rewardRouterConfig.distributionTimeframe);
+
         // lock(wnt, users.bob, getMaxTime(), 0.01e18, 1e18);
         // skip(rewardRouterConfig.distributionTimeframe);
 
-        // assertApproxEqAbs(
-        //     rewardRouter.getClaimable(wnt, users.alice) + rewardRouter.getClaimable(wnt, users.yossi),
-        //     2e18,
-        //     0.01e18
+        assertApproxEqAbs(
+            rewardRouter.getClaimable(wnt, users.alice) + rewardRouter.getClaimable(wnt, users.yossi),
+            2e18,
+            0.001e18
+        );
+        // assertEq(
+        //     votingEscrow.balanceOf(users.yossi) + votingEscrow.balanceOf(users.alice),
+        //     votingEscrow.totalSupply()
         // );
 
         // skip(rewardRouterConfig.distributionTimeframe / 2);
@@ -248,11 +255,12 @@ contract RewardRouterTest is BasicSetup {
     // }
 
     function lock(IERC20 token, address user, uint unlockTime, uint acceptableTokenPrice, uint cugarAmount) public returns (uint) {
+        rewardRouter.distribute(token); 
         generateUserRevenue(token, user, cugarAmount);
-        rewardRouter.distribute(token);
+        
         uint claimableInToken = rewardRouter.lock(token, unlockTime, acceptableTokenPrice, cugarAmount);
 
-        skip(600);
+        // skip(600);
 
         return claimableInToken;
     }
@@ -261,7 +269,7 @@ contract RewardRouterTest is BasicSetup {
         generateUserRevenue(token, user, cugarAmount);
         uint claimableInToken = rewardRouter.exit(token, acceptableTokenPrice, cugarAmount, user);
 
-        skip(600);
+        // skip(600);
 
         return claimableInToken;
     }

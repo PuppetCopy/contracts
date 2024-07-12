@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+
+import { Script } from "forge-std/src/Script.sol";
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {PRBTest} from "@prb/test/src/PRBTest.sol";
 import {IVault, IAsset} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 import {WeightedPoolUserData} from "@balancer-labs/v2-interfaces/pool-weighted/WeightedPoolUserData.sol";
 import {IBasePool} from "@balancer-labs/v2-interfaces/vault/IBasePool.sol";
@@ -15,7 +17,7 @@ import {PuppetToken} from "src/token/PuppetToken.sol";
 
 import {Address} from "script/Const.sol";
 
-contract ManagePool is PRBTest {
+contract ManagePool is Script {
     address internal DEPLOYER_ADDRESS = vm.envAddress("DEPLOYER_ADDRESS");
 
     IWNT wnt;

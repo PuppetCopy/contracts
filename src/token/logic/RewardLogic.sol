@@ -62,7 +62,7 @@ library RewardLogic {
         (VotingEscrow.Point memory point, VotingEscrow.Point memory userPoint) = votingEscrow.getPoints(user);
 
         uint pendingEmission = getPendingEmission(store, token, distributionTimeframe, source);
-        uint rewardPerTokenCursor = store.getRewardPerTokenCursor(token) + Precision.toFactor(pendingEmission, getPointBias(point, block.timestamp));
+        uint rewardPerTokenCursor = store.getRewardPerTokenCursor(token) + Precision.toFactor(pendingEmission, getPointBias(point, point.ts));
 
         return getUserAccuredRewards(store, token, rewardPerTokenCursor, user, userPoint);
     }
@@ -230,7 +230,7 @@ library RewardLogic {
         store.decreaseSourceCommit(token, source, emission);
         store.transferIn(token, source, emission);
 
-        uint rewardPerTokenDelta = Precision.toFactor(emission, getPointBias(point, block.timestamp));
+        uint rewardPerTokenDelta = Precision.toFactor(emission, getPointBias(point, point.ts));
 
         return store.increaseRewardPerTokenCursor(token, rewardPerTokenDelta);
     }
