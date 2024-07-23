@@ -13,7 +13,7 @@ import {IERC20 as IBERC20} from "@balancer-labs/v2-interfaces/solidity-utils/ope
 
 import {Dictator} from "src/shared/Dictator.sol";
 import {IWNT} from "./../src/utils/interfaces/IWNT.sol";
-import {PuppetToken} from "src/token/PuppetToken.sol";
+import {Puppet} from "src/token/Puppet.sol";
 
 import {Address} from "script/Const.sol";
 
@@ -22,7 +22,7 @@ contract ManagePool is Script {
 
     IWNT wnt;
     Dictator dictator = Dictator(Address.Dictator);
-    PuppetToken puppetToken = PuppetToken(Address.PuppetToken);
+    Puppet puppetToken = Puppet(Address.PuppetToken);
     IERC20 weth = IERC20(Address.wnt);
 
     IVault vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
@@ -31,7 +31,7 @@ contract ManagePool is Script {
     function run() public {
         vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
         // initPool();
-        // exitPool();
+        exitPool();
         vm.stopBroadcast();
     }
 
@@ -86,30 +86,30 @@ contract ManagePool is Script {
         IBasePoolErc20 pool = IBasePoolErc20(Address.BasePool);
         bytes32 poolId = pool.getPoolId();
 
-        (IBERC20[] memory tokens,,) = vault.getPoolTokens(poolId);
+        // (IBERC20[] memory tokens,,) = vault.getPoolTokens(poolId);
 
-        IAsset[] memory assets = new IAsset[](tokens.length);
+        // IAsset[] memory assets = new IAsset[](tokens.length);
 
-        for (uint _i = 0; _i < tokens.length; _i++) {
-            assets[_i] = IAsset(address(tokens[_i]));
-        }
+        // for (uint _i = 0; _i < tokens.length; _i++) {
+        //     assets[_i] = IAsset(address(tokens[_i]));
+        // }
 
-        vault.getPoolTokens(poolId);
-        uint bptBalance = pool.balanceOf(DEPLOYER_ADDRESS);
+        // vault.getPoolTokens(poolId);
+        // uint bptBalance = pool.balanceOf(DEPLOYER_ADDRESS);
 
-        uint[] memory _amounts = new uint[](tokens.length);
+        // uint[] memory _amounts = new uint[](tokens.length);
 
-        vault.exitPool(
-            poolId,
-            DEPLOYER_ADDRESS, // sender
-            payable(DEPLOYER_ADDRESS), // recipient
-            IVault.ExitPoolRequest({
-                assets: assets,
-                minAmountsOut: _amounts,
-                userData: abi.encode(WeightedPoolUserData.ExitKind.EXACT_BPT_IN_FOR_TOKENS_OUT, bptBalance),
-                toInternalBalance: false
-            })
-        );
+        // vault.exitPool(
+        //     poolId,
+        //     DEPLOYER_ADDRESS, // sender
+        //     payable(DEPLOYER_ADDRESS), // recipient
+        //     IVault.ExitPoolRequest({
+        //         assets: assets,
+        //         minAmountsOut: _amounts,
+        //         userData: abi.encode(WeightedPoolUserData.ExitKind.EXACT_BPT_IN_FOR_TOKENS_OUT, bptBalance),
+        //         toInternalBalance: false
+        //     })
+        // );
     }
 }
 

@@ -41,7 +41,7 @@
 
 [rpc_endpoints]
   localhost = "http://localhost:8545"
-  arbitrum = "https://eth-mainnet.g.alchemy.com/v2/${API_KEY_ALCHEMY}"
+  arbitrum = "https://arbitrum.llamarpc.com/sk_llama_a804526772d0fa25160e6ca3a5e9d6fd"
 
 [etherscan]
   arbitrum = { key = "${ARBISCAN_API_KEY}", chain = "arbitrum" }

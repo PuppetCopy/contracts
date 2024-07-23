@@ -5,7 +5,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {Permission} from "../utils/auth/Permission.sol";
+import {Permission} from "../utils/access/Permission.sol";
 
 import {IGmxOrderCallbackReceiver} from "./interface/IGmxOrderCallbackReceiver.sol";
 import {GmxPositionUtils} from "./util/GmxPositionUtils.sol";

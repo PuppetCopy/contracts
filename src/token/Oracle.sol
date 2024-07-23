@@ -9,7 +9,7 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
-import {Permission} from "./../utils/auth/Permission.sol";
+import {Permission} from "./../utils/access/Permission.sol";
 import {PoolUtils} from "../utils/PoolUtils.sol";
 
 import {OracleStore, SLOT_COUNT} from "./store/OracleStore.sol";

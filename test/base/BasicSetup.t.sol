@@ -7,7 +7,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Test } from "forge-std/src/Test.sol";
 
 import {Dictator} from "src/shared/Dictator.sol";
-import {PuppetToken} from "src/token/PuppetToken.sol";
+import {Puppet} from "src/token/Puppet.sol";
 import {Router} from "src/shared/Router.sol";
 import {IWNT} from "./../../src/utils/interfaces/IWNT.sol";
 
@@ -25,7 +25,7 @@ contract BasicSetup is Test {
     IERC20 usdc = IERC20(address(deployMockERC20("USDC", "USDC", 18)));
 
     Dictator dictator;
-    PuppetToken puppetToken;
+    Puppet puppetToken;
     Router router;
 
     function setUp() public virtual {
@@ -41,7 +41,7 @@ contract BasicSetup is Test {
 
         dictator = new Dictator(users.owner);
         router = new Router(dictator, 200_000);
-        puppetToken = new PuppetToken(dictator, PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}), users.owner);
+        puppetToken = new Puppet(dictator, Puppet.Config({limitFactor: 0.01e30, durationWindow: 1 hours}), users.owner);
 
         skip(1 hours);
     }

@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {Auth} from "../utils/auth/Auth.sol";
+import {Auth} from "../utils/access/Auth.sol";
 
 import {PuppetStore} from "./store/PuppetStore.sol";
 import {PuppetLogic} from "./logic/PuppetLogic.sol";

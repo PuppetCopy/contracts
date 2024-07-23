@@ -7,7 +7,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {RewardRouter} from "src/token/RewardRouter.sol";
 import {OracleStore} from "src/token/store/OracleStore.sol";
-import {PuppetToken} from "src/token/PuppetToken.sol";
+import {Puppet} from "src/token/Puppet.sol";
 import {VotingEscrow, MAXTIME} from "src/token/VotingEscrow.sol";
 import {RewardLogic} from "src/token/logic/RewardLogic.sol";
 import {Oracle} from "src/token/Oracle.sol";
@@ -122,22 +122,20 @@ contract RewardRouterTest is BasicSetup {
     // }
 
     function testLockOption() public {
-        lock(wnt, users.yossi, getMaxTime(), 0.01e18, 1e18);
+        lock(wnt, users.yossi, MAXTIME, 0.01e18, 1e18);
         skip(rewardRouterConfig.distributionTimeframe);
-        skip(rewardRouterConfig.distributionTimeframe);
-        // skip(rewardRouterConfig.distributionTimeframe / 3);
 
-        lock(wnt, users.alice, getMaxTime(), 0.01e18, 1e18);
+        lock(wnt, users.alice, MAXTIME, 0.01e18, 1e18);
         skip(rewardRouterConfig.distributionTimeframe);
-        skip(getMaxTime() / 2);
+        skip(rewardRouterConfig.distributionTimeframe);
 
         assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.5e18, 0.1e18);
         assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 0.5e18, 0.1e18);
 
-        // skip(rewardRouterConfig.distributionTimeframe);
+        // // skip(rewardRouterConfig.distributionTimeframe);
 
-        // lock(wnt, users.bob, getMaxTime(), 0.01e18, 1e18);
-        // skip(rewardRouterConfig.distributionTimeframe);
+        // // lock(wnt, users.bob, getMaxTime(), 0.01e18, 1e18);
+        // // skip(rewardRouterConfig.distributionTimeframe);
 
         assertApproxEqAbs(
             rewardRouter.getClaimable(wnt, users.alice) + rewardRouter.getClaimable(wnt, users.yossi),
@@ -257,7 +255,7 @@ contract RewardRouterTest is BasicSetup {
     function lock(IERC20 token, address user, uint unlockTime, uint acceptableTokenPrice, uint cugarAmount) public returns (uint) {
         rewardRouter.distribute(token); 
         generateUserRevenue(token, user, cugarAmount);
-        
+
         uint claimableInToken = rewardRouter.lock(token, unlockTime, acceptableTokenPrice, cugarAmount);
 
         // skip(600);
@@ -290,9 +288,7 @@ contract RewardRouterTest is BasicSetup {
 
     function getLockClaimableAmount(IERC20 token, address user) public view returns (uint) {
         uint maxClaimable = getMaxClaimableAmount(token, user);
-        uint lockMultiplier = RewardLogic.getLockRewardTimeMultiplier(votingEscrow, user, getMaxTime());
-        uint lockClaimable = Precision.applyBasisPoints(lockMultiplier, maxClaimable);
-        return Precision.applyBasisPoints(lockRate, lockClaimable);
+        return Precision.applyBasisPoints(lockRate, maxClaimable);
     }
 
     function getExitClaimableAmount(IERC20 token, address user) public view returns (uint) {
@@ -309,10 +305,6 @@ contract RewardRouterTest is BasicSetup {
         // skip block
         vm.roll(block.number + 1);
         vm.startPrank(user);
-    }
-
-    function getMaxTime() public view returns (uint) {
-        return block.timestamp + MAXTIME;
     }
 
     function fromPriceToSqrt(uint usdcPerWeth) public pure returns (uint160) {

@@ -24,7 +24,7 @@
     "test:dev:fork": "FOUNDRY_PROFILE=dev forge test --match-contract PositionRouterTest -vvvvv --fork-url https://arb-mainnet.g.alchemy.com/v2/RBsflxWv6IhITsLxAWcQlhCqSuxV7Low --fork-block-number 192315592",
     "build": "forge build --sizes",
     "build:dev": "FOUNDRY_PROFILE=dev forge build --sizes",
-    "script:ManagePool": "forge script script/ManagePool.s.sol:ManagePool --broadcast --verify -vvvv",
+    "script:ManagePool": "forge script --chain arbitrum script/ManagePool.s.sol:ManagePool --rpc-url $ARBITRUM_RPC_URL --broadcast --verify -vvvv",
     "script:DeployToken": "forge script script/DeployToken.s.sol:DeployToken --rpc-url $ARBITRUM_RPC_URL --broadcast --verify -vvvv",
     "script:DeployRewardRouter": "forge script script/DeployRewardRouter.s.sol:DeployRewardRouter --rpc-url $ARBITRUM_RPC_URL --broadcast --verify -vvvv",
     "script:DeployPuppetRouter": "forge script script/DeployPuppetRouter.s.sol:DeployPuppetRouter --rpc-url $ARBITRUM_RPC_URL --broadcast --verify -vvvv",
@@ -38,10 +38,10 @@
   },
   "dependencies": {
     "@balancer-labs/v2-interfaces": "0.4.0",
+    "@balancer-labs/v3-interfaces": "0.4.0",
     "@openzeppelin/contracts": "5.0.2",
     "@automate/contracts": "github:gelatodigital/automate#v3",
     "@zeframlou/create3-factory": "github:zeframlou/create3-factory#main",
-    "@uniswap/v3-periphery": "1.4.4",
     "forge-std": "github:foundry-rs/forge-std#v1.8.2",
     "solhint": "5.0.1"
   }

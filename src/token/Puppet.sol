@@ -4,22 +4,22 @@ pragma solidity 0.8.24;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Permission} from "./../utils/auth/Permission.sol";
+import {Permission} from "./../utils/access/Permission.sol";
 
 import {Precision} from "./../utils/Precision.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 
 /**
- * @title PuppetToken
+ * @title Puppet
  * @dev An ERC20 token with a mint rate limit designed to mitigate and provide feedback of a potential critical faults or bugs in the minting process.
  * The limit restricts the quantity of new tokens that can be minted within a given timeframe, proportional to the existing supply.
  *
  * The mintCore function in the contract is designed to allocate tokens to the core contributors over time, with the allocation amount decreasing
  * as more time passes from the deployment of the contract. This is intended to gradually transfer governance power and incentivises broader ownership
  */
-contract PuppetToken is Permission, ERC20 {
-    event PuppetToken__SetConfig(Config config);
-    event PuppetToken__MintCore(address operator, address indexed receiver, uint amount);
+contract Puppet is Permission, ERC20 {
+    event Puppet__SetConfig(Config config);
+    event Puppet__MintCore(address operator, address indexed receiver, uint amount);
 
     uint private constant CORE_RELEASE_DURATION_DIVISOR = 31560000; // 1 year
     uint private constant GENESIS_MINT_AMOUNT = 100_000e18;
@@ -57,7 +57,7 @@ contract PuppetToken is Permission, ERC20 {
         uint _totalMintedAmount = totalSupply() - mintedCoreAmount - GENESIS_MINT_AMOUNT;
         uint _maxMintableAmount = Precision.applyFactor(getCoreShare(_lastMintTime), _totalMintedAmount);
 
-        if (_maxMintableAmount < mintedCoreAmount) revert PuppetToken__CoreShareExceedsMining();
+        if (_maxMintableAmount < mintedCoreAmount) revert Puppet__CoreShareExceedsMining();
 
         return _maxMintableAmount - mintedCoreAmount;
     }
@@ -82,7 +82,7 @@ contract PuppetToken is Permission, ERC20 {
 
         // Enforce the mint rate limit based on total emitted tokens
         if (emissionRate > _limitAmount) {
-            revert PuppetToken__ExceededRateLimit(_limitAmount, emissionRate);
+            revert Puppet__ExceededRateLimit(_limitAmount, emissionRate);
         }
 
         // Add the requested mint amount to the window's mint count
@@ -103,7 +103,7 @@ contract PuppetToken is Permission, ERC20 {
         mintedCoreAmount += _mintableAmount;
         _mint(_receiver, _mintableAmount);
 
-        emit PuppetToken__MintCore(msg.sender, _receiver, _mintableAmount);
+        emit Puppet__MintCore(msg.sender, _receiver, _mintableAmount);
 
         return _mintableAmount;
     }
@@ -117,15 +117,15 @@ contract PuppetToken is Permission, ERC20 {
     }
 
     function _setConfig(Config memory _config) internal {
-        if (_config.limitFactor == 0) revert PuppetToken__InvalidRate();
+        if (_config.limitFactor == 0) revert Puppet__InvalidRate();
 
         config = _config;
         emissionRate = 0; // Reset the mint count window on rate limit change
 
-        emit PuppetToken__SetConfig(_config);
+        emit Puppet__SetConfig(_config);
     }
 
-    error PuppetToken__InvalidRate();
-    error PuppetToken__ExceededRateLimit(uint rateLimit, uint emissionRate);
-    error PuppetToken__CoreShareExceedsMining();
+    error Puppet__InvalidRate();
+    error Puppet__ExceededRateLimit(uint rateLimit, uint emissionRate);
+    error Puppet__CoreShareExceedsMining();
 }

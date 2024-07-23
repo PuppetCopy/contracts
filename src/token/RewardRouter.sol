@@ -8,7 +8,7 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {IGmxReferralStorage} from "../position/interface/IGmxReferralStorage.sol";
 
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {Permission} from "../utils/auth/Permission.sol";
+import {Permission} from "../utils/access/Permission.sol";
 import {Precision} from "../utils/Precision.sol";
 
 import {Router} from "../shared/Router.sol";
@@ -16,7 +16,7 @@ import {Router} from "../shared/Router.sol";
 import {RewardStore} from "./store/RewardStore.sol";
 import {RewardLogic} from "./logic/RewardLogic.sol";
 import {VotingEscrow} from "./VotingEscrow.sol";
-import {PuppetToken} from "./PuppetToken.sol";
+import {Puppet} from "./Puppet.sol";
 import {Oracle} from "./Oracle.sol";
 
 contract RewardRouter is Permission, EIP712, ReentrancyGuard {
@@ -34,7 +34,7 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuard {
 
     VotingEscrow immutable votingEscrow;
     RewardStore immutable store;
-    PuppetToken immutable puppetToken;
+    Puppet immutable puppetToken;
 
     function getClaimable(IERC20 token, address user) public view returns (uint) {
         return RewardLogic.getClaimable(votingEscrow, store, token, callConfig.revenueSource, callConfig.distributionTimeframe, user);
@@ -44,7 +44,7 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuard {
         IAuthority _authority,
         Router _router,
         VotingEscrow _votingEscrow,
-        PuppetToken _puppetToken,
+        Puppet _puppetToken,
         RewardStore _store,
         CallConfig memory _callConfig
     ) Permission(_authority) EIP712("Reward Router", "1") {
@@ -92,13 +92,13 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuard {
         // RewardLogic.veLock(votingEscrow, store, msg.sender, msg.sender, _tokenAmount, unlockTime);
     }
 
-    function veWithdraw(address receiver) external nonReentrant {
-        RewardLogic.veWithdraw(votingEscrow, store, msg.sender, receiver);
+    function veWithdraw(address receiver, uint amount) external nonReentrant {
+        RewardLogic.veWithdraw(votingEscrow, msg.sender, receiver, amount);
     }
 
     function distribute(IERC20 token) external nonReentrant returns (uint) {
-        VotingEscrow.Point memory point = votingEscrow.getPoint();
-        return RewardLogic.distribute(store, token, callConfig.distributionTimeframe, callConfig.revenueSource, point);
+        uint supply = votingEscrow.totalSupply();
+        return RewardLogic.distribute(store, token, callConfig.revenueSource, callConfig.distributionTimeframe, supply);
     }
 
     // governance

@@ -5,8 +5,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 
-import {Auth} from "./../utils/auth/Auth.sol";
-import {Permission} from "./../utils/auth/Permission.sol";
+import {Auth} from "./../utils/access/Auth.sol";
+import {Permission} from "./../utils/access/Permission.sol";
 
 contract Dictator is Ownable, IAuthority {
     event UpdateAccess(address target, bool enabled);
