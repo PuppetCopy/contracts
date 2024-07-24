@@ -3,13 +3,5 @@
   "exclude_informational": false,
   "exclude_low": false,
   "exclude_medium": false,
-  "exclude_high": false,
-  "solc_remaps": [
-    "@balancer-labs/v2-interfaces/=node_modules/@balancer-labs/v2-interfaces/contracts/",
-    "@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
-    "@automate/contracts/=node_modules/@automate/contracts/",
-    "forge-std/=node_modules/forge-std/",
-    "@prb/test/=node_modules/@prb/test/",
-    "@uniswap/v3-core/=node_modules/@uniswap/v3-core/contracts/"
-  ]
+  "exclude_high": false
 }

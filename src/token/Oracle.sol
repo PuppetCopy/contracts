@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IVault, IERC20 as IBalIERC20} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
+import {IVault, IERC20 as IBalIERC20} from "@balancer-labs/v2-interfaces/contracts/vault/IVault.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
+import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
+import {ReentrancyGuardTransient} from "../utils/ReentrancyGuardTransient.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 import {Permission} from "./../utils/access/Permission.sol";
 import {PoolUtils} from "../utils/PoolUtils.sol";
 
 import {OracleStore, SLOT_COUNT} from "./store/OracleStore.sol";
 
-contract Oracle is Permission, EIP712, ReentrancyGuard {
+contract Oracle is Permission, EIP712, ReentrancyGuardTransient {
     event Oracle__SetConfig(uint timestmap, PrimaryPriceConfig primaryConfig, SecondaryPriceConfig[] exchangePriceSourceList);
     event Oracle__SyncDelayedSlot(uint updateInterval, uint seedTimestamp, uint currentTimestamp, uint delayedUpdateCount, uint price);
     event Oracle__SlotSettled(uint updateInterval, uint seedTimestamp, uint seedPrice);

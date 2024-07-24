@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import {IGmxReferralStorage} from "../position/interface/IGmxReferralStorage.sol";
 
+import {ReentrancyGuardTransient} from "../utils/ReentrancyGuardTransient.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Permission} from "../utils/access/Permission.sol";
 import {Precision} from "../utils/Precision.sol";
@@ -19,7 +19,7 @@ import {VotingEscrow} from "./VotingEscrow.sol";
 import {Puppet} from "./Puppet.sol";
 import {Oracle} from "./Oracle.sol";
 
-contract RewardRouter is Permission, EIP712, ReentrancyGuard {
+contract RewardRouter is Permission, EIP712, ReentrancyGuardTransient {
     event RewardRouter__SetConfig(uint timestmap, CallConfig callConfig);
 
     struct CallConfig {

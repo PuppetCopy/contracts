@@ -38,8 +38,8 @@
   },
   "dependencies": {
     "@balancer-labs/v2-interfaces": "0.4.0",
-    "@balancer-labs/v3-interfaces": "0.4.0",
     "@openzeppelin/contracts": "5.0.2",
+    "@uniswap/v3-core": "1.0.1",
     "@automate/contracts": "github:gelatodigital/automate#v3",
     "@zeframlou/create3-factory": "github:zeframlou/create3-factory#main",
     "forge-std": "github:foundry-rs/forge-std#v1.8.2",

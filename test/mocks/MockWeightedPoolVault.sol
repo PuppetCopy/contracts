@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import {
     IVault, IAuthorizer, IFlashLoanRecipient, IProtocolFeesCollector, IWETH, IAsset, IERC20
-} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
+} from "@balancer-labs/v2-interfaces/contracts/vault/IVault.sol";
 
 contract MockWeightedPoolVault is IVault {
     IERC20[] _tokens = new IERC20[](3);

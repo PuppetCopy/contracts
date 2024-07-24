@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
+import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {RewardRouter} from "src/token/RewardRouter.sol";
@@ -124,24 +124,15 @@ contract RewardRouterTest is BasicSetup {
     function testLockOption() public {
         lock(wnt, users.yossi, MAXTIME, 0.01e18, 1e18);
         skip(rewardRouterConfig.distributionTimeframe);
+        skip(rewardRouterConfig.distributionTimeframe);
 
         lock(wnt, users.alice, MAXTIME, 0.01e18, 1e18);
-        skip(rewardRouterConfig.distributionTimeframe);
         skip(rewardRouterConfig.distributionTimeframe);
 
         assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.5e18, 0.1e18);
         assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 0.5e18, 0.1e18);
 
-        // // skip(rewardRouterConfig.distributionTimeframe);
-
-        // // lock(wnt, users.bob, getMaxTime(), 0.01e18, 1e18);
-        // // skip(rewardRouterConfig.distributionTimeframe);
-
-        assertApproxEqAbs(
-            rewardRouter.getClaimable(wnt, users.alice) + rewardRouter.getClaimable(wnt, users.yossi),
-            2e18,
-            0.001e18
-        );
+        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice) + rewardRouter.getClaimable(wnt, users.yossi), 2e18, 0.001e18);
         // assertEq(
         //     votingEscrow.balanceOf(users.yossi) + votingEscrow.balanceOf(users.alice),
         //     votingEscrow.totalSupply()
@@ -253,12 +244,10 @@ contract RewardRouterTest is BasicSetup {
     // }
 
     function lock(IERC20 token, address user, uint unlockTime, uint acceptableTokenPrice, uint cugarAmount) public returns (uint) {
-        rewardRouter.distribute(token); 
+        rewardRouter.distribute(token);
         generateUserRevenue(token, user, cugarAmount);
 
         uint claimableInToken = rewardRouter.lock(token, unlockTime, acceptableTokenPrice, cugarAmount);
-
-        // skip(600);
 
         return claimableInToken;
     }
@@ -266,8 +255,6 @@ contract RewardRouterTest is BasicSetup {
     function exit(IERC20 token, address user, uint acceptableTokenPrice, uint cugarAmount) public returns (uint) {
         generateUserRevenue(token, user, cugarAmount);
         uint claimableInToken = rewardRouter.exit(token, acceptableTokenPrice, cugarAmount, user);
-
-        // skip(600);
 
         return claimableInToken;
     }

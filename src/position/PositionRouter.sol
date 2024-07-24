@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
+import {ReentrancyGuardTransient} from "../utils/ReentrancyGuardTransient.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Permission} from "../utils/access/Permission.sol";
 
@@ -18,7 +18,7 @@ import {ExecuteIncreasePosition} from "./logic/ExecuteIncreasePosition.sol";
 import {ExecuteDecreasePosition} from "./logic/ExecuteDecreasePosition.sol";
 import {ExecuteRejectedAdjustment} from "./logic/ExecuteRejectedAdjustment.sol";
 
-contract PositionRouter is Permission, EIP712, ReentrancyGuard, IGmxOrderCallbackReceiver {
+contract PositionRouter is Permission, EIP712, ReentrancyGuardTransient, IGmxOrderCallbackReceiver {
     struct CallConfig {
         RequestIncreasePosition.CallConfig increase;
         RequestDecreasePosition.CallConfig decrease;

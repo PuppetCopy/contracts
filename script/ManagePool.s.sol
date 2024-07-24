@@ -6,10 +6,10 @@ import { Script } from "forge-std/src/Script.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IVault, IAsset} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
-import {WeightedPoolUserData} from "@balancer-labs/v2-interfaces/pool-weighted/WeightedPoolUserData.sol";
-import {IBasePool} from "@balancer-labs/v2-interfaces/vault/IBasePool.sol";
-import {IERC20 as IBERC20} from "@balancer-labs/v2-interfaces/solidity-utils/openzeppelin/IERC20.sol";
+import {IVault, IAsset} from "@balancer-labs/v2-interfaces/contracts/vault/IVault.sol";
+import {WeightedPoolUserData} from "@balancer-labs/v2-interfaces/contracts/pool-weighted/WeightedPoolUserData.sol";
+import {IBasePool} from "@balancer-labs/v2-interfaces/contracts/vault/IBasePool.sol";
+import {IERC20 as IBERC20} from "@balancer-labs/v2-interfaces/contracts/solidity-utils/openzeppelin/IERC20.sol";
 
 import {Dictator} from "src/shared/Dictator.sol";
 import {IWNT} from "./../src/utils/interfaces/IWNT.sol";
