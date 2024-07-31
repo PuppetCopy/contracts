@@ -16,15 +16,13 @@ import {Router} from "../shared/Router.sol";
 import {RewardStore} from "./store/RewardStore.sol";
 import {RewardLogic} from "./logic/RewardLogic.sol";
 import {VotingEscrow} from "./VotingEscrow.sol";
-import {Puppet} from "./Puppet.sol";
-import {Oracle} from "./Oracle.sol";
+import {PuppetToken} from "./PuppetToken.sol";
 
 contract RewardRouter is Permission, EIP712, ReentrancyGuardTransient {
     event RewardRouter__SetConfig(uint timestmap, CallConfig callConfig);
 
     struct CallConfig {
-        Oracle oracle;
-        uint lockRate;
+        uint rate;
         uint exitRate;
         uint distributionTimeframe;
         address revenueSource;
@@ -34,7 +32,7 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuardTransient {
 
     VotingEscrow immutable votingEscrow;
     RewardStore immutable store;
-    Puppet immutable puppetToken;
+    PuppetToken immutable puppetToken;
 
     function getClaimable(IERC20 token, address user) public view returns (uint) {
         return RewardLogic.getClaimable(votingEscrow, store, token, callConfig.revenueSource, callConfig.distributionTimeframe, user);
@@ -44,7 +42,7 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuardTransient {
         IAuthority _authority,
         Router _router,
         VotingEscrow _votingEscrow,
-        Puppet _puppetToken,
+        PuppetToken _puppetToken,
         RewardStore _store,
         CallConfig memory _callConfig
     ) Permission(_authority) EIP712("Reward Router", "1") {
@@ -56,40 +54,38 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuardTransient {
         _puppetToken.approve(address(_router), type(uint).max);
     }
 
-    function lock(IERC20 revenueToken, uint unlockTime, uint acceptableTokenPrice, uint cugarAmount) public nonReentrant returns (uint) {
+    function lock(IERC20 revenueToken, uint lockDuration, uint cugarAmount) public nonReentrant returns (uint) {
         RewardLogic.CallOptionParmas memory lockParams = RewardLogic.CallOptionParmas({
             revenueToken: revenueToken,
             user: msg.sender,
             revenueSource: callConfig.revenueSource,
             distributionTimeframe: callConfig.distributionTimeframe,
-            rate: callConfig.lockRate,
-            acceptableTokenPrice: acceptableTokenPrice,
+            rate: callConfig.rate,
             cugarAmount: cugarAmount
         });
 
-        return RewardLogic.lock(votingEscrow, store, callConfig.oracle, puppetToken, lockParams, unlockTime);
+        return RewardLogic.lock(votingEscrow, store, puppetToken, lockParams, lockDuration);
     }
 
-    function exit(IERC20 revenueToken, uint acceptableTokenPrice, uint cugarAmount, address receiver) public nonReentrant returns (uint) {
+    function exit(IERC20 revenueToken, uint cugarAmount, address receiver) public nonReentrant returns (uint) {
         RewardLogic.CallOptionParmas memory exitParams = RewardLogic.CallOptionParmas({
             revenueToken: revenueToken,
             user: msg.sender,
             revenueSource: callConfig.revenueSource,
             distributionTimeframe: callConfig.distributionTimeframe,
             rate: callConfig.exitRate,
-            acceptableTokenPrice: acceptableTokenPrice,
             cugarAmount: cugarAmount
         });
 
-        return RewardLogic.exit(votingEscrow, store, callConfig.oracle, puppetToken, exitParams, receiver);
+        return RewardLogic.exit(votingEscrow, store, puppetToken, exitParams, receiver);
     }
 
     function claim(IERC20 revenueToken, address receiver) public nonReentrant returns (uint) {
         return RewardLogic.claim(votingEscrow, store, revenueToken, callConfig.distributionTimeframe, callConfig.revenueSource, msg.sender, receiver);
     }
 
-    function veLock(uint _tokenAmount, uint unlockTime) external nonReentrant {
-        // RewardLogic.veLock(votingEscrow, store, msg.sender, msg.sender, _tokenAmount, unlockTime);
+    function veLock(uint _tokenAmount, uint lockDuration) external nonReentrant {
+        // RewardLogic.veLock(votingEscrow, store, msg.sender, msg.sender, _tokenAmount, lockDuration);
     }
 
     function veWithdraw(address receiver, uint amount) external nonReentrant {
@@ -98,7 +94,7 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuardTransient {
 
     function distribute(IERC20 token) external nonReentrant returns (uint) {
         uint supply = votingEscrow.totalSupply();
-        return RewardLogic.distribute(store, token, callConfig.revenueSource, callConfig.distributionTimeframe, supply);
+        return RewardLogic.distribute(votingEscrow, store, token, callConfig.revenueSource, callConfig.distributionTimeframe);
     }
 
     // governance
@@ -115,7 +111,7 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuardTransient {
     // internal
 
     function _setConfig(CallConfig memory _callConfig) internal {
-        if (_callConfig.lockRate + callConfig.exitRate > Precision.BASIS_POINT_DIVISOR) revert RewardRouter__InvalidWeightFactors();
+        if (_callConfig.rate + callConfig.exitRate > Precision.BASIS_POINT_DIVISOR) revert RewardRouter__InvalidWeightFactors();
 
         callConfig = _callConfig;
 

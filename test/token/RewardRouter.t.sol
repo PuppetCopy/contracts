@@ -6,11 +6,9 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Po
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {RewardRouter} from "src/token/RewardRouter.sol";
-import {OracleStore} from "src/token/store/OracleStore.sol";
-import {Puppet} from "src/token/Puppet.sol";
+import {PuppetToken} from "src/token/PuppetToken.sol";
 import {VotingEscrow, MAXTIME} from "src/token/VotingEscrow.sol";
 import {RewardLogic} from "src/token/logic/RewardLogic.sol";
-import {Oracle} from "src/token/Oracle.sol";
 
 import {Precision} from "src/utils/Precision.sol";
 import {RewardStore} from "src/token/store/RewardStore.sol";
@@ -22,10 +20,8 @@ import {MockUniswapV3Pool} from "test/mocks/MockUniswapV3Pool.sol";
 contract RewardRouterTest is BasicSetup {
     VotingEscrow votingEscrow;
     MockWeightedPoolVault primaryVaultPool;
-    OracleStore oracleStore;
     RewardRouter rewardRouter;
     RewardStore rewardStore;
-    Oracle oracle;
 
     RewardRouter.CallConfig rewardRouterConfig;
 
@@ -43,9 +39,6 @@ contract RewardRouterTest is BasicSetup {
         IUniswapV3Pool[] memory wntUsdPoolList = new IUniswapV3Pool[](1);
         wntUsdPoolList[0] = new MockUniswapV3Pool(fromPriceToSqrt(100), address(wnt), address(usdc));
 
-        Oracle.SecondaryPriceConfig[] memory exchangePriceSourceList = new Oracle.SecondaryPriceConfig[](1);
-        exchangePriceSourceList[0] = Oracle.SecondaryPriceConfig({enabled: true, sourceList: wntUsdPoolList, twapInterval: 0, token: usdc});
-
         primaryVaultPool = new MockWeightedPoolVault();
         primaryVaultPool.initPool(address(wnt), address(puppetToken), 20e18, 8000e18);
 
@@ -53,42 +46,30 @@ contract RewardRouterTest is BasicSetup {
 
         uint initalPrice = (balances[0] * 80e18) / (balances[1] * 20);
 
-        oracleStore = new OracleStore(dictator, initalPrice);
-        oracle = new Oracle(
-            dictator,
-            oracleStore,
-            Oracle.PrimaryPriceConfig({token: wnt, vault: primaryVaultPool, poolId: 0, updateInterval: 1 days}),
-            exchangePriceSourceList
-        );
-        dictator.setAccess(oracleStore, address(oracle));
+        IERC20[] memory _tokenBuybackThresholdList = new IERC20[](2);
+        _tokenBuybackThresholdList[0] = wnt;
+        _tokenBuybackThresholdList[1] = usdc;
 
-        rewardStore = new RewardStore(dictator, router);
+        uint[] memory _tokenBuybackThresholdAmountList = new uint[](2);
+        _tokenBuybackThresholdAmountList[0] = 0.2e18;
+        _tokenBuybackThresholdAmountList[1] = 500e30;
+
+        rewardStore = new RewardStore(dictator, router, _tokenBuybackThresholdList, _tokenBuybackThresholdAmountList);
         dictator.setPermission(router, address(rewardStore), router.transfer.selector);
-        rewardRouterConfig = RewardRouter.CallConfig({
-            oracle: oracle,
-            lockRate: lockRate,
-            exitRate: exitRate,
-            distributionTimeframe: 1 weeks,
-            revenueSource: users.owner
-        });
+        rewardRouterConfig = RewardRouter.CallConfig({rate: lockRate, exitRate: exitRate, distributionTimeframe: 1 weeks, revenueSource: users.owner});
         rewardRouter = new RewardRouter(dictator, router, votingEscrow, puppetToken, rewardStore, rewardRouterConfig);
 
         dictator.setAccess(rewardStore, address(rewardRouter));
 
-        dictator.setAccess(votingEscrow, address(rewardRouter));
-        dictator.setPermission(oracle, address(rewardRouter), oracle.setPrimaryPrice.selector);
+        dictator.setPermission(votingEscrow, address(rewardRouter), votingEscrow.lock.selector);
+        dictator.setPermission(votingEscrow, address(rewardRouter), votingEscrow.vest.selector);
+        dictator.setPermission(votingEscrow, address(rewardRouter), votingEscrow.claim.selector);
+
         dictator.setPermission(puppetToken, address(rewardRouter), puppetToken.mint.selector);
 
         // permissions used for testing
         dictator.setAccess(rewardStore, users.owner);
         wnt.approve(address(router), type(uint).max - 1);
-        for (uint i = 0; i < exchangePriceSourceList.length; i++) {
-            exchangePriceSourceList[i].token.approve(address(router), type(uint).max - 1);
-        }
-
-        assertEq(oracle.getPrimaryPoolPrice(), 0.01e18, ".01 WNT per PUPPET");
-        assertEq(oracle.getSecondaryPoolPrice(usdc), 100e6, "100 USDC per WNT");
-        assertEq(oracle.getMaxPrice(usdc), 1e6, "1 USDC per PUPPET");
     }
 
     // function testOptionRevert() public {
@@ -122,11 +103,11 @@ contract RewardRouterTest is BasicSetup {
     // }
 
     function testLockOption() public {
-        lock(wnt, users.yossi, MAXTIME, 0.01e18, 1e18);
+        lock(wnt, users.yossi, MAXTIME, 1e18);
         skip(rewardRouterConfig.distributionTimeframe);
         skip(rewardRouterConfig.distributionTimeframe);
 
-        lock(wnt, users.alice, MAXTIME, 0.01e18, 1e18);
+        lock(wnt, users.alice, MAXTIME, 1e18);
         skip(rewardRouterConfig.distributionTimeframe);
 
         assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.5e18, 0.1e18);
@@ -243,18 +224,18 @@ contract RewardRouterTest is BasicSetup {
     //     assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 1.525e18, 0.05e18);
     // }
 
-    function lock(IERC20 token, address user, uint unlockTime, uint acceptableTokenPrice, uint cugarAmount) public returns (uint) {
+    function lock(IERC20 token, address user, uint lockDuration, uint cugarAmount) public returns (uint) {
         rewardRouter.distribute(token);
         generateUserRevenue(token, user, cugarAmount);
 
-        uint claimableInToken = rewardRouter.lock(token, unlockTime, acceptableTokenPrice, cugarAmount);
+        uint claimableInToken = rewardRouter.lock(token, lockDuration, cugarAmount);
 
         return claimableInToken;
     }
 
-    function exit(IERC20 token, address user, uint acceptableTokenPrice, uint cugarAmount) public returns (uint) {
+    function exit(IERC20 token, address user, uint cugarAmount) public returns (uint) {
         generateUserRevenue(token, user, cugarAmount);
-        uint claimableInToken = rewardRouter.exit(token, acceptableTokenPrice, cugarAmount, user);
+        uint claimableInToken = rewardRouter.exit(token, cugarAmount, user);
 
         return claimableInToken;
     }
@@ -265,21 +246,14 @@ contract RewardRouterTest is BasicSetup {
         return rewardRouter.claim(token, user);
     }
 
-    function getMaxClaimableAmount(IERC20 token, address user) public view returns (uint) {
-        uint contribution = rewardStore.getSeedContribution(token, user);
-        uint maxPrice = oracle.getMaxPrice(token, oracle.getPrimaryPoolPrice());
-        uint maxClaimable = contribution * 1e18 / maxPrice;
-
-        return maxClaimable;
-    }
 
     function getLockClaimableAmount(IERC20 token, address user) public view returns (uint) {
-        uint maxClaimable = getMaxClaimableAmount(token, user);
+        uint maxClaimable = rewardRouter.getClaimable(token, user);
         return Precision.applyBasisPoints(lockRate, maxClaimable);
     }
 
     function getExitClaimableAmount(IERC20 token, address user) public view returns (uint) {
-        uint maxClaimable = getMaxClaimableAmount(token, user);
+        uint maxClaimable = rewardRouter.getClaimable(token, user);
         return Precision.applyBasisPoints(exitRate, maxClaimable);
     }
 
@@ -287,7 +261,7 @@ contract RewardRouterTest is BasicSetup {
         vm.startPrank(users.owner);
 
         _dealERC20(address(token), users.owner, amount);
-        rewardStore.commitReward(token, user, amount);
+        rewardStore.commitReward(token, users.owner, user, amount);
 
         // skip block
         vm.roll(block.number + 1);

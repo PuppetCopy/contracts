@@ -63,7 +63,15 @@ contract PositionRouterTest is BasicSetup {
         _tokenAllowanceCapAmountList[0] = 0.2e18;
         _tokenAllowanceCapAmountList[1] = 500e30;
 
-        rewardStore = new RewardStore(dictator, router);
+        IERC20[] memory _tokenBuybackThresholdList = new IERC20[](2);
+        _tokenBuybackThresholdList[0] = wnt;
+        _tokenBuybackThresholdList[1] = usdc;
+
+        uint[] memory _tokenBuybackThresholdAmountList = new uint[](2);
+        _tokenBuybackThresholdAmountList[0] = 0.2e18;
+        _tokenBuybackThresholdAmountList[1] = 500e30;
+
+        rewardStore = new RewardStore(dictator, router, _tokenBuybackThresholdList, _tokenBuybackThresholdAmountList);
 
         puppetStore = new PuppetStore(dictator, router, _tokenAllowanceCapList, _tokenAllowanceCapAmountList);
         puppetRouter = new PuppetRouter(

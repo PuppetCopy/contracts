@@ -13,7 +13,7 @@ import {IERC20 as IBERC20} from "@balancer-labs/v2-interfaces/contracts/solidity
 
 import {Dictator} from "src/shared/Dictator.sol";
 import {IWNT} from "./../src/utils/interfaces/IWNT.sol";
-import {Puppet} from "src/token/Puppet.sol";
+import {PuppetToken} from "src/token/PuppetToken.sol";
 
 import {Address} from "script/Const.sol";
 
@@ -22,7 +22,7 @@ contract ManagePool is Script {
 
     IWNT wnt;
     Dictator dictator = Dictator(Address.Dictator);
-    Puppet puppetToken = Puppet(Address.PuppetToken);
+    PuppetToken puppetToken = PuppetToken(Address.PuppetToken);
     IERC20 weth = IERC20(Address.wnt);
 
     IVault vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);

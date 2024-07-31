@@ -5,7 +5,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Precision} from "src/utils/Precision.sol";
 
-import {Puppet} from "src/token/Puppet.sol";
+import {PuppetToken} from "src/token/PuppetToken.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
 contract PuppetTest is BasicSetup {
@@ -27,7 +27,7 @@ contract PuppetTest is BasicSetup {
         // Normally Alice should be Able to mint up to 4 * getLimitAmount(). but it doesnt work since _decayRate is now equal to 0. Alice can only
         // mint a max equal to getLimitAmount() even after 3 epochs of nothing minted
         uint amountToMint = 2 * puppetToken.getLimitAmount();
-        vm.expectRevert(abi.encodeWithSelector(Puppet.Puppet__ExceededRateLimit.selector, 1000000000000000000000, 2000000000000000000000));
+        vm.expectRevert(abi.encodeWithSelector(PuppetToken.Puppet__ExceededRateLimit.selector, 1000000000000000000000, 2000000000000000000000));
         puppetToken.mint(users.alice, amountToMint);
         uint maxAmountToMint = puppetToken.getLimitAmount();
         puppetToken.mint(users.alice, maxAmountToMint);
@@ -69,12 +69,12 @@ contract PuppetTest is BasicSetup {
 
     function testMint() public {
         skip(1 hours);
-        vm.expectRevert(abi.encodeWithSelector(Puppet.Puppet__ExceededRateLimit.selector, 1000e18, 1001e18));
+        vm.expectRevert(abi.encodeWithSelector(PuppetToken.Puppet__ExceededRateLimit.selector, 1000e18, 1001e18));
         puppetToken.mint(users.alice, 1001e18);
 
         assertEq(puppetToken.mint(users.alice, 100e18), 100e18);
 
-        vm.expectRevert(abi.encodeWithSelector(Puppet.Puppet__ExceededRateLimit.selector, 1001e18, 1100e18));
+        vm.expectRevert(abi.encodeWithSelector(PuppetToken.Puppet__ExceededRateLimit.selector, 1001e18, 1100e18));
         puppetToken.mint(users.alice, 1000e18);
         puppetToken.mint(users.alice, 500e18);
 
@@ -82,7 +82,7 @@ contract PuppetTest is BasicSetup {
         puppetToken.mint(users.alice, 1000e18);
         assertEq(puppetToken.getLimitAmount(), 1016e18);
         skip(1 hours / 2);
-        vm.expectRevert(abi.encodeWithSelector(Puppet.Puppet__ExceededRateLimit.selector, 1016e18, 1492e18));
+        vm.expectRevert(abi.encodeWithSelector(PuppetToken.Puppet__ExceededRateLimit.selector, 1016e18, 1492e18));
         puppetToken.mint(users.alice, 1000e18);
         skip(1 hours / 2);
         puppetToken.mint(users.alice, 1000e18);

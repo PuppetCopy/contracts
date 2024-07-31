@@ -32,7 +32,7 @@ abstract contract BankStore is Auth {
     }
 
     function _transferOut(IERC20 _token, address _receiver, uint _value) internal {
-        _token.transfer(_receiver, _value);
+        router.transfer(_token, address(this), _receiver, _value);
         tokenBalanceMap[_token] -= _value;
     }
 

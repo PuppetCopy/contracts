@@ -4,20 +4,20 @@ pragma solidity 0.8.24;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Permission} from "./../utils/access/Permission.sol";
-
-import {Precision} from "./../utils/Precision.sol";
-import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
+import {Permission} from "src/utils/access/Permission.sol";
+import {Precision} from "src/utils/Precision.sol";
+import {IAuthority} from "src/utils/interfaces/IAuthority.sol";
+import {IERC20Mintable} from "src/utils/interfaces/IERC20Mintable.sol";
 
 /**
- * @title Puppet
+ * @title PuppetToken
  * @dev An ERC20 token with a mint rate limit designed to mitigate and provide feedback of a potential critical faults or bugs in the minting process.
  * The limit restricts the quantity of new tokens that can be minted within a given timeframe, proportional to the existing supply.
  *
  * The mintCore function in the contract is designed to allocate tokens to the core contributors over time, with the allocation amount decreasing
  * as more time passes from the deployment of the contract. This is intended to gradually transfer governance power and incentivises broader ownership
  */
-contract Puppet is Permission, ERC20 {
+contract PuppetToken is Permission, ERC20, IERC20Mintable {
     event Puppet__SetConfig(Config config);
     event Puppet__MintCore(address operator, address indexed receiver, uint amount);
 
@@ -42,6 +42,10 @@ contract Puppet is Permission, ERC20 {
         _mint(receiver, GENESIS_MINT_AMOUNT);
 
         emissionRate = getLimitAmount();
+    }
+
+    function getLockedAmount(address _user) public view returns (uint) {
+        return balanceOf(_user);
     }
 
     function getCoreShare() public view returns (uint) {

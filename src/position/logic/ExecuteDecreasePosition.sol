@@ -121,8 +121,14 @@ library ExecuteDecreasePosition {
         callConfig.puppetStore.increaseBalanceList(callParams.outputToken, address(this), callParams.mirrorPosition.puppetList, outputAmountList);
 
         if (callParams.profit > 0) {
-            callConfig.rewardStore.commitRewardList(callParams.outputToken, callParams.mirrorPosition.puppetList, contributionList);
-            callConfig.rewardStore.commitReward(callParams.outputToken, callParams.mirrorPosition.trader, totalPerformanceFee);
+            callConfig.rewardStore.commitRewardList(
+                callParams.outputToken, //
+                address(this),
+                callParams.mirrorPosition.puppetList,
+                contributionList,
+                callParams.mirrorPosition.trader,
+                totalPerformanceFee
+            );
         }
 
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91

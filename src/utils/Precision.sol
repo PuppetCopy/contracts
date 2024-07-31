@@ -5,7 +5,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 library Precision {
     uint internal constant BASIS_POINT_DIVISOR = 10000;
-    uint public constant FLOAT_PRECISION = 10 ** 30;
+    uint public constant FLOAT_PRECISION = 1e30;
 
     function applyBasisPoints(uint bps, uint value) internal pure returns (uint) {
         return Math.mulDiv(value, bps, BASIS_POINT_DIVISOR);
