@@ -25,7 +25,6 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuardTransient {
         uint rate;
         uint exitRate;
         uint distributionTimeframe;
-        address revenueSource;
     }
 
     CallConfig callConfig;
@@ -35,7 +34,7 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuardTransient {
     PuppetToken immutable puppetToken;
 
     function getClaimable(IERC20 token, address user) public view returns (uint) {
-        return RewardLogic.getClaimable(votingEscrow, store, token, callConfig.revenueSource, callConfig.distributionTimeframe, user);
+        return RewardLogic.getClaimable(votingEscrow, store, token, callConfig.distributionTimeframe, user);
     }
 
     constructor(
@@ -58,7 +57,6 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuardTransient {
         RewardLogic.CallOptionParmas memory lockParams = RewardLogic.CallOptionParmas({
             revenueToken: revenueToken,
             user: msg.sender,
-            revenueSource: callConfig.revenueSource,
             distributionTimeframe: callConfig.distributionTimeframe,
             rate: callConfig.rate,
             cugarAmount: cugarAmount
@@ -71,7 +69,6 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuardTransient {
         RewardLogic.CallOptionParmas memory exitParams = RewardLogic.CallOptionParmas({
             revenueToken: revenueToken,
             user: msg.sender,
-            revenueSource: callConfig.revenueSource,
             distributionTimeframe: callConfig.distributionTimeframe,
             rate: callConfig.exitRate,
             cugarAmount: cugarAmount
@@ -81,7 +78,7 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuardTransient {
     }
 
     function claim(IERC20 revenueToken, address receiver) public nonReentrant returns (uint) {
-        return RewardLogic.claim(votingEscrow, store, revenueToken, callConfig.distributionTimeframe, callConfig.revenueSource, msg.sender, receiver);
+        return RewardLogic.claim(votingEscrow, store, revenueToken, callConfig.distributionTimeframe, msg.sender, receiver);
     }
 
     function veLock(uint _tokenAmount, uint lockDuration) external nonReentrant {
@@ -94,7 +91,7 @@ contract RewardRouter is Permission, EIP712, ReentrancyGuardTransient {
 
     function distribute(IERC20 token) external nonReentrant returns (uint) {
         uint supply = votingEscrow.totalSupply();
-        return RewardLogic.distribute(votingEscrow, store, token, callConfig.revenueSource, callConfig.distributionTimeframe);
+        return RewardLogic.distribute(votingEscrow, store, token, callConfig.distributionTimeframe);
     }
 
     // governance

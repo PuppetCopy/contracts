@@ -56,7 +56,7 @@ contract RewardRouterTest is BasicSetup {
 
         rewardStore = new RewardStore(dictator, router, _tokenBuybackThresholdList, _tokenBuybackThresholdAmountList);
         dictator.setPermission(router, address(rewardStore), router.transfer.selector);
-        rewardRouterConfig = RewardRouter.CallConfig({rate: lockRate, exitRate: exitRate, distributionTimeframe: 1 weeks, revenueSource: users.owner});
+        rewardRouterConfig = RewardRouter.CallConfig({rate: lockRate, exitRate: exitRate, distributionTimeframe: 1 weeks});
         rewardRouter = new RewardRouter(dictator, router, votingEscrow, puppetToken, rewardStore, rewardRouterConfig);
 
         dictator.setAccess(rewardStore, address(rewardRouter));

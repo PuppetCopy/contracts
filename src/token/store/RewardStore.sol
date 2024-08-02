@@ -18,7 +18,7 @@ contract RewardStore is BankStore {
 
     mapping(IERC20 => uint) rewardPerTokenCursorMap;
     mapping(IERC20 => uint) tokenEmissionRateMap;
-    mapping(IERC20 => mapping(address => uint)) tokenEmissionTimestampMap;
+    mapping(IERC20 => uint) tokenEmissionTimestampMap;
 
     mapping(IERC20 => uint) buybackTokenThresholdAmountMap;
 
@@ -125,12 +125,12 @@ contract RewardStore is BankStore {
         tokenEmissionRateMap[_token] = _value;
     }
 
-    function getTokenEmissionTimestamp(IERC20 _token, address _source) external view returns (uint) {
-        return tokenEmissionTimestampMap[_token][_source];
+    function getTokenEmissionTimestamp(IERC20 _token) external view returns (uint) {
+        return tokenEmissionTimestampMap[_token];
     }
 
-    function setTokenEmissionTimestamp(IERC20 _token, address _source, uint _value) external auth {
-        tokenEmissionTimestampMap[_token][_source] = _value;
+    function setTokenEmissionTimestamp(IERC20 _token, uint _value) external auth {
+        tokenEmissionTimestampMap[_token] = _value;
     }
 
     function getUserTokenCursor(IERC20 _token, address _user) external view returns (UserTokenCursor memory) {

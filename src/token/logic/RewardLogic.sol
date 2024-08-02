@@ -18,29 +18,31 @@ library RewardLogic {
     event RewardLogic__Lock(address user, IERC20 revenueToken, uint accuredReward, uint rewardInToken, uint lockDuration);
     event RewardLogic__Exit(address user, IERC20 revenueToken, uint accuredReward, uint rewardInToken);
 
-    event RewardLogic__Distribute(IERC20 revenueToken, address revenueSource, uint distributionTimeframe, uint supply, uint nextRewardPerTokenCursor);
+    event RewardLogic__Distribute(IERC20 revenueToken, uint distributionTimeframe, uint supply, uint nextRewardPerTokenCursor);
 
     event RewardLogic__Claimed(address user, address receiver, uint rewardPerTokenCursor, uint amount);
     event RewardLogic__Buyback(address buyer, uint thresholdAmount, IERC20 token, uint rewardPerContributionCursor, uint totalFee);
 
     struct CallOptionParmas {
         IERC20 revenueToken;
-        address revenueSource;
         address user;
         uint rate;
         uint distributionTimeframe;
         uint cugarAmount;
     }
 
+    function getLockRewardMultiplier(uint _bonusMultiplier, uint _lockDuration) public pure returns (uint) {
+        return Precision.applyFactor(_bonusMultiplier, Precision.toFactor(_lockDuration, MAXTIME));
+    }
+
     function getClaimable(
         VotingEscrow votingEscrow, //
         RewardStore store,
         IERC20 token,
-        address source,
         uint distributionTimeframe,
         address user
     ) internal view returns (uint) {
-        uint pendingEmission = getPendingEmission(store, token, distributionTimeframe, source);
+        uint pendingEmission = getPendingEmission(store, token, distributionTimeframe);
         uint rewardPerTokenCursor = store.getRewardPerTokenCursor(token) + Precision.toFactor(pendingEmission, votingEscrow.totalSupply());
 
         return getUserAccuredRewards(store, token, user, rewardPerTokenCursor, votingEscrow.balanceOf(user));
@@ -63,10 +65,9 @@ library RewardLogic {
     function getPendingEmission(
         RewardStore store, //
         IERC20 token,
-        uint distributionTimeframe,
-        address source
+        uint distributionTimeframe
     ) internal view returns (uint) {
-        uint lastTimestamp = store.getTokenEmissionTimestamp(token, source);
+        uint lastTimestamp = store.getTokenEmissionTimestamp(token);
         uint emissionBalance = store.getTokenBalance(token);
         uint rate = store.getTokenEmissionRate(token);
 
@@ -103,10 +104,9 @@ library RewardLogic {
         VotingEscrow votingEscrow, //
         RewardStore store,
         IERC20 token,
-        address source,
         uint distributionTimeframe
     ) internal returns (uint) {
-        uint timeElapsed = block.timestamp - store.getTokenEmissionTimestamp(token, source);
+        uint timeElapsed = block.timestamp - store.getTokenEmissionTimestamp(token);
         uint tokenBalance = store.getTokenBalance(token);
         uint rate = store.getTokenEmissionRate(token);
         uint nextRate = tokenBalance / distributionTimeframe;
@@ -118,7 +118,7 @@ library RewardLogic {
             store.setTokenEmissionRate(token, nextRate);
         }
 
-        store.setTokenEmissionTimestamp(token, source, block.timestamp);
+        store.setTokenEmissionTimestamp(token, block.timestamp);
 
         uint emission = Math.min(timeElapsed * rate, tokenBalance);
 
@@ -129,7 +129,7 @@ library RewardLogic {
         uint supply = votingEscrow.totalSupply();
         uint rewardPerToken = store.increaseRewardPerTokenCursor(token, Precision.toFactor(emission, supply));
 
-        emit RewardLogic__Distribute(token, source, distributionTimeframe, supply, rewardPerToken);
+        emit RewardLogic__Distribute(token, distributionTimeframe, supply, rewardPerToken);
 
         return rewardPerToken;
     }
@@ -138,11 +138,10 @@ library RewardLogic {
         VotingEscrow votingEscrow, //
         RewardStore store,
         IERC20 token,
-        address source,
         uint distributionTimeframe,
         address user
     ) internal returns (uint) {
-        uint nextRewardPerTokenCursor = distribute(votingEscrow, store, token, source, distributionTimeframe);
+        uint nextRewardPerTokenCursor = distribute(votingEscrow, store, token, distributionTimeframe);
         uint accruedReward = getUserAccuredRewards(store, token, user, nextRewardPerTokenCursor, votingEscrow.balanceOf(user));
 
         store.setUserTokenCursor(token, user, RewardStore.UserTokenCursor({rewardPerToken: nextRewardPerTokenCursor, accruedReward: accruedReward}));
@@ -170,15 +169,14 @@ library RewardLogic {
             votingEscrow,
             store, //
             callParams.revenueToken,
-            callParams.revenueSource,
             callParams.distributionTimeframe,
             callParams.user
         );
 
         uint userTokenPerContribution = store.getTokenPerContributionCursor(callParams.revenueToken)
             - store.getUserTokenPerContributionCursor(callParams.revenueToken, callParams.user);
-
         store.setUserTokenPerContributionCursor(callParams.revenueToken, callParams.user, userTokenPerContribution);
+
         uint maxRewardInToken = callParams.cugarAmount * userTokenPerContribution / Precision.FLOAT_PRECISION;
         uint rewardInToken = Precision.applyFactor(maxRewardInToken, callParams.rate);
 
@@ -218,15 +216,14 @@ library RewardLogic {
     }
 
     function claim(
-        VotingEscrow votingEscrow,
+        VotingEscrow votingEscrow, //
         RewardStore store,
         IERC20 token,
         uint distributionTimeframe,
-        address revenueSource,
         address user,
         address receiver
     ) internal returns (uint) {
-        uint nextRewardPerTokenCursor = distribute(votingEscrow, store, token, revenueSource, distributionTimeframe);
+        uint nextRewardPerTokenCursor = distribute(votingEscrow, store, token, distributionTimeframe);
         uint accruedReward = getUserAccuredRewards(store, token, user, nextRewardPerTokenCursor, votingEscrow.balanceOf(user));
 
         if (accruedReward == 0) revert RewardLogic__NoClaimableAmount();
