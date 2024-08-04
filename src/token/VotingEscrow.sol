@@ -17,9 +17,10 @@ uint constant MAXTIME = 365 days * 2;
 
 /**
  * @title Token Voting Escrow
- * @dev Allow users to lock their tokens for a specified duration to receive governance voting power and allow them to vest their tokens
- * Adjusting existing vesting schedule is averaged weighted whenever new amount and duration is added
- * Entering Vest period is calculated based on the Lock duration, increasing will be weighted based on the new amount and duration
+ * @dev lock tokens for a certain period to obtain governance voting power.
+ * The lock duration is subject to a weighted average adjustment when additional tokens are locked for a new duration. Upon unlocking, tokens enter a
+ * vesting period, the duration of which is determined by the weighted average of the lock durations. The vesting period is recalculated whenever
+ * additional tokens are locked, incorporating the new amount and duration into the weighted average.
  */
 contract VotingEscrow is Permission, ERC20Votes {
     event VotingEscrow__Lock(address depositor, address user, Lock lock);
