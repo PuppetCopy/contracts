@@ -8,7 +8,6 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {RewardRouter} from "src/token/RewardRouter.sol";
 import {PuppetToken} from "src/token/PuppetToken.sol";
 import {VotingEscrow, MAXTIME} from "src/token/VotingEscrow.sol";
-import {RewardLogic} from "src/token/logic/RewardLogic.sol";
 
 import {Precision} from "src/utils/Precision.sol";
 import {RewardStore} from "src/token/store/RewardStore.sol";
@@ -23,10 +22,14 @@ contract RewardRouterTest is BasicSetup {
     RewardRouter rewardRouter;
     RewardStore rewardStore;
 
-    RewardRouter.CallConfig rewardRouterConfig;
+    RewardRouter.Config rewardRouterConfig;
 
-    uint public lockRate = 6000;
-    uint public exitRate = 3000;
+    RewardRouter.Config public config = RewardRouter.Config({
+        baselineEmissionRate: 1e30,
+        lockLiquidTokensBonusMultiplier: 1e30,
+        optionLockTokensBonusMultiplier: 1e30,
+        distributionTimeframe: 1 weeks
+    });
 
     function setUp() public override {
         vm.warp(1716671477);
@@ -56,7 +59,6 @@ contract RewardRouterTest is BasicSetup {
 
         rewardStore = new RewardStore(dictator, router, _tokenBuybackThresholdList, _tokenBuybackThresholdAmountList);
         dictator.setPermission(router, address(rewardStore), router.transfer.selector);
-        rewardRouterConfig = RewardRouter.CallConfig({rate: lockRate, exitRate: exitRate, distributionTimeframe: 1 weeks});
         rewardRouter = new RewardRouter(dictator, router, votingEscrow, puppetToken, rewardStore, rewardRouterConfig);
 
         dictator.setAccess(rewardStore, address(rewardRouter));
@@ -110,10 +112,10 @@ contract RewardRouterTest is BasicSetup {
         lock(wnt, users.alice, MAXTIME, 1e18);
         skip(rewardRouterConfig.distributionTimeframe);
 
-        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.5e18, 0.1e18);
-        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 0.5e18, 0.1e18);
+        assertApproxEqAbs(rewardRouter.getClaimableEmission(wnt, users.yossi), 1.5e18, 0.1e18);
+        assertApproxEqAbs(rewardRouter.getClaimableEmission(wnt, users.alice), 0.5e18, 0.1e18);
 
-        assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice) + rewardRouter.getClaimable(wnt, users.yossi), 2e18, 0.001e18);
+        assertApproxEqAbs(rewardRouter.getClaimableEmission(wnt, users.alice) + rewardRouter.getClaimableEmission(wnt, users.yossi), 2e18, 0.001e18);
         // assertEq(
         //     votingEscrow.balanceOf(users.yossi) + votingEscrow.balanceOf(users.alice),
         //     votingEscrow.totalSupply()
@@ -224,37 +226,26 @@ contract RewardRouterTest is BasicSetup {
     //     assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 1.525e18, 0.05e18);
     // }
 
-    function lock(IERC20 token, address user, uint lockDuration, uint cugarAmount) public returns (uint) {
+    function lock(IERC20 token, address user, uint lockDuration, uint amount) public returns (uint) {
         rewardRouter.distribute(token);
-        generateUserRevenue(token, user, cugarAmount);
+        generateUserRevenue(token, user, amount);
 
-        uint claimableInToken = rewardRouter.lock(token, lockDuration, cugarAmount);
+        uint claimableInToken = rewardRouter.lockContribution(token, lockDuration);
 
         return claimableInToken;
     }
 
     function exit(IERC20 token, address user, uint cugarAmount) public returns (uint) {
         generateUserRevenue(token, user, cugarAmount);
-        uint claimableInToken = rewardRouter.exit(token, cugarAmount, user);
+        // uint claimableInToken = rewardRouter.exitOption(token, cugarAmount, user);
 
-        return claimableInToken;
+        return 0;
     }
 
     function claim(IERC20 token, address user) public returns (uint) {
         vm.startPrank(user);
 
-        return rewardRouter.claim(token, user);
-    }
-
-
-    function getLockClaimableAmount(IERC20 token, address user) public view returns (uint) {
-        uint maxClaimable = rewardRouter.getClaimable(token, user);
-        return Precision.applyBasisPoints(lockRate, maxClaimable);
-    }
-
-    function getExitClaimableAmount(IERC20 token, address user) public view returns (uint) {
-        uint maxClaimable = rewardRouter.getClaimable(token, user);
-        return Precision.applyBasisPoints(exitRate, maxClaimable);
+        return rewardRouter.claimEmission(token, user);
     }
 
     function generateUserRevenue(IERC20 token, address user, uint amount) public {

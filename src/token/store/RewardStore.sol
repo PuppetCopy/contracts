@@ -11,24 +11,21 @@ import {BankStore} from "./../../shared/store/BankStore.sol";
 import {Router} from "./../../shared/Router.sol";
 
 contract RewardStore is BankStore {
-    struct UserTokenCursor {
+    struct UserEmissionCursor {
         uint rewardPerToken;
         uint accruedReward;
     }
 
-    mapping(IERC20 => uint) rewardPerTokenCursorMap;
+    mapping(IERC20 token => mapping(address user => UserEmissionCursor)) userEmissionRewardMap;
+    mapping(IERC20 => uint) tokenEmissionRewardPerTokenCursorMap;
     mapping(IERC20 => uint) tokenEmissionRateMap;
     mapping(IERC20 => uint) tokenEmissionTimestampMap;
 
-    mapping(IERC20 => uint) buybackTokenThresholdAmountMap;
-
-    mapping(IERC20 token => mapping(address user => UserTokenCursor)) userTokenCursorMap;
-    mapping(IERC20 => mapping(address source => uint)) sourceCommitEpochMap;
-
     mapping(IERC20 => uint) tokenPerContributionCursorMap;
-    mapping(IERC20 => mapping(address => uint)) userTokenPerContributionCursorMap;
+    mapping(IERC20 => uint) buybackContributionThresholdAmountMap;
 
-    mapping(IERC20 => mapping(address => uint)) userContributionMap;
+    mapping(IERC20 token => mapping(address user => uint)) userTokenPerContributionMap;
+    mapping(IERC20 => mapping(address => uint)) userContributionBalanceMap;
 
     constructor(
         IAuthority _authority, //
@@ -40,36 +37,8 @@ contract RewardStore is BankStore {
 
         for (uint i; i < _tokenBuybackThresholdList.length; i++) {
             IERC20 _token = _tokenBuybackThresholdList[i];
-            buybackTokenThresholdAmountMap[_token] = _tokenBuybackThresholdAmountList[i];
+            buybackContributionThresholdAmountMap[_token] = _tokenBuybackThresholdAmountList[i];
         }
-    }
-
-    function getBuybackTokenThresholdAmount(IERC20 _token) external view returns (uint) {
-        return buybackTokenThresholdAmountMap[_token];
-    }
-
-    function setBuybackTokenThresholdAmount(IERC20 _token, uint _value) external auth {
-        buybackTokenThresholdAmountMap[_token] = _value;
-    }
-
-    function getUserContribution(IERC20 _token, address _user) external view returns (uint) {
-        return userContributionMap[_token][_user];
-    }
-
-    function increaseTokenPerContributionCursor(IERC20 _token, uint _value) external auth returns (uint) {
-        return tokenPerContributionCursorMap[_token] += _value;
-    }
-
-    function getTokenPerContributionCursor(IERC20 _token) external view returns (uint) {
-        return tokenPerContributionCursorMap[_token];
-    }
-
-    function getUserTokenPerContributionCursor(IERC20 _token, address _user) external view returns (uint) {
-        return userTokenPerContributionCursorMap[_token][_user];
-    }
-
-    function setUserTokenPerContributionCursor(IERC20 _token, address _user, uint _value) external auth {
-        userTokenPerContributionCursorMap[_token][_user] = _value;
     }
 
     function commitRewardList(
@@ -85,10 +54,10 @@ contract RewardStore is BankStore {
 
         if (_valueListLength != _valueList.length) revert RewardStore__InvalidLength();
 
-        if (_performanceFee > 0) userContributionMap[_token][_trader] += _performanceFee;
+        if (_performanceFee > 0) userContributionBalanceMap[_token][_trader] += _performanceFee;
 
         for (uint i = 0; i < _valueListLength; i++) {
-            userContributionMap[_token][_userList[i]] += _valueList[i];
+            userContributionBalanceMap[_token][_userList[i]] += _valueList[i];
             _totalAmount += _valueList[i];
         }
 
@@ -101,20 +70,16 @@ contract RewardStore is BankStore {
         address _user,
         uint _value
     ) external auth {
-        userContributionMap[_token][_user] += _value;
+        userContributionBalanceMap[_token][_user] += _value;
         _transferIn(_token, _source, _value);
     }
 
-    function getSourceCommitEpochMap(IERC20 _token, address _source) external view returns (uint) {
-        return sourceCommitEpochMap[_token][_source];
+    function getTokenEmissionRewardPerTokenCursor(IERC20 _token) external view returns (uint) {
+        return tokenEmissionRewardPerTokenCursorMap[_token];
     }
 
-    function getRewardPerTokenCursor(IERC20 _token) external view returns (uint) {
-        return rewardPerTokenCursorMap[_token];
-    }
-
-    function increaseRewardPerTokenCursor(IERC20 _token, uint _amount) external auth returns (uint) {
-        return rewardPerTokenCursorMap[_token] += _amount;
+    function increaseTokenEmissionRewardPerTokenCursor(IERC20 _token, uint _amount) external auth returns (uint) {
+        return tokenEmissionRewardPerTokenCursorMap[_token] += _amount;
     }
 
     function getTokenEmissionRate(IERC20 _token) external view returns (uint) {
@@ -133,20 +98,44 @@ contract RewardStore is BankStore {
         tokenEmissionTimestampMap[_token] = _value;
     }
 
-    function getUserTokenCursor(IERC20 _token, address _user) external view returns (UserTokenCursor memory) {
-        return userTokenCursorMap[_token][_user];
+    function increaseTokenPerContributionCursor(IERC20 _token, uint _value) external auth returns (uint) {
+        return tokenPerContributionCursorMap[_token] += _value;
     }
 
-    function setUserTokenCursor(IERC20 _token, address _user, UserTokenCursor calldata cursor) external auth {
-        userTokenCursorMap[_token][_user] = cursor;
+    function getTokenPerContributionCursor(IERC20 _token) external view returns (uint) {
+        return tokenPerContributionCursorMap[_token];
     }
 
-    function increaseUserSeedContribution(IERC20 _token, address _user, uint _value) external auth {
-        userContributionMap[_token][_user] += _value;
+    function getBuybackTokenThresholdAmount(IERC20 _token) external view returns (uint) {
+        return buybackContributionThresholdAmountMap[_token];
     }
 
-    function decreaseUserSeedContribution(IERC20 _token, address _user, uint _value) external auth {
-        userContributionMap[_token][_user] -= _value;
+    function setBuybackTokenThresholdAmount(IERC20 _token, uint _value) external auth {
+        buybackContributionThresholdAmountMap[_token] = _value;
+    }
+
+    function getUserEmissionReward(IERC20 _token, address _user) external view returns (UserEmissionCursor memory) {
+        return userEmissionRewardMap[_token][_user];
+    }
+
+    function setUserEmissionReward(IERC20 _token, address _user, UserEmissionCursor calldata cursor) external auth {
+        userEmissionRewardMap[_token][_user] = cursor;
+    }
+
+    function getUserContributionBalance(IERC20 _token, address _user) external view returns (uint) {
+        return userContributionBalanceMap[_token][_user];
+    }
+
+    function setUserContributionBalance(IERC20 _token, address _user, uint _value) external auth {
+        userContributionBalanceMap[_token][_user] += _value;
+    }
+
+    function getUserTokenPerContributionCursor(IERC20 _token, address _user) external view returns (uint) {
+        return userTokenPerContributionMap[_token][_user];
+    }
+
+    function setUserTokenPerContributionCursor(IERC20 _token, address _user, uint _amount) external auth {
+        userTokenPerContributionMap[_token][_user] = _amount;
     }
 
     function transferOut(IERC20 _token, address _receiver, uint _value) external auth {

@@ -8,6 +8,9 @@
   test = 'test'
   allow_paths = []
   ffi = true
+  ast = true
+  build_info = true
+  extra_output = ["storageLayout"]
   fs_permissions = [
     { access = "read", path = "./out-dev" },
     { access = "read", path = "package.json" },
