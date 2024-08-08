@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {RewardRouter} from "src/token/RewardRouter.sol";
+import {RewardLogic} from "src/token/RewardLogic.sol";
 import {PuppetToken} from "src/token/PuppetToken.sol";
 import {VotingEscrow, MAXTIME} from "src/token/VotingEscrow.sol";
 
@@ -16,15 +16,15 @@ import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 import {MockUniswapV3Pool} from "test/mocks/MockUniswapV3Pool.sol";
 
-contract RewardRouterTest is BasicSetup {
+contract RewardLogicTest is BasicSetup {
     VotingEscrow votingEscrow;
     MockWeightedPoolVault primaryVaultPool;
-    RewardRouter rewardRouter;
+    RewardLogic rewardRouter;
     RewardStore rewardStore;
 
-    RewardRouter.Config rewardRouterConfig;
+    RewardLogic.Config rewardRouterConfig;
 
-    RewardRouter.Config public config = RewardRouter.Config({
+    RewardLogic.Config public config = RewardLogic.Config({
         baselineEmissionRate: 1e30,
         lockLiquidTokensBonusMultiplier: 1e30,
         optionLockTokensBonusMultiplier: 1e30,
@@ -59,7 +59,7 @@ contract RewardRouterTest is BasicSetup {
 
         rewardStore = new RewardStore(dictator, router, _tokenBuybackThresholdList, _tokenBuybackThresholdAmountList);
         dictator.setPermission(router, address(rewardStore), router.transfer.selector);
-        rewardRouter = new RewardRouter(dictator, router, votingEscrow, puppetToken, rewardStore, rewardRouterConfig);
+        rewardRouter = new RewardLogic(dictator, router, votingEscrow, puppetToken, rewardStore, rewardRouterConfig);
 
         dictator.setAccess(rewardStore, address(rewardRouter));
 
