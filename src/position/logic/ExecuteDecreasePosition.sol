@@ -12,8 +12,7 @@ import {Precision} from "./../../utils/Precision.sol";
 
 import {PuppetStore} from "./../../puppet/store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
-
-import {RewardStore} from "./../../token/store/RewardStore.sol";
+import {RevenueStore} from "./../../token/store/RevenueStore.sol";
 
 library ExecuteDecreasePosition {
     event ExecuteDecreasePosition__DecreasePosition(
@@ -24,7 +23,7 @@ library ExecuteDecreasePosition {
         Router router;
         PositionStore positionStore;
         PuppetStore puppetStore;
-        RewardStore rewardStore;
+        RevenueStore revenueStore;
         address gmxOrderReciever;
         uint performanceFeeRate;
         uint traderPerformanceFeeShare;
@@ -121,7 +120,7 @@ library ExecuteDecreasePosition {
         callConfig.puppetStore.increaseBalanceList(callParams.outputToken, address(this), callParams.mirrorPosition.puppetList, outputAmountList);
 
         if (callParams.profit > 0) {
-            callConfig.rewardStore.commitRewardList(
+            callConfig.revenueStore.commitRewardList(
                 callParams.outputToken, //
                 address(this),
                 callParams.mirrorPosition.puppetList,

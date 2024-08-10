@@ -12,10 +12,10 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Permission} from "../utils/access/Permission.sol";
 import {Precision} from "../utils/Precision.sol";
 
-import {Router} from "../shared/Router.sol";
-import {RewardStore} from "./store/RewardStore.sol";
 import {VotingEscrow, MAXTIME} from "./VotingEscrow.sol";
 import {PuppetToken} from "./PuppetToken.sol";
+import {RewardStore} from "./store/RewardStore.sol";
+import {RevenueStore} from "src/token/store/RevenueStore.sol";
 
 contract RewardLogic is Permission, EIP712, ReentrancyGuardTransient {
     event RewardLogic__SetConfig(uint timestmap, Config callConfig);
@@ -36,8 +36,10 @@ contract RewardLogic is Permission, EIP712, ReentrancyGuardTransient {
     Config config;
 
     VotingEscrow immutable votingEscrow;
-    RewardStore immutable store;
     PuppetToken immutable puppetToken;
+
+    RewardStore immutable store;
+    RevenueStore immutable revenueStore;
 
     function getClaimableEmission(IERC20 token, address user) public view returns (uint) {
         uint pendingEmission = getPendingEmission(token);
@@ -49,13 +51,7 @@ contract RewardLogic is Permission, EIP712, ReentrancyGuardTransient {
         return userCursor.accruedReward + getUserPendingReward(rewardPerTokenCursor, userCursor.rewardPerToken, votingEscrow.balanceOf(user));
     }
 
-    function getDurationBonusMultiplier(uint durationBonusMultiplier, uint duration) internal pure returns (uint) {
-        uint durationMultiplier = Precision.applyFactor(durationBonusMultiplier, MAXTIME);
-
-        return Precision.toFactor(duration, durationMultiplier);
-    }
-
-    function getBonusReward(uint durationBonusMultiplier, uint reward, uint duration) internal pure returns (uint) {
+    function getBonusReward(uint durationBonusMultiplier, uint reward, uint duration) public view returns (uint) {
         uint baselineAmount = Precision.applyFactor(config.baselineEmissionRate, reward);
         uint durationMultiplier = getDurationBonusMultiplier(durationBonusMultiplier, duration);
         return Precision.applyFactor(durationMultiplier, baselineAmount);
@@ -63,14 +59,15 @@ contract RewardLogic is Permission, EIP712, ReentrancyGuardTransient {
 
     constructor(
         IAuthority _authority,
-        Router _router,
         VotingEscrow _votingEscrow,
         PuppetToken _puppetToken,
         RewardStore _store,
+        RevenueStore _revenueStore,
         Config memory _callConfig
-    ) Permission(_authority) EIP712("Reward Router", "1") {
+    ) Permission(_authority) EIP712("Reward Logic", "1") {
         votingEscrow = _votingEscrow;
         store = _store;
+        revenueStore = _revenueStore;
         puppetToken = _puppetToken;
 
         _setConfig(_callConfig);
@@ -78,42 +75,30 @@ contract RewardLogic is Permission, EIP712, ReentrancyGuardTransient {
 
     // external
 
-    function buybackContributionToken(address source, address depositor, IERC20 token, uint amount) external nonReentrant {
-        uint thresholdAmount = store.getBuybackTokenThresholdAmount(token);
-
-        if (thresholdAmount == 0) revert RewardLogic__InvalidClaimToken();
-
-        store.transferIn(puppetToken, depositor, thresholdAmount);
-        store.transferOut(token, source, amount);
-        uint rewardPerContributionCursor = store.increaseTokenPerContributionCursor(token, Precision.toFactor(thresholdAmount, amount));
-
-        emit RewardLogic__Buyback(depositor, thresholdAmount, token, rewardPerContributionCursor, amount);
-    }
-
-    function lockContribution(IERC20 token, uint duration) public nonReentrant returns (uint) {
-        uint contributionBalance = store.getUserContributionBalance(token, msg.sender);
+    function lock(IERC20 token, uint duration) public nonReentrant returns (uint) {
+        uint contributionBalance = revenueStore.getUserContributionBalance(token, msg.sender);
 
         if (contributionBalance > 0) revert RewardLogic__AmountExceedsContribution();
 
-        uint tokenPerContributionCursor = store.getTokenPerContributionCursor(token);
+        uint tokenPerContributionCursor = revenueStore.getTokenPerContributionCursor(token);
         uint rewardInToken = getBonusReward(
-            getUserPendingReward(tokenPerContributionCursor, store.getUserTokenPerContributionCursor(token, msg.sender), contributionBalance),
+            getUserPendingReward(tokenPerContributionCursor, revenueStore.getUserTokenPerContributionCursor(token, msg.sender), contributionBalance),
             config.optionLockTokensBonusMultiplier,
             duration
         );
 
         RewardStore.UserEmissionCursor memory userEmissionCursor = store.getUserEmissionReward(token, msg.sender);
 
-        userEmissionCursor.rewardPerToken = distribute(token);
+        userEmissionCursor.rewardPerToken = distributeEmission(token);
         userEmissionCursor.accruedReward = getUserPendingReward(
             tokenPerContributionCursor, //
             userEmissionCursor.rewardPerToken,
             votingEscrow.balanceOf(msg.sender)
         );
 
-        store.setUserContributionBalance(token, msg.sender, 0);
-        store.setUserTokenPerContributionCursor(token, msg.sender, tokenPerContributionCursor);
         store.setUserEmissionReward(token, msg.sender, userEmissionCursor);
+        revenueStore.setUserContributionBalance(token, msg.sender, 0);
+        revenueStore.setUserTokenPerContributionCursor(token, msg.sender, tokenPerContributionCursor);
 
         puppetToken.mint(address(this), rewardInToken);
         votingEscrow.lock(address(this), msg.sender, rewardInToken, duration);
@@ -121,25 +106,25 @@ contract RewardLogic is Permission, EIP712, ReentrancyGuardTransient {
         emit RewardLogic__Lock(token, config.baselineEmissionRate, msg.sender, rewardInToken, duration, rewardInToken);
     }
 
-    function exitContribution(IERC20 token) external nonReentrant {
-        uint contributionBalance = store.getUserContributionBalance(token, msg.sender);
+    function exit(IERC20 token) external nonReentrant {
+        uint contributionBalance = revenueStore.getUserContributionBalance(token, msg.sender);
 
         if (contributionBalance > 0) revert RewardLogic__AmountExceedsContribution();
 
-        uint tokenPerContributionCursor = store.getTokenPerContributionCursor(token);
+        uint tokenPerContributionCursor = revenueStore.getTokenPerContributionCursor(token);
         uint rewardInToken = Precision.applyFactor(
             config.baselineEmissionRate,
-            getUserPendingReward(tokenPerContributionCursor, store.getUserTokenPerContributionCursor(token, msg.sender), contributionBalance)
+            getUserPendingReward(tokenPerContributionCursor, revenueStore.getUserTokenPerContributionCursor(token, msg.sender), contributionBalance)
         );
 
-        store.setUserContributionBalance(token, msg.sender, 0);
-        store.setUserTokenPerContributionCursor(token, msg.sender, tokenPerContributionCursor);
+        revenueStore.setUserContributionBalance(token, msg.sender, 0);
+        revenueStore.setUserTokenPerContributionCursor(token, msg.sender, tokenPerContributionCursor);
         puppetToken.mint(address(this), rewardInToken);
 
         emit RewardLogic__Exit(token, config.baselineEmissionRate, msg.sender, rewardInToken);
     }
 
-    function lockTokens(address user, uint unlockDuration, uint amount) external nonReentrant returns (uint) {
+    function lockToken(address user, uint unlockDuration, uint amount) external nonReentrant returns (uint) {
         uint rewardAfterMultiplier = getBonusReward(config.lockLiquidTokensBonusMultiplier, amount, unlockDuration);
 
         puppetToken.mint(address(this), amount);
@@ -157,12 +142,16 @@ contract RewardLogic is Permission, EIP712, ReentrancyGuardTransient {
     }
 
     function claimEmission(IERC20 token, address receiver) public nonReentrant returns (uint) {
-        uint nextRewardPerTokenCursor = distribute(token);
+        uint nextRewardPerTokenCursor = distributeEmission(token);
 
         RewardStore.UserEmissionCursor memory userCursor = store.getUserEmissionReward(token, msg.sender);
 
-        uint reward =
-            userCursor.accruedReward + getUserPendingReward(nextRewardPerTokenCursor, userCursor.rewardPerToken, votingEscrow.balanceOf(msg.sender));
+        uint reward = userCursor.accruedReward
+            + getUserPendingReward(
+                nextRewardPerTokenCursor, //
+                userCursor.rewardPerToken,
+                votingEscrow.balanceOf(msg.sender)
+            );
 
         if (reward == 0) revert RewardLogic__NoClaimableAmount();
 
@@ -170,16 +159,16 @@ contract RewardLogic is Permission, EIP712, ReentrancyGuardTransient {
         userCursor.rewardPerToken = nextRewardPerTokenCursor;
 
         store.setUserEmissionReward(token, msg.sender, userCursor);
-        store.transferOut(token, receiver, reward);
+        revenueStore.transferOut(token, receiver, reward);
 
         emit RewardLogic__Claim(msg.sender, receiver, nextRewardPerTokenCursor, reward);
 
         return reward;
     }
 
-    function distribute(IERC20 token) public nonReentrant returns (uint) {
+    function distributeEmission(IERC20 token) public nonReentrant returns (uint) {
         uint timeElapsed = block.timestamp - store.getTokenEmissionTimestamp(token);
-        uint tokenBalance = store.getTokenBalance(token);
+        uint tokenBalance = revenueStore.getTokenBalance(token);
         uint rate = store.getTokenEmissionRate(token);
         uint nextRate = tokenBalance / config.distributionTimeframe;
 
@@ -219,8 +208,14 @@ contract RewardLogic is Permission, EIP712, ReentrancyGuardTransient {
 
     // internal
 
+    function getDurationBonusMultiplier(uint durationBonusMultiplier, uint duration) internal pure returns (uint) {
+        uint durationMultiplier = Precision.applyFactor(durationBonusMultiplier, MAXTIME);
+
+        return Precision.toFactor(duration, durationMultiplier);
+    }
+
     function getPendingEmission(IERC20 token) internal view returns (uint) {
-        uint emissionBalance = store.getTokenBalance(token);
+        uint emissionBalance = revenueStore.getTokenBalance(token);
         uint lastTimestamp = store.getTokenEmissionTimestamp(token);
         uint rate = store.getTokenEmissionRate(token);
 
@@ -248,7 +243,6 @@ contract RewardLogic is Permission, EIP712, ReentrancyGuardTransient {
     error RewardLogic__UnacceptableTokenPrice(uint tokenPrice);
     error RewardLogic__InvalidClaimPrice();
     error RewardLogic__InvalidDuration();
-    error RewardLogic__InvalidClaimToken();
     error RewardLogic__NotingToClaim();
     error RewardLogic__AmountExceedsContribution();
     error RewardLogic__InvalidWeightFactors();

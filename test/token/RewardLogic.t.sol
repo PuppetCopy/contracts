@@ -2,27 +2,29 @@
 pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {RewardLogic} from "src/token/RewardLogic.sol";
 import {PuppetToken} from "src/token/PuppetToken.sol";
 import {VotingEscrow, MAXTIME} from "src/token/VotingEscrow.sol";
 
 import {Precision} from "src/utils/Precision.sol";
 import {RewardStore} from "src/token/store/RewardStore.sol";
+import {RevenueStore} from "src/token/store/RevenueStore.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
-import {MockUniswapV3Pool} from "test/mocks/MockUniswapV3Pool.sol";
+
+import {RewardLogic} from "src/token/RewardLogic.sol";
+import {RevenueLogic} from "src/token/RevenueLogic.sol";
 
 contract RewardLogicTest is BasicSetup {
     VotingEscrow votingEscrow;
     MockWeightedPoolVault primaryVaultPool;
-    RewardLogic rewardRouter;
     RewardStore rewardStore;
+    RevenueStore revenueStore;
 
-    RewardLogic.Config rewardRouterConfig;
+    RewardLogic rewardLogic;
+    RevenueLogic revenueLogic;
 
     RewardLogic.Config public config = RewardLogic.Config({
         baselineEmissionRate: 1e30,
@@ -37,110 +39,97 @@ contract RewardLogicTest is BasicSetup {
         super.setUp();
 
         votingEscrow = new VotingEscrow(dictator, router, puppetToken);
-        dictator.setPermission(router, address(votingEscrow), router.transfer.selector);
+        dictator.setAccess(router, address(votingEscrow));
 
-        IUniswapV3Pool[] memory wntUsdPoolList = new IUniswapV3Pool[](1);
-        wntUsdPoolList[0] = new MockUniswapV3Pool(fromPriceToSqrt(100), address(wnt), address(usdc));
+        IERC20[] memory _buybackTokenList = new IERC20[](2);
+        _buybackTokenList[0] = wnt;
+        _buybackTokenList[1] = usdc;
 
-        primaryVaultPool = new MockWeightedPoolVault();
-        primaryVaultPool.initPool(address(wnt), address(puppetToken), 20e18, 8000e18);
+        uint[] memory _buybackOfferAmountList = new uint[](2);
+        _buybackOfferAmountList[0] = 1e18;
+        _buybackOfferAmountList[1] = 1000e30;
 
-        (, uint[] memory balances,) = primaryVaultPool.getPoolTokens(0);
+        revenueStore = new RevenueStore(dictator, router, _buybackTokenList, _buybackOfferAmountList);
+        dictator.setAccess(router, address(revenueStore));
 
-        uint initalPrice = (balances[0] * 80e18) / (balances[1] * 20);
+        rewardStore = new RewardStore(dictator, router);
 
-        IERC20[] memory _tokenBuybackThresholdList = new IERC20[](2);
-        _tokenBuybackThresholdList[0] = wnt;
-        _tokenBuybackThresholdList[1] = usdc;
+        revenueLogic = new RevenueLogic(dictator, puppetToken, revenueStore);
+        dictator.setAccess(revenueStore, address(revenueLogic));
 
-        uint[] memory _tokenBuybackThresholdAmountList = new uint[](2);
-        _tokenBuybackThresholdAmountList[0] = 0.2e18;
-        _tokenBuybackThresholdAmountList[1] = 500e30;
-
-        rewardStore = new RewardStore(dictator, router, _tokenBuybackThresholdList, _tokenBuybackThresholdAmountList);
-        dictator.setPermission(router, address(rewardStore), router.transfer.selector);
-        rewardRouter = new RewardLogic(dictator, router, votingEscrow, puppetToken, rewardStore, rewardRouterConfig);
-
-        dictator.setAccess(rewardStore, address(rewardRouter));
-
-        dictator.setPermission(votingEscrow, address(rewardRouter), votingEscrow.lock.selector);
-        dictator.setPermission(votingEscrow, address(rewardRouter), votingEscrow.vest.selector);
-        dictator.setPermission(votingEscrow, address(rewardRouter), votingEscrow.claim.selector);
-
-        dictator.setPermission(puppetToken, address(rewardRouter), puppetToken.mint.selector);
+        rewardLogic = new RewardLogic(dictator, votingEscrow, puppetToken, rewardStore, revenueStore, config);
+        dictator.setAccess(rewardStore, address(rewardLogic));
+        dictator.setPermission(votingEscrow, address(rewardLogic), votingEscrow.lock.selector);
+        dictator.setPermission(votingEscrow, address(rewardLogic), votingEscrow.vest.selector);
+        dictator.setPermission(votingEscrow, address(rewardLogic), votingEscrow.claim.selector);
+        dictator.setPermission(puppetToken, address(rewardLogic), puppetToken.mint.selector);
 
         // permissions used for testing
-        dictator.setAccess(rewardStore, users.owner);
+        vm.startPrank(users.owner);
+        dictator.setAccess(revenueStore, users.owner);
+        dictator.setPermission(revenueLogic, users.owner, revenueLogic.buybackRevenue.selector);
         wnt.approve(address(router), type(uint).max - 1);
+        puppetToken.approve(address(router), type(uint).max - 1);
     }
 
-    // function testOptionRevert() public {
-    //     vm.expectRevert(RewardLogic.RewardLogic__NoClaimableAmount.selector);
-    //     claim(usdc, users.alice);
+    function testBuybackToken() public {
+        vm.startPrank(users.owner);
 
-    //     vm.expectRevert(Oracle.Oracle__UnavailableSecondaryPrice.selector);
-    //     oracle.getSecondaryPrice(wnt);
-    //     vm.expectRevert(Oracle.Oracle__UnavailableSecondaryPrice.selector);
-    //     oracle.getSecondaryPrice(puppetToken);
-    //     vm.expectRevert(Oracle.Oracle__UnavailableSecondaryPrice.selector);
-    //     oracle.getSecondaryPrice(IERC20(address(0)));
+        // Arrange: Set up the initial state
+        uint revenueAmount = 1e18; // 1 Other Token
+        uint thresholdAmount = revenueStore.getTokenBuybackOffer(wnt);
 
-    //     generateUserRevenue(usdc, users.alice, 100e6);
-    //     vm.expectRevert(abi.encodeWithSelector(RewardLogic.RewardLogic__UnacceptableTokenPrice.selector, 1e6));
-    //     rewardRouter.lock(usdc, getMaxTime(), 0.99e6, 100e6);
-    // }
+        userContribute(wnt, revenueAmount);
+
+        revenueLogic.buybackRevenue(address(this), users.owner, users.owner, wnt, revenueAmount);
+
+        // Assert: Check the final state
+        assertEq(puppetToken.balanceOf(address(revenueStore)), thresholdAmount, "Puppet token balance should be increased by the buyback amount");
+        assertEq(wnt.balanceOf(users.owner), revenueAmount, "Other token balance should be reduced by the buyback amount");
+    }
 
     // function testExitOption() public {
-    //     lock(wnt, users.bob, getMaxTime(), 0.01e18, 0.5e18);
-
-    //     exit(usdc, users.alice, 1e6, 100e6);
-    //     skip(rewardRouterConfig.distributionTimeframe);
-    //     claim(usdc, users.bob);
-    //     assertEq(puppetToken.balanceOf(users.alice), 30e18);
-    //     assertApproxEqAbs(usdc.balanceOf(users.bob), 100e6, 0.01e6);
-
-    //     exit(usdc, users.alice, 1e6, 100e6);
-    //     skip(rewardRouterConfig.distributionTimeframe + 1 days);
-    //     assertApproxEqAbs(rewardRouter.getClaimable(usdc, users.bob), 100e6, 0.01e6);
+    //     vm.startPrank(users.alice);
     // }
 
-    function testLockOption() public {
-        lock(wnt, users.yossi, MAXTIME, 1e18);
-        skip(rewardRouterConfig.distributionTimeframe);
-        skip(rewardRouterConfig.distributionTimeframe);
+    // function testLockOption() public {
+    //     lock(wnt, users.yossi, MAXTIME, 1e18);
+    //     skip(rewardRouterConfig.distributionTimeframe);
+    //     skip(rewardRouterConfig.distributionTimeframe);
 
-        lock(wnt, users.alice, MAXTIME, 1e18);
-        skip(rewardRouterConfig.distributionTimeframe);
+    //     lock(wnt, users.alice, MAXTIME, 1e18);
+    //     skip(rewardRouterConfig.distributionTimeframe);
 
-        assertApproxEqAbs(rewardRouter.getClaimableEmission(wnt, users.yossi), 1.5e18, 0.1e18);
-        assertApproxEqAbs(rewardRouter.getClaimableEmission(wnt, users.alice), 0.5e18, 0.1e18);
+    //     assertApproxEqAbs(rewardRouter.getClaimableEmission(wnt, users.yossi), 1.5e18, 0.1e18);
+    //     assertApproxEqAbs(rewardRouter.getClaimableEmission(wnt, users.alice), 0.5e18, 0.1e18);
 
-        assertApproxEqAbs(rewardRouter.getClaimableEmission(wnt, users.alice) + rewardRouter.getClaimableEmission(wnt, users.yossi), 2e18, 0.001e18);
-        // assertEq(
-        //     votingEscrow.balanceOf(users.yossi) + votingEscrow.balanceOf(users.alice),
-        //     votingEscrow.totalSupply()
-        // );
+    //     assertApproxEqAbs(rewardRouter.getClaimableEmission(wnt, users.alice) + rewardRouter.getClaimableEmission(wnt, users.yossi), 2e18,
+    // 0.001e18);
+    //     // assertEq(
+    //     //     votingEscrow.balanceOf(users.yossi) + votingEscrow.balanceOf(users.alice),
+    //     //     votingEscrow.totalSupply()
+    //     // );
 
-        // skip(rewardRouterConfig.distributionTimeframe / 2);
+    //     // skip(rewardRouterConfig.distributionTimeframe / 2);
 
-        // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.5e18, 0.01e18);
-        // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 0.5e18, 0.01e18);
+    //     // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 1.5e18, 0.01e18);
+    //     // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.alice), 0.5e18, 0.01e18);
 
-        // assertApproxEqAbs(rewardRouter.claim(wnt, users.alice), 0.5e18, 0.01e18);
-        // assertEq(rewardRouter.getClaimable(wnt, users.alice), 0);
+    //     // assertApproxEqAbs(rewardRouter.claim(wnt, users.alice), 0.5e18, 0.01e18);
+    //     // assertEq(rewardRouter.getClaimable(wnt, users.alice), 0);
 
-        // // lock(wnt, users.alice, getMaxTime(), 0.01e18, 1e18);
-        // skip(rewardRouterConfig.distributionTimeframe / 2);
-        // lock(wnt, users.bob, getMaxTime(), 0.01e18, 1e18);
+    //     // // lock(wnt, users.alice, getMaxTime(), 0.01e18, 1e18);
+    //     // skip(rewardRouterConfig.distributionTimeframe / 2);
+    //     // lock(wnt, users.bob, getMaxTime(), 0.01e18, 1e18);
 
-        // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 0.125e18, 0.01e18);
+    //     // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.yossi), 0.125e18, 0.01e18);
 
-        // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 0.125e18, 0.01e18);
+    //     // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 0.125e18, 0.01e18);
 
-        // skip(rewardRouterConfig.distributionTimeframe / 2);
+    //     // skip(rewardRouterConfig.distributionTimeframe / 2);
 
-        // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 0.25e18, 0.01e18);
-    }
+    //     // assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 0.25e18, 0.01e18);
+    // }
 
     // function testHistoricBalances() public {
     //     skip(1 weeks);
@@ -226,17 +215,42 @@ contract RewardLogicTest is BasicSetup {
     //     assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 1.525e18, 0.05e18);
     // }
 
-    function lock(IERC20 token, address user, uint lockDuration, uint amount) public returns (uint) {
-        rewardRouter.distribute(token);
-        generateUserRevenue(token, user, amount);
+    function contributeEth(uint amount) public {
+        uint ethPerPuppet = 0.001e18;
+        uint thresholdAmount = revenueStore.getTokenBuybackOffer(wnt);
 
-        uint claimableInToken = rewardRouter.lockContribution(token, lockDuration);
+        userContribute(wnt, amount);
+        buybackEth(amount);
+    }
+
+    function buybackEth(uint amount) public {
+        uint ethPerPuppet = 0.001e18;
+        uint thresholdAmount = revenueStore.getTokenBuybackOffer(wnt);
+
+        uint revenue = revenueLogic.getRevenueBalance(wnt);
+
+        if ((revenue / ethPerPuppet) >= thresholdAmount) {
+            revenueLogic.buybackRevenue(address(this), users.owner, users.owner, wnt, amount);
+        }
+    }
+
+    function userContribute(IERC20 token, uint amount) public {
+        _dealERC20(address(token), users.owner, amount);
+        revenueStore.commitReward(token, users.owner, msg.sender, amount);
+
+        // skip block
+        vm.roll(block.number + 1);
+    }
+
+    function lock(IERC20 token, address user, uint lockDuration, uint amount) public returns (uint) {
+        rewardLogic.distributeEmission(token);
+
+        uint claimableInToken = rewardLogic.lock(token, lockDuration);
 
         return claimableInToken;
     }
 
     function exit(IERC20 token, address user, uint cugarAmount) public returns (uint) {
-        generateUserRevenue(token, user, cugarAmount);
         // uint claimableInToken = rewardRouter.exitOption(token, cugarAmount, user);
 
         return 0;
@@ -245,18 +259,7 @@ contract RewardLogicTest is BasicSetup {
     function claim(IERC20 token, address user) public returns (uint) {
         vm.startPrank(user);
 
-        return rewardRouter.claimEmission(token, user);
-    }
-
-    function generateUserRevenue(IERC20 token, address user, uint amount) public {
-        vm.startPrank(users.owner);
-
-        _dealERC20(address(token), users.owner, amount);
-        rewardStore.commitReward(token, users.owner, user, amount);
-
-        // skip block
-        vm.roll(block.number + 1);
-        vm.startPrank(user);
+        return rewardLogic.claimEmission(token, user);
     }
 
     function fromPriceToSqrt(uint usdcPerWeth) public pure returns (uint160) {

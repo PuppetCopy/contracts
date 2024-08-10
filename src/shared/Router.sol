@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
-import {Permission} from "./../utils/access/Permission.sol";
+import {Auth} from "./../utils/access/Auth.sol";
 
 import {ExternalCallUtils} from "../utils/ExternalCallUtils.sol";
 
@@ -12,10 +12,10 @@ import {ExternalCallUtils} from "../utils/ExternalCallUtils.sol";
  * @title Router
  * @dev Users will approve this router for token spenditures
  */
-contract Router is Permission {
+contract Router is Auth {
     uint transferGasLimit;
 
-    constructor(IAuthority _authority, uint _trasnferGasLimit) Permission(_authority) {
+    constructor(IAuthority _authority, uint _trasnferGasLimit) Auth(_authority) {
         authority = _authority;
         transferGasLimit = _trasnferGasLimit;
     }
