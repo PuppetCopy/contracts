@@ -1,7 +1,7 @@
 import { defineConfig } from 'vocs'
 
 export default defineConfig({
-  title: 'Docs',
+  title: '',
   sidebar: [
     {
       text: 'Getting Started',
@@ -11,11 +11,22 @@ export default defineConfig({
       text: 'Example',
       link: '/example',
     },
+    {
+      text: 'Contracts',
+      collapsed: false,
+      items: [
+        {
+          text: 'PuppetToken',
+          link: '/contracts/src/token/PuppetToken.sol/puppetToken',
+        },
+        // {
+        //   text: 'ERC721',
+        //   link: '/contracts/erc'
+        // }
+      ],
+      link: '/contracts/README',
+    },
   ],
-
   vite: {
-    resolve: {
-
-    }
   }
 })
