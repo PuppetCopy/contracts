@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IGmxEventUtils} from "./../interface/IGmxEventUtils.sol";
 
 import {Router} from "src/shared/Router.sol";
-import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
+import {GmxPositionUtils} from "../utils/GmxPositionUtils.sol";
 import {Precision} from "./../../utils/Precision.sol";
 
 import {PuppetStore} from "./../../puppet/store/PuppetStore.sol";

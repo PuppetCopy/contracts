@@ -7,7 +7,7 @@ import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 
 import {Router} from "./../../shared/Router.sol";
 import {BankStore} from "./../../shared/store/BankStore.sol";
-import {PositionUtils} from "../../position/util/PositionUtils.sol";
+import {PositionUtils} from "../../position/utils/PositionUtils.sol";
 
 import {Auth} from "./../../utils/access/Auth.sol";
 

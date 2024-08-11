@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {GmxPositionUtils} from "./../util/GmxPositionUtils.sol";
+import {GmxPositionUtils} from "./../utils/GmxPositionUtils.sol";
 
 interface IGmxOrderCallbackReceiver {
     /// @dev called after an order execution

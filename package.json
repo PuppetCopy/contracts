@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "license": "BUSL-1.1",
   "description": "Puppet DAO contracts",
-  "packageManager": "bun@1.0.18",
+  "packageManager": "bun@1.1.22",
   "keywords": [
     "puppet",
     "Copy Trading",
@@ -28,21 +28,28 @@
     "script:DeployToken": "forge script script/DeployToken.s.sol:DeployToken --rpc-url $ARBITRUM_RPC_URL --broadcast --verify -vvvv",
     "script:DeployRewardRouter": "forge script script/DeployRewardRouter.s.sol:DeployRewardRouter --rpc-url $ARBITRUM_RPC_URL --broadcast --verify -vvvv",
     "script:DeployPuppetRouter": "forge script script/DeployPuppetRouter.s.sol:DeployPuppetRouter --rpc-url $ARBITRUM_RPC_URL --broadcast --verify -vvvv",
+    "docs:dev": "bun ./script/shell/docgen.ts && vocs dev",
+    "docs:build": "bun ./script/shell/docgen.ts && vocs build",
+    "docs:preview": "vocs preview",
     "gas-report": "FOUNDRY_PROFILE=dev forge test --gas-report",
     "size-contracts": "bun hardhat size-contracts",
     "lint": "bun run lint:sol",
     "lint:sol": "forge fmt --check && bun solhint \"{script,src,test}/**/*.sol\""
   },
   "devDependencies": {
-    "dotenv": "^16.4.1"
-  },
-  "dependencies": {
+    "@automate/contracts": "github:gelatodigital/automate#v3",
     "@balancer-labs/v2-interfaces": "0.4.0",
     "@openzeppelin/contracts": "5.0.2",
+    "@types/react": "latest",
     "@uniswap/v3-core": "1.0.1",
-    "@automate/contracts": "github:gelatodigital/automate#v3",
     "@zeframlou/create3-factory": "github:zeframlou/create3-factory#main",
+    "bun": "^1.1.22",
+    "dotenv": "^16.4.1",
     "forge-std": "github:foundry-rs/forge-std#v1.8.2",
-    "solhint": "5.0.1"
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "solhint": "5.0.1",
+    "typescript": "5.5.4",
+    "vocs": "1.0.0-alpha.55"
   }
 }

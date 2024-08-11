@@ -7,7 +7,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {IWNT} from "src/utils/interfaces/IWNT.sol";
 
-import {PositionUtils} from "src/position/util/PositionUtils.sol";
+import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 

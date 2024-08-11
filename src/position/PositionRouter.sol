@@ -8,8 +8,8 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Permission} from "../utils/access/Permission.sol";
 
 import {IGmxOrderCallbackReceiver} from "./interface/IGmxOrderCallbackReceiver.sol";
-import {GmxPositionUtils} from "./util/GmxPositionUtils.sol";
-import {PositionUtils} from "./util/PositionUtils.sol";
+import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
+import {PositionUtils} from "./utils/PositionUtils.sol";
 
 import {PositionStore} from "./store/PositionStore.sol";
 import {RequestIncreasePosition} from "./logic/RequestIncreasePosition.sol";

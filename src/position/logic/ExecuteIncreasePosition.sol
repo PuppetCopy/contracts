@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
+import {GmxPositionUtils} from "../utils/GmxPositionUtils.sol";
 import {PositionStore} from "../store/PositionStore.sol";
 
 library ExecuteIncreasePosition {

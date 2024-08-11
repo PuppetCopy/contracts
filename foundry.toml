@@ -24,6 +24,8 @@
   evm_version = 'cancun'
   ignored_error_codes = [2394, 5574, 3860] # Transient storage, code size
 
+[doc]
+ignore = ["**/interface/**/*.sol", "**/utils/**/*.sol", "**/shared/**/*.sol"]
 
 [profile.dev]
   out = "forge-artifacts-dev"

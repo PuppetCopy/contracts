@@ -6,10 +6,9 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IGmxExchangeRouter} from "./../interface/IGmxExchangeRouter.sol";
 import {Subaccount} from "./../../shared/Subaccount.sol";
 
-import {PositionUtils} from "./../util/PositionUtils.sol";
-import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
+import {PositionUtils} from "./../utils/PositionUtils.sol";
+import {GmxPositionUtils} from "../utils/GmxPositionUtils.sol";
 import {ErrorUtils} from "./../../utils/ErrorUtils.sol";
-import {TransferUtils} from "./../../utils/TransferUtils.sol";
 import {IWNT} from "./../../utils/interfaces/IWNT.sol";
 
 import {PositionStore} from "../store/PositionStore.sol";
