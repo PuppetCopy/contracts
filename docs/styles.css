@@ -1,0 +1,11 @@
+body {}
+
+.vocs_Footer {
+    display: none;
+}
+
+:root.dark {
+    --vocs-color_background: #0f0f16;
+    --vocs-color_backgroundDark: #06070e;
+    --vocs-color_text: #dbddff;
+}

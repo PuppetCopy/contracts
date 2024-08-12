@@ -15,7 +15,7 @@
 // import {RewardLogic} from "./../src/token/logic/RewardLogic.sol";
 // import {RewardStore} from "./../src/token/store/RewardStore.sol";
 // import {RewardRouter} from "src/token/RewardRouter.sol";
-// import {PuppetToken} from "src/token/PuppetToken.sol";
+// import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 // import {VotingEscrow} from "src/token/VotingEscrow.sol";
 
 // import {Address} from "script/Const.sol";

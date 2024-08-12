@@ -13,7 +13,7 @@ import {IERC20 as IBERC20} from "@balancer-labs/v2-interfaces/contracts/solidity
 
 import {Dictator} from "src/shared/Dictator.sol";
 import {IWNT} from "./../src/utils/interfaces/IWNT.sol";
-import {PuppetToken} from "src/token/PuppetToken.sol";
+import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 
 import {Address} from "script/Const.sol";
 

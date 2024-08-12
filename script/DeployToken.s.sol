@@ -5,8 +5,8 @@ import { Script } from "forge-std/src/Script.sol";
 
 import {Dictator} from "src/shared/Dictator.sol";
 import {Router} from "src/shared/Router.sol";
-import {PuppetToken} from "src/token/PuppetToken.sol";
-import {VotingEscrow} from "src/token/VotingEscrow.sol";
+import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+import {VotingEscrow} from "src/tokenomics/VotingEscrow.sol";
 
 import {Address} from "script/Const.sol";
 

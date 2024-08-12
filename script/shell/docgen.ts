@@ -11,9 +11,10 @@ await write(file(`docs/pages/contracts/README/LICENSE.md`), file('LICENSE'), { c
 for await (const match of files.scan(".")) {
     if (/(.*)\/([^\/]+)\.sol\/[^\/]+\.md$/.test(match)) {
         const matchLoc = match.replace("docs/generated/src/src", "").replace(/(.*)\/([^\/]+)\.sol\/[^\/]+\.md$/, "$1/$2.md")
+        const filename = `docs/pages/contracts/${matchLoc}`
 
-        // await Bun.write(Bun.stdout, `${matchLoc}\n`);
-        await write(file(`docs/pages/contracts/${matchLoc}`), file(match), { createPath: true });
+        await Bun.write(Bun.stdout, `${filename}\n`);
+        await write(file(filename), file(match), { createPath: true });
     }
 }
 

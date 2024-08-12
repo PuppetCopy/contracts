@@ -2,6 +2,7 @@ import { defineConfig } from 'vocs'
 
 export default defineConfig({
   title: '',
+  outlineFooter: false,
   sidebar: [
     {
       text: 'Getting Started',
@@ -12,21 +13,31 @@ export default defineConfig({
       link: '/example',
     },
     {
-      text: 'Contracts',
+      text: 'Core NatSpec',
       collapsed: false,
       items: [
         {
-          text: 'PuppetToken',
-          link: '/contracts/src/token/PuppetToken.sol/puppetToken',
+          text: 'PuppetToken.sol',
+          link: '/contracts/tokenomics/PuppetToken',
         },
-        // {
-        //   text: 'ERC721',
-        //   link: '/contracts/erc'
-        // }
+        {
+          text: 'VotingEscrow.sol',
+          link: '/contracts/tokenomics/VotingEscrow',
+        },
+        {
+          text: 'RevenueLogic.sol',
+          link: '/contracts/tokenomics/RevenueLogic',
+        },
+        {
+          text: 'RewardLogic.sol',
+          link: '/contracts/tokenomics/RewardLogic',
+        },
       ],
       link: '/contracts/README',
     },
   ],
   vite: {
+    dir
+    publicDir: '.dist',
   }
 })

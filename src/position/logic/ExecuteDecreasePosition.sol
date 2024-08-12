@@ -12,7 +12,7 @@ import {Precision} from "./../../utils/Precision.sol";
 
 import {PuppetStore} from "./../../puppet/store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
-import {RevenueStore} from "./../../token/store/RevenueStore.sol";
+import {RevenueStore} from "./../../tokenomics/store/RevenueStore.sol";
 
 library ExecuteDecreasePosition {
     event ExecuteDecreasePosition__DecreasePosition(

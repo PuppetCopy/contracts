@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {VotingEscrow} from "src/token/VotingEscrow.sol";
+import {VotingEscrow} from "src/tokenomics/VotingEscrow.sol";
 import {Router} from "src/shared/Router.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";

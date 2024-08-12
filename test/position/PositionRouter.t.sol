@@ -11,7 +11,7 @@ import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
-import {RevenueStore} from "src/token/store/RevenueStore.sol";
+import {RevenueStore} from "src/tokenomics/store/RevenueStore.sol";
 import {PuppetLogic} from "src/puppet/logic/PuppetLogic.sol";
 
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";

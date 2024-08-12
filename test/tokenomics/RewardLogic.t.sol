@@ -4,18 +4,18 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {PuppetToken} from "src/token/PuppetToken.sol";
-import {VotingEscrow, MAXTIME} from "src/token/VotingEscrow.sol";
+import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 
 import {Precision} from "src/utils/Precision.sol";
-import {RewardStore} from "src/token/store/RewardStore.sol";
-import {RevenueStore} from "src/token/store/RevenueStore.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 
-import {RewardLogic} from "src/token/RewardLogic.sol";
-import {RevenueLogic} from "src/token/RevenueLogic.sol";
+import {VotingEscrow, MAXTIME} from "src/tokenomics/VotingEscrow.sol";
+import {RewardStore} from "src/tokenomics/store/RewardStore.sol";
+import {RevenueStore} from "src/tokenomics/store/RevenueStore.sol";
+import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
+import {RevenueLogic} from "src/tokenomics/RevenueLogic.sol";
 
 contract RewardLogicTest is BasicSetup {
     VotingEscrow votingEscrow;
