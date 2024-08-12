@@ -5,12 +5,12 @@ export default defineConfig({
   outlineFooter: false,
   sidebar: [
     {
-      text: 'Getting Started',
-      link: '/getting-started',
+      text: 'About',
+      link: '/about',
     },
     {
-      text: 'Example',
-      link: '/example',
+      text: 'Tokenomics',
+      link: '/tokenomics',
     },
     {
       text: 'Core NatSpec',
@@ -35,9 +35,5 @@ export default defineConfig({
       ],
       link: '/contracts/README',
     },
-  ],
-  vite: {
-    dir
-    publicDir: '.dist',
-  }
+  ]
 })
