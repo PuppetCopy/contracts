@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import { Script } from "forge-std/src/Script.sol";
+import {Script} from "forge-std/src/Script.sol";
 
 import {Dictator} from "src/shared/Dictator.sol";
 import {Router} from "src/shared/Router.sol";

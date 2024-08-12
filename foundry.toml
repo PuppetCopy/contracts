@@ -4,9 +4,9 @@
   src = 'src'
   out = 'forge-artifacts'
   cache_path  = 'forge-cache'
-  libs = ['node_modules']
-  test = 'test'
+  libs = ['../node_modules', 'node_modules']
   allow_paths = []
+  test = 'test'
   ffi = true
   ast = true
   build_info = true
