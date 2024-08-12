@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
+import {ReentrancyGuardTransient} from "../utils/ReentrancyGuardTransient.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {Auth} from "../utils/auth/Auth.sol";
+import {Auth} from "../utils/access/Auth.sol";
 
 import {PuppetStore} from "./store/PuppetStore.sol";
 import {PuppetLogic} from "./logic/PuppetLogic.sol";
 
-contract PuppetRouter is Auth, EIP712, ReentrancyGuard {
+contract PuppetRouter is Auth, EIP712, ReentrancyGuardTransient {
     event PuppetRouter__SetConfig(uint timestamp, CallConfig callConfig);
 
     struct CallConfig {

@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Router} from "./../../shared/Router.sol";
-import {PositionUtils} from "../../position/util/PositionUtils.sol";
+import {PositionUtils} from "../../position/utils/PositionUtils.sol";
 import {PuppetStore} from "../store/PuppetStore.sol";
 
 library PuppetLogic {

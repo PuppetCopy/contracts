@@ -6,14 +6,14 @@ import { Script } from "forge-std/src/Script.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IVault, IAsset} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
-import {WeightedPoolUserData} from "@balancer-labs/v2-interfaces/pool-weighted/WeightedPoolUserData.sol";
-import {IBasePool} from "@balancer-labs/v2-interfaces/vault/IBasePool.sol";
-import {IERC20 as IBERC20} from "@balancer-labs/v2-interfaces/solidity-utils/openzeppelin/IERC20.sol";
+import {IVault, IAsset} from "@balancer-labs/v2-interfaces/contracts/vault/IVault.sol";
+import {WeightedPoolUserData} from "@balancer-labs/v2-interfaces/contracts/pool-weighted/WeightedPoolUserData.sol";
+import {IBasePool} from "@balancer-labs/v2-interfaces/contracts/vault/IBasePool.sol";
+import {IERC20 as IBERC20} from "@balancer-labs/v2-interfaces/contracts/solidity-utils/openzeppelin/IERC20.sol";
 
 import {Dictator} from "src/shared/Dictator.sol";
 import {IWNT} from "./../src/utils/interfaces/IWNT.sol";
-import {PuppetToken} from "src/token/PuppetToken.sol";
+import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 
 import {Address} from "script/Const.sol";
 
@@ -31,7 +31,7 @@ contract ManagePool is Script {
     function run() public {
         vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
         // initPool();
-        // exitPool();
+        exitPool();
         vm.stopBroadcast();
     }
 
@@ -86,30 +86,30 @@ contract ManagePool is Script {
         IBasePoolErc20 pool = IBasePoolErc20(Address.BasePool);
         bytes32 poolId = pool.getPoolId();
 
-        (IBERC20[] memory tokens,,) = vault.getPoolTokens(poolId);
+        // (IBERC20[] memory tokens,,) = vault.getPoolTokens(poolId);
 
-        IAsset[] memory assets = new IAsset[](tokens.length);
+        // IAsset[] memory assets = new IAsset[](tokens.length);
 
-        for (uint _i = 0; _i < tokens.length; _i++) {
-            assets[_i] = IAsset(address(tokens[_i]));
-        }
+        // for (uint _i = 0; _i < tokens.length; _i++) {
+        //     assets[_i] = IAsset(address(tokens[_i]));
+        // }
 
-        vault.getPoolTokens(poolId);
-        uint bptBalance = pool.balanceOf(DEPLOYER_ADDRESS);
+        // vault.getPoolTokens(poolId);
+        // uint bptBalance = pool.balanceOf(DEPLOYER_ADDRESS);
 
-        uint[] memory _amounts = new uint[](tokens.length);
+        // uint[] memory _amounts = new uint[](tokens.length);
 
-        vault.exitPool(
-            poolId,
-            DEPLOYER_ADDRESS, // sender
-            payable(DEPLOYER_ADDRESS), // recipient
-            IVault.ExitPoolRequest({
-                assets: assets,
-                minAmountsOut: _amounts,
-                userData: abi.encode(WeightedPoolUserData.ExitKind.EXACT_BPT_IN_FOR_TOKENS_OUT, bptBalance),
-                toInternalBalance: false
-            })
-        );
+        // vault.exitPool(
+        //     poolId,
+        //     DEPLOYER_ADDRESS, // sender
+        //     payable(DEPLOYER_ADDRESS), // recipient
+        //     IVault.ExitPoolRequest({
+        //         assets: assets,
+        //         minAmountsOut: _amounts,
+        //         userData: abi.encode(WeightedPoolUserData.ExitKind.EXACT_BPT_IN_FOR_TOKENS_OUT, bptBalance),
+        //         toInternalBalance: false
+        //     })
+        // );
     }
 }
 

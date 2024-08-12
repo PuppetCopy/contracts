@@ -7,12 +7,11 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {IWNT} from "src/utils/interfaces/IWNT.sol";
 
-import {PositionUtils} from "src/position/util/PositionUtils.sol";
+import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
-import {RewardStore} from "src/token/store/RewardStore.sol";
-
+import {RevenueStore} from "src/tokenomics/store/RevenueStore.sol";
 import {PuppetLogic} from "src/puppet/logic/PuppetLogic.sol";
 
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
@@ -43,7 +42,7 @@ contract PositionRouterTest is BasicSetup {
     PositionRouter positionRouter;
     IGmxExchangeRouter gmxExchangeRouter;
 
-    RewardStore rewardStore;
+    RevenueStore revenueStore;
 
     SubaccountStore subaccountStore;
 
@@ -63,7 +62,15 @@ contract PositionRouterTest is BasicSetup {
         _tokenAllowanceCapAmountList[0] = 0.2e18;
         _tokenAllowanceCapAmountList[1] = 500e30;
 
-        rewardStore = new RewardStore(dictator, router);
+        IERC20[] memory _tokenBuybackThresholdList = new IERC20[](2);
+        _tokenBuybackThresholdList[0] = wnt;
+        _tokenBuybackThresholdList[1] = usdc;
+
+        uint[] memory _tokenBuybackThresholdAmountList = new uint[](2);
+        _tokenBuybackThresholdAmountList[0] = 0.2e18;
+        _tokenBuybackThresholdAmountList[1] = 500e30;
+
+        revenueStore = new RevenueStore(dictator, router, _tokenBuybackThresholdList, _tokenBuybackThresholdAmountList);
 
         puppetStore = new PuppetStore(dictator, router, _tokenAllowanceCapList, _tokenAllowanceCapAmountList);
         puppetRouter = new PuppetRouter(
@@ -79,7 +86,7 @@ contract PositionRouterTest is BasicSetup {
             })
         );
         dictator.setAccess(puppetStore, address(puppetRouter));
-        dictator.setPermission(router, address(puppetStore), router.transfer.selector);
+        dictator.setAccess(router, address(puppetStore));
 
         subaccountStore = new SubaccountStore(dictator, computeCreateAddress(users.owner, vm.getNonce(users.owner) + 2));
         positionStore = new PositionStore(dictator, router);
@@ -119,7 +126,7 @@ contract PositionRouterTest is BasicSetup {
                     router: router,
                     positionStore: positionStore,
                     puppetStore: puppetStore,
-                    rewardStore: rewardStore,
+                    revenueStore: revenueStore,
                     gmxOrderReciever: address(positionStore),
                     performanceFeeRate: 0.1e30, // 10%
                     traderPerformanceFeeShare: 0.5e30 // shared between trader and platform
@@ -129,9 +136,9 @@ contract PositionRouterTest is BasicSetup {
 
         dictator.setAccess(subaccountStore, address(positionRouter));
         dictator.setAccess(positionStore, address(positionRouter));
-        dictator.setAccess(rewardStore, address(positionRouter));
+        dictator.setAccess(revenueStore, address(positionRouter));
         dictator.setAccess(puppetStore, address(positionRouter));
-        dictator.setPermission(router, address(positionRouter), router.transfer.selector);
+        dictator.setAccess(router, address(positionRouter));
 
         dictator.setPermission(positionRouter, Address.gmxOrderHandler, positionRouter.afterOrderExecution.selector);
         dictator.setPermission(positionRouter, Address.gmxOrderHandler, positionRouter.afterOrderCancellation.selector);

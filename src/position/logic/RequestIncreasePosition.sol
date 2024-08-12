@@ -8,8 +8,8 @@ import {IGmxExchangeRouter} from "./../interface/IGmxExchangeRouter.sol";
 import {Precision} from "./../../utils/Precision.sol";
 import {IWNT} from "./../../utils/interfaces/IWNT.sol";
 import {ErrorUtils} from "./../../utils/ErrorUtils.sol";
-import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
-import {PositionUtils} from "./../util/PositionUtils.sol";
+import {GmxPositionUtils} from "../utils/GmxPositionUtils.sol";
+import {PositionUtils} from "./../utils/PositionUtils.sol";
 import {TransferUtils} from "./../../utils/TransferUtils.sol";
 
 import {Router} from "./../../shared/Router.sol";

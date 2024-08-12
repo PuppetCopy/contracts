@@ -5,7 +5,7 @@ import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 
 import {Router} from "./../../shared/Router.sol";
 import {BankStore} from "./../../shared/store/BankStore.sol";
-import {GmxPositionUtils} from "./../util/GmxPositionUtils.sol";
+import {GmxPositionUtils} from "./../utils/GmxPositionUtils.sol";
 
 contract PositionStore is BankStore {
     struct RequestMatch {

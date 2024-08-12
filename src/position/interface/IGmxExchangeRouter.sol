@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {GmxPositionUtils} from "./../util/GmxPositionUtils.sol";
+import {GmxPositionUtils} from "./../utils/GmxPositionUtils.sol";
 
 interface IGmxExchangeRouter {
     /// @dev Executes multiple calls in a single transaction, and returns the results of each call.

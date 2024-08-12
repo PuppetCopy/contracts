@@ -7,13 +7,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IGmxEventUtils} from "./../interface/IGmxEventUtils.sol";
 
 import {Router} from "src/shared/Router.sol";
-import {GmxPositionUtils} from "../util/GmxPositionUtils.sol";
+import {GmxPositionUtils} from "../utils/GmxPositionUtils.sol";
 import {Precision} from "./../../utils/Precision.sol";
 
 import {PuppetStore} from "./../../puppet/store/PuppetStore.sol";
 import {PositionStore} from "../store/PositionStore.sol";
-
-import {RewardStore} from "./../../token/store/RewardStore.sol";
+import {RevenueStore} from "./../../tokenomics/store/RevenueStore.sol";
 
 library ExecuteDecreasePosition {
     event ExecuteDecreasePosition__DecreasePosition(
@@ -24,7 +23,7 @@ library ExecuteDecreasePosition {
         Router router;
         PositionStore positionStore;
         PuppetStore puppetStore;
-        RewardStore rewardStore;
+        RevenueStore revenueStore;
         address gmxOrderReciever;
         uint performanceFeeRate;
         uint traderPerformanceFeeShare;
@@ -121,8 +120,14 @@ library ExecuteDecreasePosition {
         callConfig.puppetStore.increaseBalanceList(callParams.outputToken, address(this), callParams.mirrorPosition.puppetList, outputAmountList);
 
         if (callParams.profit > 0) {
-            callConfig.rewardStore.commitRewardList(callParams.outputToken, callParams.mirrorPosition.puppetList, contributionList);
-            callConfig.rewardStore.commitReward(callParams.outputToken, callParams.mirrorPosition.trader, totalPerformanceFee);
+            callConfig.revenueStore.commitRewardList(
+                callParams.outputToken, //
+                address(this),
+                callParams.mirrorPosition.puppetList,
+                contributionList,
+                callParams.mirrorPosition.trader,
+                totalPerformanceFee
+            );
         }
 
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91

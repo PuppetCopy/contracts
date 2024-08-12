@@ -1,28 +1,35 @@
 # Full reference https://github.com/foundry-rs/foundry/tree/master/config
 
 [profile.default]
-  auto_detect_solc = false
-  bytecode_hash = "none"
-  emv_version = "paris"
+  src = 'src'
+  out = 'forge-artifacts'
+  cache_path  = 'forge-cache'
+  libs = ['node_modules']
+  test = 'test'
+  allow_paths = []
   ffi = true
-  fs_permissions = [{ access = "read", path = "out-optimized" }]
-  gas_reports = [
-    "IncreasePosition",
-    "PositionLogic"
+  ast = true
+  build_info = true
+  extra_output = ["storageLayout"]
+  fs_permissions = [
+    { access = "read", path = "./out-dev" },
+    { access = "read", path = "package.json" },
+    { access = "read-write", path = "./benchmark/results" },
   ]
   optimizer = true
-  optimizer_runs = 10_000_000
-  out = "out"
-  script = "script"
-  solc = "0.8.24"
-  src = "src"
-  test = "test"
-  extra_output = [
-    "abi",
-    "evm.deployedBytecode",
-  ]
+  optimizer_runs = 1000
+  solc_version = '0.8.24'
+  auto_detect_solc = false
+  bytecode_hash = "none"
+  evm_version = 'cancun'
+  ignored_error_codes = [2394, 5574, 3860] # Transient storage, code size
+
+[doc]
+ignore = ["**/interface/**/*.sol", "**/utils/**/*.sol", "**/shared/**/*.sol"]
 
 [profile.dev]
+  out = "forge-artifacts-dev"
+  cache_path  = 'forge-cache-dev'
   optimizer = false
 
 [profile.default.fuzz]
@@ -41,7 +48,7 @@
 
 [rpc_endpoints]
   localhost = "http://localhost:8545"
-  arbitrum = "https://eth-mainnet.g.alchemy.com/v2/${API_KEY_ALCHEMY}"
+  arbitrum = "https://arbitrum.llamarpc.com/sk_llama_a804526772d0fa25160e6ca3a5e9d6fd"
 
 [etherscan]
   arbitrum = { key = "${ARBISCAN_API_KEY}", chain = "arbitrum" }

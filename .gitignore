@@ -1,5 +1,6 @@
 .DS_Store
 
+dist
 node_modules
 .env
 coverage
@@ -8,12 +9,8 @@ typechain
 typechain-types
 broadcast
 
-# Hardhat files
-cache
-artifacts
-
 # foundry files
-out
-foundry-out
+forge-artifacts
+forge-artifacts-dev
 forge-cache
-lib
+forge-cache-dev

@@ -7,7 +7,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Test } from "forge-std/src/Test.sol";
 
 import {Dictator} from "src/shared/Dictator.sol";
-import {PuppetToken} from "src/token/PuppetToken.sol";
+import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {Router} from "src/shared/Router.sol";
 import {IWNT} from "./../../src/utils/interfaces/IWNT.sol";
 

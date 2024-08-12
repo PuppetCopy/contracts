@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {Auth} from "./../../utils/auth/Auth.sol";
+import {Auth} from "./../../utils/access/Auth.sol";
 import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 
 import {Subaccount} from "../Subaccount.sol";

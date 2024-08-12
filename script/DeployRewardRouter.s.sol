@@ -2,7 +2,7 @@
 // pragma solidity 0.8.24;
 
 // import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-// import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
+// import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 // import {IVault} from "@balancer-labs/v2-interfaces/vault/IVault.sol";
 // import {PRBTest} from "@prb/test/src/PRBTest.sol";
 // import {IBasePool} from "@balancer-labs/v2-interfaces/vault/IBasePool.sol";
@@ -15,7 +15,7 @@
 // import {RewardLogic} from "./../src/token/logic/RewardLogic.sol";
 // import {RewardStore} from "./../src/token/store/RewardStore.sol";
 // import {RewardRouter} from "src/token/RewardRouter.sol";
-// import {PuppetToken} from "src/token/PuppetToken.sol";
+// import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 // import {VotingEscrow} from "src/token/VotingEscrow.sol";
 
 // import {Address} from "script/Const.sol";
