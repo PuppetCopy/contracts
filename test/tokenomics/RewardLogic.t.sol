@@ -81,7 +81,7 @@ contract RewardLogicTest is BasicSetup {
 
         userContribute(wnt, revenueAmount);
 
-        revenueLogic.buybackRevenue(address(this), users.owner, users.owner, wnt, revenueAmount);
+        revenueLogic.buybackRevenue(users.owner, users.owner, wnt, revenueAmount);
 
         // Assert: Check the final state
         assertEq(puppetToken.balanceOf(address(revenueStore)), thresholdAmount, "Puppet token balance should be increased by the buyback amount");
@@ -230,7 +230,7 @@ contract RewardLogicTest is BasicSetup {
         uint revenue = revenueLogic.getRevenueBalance(wnt);
 
         if ((revenue / ethPerPuppet) >= thresholdAmount) {
-            revenueLogic.buybackRevenue(address(this), users.owner, users.owner, wnt, amount);
+            revenueLogic.buybackRevenue(users.owner, users.owner, wnt, amount);
         }
     }
 

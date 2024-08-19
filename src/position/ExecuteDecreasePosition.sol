@@ -3,18 +3,24 @@ pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-import {IGmxEventUtils} from "./../interface/IGmxEventUtils.sol";
+import {IAuthority} from "../utils/interfaces/IAuthority.sol";
+import {Permission} from "../utils/access/Permission.sol";
+
+import {IGmxEventUtils} from "./interface/IGmxEventUtils.sol";
 
 import {Router} from "src/shared/Router.sol";
-import {GmxPositionUtils} from "../utils/GmxPositionUtils.sol";
-import {Precision} from "./../../utils/Precision.sol";
+import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
+import {Precision} from "./../utils/Precision.sol";
 
-import {PuppetStore} from "./../../puppet/store/PuppetStore.sol";
-import {PositionStore} from "../store/PositionStore.sol";
-import {RevenueStore} from "./../../tokenomics/store/RevenueStore.sol";
+import {PuppetStore} from "./../puppet/store/PuppetStore.sol";
+import {PositionStore} from "./store/PositionStore.sol";
+import {RevenueStore} from "./../tokenomics/store/RevenueStore.sol";
 
-library ExecuteDecreasePosition {
+contract ExecuteDecreasePosition is Permission, EIP712 {
+    event ExecuteIncreasePosition__SetConfig(uint timestamp, CallConfig callConfig);
+
     event ExecuteDecreasePosition__DecreasePosition(
         bytes32 requestKey, bytes32 positionKey, uint totalAmountOut, uint profit, uint totalPerformanceFee, uint traderPerformanceCutoffFee
     );
@@ -40,7 +46,13 @@ library ExecuteDecreasePosition {
         uint profit;
     }
 
-    function decrease(CallConfig calldata callConfig, bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external {
+    CallConfig callConfig;
+
+    constructor(IAuthority _authority, CallConfig memory _callConfig) Permission(_authority) EIP712("Position Router", "1") {
+        _setConfig(_callConfig);
+    }
+
+    function decrease(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external auth {
         (IGmxEventUtils.EventLogData memory eventLogData) = abi.decode(eventData, (IGmxEventUtils.EventLogData));
 
         // Check if there is at least one uint item available
@@ -78,12 +90,11 @@ library ExecuteDecreasePosition {
             profit: profit
         });
 
-        _decrease(callConfig, order, callParams, request);
+        _decrease(order, callParams, request);
     }
 
     function _decrease(
-        CallConfig calldata callConfig,
-        GmxPositionUtils.Props calldata order,
+        GmxPositionUtils.Props calldata order, //
         CallParams memory callParams,
         PositionStore.RequestAdjustment memory request
     ) internal {
@@ -175,6 +186,18 @@ library ExecuteDecreasePosition {
         performanceFee -= traderPerformanceCutoffFee;
 
         return (performanceFee, traderPerformanceCutoffFee, amountOutAfterFee);
+    }
+
+    // governance
+
+    function setConfig(CallConfig memory _callConfig) external auth {
+        _setConfig(_callConfig);
+    }
+
+    function _setConfig(CallConfig memory _callConfig) internal {
+        callConfig = _callConfig;
+
+        emit ExecuteIncreasePosition__SetConfig(block.timestamp, callConfig);
     }
 
     error ExecutePosition__InvalidRequest(bytes32 positionKey, bytes32 key);

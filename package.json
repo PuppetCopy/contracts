@@ -14,7 +14,7 @@
     "script:DeployRewardRouter": "forge script script/DeployRewardRouter.s.sol:DeployRewardRouter --rpc-url $ARBITRUM_RPC_URL --broadcast --verify -vvvv",
     "script:DeployPuppetRouter": "forge script script/DeployPuppetRouter.s.sol:DeployPuppetRouter --rpc-url $ARBITRUM_RPC_URL --broadcast --verify -vvvv",
     "docgen": "forge doc --out '.docgen' --build",
-    "gas-report": "FOUNDRY_PROFILE=dev forge test --gas-report",
+    "gas-report": "forge test --gas-report",
     "lint": "bun run lint:sol",
     "lint:sol": "forge fmt --check && bun solhint \"{script,src,test}/**/*.sol\""
   },

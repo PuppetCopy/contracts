@@ -40,12 +40,11 @@ contract RevenueLogic is Permission, EIP712, ReentrancyGuardTransient {
 
     /// @notice Executes the buyback of revenue tokens using the protocol's accumulated fees.
     /// @dev In effect permissioned contract would publicly allow this method to be called.
-    /// @param source The source address from which the buyback is initiated.
     /// @param depositor The address that deposits the buyback token.
     /// @param receiver The address that will receive the revenue token.
     /// @param revenueToken The address of the revenue token to be bought back.
     /// @param amount The amount of revenue tokens to be bought back.
-    function buybackRevenue(address source, address depositor, address receiver, IERC20 revenueToken, uint amount) external auth {
+    function buybackRevenue(address depositor, address receiver, IERC20 revenueToken, uint amount) external auth {
         uint thresholdAmount = store.getTokenBuybackOffer(revenueToken);
 
         if (thresholdAmount == 0) revert RewardLogic__InvalidClaimToken();

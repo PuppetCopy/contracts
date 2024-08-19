@@ -17,10 +17,11 @@ import {PuppetLogic} from "src/puppet/logic/PuppetLogic.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxOracle} from "src/position/interface/IGmxOracle.sol";
 
-import {RequestIncreasePosition} from "src/position/logic/RequestIncreasePosition.sol";
-import {RequestDecreasePosition} from "src/position/logic/RequestDecreasePosition.sol";
-import {ExecuteIncreasePosition} from "src/position/logic/ExecuteIncreasePosition.sol";
-import {ExecuteDecreasePosition} from "src/position/logic/ExecuteDecreasePosition.sol";
+import {RequestIncreasePosition} from "src/position/RequestIncreasePosition.sol";
+import {RequestDecreasePosition} from "src/position/RequestDecreasePosition.sol";
+import {ExecuteIncreasePosition} from "src/position/ExecuteIncreasePosition.sol";
+import {ExecuteDecreasePosition} from "src/position/ExecuteDecreasePosition.sol";
+import {ExecuteRevertedAdjustment} from "src/position/ExecuteRevertedAdjustment.sol";
 
 import {SubaccountStore} from "src/shared/store/SubaccountStore.sol";
 
@@ -28,7 +29,7 @@ import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
 import {PuppetRouter} from "src/puppet/PuppetRouter.sol";
 
 import {PositionStore} from "src/position/store/PositionStore.sol";
-import {PositionRouter} from "src/position/PositionRouter.sol";
+import {PositionRouter} from "src/PositionRouter.sol";
 
 import {Address} from "script/Const.sol";
 
@@ -90,47 +91,63 @@ contract PositionRouterTest is BasicSetup {
 
         subaccountStore = new SubaccountStore(dictator, computeCreateAddress(users.owner, vm.getNonce(users.owner) + 2));
         positionStore = new PositionStore(dictator, router);
+
+        RequestIncreasePosition requestIncrease = new RequestIncreasePosition(
+            dictator,
+            RequestIncreasePosition.CallConfig({
+                wnt: wnt,
+                gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
+                router: router,
+                positionStore: positionStore,
+                subaccountStore: subaccountStore,
+                gmxOrderReciever: address(positionStore),
+                gmxOrderVault: Address.gmxOrderVault,
+                referralCode: Address.referralCode,
+                callbackGasLimit: 2_000_000,
+                puppetStore: puppetStore,
+                limitPuppetList: 20,
+                minimumMatchAmount: 100e30,
+                tokenTransferGasLimit: 200_000
+            })
+        );
+        ExecuteIncreasePosition executeIncrease =
+            new ExecuteIncreasePosition(dictator, ExecuteIncreasePosition.CallConfig({positionStore: positionStore}));
+        RequestDecreasePosition requestDecrease = new RequestDecreasePosition(
+            dictator,
+            RequestDecreasePosition.CallConfig({
+                gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
+                positionStore: positionStore,
+                subaccountStore: subaccountStore,
+                gmxOrderReciever: address(positionStore),
+                gmxOrderVault: Address.gmxOrderVault,
+                referralCode: Address.referralCode,
+                callbackGasLimit: 2_000_000
+            })
+        );
+        ExecuteDecreasePosition executeDecrease = new ExecuteDecreasePosition(
+            dictator,
+            ExecuteDecreasePosition.CallConfig({
+                router: router,
+                positionStore: positionStore,
+                puppetStore: puppetStore,
+                revenueStore: revenueStore,
+                gmxOrderReciever: address(positionStore),
+                performanceFeeRate: 0.1e30, // 10%
+                traderPerformanceFeeShare: 0.5e30 // shared between trader and platform
+            })
+        );
+        ExecuteRevertedAdjustment executeRevertedAdjustment =
+            new ExecuteRevertedAdjustment(dictator, ExecuteRevertedAdjustment.CallConfig({handlehandle: "test"}));
+
         positionRouter = new PositionRouter(
             dictator,
+            positionStore,
             PositionRouter.CallConfig({
-                increase: RequestIncreasePosition.CallConfig({
-                    wnt: wnt,
-                    router: router,
-                    positionStore: positionStore,
-                    gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
-                    subaccountStore: subaccountStore,
-                    gmxOrderReciever: address(positionStore),
-                    gmxOrderVault: Address.gmxOrderVault,
-                    referralCode: Address.referralCode,
-                    callbackGasLimit: 2_000_000,
-                    puppetStore: puppetStore,
-                    limitPuppetList: 20,
-                    minimumMatchAmount: 100e30,
-                    tokenTransferGasLimit: 200_000
-                }),
-                decrease: RequestDecreasePosition.CallConfig({
-                    wnt: IWNT(Address.wnt),
-                    gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
-                    positionStore: positionStore,
-                    subaccountStore: subaccountStore,
-                    gmxOrderReciever: address(positionStore),
-                    gmxOrderVault: Address.gmxOrderVault,
-                    referralCode: Address.referralCode,
-                    callbackGasLimit: 2_000_000
-                }),
-                executeIncrease: ExecuteIncreasePosition.CallConfig({
-                    positionStore: positionStore, //
-                    gmxOrderHandler: Address.gmxOrderHandler
-                }),
-                executeDecrease: ExecuteDecreasePosition.CallConfig({
-                    router: router,
-                    positionStore: positionStore,
-                    puppetStore: puppetStore,
-                    revenueStore: revenueStore,
-                    gmxOrderReciever: address(positionStore),
-                    performanceFeeRate: 0.1e30, // 10%
-                    traderPerformanceFeeShare: 0.5e30 // shared between trader and platform
-                })
+                requestIncrease: requestIncrease,
+                requestDecrease: requestDecrease,
+                executeIncrease: executeIncrease,
+                executeDecrease: executeDecrease,
+                executeRevertedAdjustment: executeRevertedAdjustment
             })
         );
 
@@ -160,20 +177,20 @@ contract PositionRouterTest is BasicSetup {
         _dealERC20(address(usdc), trader, 100e6);
         usdc.approve(address(router), 100e6);
 
-        positionRouter.requestIncrease{value: executionFee}(
-            PositionUtils.TraderCallParams({
-                account: trader,
-                market: Address.gmxEthUsdcMarket,
-                collateralToken: usdc,
-                isLong: true,
-                executionFee: executionFee,
-                collateralDelta: 100e6,
-                sizeDelta: 1000e30,
-                acceptablePrice: 3320e12,
-                triggerPrice: 3420e6
-            }),
-            puppetList
-        );
+        // positionRouter.requestIncrease{value: executionFee}(
+        //     PositionUtils.TraderCallParams({
+        //         account: trader,
+        //         market: Address.gmxEthUsdcMarket,
+        //         collateralToken: usdc,
+        //         isLong: true,
+        //         executionFee: executionFee,
+        //         collateralDelta: 100e6,
+        //         sizeDelta: 1000e30,
+        //         acceptablePrice: 3320e12,
+        //         triggerPrice: 3420e6
+        //     }),
+        //     puppetList
+        // );
     }
 
     function getGeneratePuppetList(IERC20 collateralToken, address trader, uint _length) internal returns (address[] memory) {

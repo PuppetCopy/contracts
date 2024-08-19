@@ -156,6 +156,8 @@ contract RewardLogic is Permission, EIP712, ReentrancyGuardTransient {
         votingEscrow.lock(address(this), msg.sender, rewardInToken, duration);
 
         emit RewardLogic__Lock(token, config.baselineEmissionRate, msg.sender, rewardInToken, duration, rewardInToken);
+
+        return rewardInToken;
     }
 
     /// @notice Allows a user to exit their locked position and claim rewards.
