@@ -17,7 +17,7 @@ contract ExecuteRevertedAdjustment is Permission, EIP712 {
 
     CallConfig callConfig;
 
-    constructor(IAuthority _authority, CallConfig memory _callConfig) Permission(_authority) EIP712("Position Router", "1") {
+    constructor(IAuthority _authority, CallConfig memory _callConfig) Permission(_authority) EIP712("ExecuteRevertedAdjustment", "1") {
         _setConfig(_callConfig);
     }
 

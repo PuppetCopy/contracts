@@ -17,9 +17,7 @@ import {PositionStore} from "./store/PositionStore.sol";
 import {SubaccountStore} from "./../shared/store/SubaccountStore.sol";
 
 contract RequestDecreasePosition is Permission, EIP712 {
-    event RequestDecreasePosition__SetConfig(uint timestamp, CallConfig callConfig);
-
-    event RequestDecreasePosition__Request(
+    event RequestDecreasePosition__Decrease(
         address trader,
         //
         address subaccount,
@@ -27,6 +25,7 @@ contract RequestDecreasePosition is Permission, EIP712 {
         bytes32 requestKey,
         uint traderCollateralDelta
     );
+    event RequestDecreasePosition__SetConfig(uint timestamp, CallConfig callConfig);
 
     struct CallConfig {
         IGmxExchangeRouter gmxExchangeRouter;
@@ -40,7 +39,7 @@ contract RequestDecreasePosition is Permission, EIP712 {
 
     CallConfig callConfig;
 
-    constructor(IAuthority _authority, CallConfig memory _callConfig) Permission(_authority) EIP712("Position Router", "1") {
+    constructor(IAuthority _authority, CallConfig memory _callConfig) Permission(_authority) EIP712("RequestDecreasePosition", "1") {
         _setConfig(_callConfig);
     }
 
@@ -63,7 +62,7 @@ contract RequestDecreasePosition is Permission, EIP712 {
 
         PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
             positionKey: positionKey,
-            puppetCollateralDeltaList: new uint[](mirrorPosition.puppetList.length),
+            collateralDeltaList: new uint[](mirrorPosition.puppetList.length),
             collateralDelta: traderCallParams.collateralDelta,
             sizeDelta: traderCallParams.sizeDelta,
             transactionCost: startGas
@@ -91,7 +90,7 @@ contract RequestDecreasePosition is Permission, EIP712 {
 
         PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
             positionKey: positionKey,
-            puppetCollateralDeltaList: new uint[](mirrorPosition.puppetList.length),
+            collateralDeltaList: new uint[](mirrorPosition.puppetList.length),
             collateralDelta: 0,
             sizeDelta: 0,
             transactionCost: startGas
@@ -108,8 +107,7 @@ contract RequestDecreasePosition is Permission, EIP712 {
         address subaccountAddress
     ) internal {
         for (uint i = 0; i < mirrorPosition.puppetList.length; i++) {
-            request.puppetCollateralDeltaList[i] -=
-                request.puppetCollateralDeltaList[i] * traderCallParams.collateralDelta / mirrorPosition.collateral;
+            request.collateralDeltaList[i] -= request.collateralDeltaList[i] * traderCallParams.collateralDelta / mirrorPosition.collateral;
         }
 
         GmxPositionUtils.CreateOrderParams memory orderParams = GmxPositionUtils.CreateOrderParams({
@@ -149,7 +147,7 @@ contract RequestDecreasePosition is Permission, EIP712 {
 
         callConfig.positionStore.setRequestAdjustment(requestKey, request);
 
-        emit RequestDecreasePosition__Request(
+        emit RequestDecreasePosition__Decrease(
             traderCallParams.account, subaccountAddress, request.positionKey, requestKey, traderCallParams.collateralDelta
         );
     }

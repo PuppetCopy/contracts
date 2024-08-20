@@ -19,10 +19,10 @@ import {PositionStore} from "./store/PositionStore.sol";
 import {RevenueStore} from "./../tokenomics/store/RevenueStore.sol";
 
 contract ExecuteDecreasePosition is Permission, EIP712 {
-    event ExecuteIncreasePosition__SetConfig(uint timestamp, CallConfig callConfig);
+    event ExecuteDecreasePosition__SetConfig(uint timestamp, CallConfig callConfig);
 
-    event ExecuteDecreasePosition__DecreasePosition(
-        bytes32 requestKey, bytes32 positionKey, uint totalAmountOut, uint profit, uint totalPerformanceFee, uint traderPerformanceCutoffFee
+    event ExecuteDecreasePosition__Execute(
+        bytes32 requestKey, uint totalAmountOut, uint profit, uint totalPerformanceFee, uint traderPerformanceCutoffFee
     );
 
     struct CallConfig {
@@ -36,23 +36,19 @@ contract ExecuteDecreasePosition is Permission, EIP712 {
     }
 
     struct CallParams {
-        PositionStore.MirrorPosition mirrorPosition;
-        bytes32 positionKey;
-        bytes32 requestKey;
-        address positionRouterAddress;
-        IERC20 outputToken;
-        uint puppetListLength;
         uint totalAmountOut;
         uint profit;
+        uint totalPerformanceFee;
+        uint traderPerformanceCutoffFee;
     }
 
     CallConfig callConfig;
 
-    constructor(IAuthority _authority, CallConfig memory _callConfig) Permission(_authority) EIP712("Position Router", "1") {
+    constructor(IAuthority _authority, CallConfig memory _callConfig) Permission(_authority) EIP712("ExecuteDecreasePosition", "1") {
         _setConfig(_callConfig);
     }
 
-    function decrease(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external auth {
+    function execute(bytes32 requestKey, GmxPositionUtils.Props calldata order, bytes calldata eventData) external auth {
         (IGmxEventUtils.EventLogData memory eventLogData) = abi.decode(eventData, (IGmxEventUtils.EventLogData));
 
         // Check if there is at least one uint item available
@@ -60,112 +56,85 @@ contract ExecuteDecreasePosition is Permission, EIP712 {
             revert ExecutePosition__UnexpectedEventData();
         }
 
-        bytes32 positionKey = GmxPositionUtils.getPositionKey(
-            order.addresses.account, order.addresses.market, order.addresses.initialCollateralToken, order.flags.isLong
-        );
-
-        uint totalAmountOut = eventLogData.uintItems.items[0].value;
-
-        PositionStore.RequestAdjustment memory request = callConfig.positionStore.getRequestAdjustment(key);
-        PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
-
-        if (mirrorPosition.size == 0) {
-            revert ExecutePosition__InvalidRequest(positionKey, key);
-        }
-
-        uint profit;
-
-        if (totalAmountOut > order.numbers.initialCollateralDeltaAmount) {
-            profit = totalAmountOut - order.numbers.initialCollateralDeltaAmount;
-        }
-
         CallParams memory callParams = CallParams({
-            mirrorPosition: mirrorPosition,
-            positionKey: positionKey,
-            requestKey: key,
-            positionRouterAddress: address(callConfig.positionStore),
-            outputToken: IERC20(eventLogData.addressItems.items[0].value),
-            puppetListLength: mirrorPosition.puppetList.length,
-            totalAmountOut: totalAmountOut,
-            profit: profit
+            totalAmountOut: eventLogData.uintItems.items[0].value, //
+            totalPerformanceFee: 0,
+            traderPerformanceCutoffFee: 0,
+            profit: 0
         });
 
-        _decrease(order, callParams, request);
-    }
+        PositionStore.RequestAdjustment memory request = callConfig.positionStore.getRequestAdjustment(requestKey);
+        PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(request.positionKey);
 
-    function _decrease(
-        GmxPositionUtils.Props calldata order, //
-        CallParams memory callParams,
-        PositionStore.RequestAdjustment memory request
-    ) internal {
-        callParams.mirrorPosition.collateral -= request.collateralDelta;
-        callParams.mirrorPosition.size -= request.sizeDelta;
-        callParams.mirrorPosition.cumulativeTransactionCost += request.transactionCost;
+        if (mirrorPosition.size == 0) {
+            revert ExecutePosition__InvalidRequest(request.positionKey, requestKey);
+        }
+        IERC20 outputToken = IERC20(eventLogData.addressItems.items[0].value);
 
-        uint[] memory outputAmountList = new uint[](callParams.puppetListLength);
-        uint[] memory contributionList = new uint[](callParams.puppetListLength);
+        if (callParams.totalAmountOut > order.numbers.initialCollateralDeltaAmount) {
+            callParams.profit = callParams.totalAmountOut - order.numbers.initialCollateralDeltaAmount;
+        }
 
-        uint totalPerformanceFee;
-        uint traderPerformanceCutoffFee;
+        mirrorPosition.collateral -= request.collateralDelta;
+        mirrorPosition.size -= request.sizeDelta;
+        mirrorPosition.cumulativeTransactionCost += request.transactionCost;
 
-        for (uint i = 0; i < callParams.puppetListLength; i++) {
-            if (request.puppetCollateralDeltaList[i] == 0) continue;
+        uint[] memory outputAmountList = new uint[](mirrorPosition.puppetList.length);
+        uint[] memory contributionList = new uint[](mirrorPosition.puppetList.length);
 
-            callParams.mirrorPosition.collateralList[i] -= request.puppetCollateralDeltaList[i];
+        for (uint i = 0; i < mirrorPosition.puppetList.length; i++) {
+            if (request.collateralDeltaList[i] == 0) continue;
+
+            mirrorPosition.collateralList[i] -= request.collateralDeltaList[i];
 
             (uint performanceFee, uint traderCutoff, uint amountOutAfterFee) = getDistribution(
                 callConfig.performanceFeeRate,
                 callConfig.traderPerformanceFeeShare,
                 callParams.profit,
-                request.puppetCollateralDeltaList[i] * callParams.mirrorPosition.collateral / callParams.profit,
+                request.collateralDeltaList[i] * mirrorPosition.collateral / callParams.profit,
                 callParams.profit
             );
 
-            totalPerformanceFee += performanceFee;
-            traderPerformanceCutoffFee += traderCutoff;
+            callParams.totalPerformanceFee += performanceFee;
+            callParams.traderPerformanceCutoffFee += traderCutoff;
 
             contributionList[i] = performanceFee;
             outputAmountList[i] += amountOutAfterFee;
         }
 
-        callConfig.puppetStore.increaseBalanceList(callParams.outputToken, address(this), callParams.mirrorPosition.puppetList, outputAmountList);
+        callConfig.puppetStore.increaseBalanceList(outputToken, address(this), mirrorPosition.puppetList, outputAmountList);
 
         if (callParams.profit > 0) {
             callConfig.revenueStore.commitRewardList(
-                callParams.outputToken, //
+                outputToken, //
                 address(this),
-                callParams.mirrorPosition.puppetList,
+                mirrorPosition.puppetList,
                 contributionList,
-                callParams.mirrorPosition.trader,
-                totalPerformanceFee
+                mirrorPosition.trader,
+                callParams.totalPerformanceFee
             );
         }
 
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
-        if (callParams.mirrorPosition.size == order.numbers.sizeDeltaUsd) {
-            callConfig.positionStore.removeMirrorPosition(callParams.positionKey);
+        if (mirrorPosition.size == order.numbers.sizeDeltaUsd) {
+            callConfig.positionStore.removeMirrorPosition(request.positionKey);
         } else {
-            callConfig.positionStore.setMirrorPosition(callParams.positionKey, callParams.mirrorPosition);
+            callConfig.positionStore.setMirrorPosition(request.positionKey, mirrorPosition);
         }
 
-        callConfig.positionStore.removeRequestDecrease(callParams.requestKey);
+        callConfig.positionStore.removeRequestDecrease(requestKey);
 
         if (request.collateralDelta > 0) {
             callConfig.router.transfer(
-                callParams.outputToken,
+                outputToken,
                 callConfig.gmxOrderReciever,
-                callParams.mirrorPosition.trader,
-                request.collateralDelta * callParams.mirrorPosition.collateral / callParams.totalAmountOut
+                mirrorPosition.trader,
+                request.collateralDelta * mirrorPosition.collateral / callParams.totalAmountOut
             );
         }
 
-        emit ExecuteDecreasePosition__DecreasePosition(
-            callParams.requestKey,
-            callParams.positionKey,
-            callParams.totalAmountOut,
-            callParams.profit,
-            totalPerformanceFee,
-            traderPerformanceCutoffFee
+        emit ExecuteDecreasePosition__Execute(
+            requestKey, callParams.totalAmountOut, callParams.profit, callParams.totalPerformanceFee, callParams.traderPerformanceCutoffFee
         );
     }
 
@@ -197,7 +166,7 @@ contract ExecuteDecreasePosition is Permission, EIP712 {
     function _setConfig(CallConfig memory _callConfig) internal {
         callConfig = _callConfig;
 
-        emit ExecuteIncreasePosition__SetConfig(block.timestamp, callConfig);
+        emit ExecuteDecreasePosition__SetConfig(block.timestamp, callConfig);
     }
 
     error ExecutePosition__InvalidRequest(bytes32 positionKey, bytes32 key);

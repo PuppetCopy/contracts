@@ -12,6 +12,7 @@ import {PositionStore} from "./store/PositionStore.sol";
 
 contract ExecuteIncreasePosition is Permission, EIP712 {
     event ExecuteIncreasePosition__SetConfig(uint timestamp, CallConfig callConfig);
+    event ExecuteIncreasePosition__Execute(bytes32 requestKey);
 
     struct CallConfig {
         PositionStore positionStore;
@@ -19,32 +20,36 @@ contract ExecuteIncreasePosition is Permission, EIP712 {
 
     CallConfig callConfig;
 
-    constructor(IAuthority _authority, CallConfig memory _callConfig) Permission(_authority) EIP712("Position Router", "1") {
+    constructor(IAuthority _authority, CallConfig memory _callConfig) Permission(_authority) EIP712("ExecuteIncreasePosition", "1") {
         _setConfig(_callConfig);
     }
 
-    function increase(bytes32 key, GmxPositionUtils.Props memory order) external auth {
-        bytes32 positionKey = GmxPositionUtils.getPositionKey(
-            order.addresses.account, order.addresses.market, order.addresses.initialCollateralToken, order.flags.isLong
-        );
-
-        PositionStore.RequestAdjustment memory request = callConfig.positionStore.getRequestAdjustment(key);
-        PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
+    function execute(bytes32 requestKey, GmxPositionUtils.Props memory order) external auth {
+        PositionStore.RequestAdjustment memory request = callConfig.positionStore.getRequestAdjustment(requestKey);
+        PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(request.positionKey);
 
         if (mirrorPosition.size == 0) {
-            PositionStore.RequestMatch memory matchRequest = callConfig.positionStore.getRequestMatch(positionKey);
+            PositionStore.RequestMatch memory matchRequest = callConfig.positionStore.getRequestMatch(request.positionKey);
             mirrorPosition.trader = matchRequest.trader;
             mirrorPosition.puppetList = matchRequest.puppetList;
+            mirrorPosition.collateralList = request.collateralDeltaList;
 
-            callConfig.positionStore.removeRequestMatch(positionKey);
+            callConfig.positionStore.removeRequestMatch(request.positionKey);
+        } else {
+            // fill mirror position collateralList list
+            for (uint i = 0; i < mirrorPosition.puppetList.length; i++) {
+                mirrorPosition.collateralList[i] += request.collateralDeltaList[i];
+            }
         }
 
         mirrorPosition.collateral += request.collateralDelta;
         mirrorPosition.size += request.sizeDelta;
         mirrorPosition.cumulativeTransactionCost += request.transactionCost;
 
-        callConfig.positionStore.setMirrorPosition(key, mirrorPosition);
-        callConfig.positionStore.removeRequestAdjustment(key);
+        callConfig.positionStore.setMirrorPosition(requestKey, mirrorPosition);
+        callConfig.positionStore.removeRequestAdjustment(requestKey);
+
+        emit ExecuteIncreasePosition__Execute(requestKey);
     }
 
     // governance

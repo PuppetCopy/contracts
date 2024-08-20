@@ -71,12 +71,12 @@ contract PositionRouter is Permission, EIP712, ReentrancyGuardTransient, IGmxOrd
     // in case of failure we can recover the callback to later attempt to execute it again
     function afterOrderExecution(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) external nonReentrant auth {
         if (GmxPositionUtils.isIncreaseOrder(order.numbers.orderType)) {
-            try callConfig.executeIncrease.increase(key, order) {}
+            try callConfig.executeIncrease.execute(key, order) {}
             catch {
                 storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.ExecutedIncrease, order, key, eventData);
             }
         } else if (GmxPositionUtils.isDecreaseOrder(order.numbers.orderType)) {
-            try callConfig.executeDecrease.decrease(key, order, eventData) {}
+            try callConfig.executeDecrease.execute(key, order, eventData) {}
             catch {
                 storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.ExecutedDecrease, order, key, eventData);
             }
@@ -109,9 +109,9 @@ contract PositionRouter is Permission, EIP712, ReentrancyGuardTransient, IGmxOrd
         PositionStore.UnhandledCallback memory callbackData = positionStore.getUnhandledCallback(key);
 
         if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.ExecutedIncrease) {
-            callConfig.executeIncrease.increase(key, callbackData.order);
+            callConfig.executeIncrease.execute(key, callbackData.order);
         } else if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.ExecutedDecrease) {
-            callConfig.executeDecrease.decrease(key, callbackData.order, callbackData.eventData);
+            callConfig.executeDecrease.execute(key, callbackData.order, callbackData.eventData);
         } else if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.Cancelled) {
             callConfig.executeRevertedAdjustment.handleCancelled(key, callbackData.order);
         } else if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.Frozen) {

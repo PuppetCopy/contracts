@@ -4,7 +4,6 @@ pragma solidity 0.8.24;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-import {ReentrancyGuardTransient} from "../utils/ReentrancyGuardTransient.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Permission} from "../utils/access/Permission.sol";
 
@@ -23,7 +22,7 @@ import {SubaccountStore} from "./../shared/store/SubaccountStore.sol";
 import {PuppetStore} from "./../puppet/store/PuppetStore.sol";
 import {PositionStore} from "./store/PositionStore.sol";
 
-contract RequestIncreasePosition is Permission, EIP712, ReentrancyGuardTransient {
+contract RequestIncreasePosition is Permission, EIP712 {
     event RequestIncreasePosition__SetConfig(uint timestamp, CallConfig callConfig);
 
     event RequestIncreasePosition__Match(
@@ -31,9 +30,7 @@ contract RequestIncreasePosition is Permission, EIP712, ReentrancyGuardTransient
         address subaccount,
         bytes32 positionKey,
         bytes32 requestKey,
-        uint transactionCost,
-        address[] puppetList,
-        uint[] puppetCollateralDeltaList
+        address[] puppetList
     );
     event RequestIncreasePosition__Adjust(
         address trader,
@@ -41,10 +38,10 @@ contract RequestIncreasePosition is Permission, EIP712, ReentrancyGuardTransient
         //
         bytes32 positionKey,
         bytes32 requestKey,
-        uint transactionCost,
-        uint[] puppetCollateralDeltaList
+        uint[] puppetCollateralDeltaList,
+        uint transactionCost
     );
-    event RequestIncreasePosition__RequestReducePuppetSize(
+    event RequestIncreasePosition__ReducePuppetSize(
         address trader,
         //
         address subaccount,
@@ -92,7 +89,7 @@ contract RequestIncreasePosition is Permission, EIP712, ReentrancyGuardTransient
 
     CallConfig callConfig;
 
-    constructor(IAuthority _authority, CallConfig memory _callConfig) Permission(_authority) EIP712("Increase Position", "1") {
+    constructor(IAuthority _authority, CallConfig memory _callConfig) Permission(_authority) EIP712("RequestIncreasePosition", "1") {
         _setConfig(_callConfig);
     }
 
@@ -112,7 +109,7 @@ contract RequestIncreasePosition is Permission, EIP712, ReentrancyGuardTransient
                 traderCallParams.collateralToken,
                 traderCallParams.isLong
                 ),
-            puppetCollateralDeltaList: new uint[](puppetList.length),
+            collateralDeltaList: new uint[](puppetList.length),
             collateralDelta: 0,
             sizeDelta: 0,
             transactionCost: startGas
@@ -138,7 +135,7 @@ contract RequestIncreasePosition is Permission, EIP712, ReentrancyGuardTransient
                 traderCallParams.collateralToken,
                 traderCallParams.isLong
                 ),
-            puppetCollateralDeltaList: new uint[](puppetList.length),
+            collateralDeltaList: new uint[](puppetList.length),
             collateralDelta: traderCallParams.collateralDelta,
             sizeDelta: traderCallParams.sizeDelta,
             transactionCost: startGas
@@ -200,7 +197,7 @@ contract RequestIncreasePosition is Permission, EIP712, ReentrancyGuardTransient
 
             matchUp(request, callParams, traderCallParams, puppetList);
         } else {
-            request.puppetCollateralDeltaList = new uint[](mirrorPosition.puppetList.length);
+            request.collateralDeltaList = new uint[](mirrorPosition.puppetList.length);
             AdjustCallParams memory callParams = AdjustCallParams({
                 subaccountAddress: subaccountAddress,
                 ruleList: ruleList,
@@ -255,7 +252,7 @@ contract RequestIncreasePosition is Permission, EIP712, ReentrancyGuardTransient
                 callParams.balanceList[i] = collateralDelta;
                 callParams.activityList[i] = block.timestamp;
 
-                request.puppetCollateralDeltaList[i] = collateralDelta;
+                request.collateralDeltaList[i] = collateralDelta;
                 request.collateralDelta += collateralDelta;
                 request.sizeDelta += Precision.applyBasisPoints(callParams.sizeDeltaMultiplier, collateralDelta);
             }
@@ -273,9 +270,7 @@ contract RequestIncreasePosition is Permission, EIP712, ReentrancyGuardTransient
             callParams.subaccountAddress,
             request.positionKey,
             requestKey,
-            request.transactionCost,
-            requestMatch.puppetList,
-            request.puppetCollateralDeltaList
+            requestMatch.puppetList
         );
     }
 
@@ -301,7 +296,7 @@ contract RequestIncreasePosition is Permission, EIP712, ReentrancyGuardTransient
                 callParams.depositList[i] -= collateralDelta;
                 callParams.activityList[i] = block.timestamp;
 
-                request.puppetCollateralDeltaList[i] += collateralDelta;
+                request.collateralDeltaList[i] += collateralDelta;
                 request.collateralDelta += collateralDelta;
                 request.sizeDelta += Precision.applyBasisPoints(callParams.sizeDeltaMultiplier, collateralDelta);
             } else if (callParams.mpTargetLeverage > callParams.mpLeverage) {
@@ -334,9 +329,9 @@ contract RequestIncreasePosition is Permission, EIP712, ReentrancyGuardTransient
                 requestKey = _createOrder(request, traderCallParams, callParams.subaccountAddress, request.positionKey);
             }
 
-            bytes32 reduceKey =
+            bytes32 requestReduceKey =
                 _reducePuppetSizeDelta(traderCallParams, callParams.subaccountAddress, callParams.puppetReduceSizeDelta, request.positionKey);
-            callConfig.positionStore.setRequestAdjustment(reduceKey, request);
+            callConfig.positionStore.setRequestAdjustment(requestReduceKey, request);
         } else {
             request.sizeDelta -= callParams.puppetReduceSizeDelta;
             requestKey = _createOrder(request, traderCallParams, callParams.subaccountAddress, request.positionKey);
@@ -393,8 +388,8 @@ contract RequestIncreasePosition is Permission, EIP712, ReentrancyGuardTransient
             //
             positionKey,
             requestKey,
-            request.transactionCost,
-            request.puppetCollateralDeltaList
+            request.collateralDeltaList,
+            request.transactionCost
         );
     }
 
@@ -436,7 +431,7 @@ contract RequestIncreasePosition is Permission, EIP712, ReentrancyGuardTransient
 
         requestKey = abi.decode(orderReturnData, (bytes32));
 
-        emit RequestIncreasePosition__RequestReducePuppetSize(
+        emit RequestIncreasePosition__ReducePuppetSize(
             traderCallParams.account, subaccountAddress, positionKey, requestKey, puppetReduceSizeDelta
         );
     }
