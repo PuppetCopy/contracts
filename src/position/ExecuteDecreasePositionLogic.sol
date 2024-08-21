@@ -1,31 +1,26 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
-
-import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {Permission} from "../utils/access/Permission.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IGmxEventUtils} from "./interface/IGmxEventUtils.sol";
-
 import {Router} from "src/shared/Router.sol";
-import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
+
+import {CoreContract} from "../utils/CoreContract.sol";
+import {EventEmitter} from "../utils/EventEmitter.sol";
+import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "./../utils/Precision.sol";
+import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
-import {PuppetStore} from "./../puppet/store/PuppetStore.sol";
+import {PuppetStore} from "../puppet/store/PuppetStore.sol";
+import {RevenueStore} from "../tokenomics/store/RevenueStore.sol";
 import {PositionStore} from "./store/PositionStore.sol";
-import {RevenueStore} from "./../tokenomics/store/RevenueStore.sol";
 
-contract ExecuteDecreasePosition is Permission, EIP712 {
-    event ExecuteDecreasePosition__SetConfig(uint timestamp, CallConfig callConfig);
+contract ExecuteDecreasePositionLogic is CoreContract {
+    event ExecuteDecreasePositionLogic__SetConfig(uint timestamp, Config config);
 
-    event ExecuteDecreasePosition__Execute(
-        bytes32 requestKey, uint totalAmountOut, uint profit, uint totalPerformanceFee, uint traderPerformanceCutoffFee
-    );
-
-    struct CallConfig {
+    struct Config {
         Router router;
         PositionStore positionStore;
         PuppetStore puppetStore;
@@ -42,18 +37,26 @@ contract ExecuteDecreasePosition is Permission, EIP712 {
         uint traderPerformanceCutoffFee;
     }
 
-    CallConfig callConfig;
+    Config config;
 
-    constructor(IAuthority _authority, CallConfig memory _callConfig) Permission(_authority) EIP712("ExecuteDecreasePosition", "1") {
-        _setConfig(_callConfig);
+    constructor(
+        IAuthority _authority,
+        EventEmitter _eventEmitter,
+        Config memory _config
+    ) CoreContract("ExecuteDecreasePositionLogic", "1", _authority, _eventEmitter) {
+        _setConfig(_config);
     }
 
-    function execute(bytes32 requestKey, GmxPositionUtils.Props calldata order, bytes calldata eventData) external auth {
+    function execute(
+        bytes32 requestKey,
+        GmxPositionUtils.Props calldata order,
+        bytes calldata eventData
+    ) external auth {
         (IGmxEventUtils.EventLogData memory eventLogData) = abi.decode(eventData, (IGmxEventUtils.EventLogData));
 
         // Check if there is at least one uint item available
         if (eventLogData.uintItems.items.length == 0 && eventLogData.uintItems.arrayItems.length == 0) {
-            revert ExecutePosition__UnexpectedEventData();
+            revert ExecuteDecreasePositionLogic__UnexpectedEventData();
         }
 
         CallParams memory callParams = CallParams({
@@ -63,11 +66,11 @@ contract ExecuteDecreasePosition is Permission, EIP712 {
             profit: 0
         });
 
-        PositionStore.RequestAdjustment memory request = callConfig.positionStore.getRequestAdjustment(requestKey);
-        PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(request.positionKey);
+        PositionStore.RequestAdjustment memory request = config.positionStore.getRequestAdjustment(requestKey);
+        PositionStore.MirrorPosition memory mirrorPosition = config.positionStore.getMirrorPosition(request.positionKey);
 
         if (mirrorPosition.size == 0) {
-            revert ExecutePosition__InvalidRequest(request.positionKey, requestKey);
+            revert ExecuteDecreasePositionLogic__InvalidRequest(request.positionKey, requestKey);
         }
         IERC20 outputToken = IERC20(eventLogData.addressItems.items[0].value);
 
@@ -88,8 +91,8 @@ contract ExecuteDecreasePosition is Permission, EIP712 {
             mirrorPosition.collateralList[i] -= request.collateralDeltaList[i];
 
             (uint performanceFee, uint traderCutoff, uint amountOutAfterFee) = getDistribution(
-                callConfig.performanceFeeRate,
-                callConfig.traderPerformanceFeeShare,
+                config.performanceFeeRate,
+                config.traderPerformanceFeeShare,
                 callParams.profit,
                 request.collateralDeltaList[i] * mirrorPosition.collateral / callParams.profit,
                 callParams.profit
@@ -102,10 +105,10 @@ contract ExecuteDecreasePosition is Permission, EIP712 {
             outputAmountList[i] += amountOutAfterFee;
         }
 
-        callConfig.puppetStore.increaseBalanceList(outputToken, address(this), mirrorPosition.puppetList, outputAmountList);
+        config.puppetStore.increaseBalanceList(outputToken, address(this), mirrorPosition.puppetList, outputAmountList);
 
         if (callParams.profit > 0) {
-            callConfig.revenueStore.commitRewardList(
+            config.revenueStore.commitRewardList(
                 outputToken, //
                 address(this),
                 mirrorPosition.puppetList,
@@ -117,24 +120,32 @@ contract ExecuteDecreasePosition is Permission, EIP712 {
 
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
         if (mirrorPosition.size == order.numbers.sizeDeltaUsd) {
-            callConfig.positionStore.removeMirrorPosition(request.positionKey);
+            config.positionStore.removeMirrorPosition(request.positionKey);
         } else {
-            callConfig.positionStore.setMirrorPosition(request.positionKey, mirrorPosition);
+            config.positionStore.setMirrorPosition(request.positionKey, mirrorPosition);
         }
 
-        callConfig.positionStore.removeRequestDecrease(requestKey);
+        config.positionStore.removeRequestDecrease(requestKey);
 
         if (request.collateralDelta > 0) {
-            callConfig.router.transfer(
+            config.router.transfer(
                 outputToken,
-                callConfig.gmxOrderReciever,
+                config.gmxOrderReciever,
                 mirrorPosition.trader,
                 request.collateralDelta * mirrorPosition.collateral / callParams.totalAmountOut
             );
         }
 
-        emit ExecuteDecreasePosition__Execute(
-            requestKey, callParams.totalAmountOut, callParams.profit, callParams.totalPerformanceFee, callParams.traderPerformanceCutoffFee
+        eventEmitter.log(
+            "ExecuteDecreasePositionLogic",
+            abi.encode(
+                requestKey,
+                request.positionKey,
+                callParams.totalAmountOut,
+                callParams.profit,
+                callParams.totalPerformanceFee,
+                callParams.traderPerformanceCutoffFee
+            )
         );
     }
 
@@ -159,16 +170,16 @@ contract ExecuteDecreasePosition is Permission, EIP712 {
 
     // governance
 
-    function setConfig(CallConfig memory _callConfig) external auth {
-        _setConfig(_callConfig);
+    function setConfig(Config memory _config) external auth {
+        _setConfig(_config);
     }
 
-    function _setConfig(CallConfig memory _callConfig) internal {
-        callConfig = _callConfig;
+    function _setConfig(Config memory _config) internal {
+        config = _config;
 
-        emit ExecuteDecreasePosition__SetConfig(block.timestamp, callConfig);
+        emit ExecuteDecreasePositionLogic__SetConfig(block.timestamp, _config);
     }
 
-    error ExecutePosition__InvalidRequest(bytes32 positionKey, bytes32 key);
-    error ExecutePosition__UnexpectedEventData();
+    error ExecuteDecreasePositionLogic__InvalidRequest(bytes32 positionKey, bytes32 key);
+    error ExecuteDecreasePositionLogic__UnexpectedEventData();
 }

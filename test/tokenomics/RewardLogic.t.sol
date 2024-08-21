@@ -11,20 +11,30 @@ import {Precision} from "src/utils/Precision.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 
-import {VotingEscrow, MAXTIME} from "src/tokenomics/VotingEscrow.sol";
-import {RewardStore} from "src/tokenomics/store/RewardStore.sol";
-import {RevenueStore} from "src/tokenomics/store/RevenueStore.sol";
-import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
 import {RevenueLogic} from "src/tokenomics/RevenueLogic.sol";
+import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
+import {MAXTIME, VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
+import {RevenueStore} from "src/tokenomics/store/RevenueStore.sol";
+import {RewardStore} from "src/tokenomics/store/RewardStore.sol";
+
+import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
+import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
+
+import {TokenomicsRouter} from "src/TokenomicsRouter.sol";
 
 contract RewardLogicTest is BasicSetup {
-    VotingEscrow votingEscrow;
+    VotingEscrowLogic votingEscrow;
     MockWeightedPoolVault primaryVaultPool;
     RewardStore rewardStore;
     RevenueStore revenueStore;
 
     RewardLogic rewardLogic;
     RevenueLogic revenueLogic;
+
+    PuppetVoteToken puppetVoteToken;
+    VotingEscrowStore votingEscrowStore;
+
+    TokenomicsRouter tokenomicsRouter;
 
     RewardLogic.Config public config = RewardLogic.Config({
         baselineEmissionRate: 1e30,
@@ -38,7 +48,11 @@ contract RewardLogicTest is BasicSetup {
 
         super.setUp();
 
-        votingEscrow = new VotingEscrow(dictator, router, puppetToken);
+        puppetVoteToken = new PuppetVoteToken(dictator);
+        votingEscrowStore = new VotingEscrowStore(dictator);
+
+        votingEscrow =
+            new VotingEscrowLogic(dictator, eventEmitter, router, puppetToken, puppetVoteToken, votingEscrowStore);
         dictator.setAccess(router, address(votingEscrow));
 
         IERC20[] memory _buybackTokenList = new IERC20[](2);
@@ -57,12 +71,21 @@ contract RewardLogicTest is BasicSetup {
         revenueLogic = new RevenueLogic(dictator, puppetToken, revenueStore);
         dictator.setAccess(revenueStore, address(revenueLogic));
 
-        rewardLogic = new RewardLogic(dictator, votingEscrow, puppetToken, rewardStore, revenueStore, config);
+        rewardLogic = new RewardLogic(
+            dictator, //
+            eventEmitter,
+            votingEscrow,
+            puppetToken,
+            rewardStore,
+            revenueStore,
+            config
+        );
         dictator.setAccess(rewardStore, address(rewardLogic));
-        dictator.setPermission(votingEscrow, address(rewardLogic), votingEscrow.lock.selector);
-        dictator.setPermission(votingEscrow, address(rewardLogic), votingEscrow.vest.selector);
-        dictator.setPermission(votingEscrow, address(rewardLogic), votingEscrow.claim.selector);
+        dictator.setAccess(votingEscrow, address(rewardLogic));
         dictator.setPermission(puppetToken, address(rewardLogic), puppetToken.mint.selector);
+
+        tokenomicsRouter =
+            new TokenomicsRouter(dictator, TokenomicsRouter.Config({rewardLogic: rewardLogic, veLogic: votingEscrow}));
 
         // permissions used for testing
         vm.startPrank(users.owner);
@@ -84,8 +107,14 @@ contract RewardLogicTest is BasicSetup {
         revenueLogic.buybackRevenue(users.owner, users.owner, wnt, revenueAmount);
 
         // Assert: Check the final state
-        assertEq(puppetToken.balanceOf(address(revenueStore)), thresholdAmount, "Puppet token balance should be increased by the buyback amount");
-        assertEq(wnt.balanceOf(users.owner), revenueAmount, "Other token balance should be reduced by the buyback amount");
+        assertEq(
+            puppetToken.balanceOf(address(revenueStore)),
+            thresholdAmount,
+            "Puppet token balance should be increased by the buyback amount"
+        );
+        assertEq(
+            wnt.balanceOf(users.owner), revenueAmount, "Other token balance should be reduced by the buyback amount"
+        );
     }
 
     // function testExitOption() public {
@@ -103,7 +132,8 @@ contract RewardLogicTest is BasicSetup {
     //     assertApproxEqAbs(rewardRouter.getClaimableEmission(wnt, users.yossi), 1.5e18, 0.1e18);
     //     assertApproxEqAbs(rewardRouter.getClaimableEmission(wnt, users.alice), 0.5e18, 0.1e18);
 
-    //     assertApproxEqAbs(rewardRouter.getClaimableEmission(wnt, users.alice) + rewardRouter.getClaimableEmission(wnt, users.yossi), 2e18,
+    //     assertApproxEqAbs(rewardRouter.getClaimableEmission(wnt, users.alice) +
+    // rewardRouter.getClaimableEmission(wnt, users.yossi), 2e18,
     // 0.001e18);
     //     // assertEq(
     //     //     votingEscrow.balanceOf(users.yossi) + votingEscrow.balanceOf(users.alice),
@@ -174,7 +204,8 @@ contract RewardLogicTest is BasicSetup {
     //     generateUserRevenue(usdc, users.bob, 100e6);
     //     assertEq(getLockClaimableAmount(usdc, users.bob), 60e18);
     //     lock(usdc, getMaxTime() / 2, 1e6, 100e6);
-    //     assertApproxEqAbs(votingEscrow.balanceOf(users.bob), Precision.applyBasisPoints(lockRate, 100e18) / 4, 0.05e18);
+    //     assertApproxEqAbs(votingEscrow.balanceOf(users.bob), Precision.applyBasisPoints(lockRate, 100e18) / 4,
+    // 0.05e18);
     // }
 
     // function testVestingDecay() public {
@@ -243,9 +274,9 @@ contract RewardLogicTest is BasicSetup {
     }
 
     function lock(IERC20 token, address user, uint lockDuration, uint amount) public returns (uint) {
-        rewardLogic.distributeEmission(token);
+        // rewardLogic.distributeEmission(token);
 
-        uint claimableInToken = rewardLogic.lock(token, lockDuration);
+        uint claimableInToken = tokenomicsRouter.lock(token, lockDuration);
 
         return claimableInToken;
     }
@@ -259,7 +290,7 @@ contract RewardLogicTest is BasicSetup {
     function claim(IERC20 token, address user) public returns (uint) {
         vm.startPrank(user);
 
-        return rewardLogic.claimEmission(token, user);
+        return tokenomicsRouter.claimEmission(token, user);
     }
 
     function fromPriceToSqrt(uint usdcPerWeth) public pure returns (uint160) {

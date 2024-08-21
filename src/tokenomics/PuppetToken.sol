@@ -4,16 +4,24 @@ pragma solidity 0.8.24;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Permission} from "src/utils/access/Permission.sol";
 import {Precision} from "src/utils/Precision.sol";
+import {Permission} from "src/utils/access/Permission.sol";
 import {IAuthority} from "src/utils/interfaces/IAuthority.sol";
 import {IERC20Mintable} from "src/utils/interfaces/IERC20Mintable.sol";
 
 /// @title Puppet ERC20 Token
-/// @notice An ERC20 token with a mint rate limit designed to mitigate and provide feedback of a potential critical faults or bugs in the minting process.
-/// @dev The limit restricts the quantity of new tokens that can be minted within a given timeframe, proportional to the existing supply.
-/// The mintCore function in the contract is designed to allocate tokens to the core contributors over time, with the allocation amount decreasing
-/// as more time passes from the deployment of the contract. This is intended to gradually transfer governance power and incentivises broader ownership.
+/// @notice An ERC20 token with a mint rate limit designed to mitigate and provide feedback of a
+/// potential critical
+/// faults or bugs in the minting process.
+/// @dev The limit restricts the quantity of new tokens that can be minted within a given timeframe,
+/// proportional to the
+/// existing supply.
+/// The mintCore function in the contract is designed to allocate tokens to the core contributors
+/// over time, with the
+/// allocation amount decreasing
+/// as more time passes from the deployment of the contract. This is intended to gradually transfer
+/// governance power and
+/// incentivises broader ownership.
 contract PuppetToken is Permission, ERC20, IERC20Mintable {
     /// @notice Emitted when the configuration is set or updated.
     /// @param config The new configuration.
@@ -33,7 +41,9 @@ contract PuppetToken is Permission, ERC20, IERC20Mintable {
 
     /// @notice The configuration for the mint rate limit.
     struct Config {
-        uint limitFactor; // Rate limit for minting new tokens in percentage of total supply, e.g. 0.01e30 (1%) circulating supply per durationWindow
+        uint limitFactor; // Rate limit for minting new tokens in percentage of total supply, e.g.
+            // 0.01e30 (1%)
+            // circulating supply per durationWindow
         uint durationWindow; // Time window for minting rate limit in seconds
     }
 
@@ -52,11 +62,16 @@ contract PuppetToken is Permission, ERC20, IERC20Mintable {
     /// @notice The amount of tokens minted to the core.
     uint public mintedCoreAmount = 0;
 
-    /// @notice Initializes the contract with authority, configuration, and initial receiver of genesis mint.
+    /// @notice Initializes the contract with authority, configuration, and initial receiver of
+    /// genesis mint.
     /// @param _authority The authority contract for permission checks.
     /// @param _config The initial configuration for mint rate limit.
     /// @param receiver The address to receive the genesis mint amount.
-    constructor(IAuthority _authority, Config memory _config, address receiver) Permission(_authority) ERC20("Puppet Test", "PUPPET-TEST") {
+    constructor(
+        IAuthority _authority,
+        Config memory _config,
+        address receiver
+    ) Permission(_authority) ERC20("Puppet Test", "PUPPET-TEST") {
         _setConfig(_config);
         _mint(receiver, GENESIS_MINT_AMOUNT);
 

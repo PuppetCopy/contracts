@@ -2,32 +2,24 @@
 pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {Permission} from "../utils/access/Permission.sol";
-import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
+
+import {CoreContract} from "../utils/CoreContract.sol";
+import {EventEmitter} from "../utils/EventEmitter.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {Subaccount} from "./../shared/Subaccount.sol";
-
-import {PositionUtils} from "./utils/PositionUtils.sol";
-import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 import {ErrorUtils} from "./../utils/ErrorUtils.sol";
+import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
+import {PositionUtils} from "./utils/PositionUtils.sol";
 
-import {PositionStore} from "./store/PositionStore.sol";
+import {Subaccount} from "./../shared/Subaccount.sol";
 import {SubaccountStore} from "./../shared/store/SubaccountStore.sol";
+import {PositionStore} from "./store/PositionStore.sol";
 
-contract RequestDecreasePosition is Permission, EIP712 {
-    event RequestDecreasePosition__Decrease(
-        address trader,
-        //
-        address subaccount,
-        bytes32 positionKey,
-        bytes32 requestKey,
-        uint traderCollateralDelta
-    );
-    event RequestDecreasePosition__SetConfig(uint timestamp, CallConfig callConfig);
+contract RequestDecreasePositionLogic is CoreContract {
+    event RequestDecreasePositionLogic__SetConfig(uint timestamp, Config config);
 
-    struct CallConfig {
+    struct Config {
         IGmxExchangeRouter gmxExchangeRouter;
         PositionStore positionStore;
         SubaccountStore subaccountStore;
@@ -37,19 +29,25 @@ contract RequestDecreasePosition is Permission, EIP712 {
         uint callbackGasLimit;
     }
 
-    CallConfig callConfig;
+    Config config;
 
-    constructor(IAuthority _authority, CallConfig memory _callConfig) Permission(_authority) EIP712("RequestDecreasePosition", "1") {
-        _setConfig(_callConfig);
+    constructor(
+        IAuthority _authority,
+        EventEmitter _eventEmitter,
+        Config memory _config
+    ) CoreContract("RequestDecreasePositionLogic", "1", _authority, _eventEmitter) {
+        _setConfig(_config);
     }
 
     function traderDecrease(PositionUtils.TraderCallParams calldata traderCallParams, address user) external auth {
         uint startGas = gasleft();
 
-        Subaccount subaccount = callConfig.subaccountStore.getSubaccount(user);
+        Subaccount subaccount = config.subaccountStore.getSubaccount(user);
         address subaccountAddress = address(subaccount);
 
-        if (subaccountAddress == address(0)) revert RequestDecreasePosition__SubaccountNotFound(traderCallParams.account);
+        if (subaccountAddress == address(0)) {
+            revert RequestDecreasePositionLogic__SubaccountNotFound(traderCallParams.account);
+        }
 
         bytes32 positionKey = GmxPositionUtils.getPositionKey(
             subaccountAddress, //
@@ -58,7 +56,7 @@ contract RequestDecreasePosition is Permission, EIP712 {
             traderCallParams.isLong
         );
 
-        PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
+        PositionStore.MirrorPosition memory mirrorPosition = config.positionStore.getMirrorPosition(positionKey);
 
         PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
             positionKey: positionKey,
@@ -74,10 +72,12 @@ contract RequestDecreasePosition is Permission, EIP712 {
     function proxyDecrease(PositionUtils.TraderCallParams calldata traderCallParams, address user) external auth {
         uint startGas = gasleft();
 
-        Subaccount subaccount = callConfig.subaccountStore.getSubaccount(user);
+        Subaccount subaccount = config.subaccountStore.getSubaccount(user);
         address subaccountAddress = address(subaccount);
 
-        if (subaccountAddress == address(0)) revert RequestDecreasePosition__SubaccountNotFound(traderCallParams.account);
+        if (subaccountAddress == address(0)) {
+            revert RequestDecreasePositionLogic__SubaccountNotFound(traderCallParams.account);
+        }
 
         bytes32 positionKey = GmxPositionUtils.getPositionKey(
             subaccountAddress, //
@@ -86,7 +86,7 @@ contract RequestDecreasePosition is Permission, EIP712 {
             traderCallParams.isLong
         );
 
-        PositionStore.MirrorPosition memory mirrorPosition = callConfig.positionStore.getMirrorPosition(positionKey);
+        PositionStore.MirrorPosition memory mirrorPosition = config.positionStore.getMirrorPosition(positionKey);
 
         PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
             positionKey: positionKey,
@@ -107,13 +107,14 @@ contract RequestDecreasePosition is Permission, EIP712 {
         address subaccountAddress
     ) internal {
         for (uint i = 0; i < mirrorPosition.puppetList.length; i++) {
-            request.collateralDeltaList[i] -= request.collateralDeltaList[i] * traderCallParams.collateralDelta / mirrorPosition.collateral;
+            request.collateralDeltaList[i] -=
+                request.collateralDeltaList[i] * traderCallParams.collateralDelta / mirrorPosition.collateral;
         }
 
         GmxPositionUtils.CreateOrderParams memory orderParams = GmxPositionUtils.CreateOrderParams({
             addresses: GmxPositionUtils.CreateOrderParamsAddresses({
-                receiver: callConfig.gmxOrderReciever,
-                callbackContract: callConfig.gmxOrderReciever,
+                receiver: config.gmxOrderReciever,
+                callbackContract: config.gmxOrderReciever,
                 uiFeeReceiver: address(0),
                 market: traderCallParams.market,
                 initialCollateralToken: traderCallParams.collateralToken,
@@ -125,18 +126,19 @@ contract RequestDecreasePosition is Permission, EIP712 {
                 triggerPrice: traderCallParams.triggerPrice,
                 acceptablePrice: traderCallParams.acceptablePrice,
                 executionFee: traderCallParams.executionFee,
-                callbackGasLimit: callConfig.callbackGasLimit,
+                callbackGasLimit: config.callbackGasLimit,
                 minOutputAmount: 0
             }),
             orderType: GmxPositionUtils.OrderType.MarketDecrease,
             decreasePositionSwapType: GmxPositionUtils.DecreasePositionSwapType.NoSwap,
             isLong: traderCallParams.isLong,
             shouldUnwrapNativeToken: false,
-            referralCode: callConfig.referralCode
+            referralCode: config.referralCode
         });
 
         (bool orderSuccess, bytes memory orderReturnData) = subaccount.execute(
-            address(callConfig.gmxExchangeRouter), abi.encodeWithSelector(callConfig.gmxExchangeRouter.createOrder.selector, orderParams)
+            address(config.gmxExchangeRouter),
+            abi.encodeWithSelector(config.gmxExchangeRouter.createOrder.selector, orderParams)
         );
 
         if (!orderSuccess) ErrorUtils.revertWithParsedMessage(orderReturnData);
@@ -145,24 +147,31 @@ contract RequestDecreasePosition is Permission, EIP712 {
 
         request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + traderCallParams.executionFee;
 
-        callConfig.positionStore.setRequestAdjustment(requestKey, request);
+        config.positionStore.setRequestAdjustment(requestKey, request);
 
-        emit RequestDecreasePosition__Decrease(
-            traderCallParams.account, subaccountAddress, request.positionKey, requestKey, traderCallParams.collateralDelta
+        eventEmitter.log(
+            "RequestDecreasePositionLogic__Decrease",
+            abi.encode(
+                traderCallParams.account,
+                subaccountAddress,
+                requestKey,
+                request.positionKey,
+                traderCallParams.collateralDelta
+            )
         );
     }
 
     // governance
 
-    function setConfig(CallConfig memory _callConfig) external auth {
-        _setConfig(_callConfig);
+    function setConfig(Config memory _config) external auth {
+        _setConfig(_config);
     }
 
-    function _setConfig(CallConfig memory _callConfig) internal {
-        callConfig = _callConfig;
+    function _setConfig(Config memory _config) internal {
+        config = _config;
 
-        emit RequestDecreasePosition__SetConfig(block.timestamp, callConfig);
+        emit RequestDecreasePositionLogic__SetConfig(block.timestamp, _config);
     }
 
-    error RequestDecreasePosition__SubaccountNotFound(address user);
+    error RequestDecreasePositionLogic__SubaccountNotFound(address user);
 }

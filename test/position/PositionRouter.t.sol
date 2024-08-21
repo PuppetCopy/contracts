@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IWNT} from "src/utils/interfaces/IWNT.sol";
 
@@ -11,25 +11,24 @@ import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
+import {PuppetLogic} from "src/puppet/PuppetLogic.sol";
 import {RevenueStore} from "src/tokenomics/store/RevenueStore.sol";
-import {PuppetLogic} from "src/puppet/logic/PuppetLogic.sol";
 
+import {ExecuteDecreasePositionLogic} from "src/position/ExecuteDecreasePositionLogic.sol";
+import {ExecuteIncreasePositionLogic} from "src/position/ExecuteIncreasePositionLogic.sol";
+import {ExecuteRevertedAdjustmentLogic} from "src/position/ExecuteRevertedAdjustmentLogic.sol";
+import {RequestDecreasePositionLogic} from "src/position/RequestDecreasePositionLogic.sol";
+import {RequestIncreasePositionLogic} from "src/position/RequestIncreasePositionLogic.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxOracle} from "src/position/interface/IGmxOracle.sol";
 
-import {RequestIncreasePosition} from "src/position/RequestIncreasePosition.sol";
-import {RequestDecreasePosition} from "src/position/RequestDecreasePosition.sol";
-import {ExecuteIncreasePosition} from "src/position/ExecuteIncreasePosition.sol";
-import {ExecuteDecreasePosition} from "src/position/ExecuteDecreasePosition.sol";
-import {ExecuteRevertedAdjustment} from "src/position/ExecuteRevertedAdjustment.sol";
-
 import {SubaccountStore} from "src/shared/store/SubaccountStore.sol";
 
+import {PuppetRouter} from "src/PuppetRouter.sol";
 import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
-import {PuppetRouter} from "src/puppet/PuppetRouter.sol";
 
-import {PositionStore} from "src/position/store/PositionStore.sol";
 import {PositionRouter} from "src/PositionRouter.sol";
+import {PositionStore} from "src/position/store/PositionStore.sol";
 
 import {Address} from "script/Const.sol";
 
@@ -37,6 +36,7 @@ contract PositionRouterTest is BasicSetup {
     uint arbitrumFork;
 
     PuppetStore puppetStore;
+    PuppetLogic puppetLogic;
     PositionStore positionStore;
 
     PuppetRouter puppetRouter;
@@ -74,27 +74,25 @@ contract PositionRouterTest is BasicSetup {
         revenueStore = new RevenueStore(dictator, router, _tokenBuybackThresholdList, _tokenBuybackThresholdAmountList);
 
         puppetStore = new PuppetStore(dictator, router, _tokenAllowanceCapList, _tokenAllowanceCapAmountList);
-        puppetRouter = new PuppetRouter(
+        puppetLogic = new PuppetLogic(
             dictator,
+            eventEmitter,
+            router,
             puppetStore,
-            PuppetRouter.CallConfig({
-                setRule: PuppetLogic.CallSetRuleConfig({
-                    router: router, //
-                    minExpiryDuration: 0,
-                    minAllowanceRate: 100,
-                    maxAllowanceRate: 5000
-                })
-            })
+            PuppetLogic.Config({minExpiryDuration: 0, minAllowanceRate: 100, maxAllowanceRate: 5000})
         );
+        puppetRouter = new PuppetRouter(dictator, PuppetRouter.Config({logic: puppetLogic}));
+
         dictator.setAccess(puppetStore, address(puppetRouter));
         dictator.setAccess(router, address(puppetStore));
 
         subaccountStore = new SubaccountStore(dictator, computeCreateAddress(users.owner, vm.getNonce(users.owner) + 2));
         positionStore = new PositionStore(dictator, router);
 
-        RequestIncreasePosition requestIncrease = new RequestIncreasePosition(
+        RequestIncreasePositionLogic requestIncrease = new RequestIncreasePositionLogic(
             dictator,
-            RequestIncreasePosition.CallConfig({
+            eventEmitter,
+            RequestIncreasePositionLogic.Config({
                 wnt: wnt,
                 gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
                 router: router,
@@ -110,11 +108,13 @@ contract PositionRouterTest is BasicSetup {
                 tokenTransferGasLimit: 200_000
             })
         );
-        ExecuteIncreasePosition executeIncrease =
-            new ExecuteIncreasePosition(dictator, ExecuteIncreasePosition.CallConfig({positionStore: positionStore}));
-        RequestDecreasePosition requestDecrease = new RequestDecreasePosition(
+        ExecuteIncreasePositionLogic executeIncrease = new ExecuteIncreasePositionLogic(
+            dictator, eventEmitter, ExecuteIncreasePositionLogic.Config({positionStore: positionStore})
+        );
+        RequestDecreasePositionLogic requestDecrease = new RequestDecreasePositionLogic(
             dictator,
-            RequestDecreasePosition.CallConfig({
+            eventEmitter,
+            RequestDecreasePositionLogic.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
                 positionStore: positionStore,
                 subaccountStore: subaccountStore,
@@ -124,9 +124,10 @@ contract PositionRouterTest is BasicSetup {
                 callbackGasLimit: 2_000_000
             })
         );
-        ExecuteDecreasePosition executeDecrease = new ExecuteDecreasePosition(
+        ExecuteDecreasePositionLogic executeDecrease = new ExecuteDecreasePositionLogic(
             dictator,
-            ExecuteDecreasePosition.CallConfig({
+            eventEmitter,
+            ExecuteDecreasePositionLogic.Config({
                 router: router,
                 positionStore: positionStore,
                 puppetStore: puppetStore,
@@ -136,13 +137,14 @@ contract PositionRouterTest is BasicSetup {
                 traderPerformanceFeeShare: 0.5e30 // shared between trader and platform
             })
         );
-        ExecuteRevertedAdjustment executeRevertedAdjustment =
-            new ExecuteRevertedAdjustment(dictator, ExecuteRevertedAdjustment.CallConfig({handlehandle: "test"}));
+        ExecuteRevertedAdjustmentLogic executeRevertedAdjustment = new ExecuteRevertedAdjustmentLogic(
+            dictator, eventEmitter, ExecuteRevertedAdjustmentLogic.Config({handlehandle: "test"})
+        );
 
         positionRouter = new PositionRouter(
             dictator,
             positionStore,
-            PositionRouter.CallConfig({
+            PositionRouter.Config({
                 requestIncrease: requestIncrease,
                 requestDecrease: requestDecrease,
                 executeIncrease: executeIncrease,
@@ -193,15 +195,25 @@ contract PositionRouterTest is BasicSetup {
         // );
     }
 
-    function getGeneratePuppetList(IERC20 collateralToken, address trader, uint _length) internal returns (address[] memory) {
+    function getGeneratePuppetList(
+        IERC20 collateralToken,
+        address trader,
+        uint _length
+    ) internal returns (address[] memory) {
         address[] memory puppetList = new address[](_length);
         for (uint i; i < _length; i++) {
-            puppetList[i] = createPuppet(collateralToken, trader, string(abi.encodePacked("puppet:", Strings.toString(i))), 100e6);
+            puppetList[i] =
+                createPuppet(collateralToken, trader, string(abi.encodePacked("puppet:", Strings.toString(i))), 100e6);
         }
         return sortAddresses(puppetList);
     }
 
-    function createPuppet(IERC20 collateralToken, address trader, string memory name, uint fundValue) internal returns (address payable) {
+    function createPuppet(
+        IERC20 collateralToken,
+        address trader,
+        string memory name,
+        uint fundValue
+    ) internal returns (address payable) {
         address payable user = payable(makeAddr(name));
         _dealERC20(address(collateralToken), user, fundValue);
         vm.startPrank(user);

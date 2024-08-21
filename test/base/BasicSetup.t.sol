@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import { Test } from "forge-std/src/Test.sol";
+import {Test} from "forge-std/src/Test.sol";
 
-import {Dictator} from "src/shared/Dictator.sol";
-import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
-import {Router} from "src/shared/Router.sol";
 import {IWNT} from "./../../src/utils/interfaces/IWNT.sol";
+import {Dictator} from "src/shared/Dictator.sol";
+
+import {Router} from "src/shared/Router.sol";
+import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+import {EventEmitter} from "src/utils/EventEmitter.sol";
 
 contract BasicSetup is Test {
     struct Users {
@@ -25,6 +27,7 @@ contract BasicSetup is Test {
     IERC20 usdc = IERC20(address(deployMockERC20("USDC", "USDC", 18)));
 
     Dictator dictator;
+    EventEmitter eventEmitter;
     PuppetToken puppetToken;
     Router router;
 
@@ -40,8 +43,10 @@ contract BasicSetup is Test {
         vm.startPrank(users.owner);
 
         dictator = new Dictator(users.owner);
+        eventEmitter = new EventEmitter(dictator);
         router = new Router(dictator, 200_000);
-        puppetToken = new PuppetToken(dictator, PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}), users.owner);
+        puppetToken =
+            new PuppetToken(dictator, PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}), users.owner);
 
         skip(1 hours);
     }

@@ -41,10 +41,11 @@ ignore = ["**/interface/**/*.sol", "**/utils/**/*.sol", "**/shared/**/*.sol"]
   int_types = "short"
   number_underscore = "preserve"
   quote_style = "double"
+  multiline_func_header = "params_first"
+  sort_imports = true
   tab_width = 4
   wrap_comments = true
   func_attrs_with_params_multiline = true
-  line_length = 150
 
 [rpc_endpoints]
   localhost = "http://localhost:8545"

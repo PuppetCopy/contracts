@@ -1,21 +1,37 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {VotingEscrow} from "src/tokenomics/VotingEscrow.sol";
 import {Router} from "src/shared/Router.sol";
+
+import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
+
+import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
+import {VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
+import {VotingEscrowLocker} from "test/tokenomics/VotingEscrow.t.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
 contract VotingEscrowTest is BasicSetup {
     uint private constant MAXTIME = 2 * 365 * 86400; // 4 years
 
-    VotingEscrow votingEscrow;
+    PuppetVoteToken puppetVoteToken;
+    VotingEscrowStore votingEscrowStore;
+    VotingEscrowLogic votingEscrow;
     VotingEscrowLocker veLocker;
 
     function setUp() public override {
         BasicSetup.setUp();
 
-        votingEscrow = new VotingEscrow(dictator, router, puppetToken);
+        puppetVoteToken = new PuppetVoteToken(dictator);
+        votingEscrowStore = new VotingEscrowStore(dictator);
+        votingEscrow = new VotingEscrowLogic(
+            dictator, //
+            eventEmitter,
+            router,
+            puppetToken,
+            puppetVoteToken,
+            votingEscrowStore
+        );
         veLocker = new VotingEscrowLocker(votingEscrow);
 
         dictator.setPermission(puppetToken, users.owner, puppetToken.mint.selector);
@@ -25,10 +41,7 @@ contract VotingEscrowTest is BasicSetup {
         puppetToken.mint(users.yossi, 100 * 1e18);
 
         dictator.setAccess(router, address(votingEscrow));
-
-        dictator.setPermission(votingEscrow, address(veLocker), votingEscrow.lock.selector);
-        dictator.setPermission(votingEscrow, address(veLocker), votingEscrow.vest.selector);
-        dictator.setPermission(votingEscrow, address(veLocker), votingEscrow.claim.selector);
+        dictator.setAccess(votingEscrow, address(veLocker));
 
         vm.stopPrank();
     }
@@ -42,9 +55,9 @@ contract VotingEscrowTest is BasicSetup {
         veLocker.lock(amount, duration);
         vm.stopPrank();
 
-        (uint amountCursor, uint lockDuration) = votingEscrow.lockMap(users.alice);
-        assertEq(amountCursor, amount, "Lock amount should match");
-        assertEq(lockDuration, duration, "Lock duration should match");
+        VotingEscrowStore.Lock memory lock = votingEscrowStore.getLock(users.alice);
+        assertEq(lock.amount, amount, "Lock amount should match");
+        assertEq(lock.duration, duration, "Lock duration should match");
     }
 
     function testLockAveraging() public {
@@ -63,16 +76,17 @@ contract VotingEscrowTest is BasicSetup {
         vm.stopPrank();
 
         // Calculate the expected average duration
-        uint expectedAverageDuration = (initialAmount * initialDuration + additionalAmount * additionalDuration) / (initialAmount + additionalAmount);
+        uint expectedAverageDuration = (initialAmount * initialDuration + additionalAmount * additionalDuration)
+            / (initialAmount + additionalAmount);
 
         // Retrieve the lock information from the contract
-        (uint amountCursor, uint lockDuration) = votingEscrow.lockMap(users.alice);
+        VotingEscrowStore.Lock memory lock = votingEscrowStore.getLock(users.alice);
 
         // Check that the total locked amount is the sum of the initial and additional amounts
-        assertEq(amountCursor, initialAmount + additionalAmount, "Total locked amount should match");
+        assertEq(lock.amount, initialAmount + additionalAmount, "Total locked amount should match");
 
         // Check that the lock duration is correctly averaged
-        assertEq(lockDuration, expectedAverageDuration, "Lock duration should be correctly averaged");
+        assertEq(lock.duration, expectedAverageDuration, "Lock duration should be correctly averaged");
     }
 
     function testVest() public {
@@ -90,7 +104,7 @@ contract VotingEscrowTest is BasicSetup {
         vm.stopPrank();
 
         // Check the vesting schedule
-        VotingEscrow.Vest memory vest = votingEscrow.getVest(users.alice);
+        VotingEscrowStore.Vest memory vest = votingEscrowStore.getVest(users.alice);
         assertEq(vest.amount, amount - vestAmount, "Vested amount should be reduced from total locked amount");
         assertEq(vest.accrued, 0, "Accrued amount should be zero initially");
         assertGt(vest.remainingDuration, 0, "Remaining duration should be greater than zero");
@@ -118,7 +132,7 @@ contract VotingEscrowTest is BasicSetup {
         veLocker.claim(1);
 
         // Check the vesting schedule after claiming
-        VotingEscrow.Vest memory vest = votingEscrow.getVest(users.alice);
+        VotingEscrowStore.Vest memory vest = votingEscrowStore.getVest(users.alice);
         assertApproxEqAbs(amount / 2, amount / 2, 0.01e18, "Accrued amount should match the claimed amount");
         assertEq(vest.remainingDuration, duration - timePassed, "Remaining duration should be reduced by time passed");
         // vm.stopPrank();
@@ -153,7 +167,9 @@ contract VotingEscrowTest is BasicSetup {
         vm.startPrank(users.alice);
         puppetToken.approve(address(router), amount);
         veLocker.lock(amount, duration);
-        vm.expectRevert(abi.encodeWithSelector(VotingEscrow.VotingEscrow__ExceedingLockAmount.selector, amount));
+        vm.expectRevert(
+            abi.encodeWithSelector(VotingEscrowLogic.VotingEscrowLogic__ExceedingLockAmount.selector, amount)
+        );
         veLocker.vest(amount + 1); // Attempt to vest more than locked amount, should fail
         vm.stopPrank();
     }
@@ -167,7 +183,9 @@ contract VotingEscrowTest is BasicSetup {
         veLocker.lock(amount, duration);
         veLocker.vest(amount);
         skip(block.timestamp + duration + 10); // Fast-forward time
-        vm.expectRevert(abi.encodeWithSelector(VotingEscrow.VotingEscrow__ExceedingAccruedAmount.selector, amount));
+        vm.expectRevert(
+            abi.encodeWithSelector(VotingEscrowLogic.VotingEscrowLogic__ExceedingAccruedAmount.selector, amount)
+        );
         veLocker.claim(amount + 1); // Attempt to claim more than vested amount, should fail
         vm.stopPrank();
     }
@@ -178,7 +196,7 @@ contract VotingEscrowTest is BasicSetup {
 
         vm.startPrank(users.alice);
         puppetToken.approve(address(router), zeroAmount);
-        vm.expectRevert(abi.encodeWithSelector(VotingEscrow.VotingEscrow__ZeroAmount.selector));
+        vm.expectRevert(abi.encodeWithSelector(VotingEscrowLogic.VotingEscrowLogic__ZeroAmount.selector));
         veLocker.lock(zeroAmount, duration);
         vm.stopPrank();
     }
@@ -201,12 +219,18 @@ contract VotingEscrowTest is BasicSetup {
 
         // Check that the claimed amount is correct
         assertApproxEqAbs(
-            votingEscrow.getVest(users.alice).accrued, aliceAmount / 4, 1e8, "Alice's accrued amount should match the first claimed amount"
+            votingEscrowStore.getVest(users.alice).accrued,
+            aliceAmount / 4,
+            1e8,
+            "Alice's accrued amount should match the first claimed amount"
         );
 
         // Simulate more time passing for Alice to claim the second portion
         assertApproxEqAbs(
-            votingEscrow.getClaimable(users.alice), aliceAmount, 1e8, "Alice's total accrued amount should match the total claimed amount"
+            votingEscrow.getClaimable(users.alice),
+            aliceAmount,
+            1e8,
+            "Alice's total accrued amount should match the total claimed amount"
         );
 
         // Alice claims a portion of her vested tokens
@@ -215,9 +239,9 @@ contract VotingEscrowTest is BasicSetup {
 }
 
 contract VotingEscrowLocker {
-    VotingEscrow votingEscrow;
+    VotingEscrowLogic votingEscrow;
 
-    constructor(VotingEscrow _votingEscrow) {
+    constructor(VotingEscrowLogic _votingEscrow) {
         votingEscrow = _votingEscrow;
     }
 
