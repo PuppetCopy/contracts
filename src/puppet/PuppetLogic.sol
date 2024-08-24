@@ -31,7 +31,6 @@ contract PuppetLogic is CoreContract {
         Config memory _config
     ) CoreContract("PuppetLogic", "1", _authority, _eventEmitter) {
         router = _router;
-        config = _config;
         store = _store;
 
         _setConfig(_config);

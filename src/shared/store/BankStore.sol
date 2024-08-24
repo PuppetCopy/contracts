@@ -3,8 +3,8 @@ pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 import {Auth} from "./../../utils/access/Auth.sol";
+import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 
 import {Router} from "../Router.sol";
 
@@ -23,7 +23,7 @@ abstract contract BankStore is Auth {
         return tokenBalanceMap[_token];
     }
 
-    function recordedTransferIn(IERC20 _token) public returns (uint) {
+    function recordedTransferIn(IERC20 _token) public auth returns (uint) {
         return _recordTransferIn(_token);
     }
 
@@ -31,12 +31,12 @@ abstract contract BankStore is Auth {
         tokenBalanceMap[_token] = _token.balanceOf(address(this));
     }
 
-    function _transferOut(IERC20 _token, address _receiver, uint _value) internal {
+    function transferOut(IERC20 _token, address _receiver, uint _value) public auth {
         _token.transfer(_receiver, _value);
         tokenBalanceMap[_token] -= _value;
     }
 
-    function _transferIn(IERC20 _token, address _depositor, uint _value) internal {
+    function transferIn(IERC20 _token, address _depositor, uint _value) public auth {
         router.transfer(_token, _depositor, address(this), _value);
         tokenBalanceMap[_token] += _value;
     }

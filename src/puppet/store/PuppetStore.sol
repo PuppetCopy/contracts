@@ -3,14 +3,12 @@ pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {Auth} from "./../../utils/access/Auth.sol";
 import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 
+import {PositionUtils} from "../../position/utils/PositionUtils.sol";
 import {Router} from "./../../shared/Router.sol";
 import {BankStore} from "./../../shared/store/BankStore.sol";
-import {PositionUtils} from "../../position/utils/PositionUtils.sol";
-
-import {Auth} from "./../../utils/access/Auth.sol";
-
 
 contract PuppetStore is BankStore {
     struct Rule {
@@ -24,9 +22,12 @@ contract PuppetStore is BankStore {
     mapping(bytes32 ruleKey => Rule) public ruleMap; // ruleKey = keccak256(collateralToken, puppet, trader)
     mapping(address puppet => mapping(address trader => uint) name) public fundingActivityMap;
 
-    constructor(IAuthority _authority, Router _router, IERC20[] memory _tokenAllowanceCapList, uint[] memory _tokenAllowanceConfigList)
-        BankStore(_authority, _router)
-    {
+    constructor(
+        IAuthority _authority,
+        Router _router,
+        IERC20[] memory _tokenAllowanceCapList,
+        uint[] memory _tokenAllowanceConfigList
+    ) BankStore(_authority, _router) {
         if (_tokenAllowanceCapList.length != _tokenAllowanceConfigList.length) revert PuppetStore__InvalidLength();
 
         for (uint i; i < _tokenAllowanceCapList.length; i++) {
@@ -59,10 +60,15 @@ contract PuppetStore is BankStore {
     function increaseBalance(IERC20 _token, address _depositor, uint _value) external auth {
         balanceMap[_depositor][_token] += _value;
 
-        _transferIn(_token, _depositor, _value);
+        transferIn(_token, _depositor, _value);
     }
 
-    function increaseBalanceList(IERC20 _token, address _depositor, address[] calldata _accountList, uint[] calldata _valueList) external auth {
+    function increaseBalanceList(
+        IERC20 _token,
+        address _depositor,
+        address[] calldata _accountList,
+        uint[] calldata _valueList
+    ) external auth {
         uint _accountListLength = _accountList.length;
         uint totalAmountIn;
 
@@ -73,12 +79,12 @@ contract PuppetStore is BankStore {
             totalAmountIn += _valueList[i];
         }
 
-        _transferIn(_token, _depositor, totalAmountIn);
+        transferIn(_token, _depositor, totalAmountIn);
     }
 
     function decreaseBalance(IERC20 _token, address _user, address _receiver, uint _value) public auth {
         balanceMap[_user][_token] -= _value;
-        _transferOut(_token, _receiver, _value);
+        transferOut(_token, _receiver, _value);
     }
 
     function getRule(bytes32 _key) external view returns (Rule memory) {
@@ -89,7 +95,12 @@ contract PuppetStore is BankStore {
         ruleMap[_key] = _rule;
     }
 
-    function decreaseBalanceList(IERC20 _token, address _receiver, address[] calldata _accountList, uint[] calldata _valueList) external auth {
+    function decreaseBalanceList(
+        IERC20 _token,
+        address _receiver,
+        address[] calldata _accountList,
+        uint[] calldata _valueList
+    ) external auth {
         uint _accountListLength = _accountList.length;
         uint totalAmountOut;
 
@@ -100,7 +111,7 @@ contract PuppetStore is BankStore {
             totalAmountOut -= _valueList[i];
         }
 
-        _transferOut(_token, _receiver, totalAmountOut);
+        transferOut(_token, _receiver, totalAmountOut);
     }
 
     function getRuleList(bytes32[] calldata _keyList) external view returns (Rule[] memory) {
@@ -123,7 +134,10 @@ contract PuppetStore is BankStore {
         }
     }
 
-    function getFundingActivityList(address trader, address[] calldata puppetList) external view returns (uint[] memory) {
+    function getFundingActivityList(
+        address trader,
+        address[] calldata puppetList
+    ) external view returns (uint[] memory) {
         uint _puppetListLength = puppetList.length;
         uint[] memory fundingActivityList = new uint[](_puppetListLength);
         for (uint i = 0; i < _puppetListLength; i++) {
@@ -132,7 +146,11 @@ contract PuppetStore is BankStore {
         return fundingActivityList;
     }
 
-    function setFundingActivityList(address trader, address[] calldata puppetList, uint[] calldata _timeList) external auth {
+    function setFundingActivityList(
+        address trader,
+        address[] calldata puppetList,
+        uint[] calldata _timeList
+    ) external auth {
         uint _puppetListLength = puppetList.length;
 
         if (_puppetListLength != _timeList.length) revert PuppetStore__InvalidLength();
@@ -150,11 +168,11 @@ contract PuppetStore is BankStore {
         return fundingActivityMap[puppet][trader];
     }
 
-    function getBalanceAndActivityList(IERC20 collateralToken, address trader, address[] calldata _puppetList)
-        external
-        view
-        returns (Rule[] memory _ruleList, uint[] memory _fundingActivityList, uint[] memory _valueList)
-    {
+    function getBalanceAndActivityList(
+        IERC20 collateralToken,
+        address trader,
+        address[] calldata _puppetList
+    ) external view returns (Rule[] memory _ruleList, uint[] memory _fundingActivityList, uint[] memory _valueList) {
         uint _puppetListLength = _puppetList.length;
 
         _ruleList = new Rule[](_puppetListLength);
@@ -193,7 +211,7 @@ contract PuppetStore is BankStore {
             totalAmountOut += _amount;
         }
 
-        _transferOut(_token, _receiver, totalAmountOut);
+        transferOut(_token, _receiver, totalAmountOut);
     }
 
     error PuppetStore__InvalidLength();

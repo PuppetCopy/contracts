@@ -29,11 +29,17 @@ contract DeployToken is Script {
         PuppetToken puppetToken =
             new PuppetToken(dictator, PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}), Address.dao);
         EventEmitter eventEmitter = new EventEmitter(dictator);
+        Router router = new Router(dictator, 200_000);
 
         PuppetVoteToken puppetVoteToken = new PuppetVoteToken(dictator);
-        VotingEscrowStore votingEscrowStore = new VotingEscrowStore(dictator);
-        Router router = new Router(dictator, 200_000);
-        VotingEscrowLogic votingEscrow =
-            new VotingEscrowLogic(dictator, eventEmitter, router, puppetToken, puppetVoteToken, votingEscrowStore);
+        VotingEscrowStore votingEscrowStore = new VotingEscrowStore(dictator, router);
+        VotingEscrowLogic votingEscrow = new VotingEscrowLogic(
+            dictator,
+            eventEmitter,
+            votingEscrowStore,
+            puppetToken,
+            puppetVoteToken,
+            VotingEscrowLogic.Config({baseMultiplier: 0.3e30})
+        );
     }
 }

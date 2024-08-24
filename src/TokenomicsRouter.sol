@@ -7,6 +7,7 @@ import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
 import {Auth} from "./utils/access/Auth.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
+import {RevenueLogic} from "./tokenomics/RevenueLogic.sol";
 import {RewardLogic} from "./tokenomics/RewardLogic.sol";
 import {VotingEscrowLogic} from "./tokenomics/VotingEscrowLogic.sol";
 
@@ -16,6 +17,7 @@ contract TokenomicsRouter is Auth, ReentrancyGuardTransient {
     struct Config {
         RewardLogic rewardLogic;
         VotingEscrowLogic veLogic;
+        RevenueLogic revenueLogic;
     }
 
     Config config;
@@ -24,16 +26,22 @@ contract TokenomicsRouter is Auth, ReentrancyGuardTransient {
         _setConfig(_config);
     }
 
-    function lock(IERC20 token, uint duration) external nonReentrant returns (uint) {
-        return config.rewardLogic.lock(token, duration, msg.sender);
+    function lockContribution(IERC20 token, uint amount, uint duration) external nonReentrant returns (uint reward) {
+        config.revenueLogic.claim(token, msg.sender, msg.sender, amount);
+
+        reward = config.rewardLogic.lock(token, msg.sender, amount, duration);
+
+        config.veLogic.lock(address(config.rewardLogic), msg.sender, amount, duration);
     }
 
-    function exit(IERC20 token) external nonReentrant {
-        config.rewardLogic.exit(token, msg.sender);
+    function exitContribution(IERC20 token, uint amount) external nonReentrant returns (uint) {
+        config.revenueLogic.claim(token, msg.sender, msg.sender, amount);
+
+        return config.rewardLogic.exit(token, msg.sender, amount);
     }
 
-    function claimEmission(IERC20 token, address receiver) external nonReentrant returns (uint) {
-        return config.rewardLogic.claimEmission(token, msg.sender, receiver);
+    function claimEmission(IERC20 token, address receiver, uint amount) external nonReentrant returns (uint) {
+        return config.rewardLogic.claimEmission(token, msg.sender, receiver, amount);
     }
 
     /// @notice Locks tokens, granting them voting power.
@@ -60,6 +68,10 @@ contract TokenomicsRouter is Auth, ReentrancyGuardTransient {
     /// @param amount The amount of tokens to claim.
     function veClaim(address receiver, uint amount) public nonReentrant {
         config.veLogic.claim(msg.sender, receiver, amount);
+    }
+
+    function buyback(IERC20 token, address receiver, uint amount) external nonReentrant {
+        // config.revenueLogic.buyback(config.distributorBankStore, msg.sender, receiver, token, amount);
     }
 
     // governance

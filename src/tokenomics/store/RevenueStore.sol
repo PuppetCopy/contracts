@@ -4,18 +4,20 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {Precision} from "./../../utils/Precision.sol";
 import {Auth} from "./../../utils/access/Auth.sol";
 import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 
-import {BankStore} from "./../../shared/store/BankStore.sol";
 import {Router} from "./../../shared/Router.sol";
+import {BankStore} from "./../../shared/store/BankStore.sol";
 
 contract RevenueStore is BankStore {
-    mapping(IERC20 => uint) tokenPerContributionCursorMap;
-    mapping(IERC20 => uint) tokenBuybackOfferMap;
+    mapping(IERC20 => uint) tokenBuybackOffer;
+    mapping(IERC20 => uint) cumulativeRewardPerContributionMap;
 
-    mapping(IERC20 token => mapping(address user => uint)) userTokenPerContributionMap;
-    mapping(IERC20 => mapping(address => uint)) userContributionBalanceMap;
+    mapping(IERC20 => mapping(address => uint)) userCumulativeContributionMap;
+    mapping(IERC20 => mapping(address => uint)) userRewardPerContributionMap;
+    mapping(IERC20 => mapping(address => uint)) userAccruedRewardMap;
 
     constructor(
         IAuthority _authority, //
@@ -23,85 +25,101 @@ contract RevenueStore is BankStore {
         IERC20[] memory _tokenBuybackThresholdList,
         uint[] memory _tokenBuybackThresholdAmountList
     ) BankStore(_authority, _router) {
-        if (_tokenBuybackThresholdList.length != _tokenBuybackThresholdAmountList.length) revert RewardStore__InvalidLength();
+        uint thresholdListLength = _tokenBuybackThresholdList.length;
+        if (thresholdListLength != _tokenBuybackThresholdAmountList.length) revert RewardStore__InvalidLength();
 
-        for (uint i; i < _tokenBuybackThresholdList.length; i++) {
+        for (uint i; i < thresholdListLength; i++) {
             IERC20 _token = _tokenBuybackThresholdList[i];
-            tokenBuybackOfferMap[_token] = _tokenBuybackThresholdAmountList[i];
+            tokenBuybackOffer[_token] = _tokenBuybackThresholdAmountList[i];
         }
     }
 
-    function increaseTokenPerContributionCursor(IERC20 _token, uint _value) external auth returns (uint) {
-        return tokenPerContributionCursorMap[_token] += _value;
-    }
-
-    function getTokenPerContributionCursor(IERC20 _token) external view returns (uint) {
-        return tokenPerContributionCursorMap[_token];
-    }
-
     function getTokenBuybackOffer(IERC20 _token) external view returns (uint) {
-        return tokenBuybackOfferMap[_token];
+        return tokenBuybackOffer[_token];
     }
 
     function setTokenBuybackOffer(IERC20 _token, uint _value) external auth {
-        tokenBuybackOfferMap[_token] = _value;
+        tokenBuybackOffer[_token] = _value;
     }
 
-    function getUserContributionBalance(IERC20 _token, address _user) external view returns (uint) {
-        return userContributionBalanceMap[_token][_user];
+    function getCumulativeRewardPerContribution(IERC20 _token) external view returns (uint) {
+        return cumulativeRewardPerContributionMap[_token];
     }
 
-    function setUserContributionBalance(IERC20 _token, address _user, uint _value) external auth {
-        userContributionBalanceMap[_token][_user] += _value;
+    function increaseCumulativeRewardPerContribution(IERC20 _token, uint _value) external auth returns (uint) {
+        return cumulativeRewardPerContributionMap[_token] += _value;
     }
 
-    function commitReward(
+    function getUserCumulativeContribution(IERC20 _token, address _user) external view returns (uint) {
+        return userCumulativeContributionMap[_token][_user];
+    }
+
+    function contribute(
         IERC20 _token, //
-        address _source,
+        address _depositor,
         address _user,
         uint _value
     ) external auth {
-        userContributionBalanceMap[_token][_user] += _value;
-        _transferIn(_token, _source, _value);
+        uint cumTokenPerContrib = cumulativeRewardPerContributionMap[_token];
+        uint userRewardPerContribution = userRewardPerContributionMap[_token][_user];
+
+        if (cumTokenPerContrib > userRewardPerContribution) {
+            userRewardPerContributionMap[_token][_user] = cumTokenPerContrib;
+            uint cumContribution = userCumulativeContributionMap[_token][_user];
+
+            userAccruedRewardMap[_token][_user] +=
+                cumContribution * (cumTokenPerContrib - userRewardPerContribution) / Precision.FLOAT_PRECISION;
+        }
+
+        userCumulativeContributionMap[_token][_user] += _value;
+        transferIn(_token, _depositor, _value);
     }
 
-    function commitRewardList(
+    function contributeMany(
         IERC20 _token, //
-        address _source,
+        address _depositor,
         address[] calldata _userList,
-        uint[] calldata _valueList,
-        address _trader,
-        uint _performanceFee
+        uint[] calldata _valueList
     ) external auth {
         uint _valueListLength = _valueList.length;
         uint _totalAmount = 0;
 
         if (_valueListLength != _valueList.length) revert RewardStore__InvalidLength();
 
-        if (_performanceFee > 0) userContributionBalanceMap[_token][_trader] += _performanceFee;
-
         for (uint i = 0; i < _valueListLength; i++) {
-            userContributionBalanceMap[_token][_userList[i]] += _valueList[i];
+            address _user = _userList[i];
+            userCumulativeContributionMap[_token][_user] += _valueList[i];
             _totalAmount += _valueList[i];
+
+            uint cumTokenPerContrib = cumulativeRewardPerContributionMap[_token];
+            uint userRewardPerContribution = userRewardPerContributionMap[_token][_user];
+
+            if (cumTokenPerContrib > userRewardPerContribution) {
+                userRewardPerContributionMap[_token][_user] = cumTokenPerContrib;
+                uint cumContribution = userCumulativeContributionMap[_token][_user];
+
+                userAccruedRewardMap[_token][_user] +=
+                    cumContribution * (cumTokenPerContrib - userRewardPerContribution) / Precision.FLOAT_PRECISION;
+            }
         }
 
-        _transferIn(_token, _source, _totalAmount + _performanceFee);
+        transferIn(_token, _depositor, _totalAmount);
     }
 
-    function getUserTokenPerContributionCursor(IERC20 _token, address _user) external view returns (uint) {
-        return userTokenPerContributionMap[_token][_user];
+    function getUserRewardPerContribution(IERC20 _token, address _user) external view returns (uint) {
+        return userRewardPerContributionMap[_token][_user];
     }
 
-    function setUserTokenPerContributionCursor(IERC20 _token, address _user, uint _amount) external auth {
-        userTokenPerContributionMap[_token][_user] = _amount;
+    function setUserRewardPerContribution(IERC20 _token, address _user, uint _value) external auth {
+        userRewardPerContributionMap[_token][_user] = _value;
     }
 
-    function transferOut(IERC20 _token, address _receiver, uint _value) external auth {
-        _transferOut(_token, _receiver, _value);
+    function getUserAccruedReward(IERC20 _token, address _user) external view returns (uint) {
+        return userAccruedRewardMap[_token][_user];
     }
 
-    function transferIn(IERC20 _token, address _depositor, uint _value) external auth {
-        _transferIn(_token, _depositor, _value);
+    function setUserAccruedReward(IERC20 _token, address _user, uint _value) external auth {
+        userAccruedRewardMap[_token][_user] = _value;
     }
 
     error RewardStore__InvalidLength();

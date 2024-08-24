@@ -3,40 +3,52 @@ pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {BankStore} from "../../shared/store/BankStore.sol";
+import {Router} from "./../../shared/Router.sol";
 import {Auth} from "./../../utils/access/Auth.sol";
 import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 
-contract VotingEscrowStore is Auth {
-    struct Lock {
-        uint amount;
-        uint duration;
-    }
-
-    struct Vest {
+contract VotingEscrowStore is BankStore {
+    struct Vested {
         uint amount;
         uint remainingDuration;
         uint lastAccruedTime;
         uint accrued;
     }
 
-    mapping(address => Lock) public lockMap;
-    mapping(address => Vest) public vestMap;
+    mapping(address => uint) public userBalanceMap;
+    mapping(address => uint) public lockDurationMap;
+    mapping(address => Vested) public vestMap;
 
-    constructor(IAuthority _authority) Auth(_authority) {}
+    uint public totalSupply;
 
-    function getLock(address _user) external view returns (Lock memory) {
-        return lockMap[_user];
+    constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
+
+    function getLockDuration(address _user) external view returns (uint) {
+        return lockDurationMap[_user];
     }
 
-    function setLock(address _user, Lock memory _lock) external auth {
-        lockMap[_user] = _lock;
+    function setLockDuration(address _user, uint _duration) external auth {
+        lockDurationMap[_user] = _duration;
     }
 
-    function getVest(address _user) external view returns (Vest memory) {
+    function getVested(address _user) external view returns (Vested memory) {
         return vestMap[_user];
     }
 
-    function setVest(address _user, Vest memory _vest) external auth {
+    function setVested(address _user, Vested memory _vest) external auth {
         vestMap[_user] = _vest;
+    }
+
+    function setTotalLocked(uint _amount) external auth {
+        totalSupply = _amount;
+    }
+
+    function increaseUserBalance(address _user, uint _amount) external auth returns (uint) {
+        return userBalanceMap[_user] += _amount;
+    }
+
+    function decreaseUserBalance(address _user, uint _amount) external auth returns (uint) {
+        return userBalanceMap[_user] -= _amount;
     }
 }

@@ -9,7 +9,7 @@ import {Permission} from "src/utils/access/Permission.sol";
 import {IAuthority} from "src/utils/interfaces/IAuthority.sol";
 import {IERC20Mintable} from "src/utils/interfaces/IERC20Mintable.sol";
 
-/// @title Puppet ERC20 Token
+/// @title PuppetToken
 /// @notice An ERC20 token with a mint rate limit designed to mitigate and provide feedback of a
 /// potential critical
 /// faults or bugs in the minting process.

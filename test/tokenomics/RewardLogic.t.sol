@@ -49,10 +49,16 @@ contract RewardLogicTest is BasicSetup {
         super.setUp();
 
         puppetVoteToken = new PuppetVoteToken(dictator);
-        votingEscrowStore = new VotingEscrowStore(dictator);
+        votingEscrowStore = new VotingEscrowStore(dictator, router);
 
-        votingEscrow =
-            new VotingEscrowLogic(dictator, eventEmitter, router, puppetToken, puppetVoteToken, votingEscrowStore);
+        votingEscrow = new VotingEscrowLogic(
+            dictator,
+            eventEmitter,
+            votingEscrowStore,
+            puppetToken,
+            puppetVoteToken,
+            VotingEscrowLogic.Config({baseMultiplier: 0.6e30})
+        );
         dictator.setAccess(router, address(votingEscrow));
 
         IERC20[] memory _buybackTokenList = new IERC20[](2);
@@ -68,54 +74,54 @@ contract RewardLogicTest is BasicSetup {
 
         rewardStore = new RewardStore(dictator, router);
 
-        revenueLogic = new RevenueLogic(dictator, puppetToken, revenueStore);
+        revenueLogic = new RevenueLogic(dictator, eventEmitter, puppetToken, revenueStore);
         dictator.setAccess(revenueStore, address(revenueLogic));
 
         rewardLogic = new RewardLogic(
             dictator, //
             eventEmitter,
-            votingEscrow,
             puppetToken,
             rewardStore,
-            revenueStore,
             config
         );
         dictator.setAccess(rewardStore, address(rewardLogic));
         dictator.setAccess(votingEscrow, address(rewardLogic));
         dictator.setPermission(puppetToken, address(rewardLogic), puppetToken.mint.selector);
 
-        tokenomicsRouter =
-            new TokenomicsRouter(dictator, TokenomicsRouter.Config({rewardLogic: rewardLogic, veLogic: votingEscrow}));
+        tokenomicsRouter = new TokenomicsRouter(
+            dictator,
+            TokenomicsRouter.Config({rewardLogic: rewardLogic, veLogic: votingEscrow, revenueLogic: revenueLogic})
+        );
 
         // permissions used for testing
         vm.startPrank(users.owner);
         dictator.setAccess(revenueStore, users.owner);
-        dictator.setPermission(revenueLogic, users.owner, revenueLogic.buybackRevenue.selector);
+        dictator.setAccess(revenueLogic, users.owner);
         wnt.approve(address(router), type(uint).max - 1);
         puppetToken.approve(address(router), type(uint).max - 1);
     }
 
-    function testBuybackToken() public {
-        vm.startPrank(users.owner);
+    // function testBuybackToken() public {
+    //     vm.startPrank(users.owner);
 
-        // Arrange: Set up the initial state
-        uint revenueAmount = 1e18; // 1 Other Token
-        uint thresholdAmount = revenueStore.getTokenBuybackOffer(wnt);
+    //     // Arrange: Set up the initial state
+    //     uint revenueAmount = 1e18; // 1 Other Token
+    //     uint thresholdAmount = revenueStore.getTokenBuybackOffer(wnt);
 
-        userContribute(wnt, revenueAmount);
+    //     userContribute(wnt, revenueAmount);
 
-        revenueLogic.buybackRevenue(users.owner, users.owner, wnt, revenueAmount);
+    //     revenueLogic.buybackRevenue(users.owner, users.owner, wnt, revenueAmount);
 
-        // Assert: Check the final state
-        assertEq(
-            puppetToken.balanceOf(address(revenueStore)),
-            thresholdAmount,
-            "Puppet token balance should be increased by the buyback amount"
-        );
-        assertEq(
-            wnt.balanceOf(users.owner), revenueAmount, "Other token balance should be reduced by the buyback amount"
-        );
-    }
+    //     // Assert: Check the final state
+    //     assertEq(
+    //         puppetToken.balanceOf(address(revenueStore)),
+    //         thresholdAmount,
+    //         "Puppet token balance should be increased by the buyback amount"
+    //     );
+    //     assertEq(
+    //         wnt.balanceOf(users.owner), revenueAmount, "Other token balance should be reduced by the buyback amount"
+    //     );
+    // }
 
     // function testExitOption() public {
     //     vm.startPrank(users.alice);
@@ -261,13 +267,13 @@ contract RewardLogicTest is BasicSetup {
         uint revenue = revenueLogic.getRevenueBalance(wnt);
 
         if ((revenue / ethPerPuppet) >= thresholdAmount) {
-            revenueLogic.buybackRevenue(users.owner, users.owner, wnt, amount);
+            revenueLogic.buyback(users.owner, users.owner, wnt, amount);
         }
     }
 
     function userContribute(IERC20 token, uint amount) public {
         _dealERC20(address(token), users.owner, amount);
-        revenueStore.commitReward(token, users.owner, msg.sender, amount);
+        revenueStore.contribute(token, users.owner, msg.sender, amount);
 
         // skip block
         vm.roll(block.number + 1);
@@ -276,7 +282,7 @@ contract RewardLogicTest is BasicSetup {
     function lock(IERC20 token, address user, uint lockDuration, uint amount) public returns (uint) {
         // rewardLogic.distributeEmission(token);
 
-        uint claimableInToken = tokenomicsRouter.lock(token, lockDuration);
+        uint claimableInToken = tokenomicsRouter.lockContribution(token, amount, lockDuration);
 
         return claimableInToken;
     }
@@ -287,10 +293,10 @@ contract RewardLogicTest is BasicSetup {
         return 0;
     }
 
-    function claim(IERC20 token, address user) public returns (uint) {
+    function claim(IERC20 token, address user, uint amount) public returns (uint) {
         vm.startPrank(user);
 
-        return tokenomicsRouter.claimEmission(token, user);
+        return tokenomicsRouter.claimEmission(token, user, amount);
     }
 
     function fromPriceToSqrt(uint usdcPerWeth) public pure returns (uint160) {

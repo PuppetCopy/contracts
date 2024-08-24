@@ -108,13 +108,11 @@ contract ExecuteDecreasePositionLogic is CoreContract {
         config.puppetStore.increaseBalanceList(outputToken, address(this), mirrorPosition.puppetList, outputAmountList);
 
         if (callParams.profit > 0) {
-            config.revenueStore.commitRewardList(
+            config.revenueStore.contributeMany(
                 outputToken, //
                 address(this),
                 mirrorPosition.puppetList,
-                contributionList,
-                mirrorPosition.trader,
-                callParams.totalPerformanceFee
+                contributionList
             );
         }
 

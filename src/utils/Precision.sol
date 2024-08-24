@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 library Precision {
-    uint internal constant BASIS_POINT_DIVISOR = 10000;
+    uint public constant BASIS_POINT_DIVISOR = 10000;
     uint public constant FLOAT_PRECISION = 1e30;
 
     function applyBasisPoints(uint bps, uint value) internal pure returns (uint) {

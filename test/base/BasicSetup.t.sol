@@ -45,8 +45,11 @@ contract BasicSetup is Test {
         dictator = new Dictator(users.owner);
         eventEmitter = new EventEmitter(dictator);
         router = new Router(dictator, 200_000);
-        puppetToken =
-            new PuppetToken(dictator, PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}), users.owner);
+        puppetToken = new PuppetToken(
+            dictator, //
+            PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}),
+            users.owner
+        );
 
         skip(1 hours);
     }
