@@ -23,8 +23,6 @@ import {SubaccountStore} from "./../shared/store/SubaccountStore.sol";
 import {PositionStore} from "./store/PositionStore.sol";
 
 contract RequestIncreasePositionLogic is CoreContract {
-    event RequestIncreasePositionLogic__SetConfig(uint timestamp, Config config);
-
     struct Config {
         IWNT wnt;
         IGmxExchangeRouter gmxExchangeRouter;
@@ -69,7 +67,7 @@ contract RequestIncreasePositionLogic is CoreContract {
         EventEmitter _eventEmitter,
         Config memory _config
     ) CoreContract("RequestIncreasePositionLogic", "1", _authority, _eventEmitter) {
-        _setConfig(_config);
+        setConfig(_config);
     }
 
     function proxyIncrease(
@@ -257,7 +255,7 @@ contract RequestIncreasePositionLogic is CoreContract {
 
         bytes32 requestKey = _createOrder(request, traderCallParams, callParams.subaccountAddress);
 
-        eventEmitter.log(
+        logEvent(
             "RequestIncreasePositionLogic__Match",
             abi.encode(
                 traderCallParams.account,
@@ -337,7 +335,7 @@ contract RequestIncreasePositionLogic is CoreContract {
             requestKey = _createOrder(request, traderCallParams, callParams.subaccountAddress);
         }
 
-        eventEmitter.log(
+        logEvent(
             "RequestIncreasePositionLogic__Adjust",
             abi.encode(
                 traderCallParams.account,
@@ -434,7 +432,7 @@ contract RequestIncreasePositionLogic is CoreContract {
 
         requestKey = abi.decode(orderReturnData, (bytes32));
 
-        eventEmitter.log(
+        logEvent(
             "RequestIncreasePositionLogic__ReducePuppetSize",
             abi.encode(traderCallParams.account, subaccountAddress, requestKey, positionKey, puppetReduceSizeDelta)
         );
@@ -442,14 +440,10 @@ contract RequestIncreasePositionLogic is CoreContract {
 
     // governance
 
-    function setConfig(Config memory _config) external auth {
-        _setConfig(_config);
-    }
-
-    function _setConfig(Config memory _config) internal {
+    function setConfig(Config memory _config) public auth {
         config = _config;
 
-        emit RequestIncreasePositionLogic__SetConfig(block.timestamp, _config);
+        logEvent("setConfig()", abi.encode(_config));
     }
 
     error RequestIncreasePositionLogic__PuppetListLimitExceeded();

@@ -47,7 +47,8 @@ contract VotingEscrowTest is BasicSetup {
         puppetToken.mint(users.yossi, 100 * 1e18);
 
         dictator.setAccess(router, address(veLogic));
-        dictator.setAccess(veLogic, address(veRouter));
+        dictator.setPermission(veLogic, address(veRouter), veLogic.lock.selector);
+        dictator.setPermission(veLogic, address(veRouter), veLogic.vest.selector);
 
         vm.stopPrank();
     }

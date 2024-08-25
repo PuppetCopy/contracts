@@ -3,8 +3,6 @@ pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Router} from "../shared/Router.sol";
-
 import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
@@ -19,21 +17,18 @@ contract PuppetLogic is CoreContract {
         uint maxAllowanceRate;
     }
 
-    Router router;
     Config config;
     PuppetStore store;
 
     constructor(
         IAuthority _authority,
         EventEmitter _eventEmitter,
-        Router _router,
         PuppetStore _store,
         Config memory _config
     ) CoreContract("PuppetLogic", "1", _authority, _eventEmitter) {
-        router = _router;
         store = _store;
 
-        _setConfig(_config);
+        setConfig(_config);
     }
 
     function deposit(IERC20 token, address user, uint amount) external auth {
@@ -41,7 +36,7 @@ contract PuppetLogic is CoreContract {
 
         store.increaseBalance(token, user, amount);
 
-        eventEmitter.log("PuppetLogic__Deposit", abi.encode(token, user, amount));
+        logEvent("deposit()", abi.encode(token, user, amount));
     }
 
     function withdraw(IERC20 token, address user, address receiver, uint amount) external auth {
@@ -52,7 +47,7 @@ contract PuppetLogic is CoreContract {
 
         store.decreaseBalance(token, user, receiver, amount);
 
-        eventEmitter.log("PuppetLogic__Withdraw", abi.encode(token, user, amount));
+        logEvent("withdraw()", abi.encode(token, user, amount));
     }
 
     function setRule(
@@ -69,7 +64,7 @@ contract PuppetLogic is CoreContract {
 
         store.setRule(ruleKey, rule);
 
-        eventEmitter.log("PuppetLogic__SetRule", abi.encode(ruleKey, rule));
+        logEvent("setRule()", abi.encode(ruleKey, rule));
     }
 
     function setRuleList(
@@ -95,7 +90,7 @@ contract PuppetLogic is CoreContract {
                 verifyAllowanceTokenList[verifyAllowanceTokenList.length] = collateralTokenList[i];
             }
 
-            eventEmitter.log("PuppetLogic__SetRule", abi.encode(keyList[i], storedRuleList[i]));
+            logEvent("setRuleList()", abi.encode(keyList[i], storedRuleList[i]));
         }
 
         store.setRuleList(keyList, storedRuleList);
@@ -158,14 +153,10 @@ contract PuppetLogic is CoreContract {
 
     // governance
 
-    function setConfig(Config memory _config) external auth {
-        _setConfig(_config);
-    }
-
-    function _setConfig(Config memory _config) internal {
+    function setConfig(Config memory _config) public auth {
         config = _config;
 
-        eventEmitter.log("RequestIncreasePosition__SetConfig", abi.encode(block.timestamp, _config));
+        logEvent("setConfig()", abi.encode(_config));
     }
 
     error PuppetLogic__InvalidAllowanceRate(uint min, uint max);

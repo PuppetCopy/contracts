@@ -4,29 +4,21 @@ pragma solidity 0.8.24;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Precision} from "src/utils/Precision.sol";
-import {Permission} from "src/utils/access/Permission.sol";
-import {IAuthority} from "src/utils/interfaces/IAuthority.sol";
-import {IERC20Mintable} from "src/utils/interfaces/IERC20Mintable.sol";
+import {CoreContract} from "../utils/CoreContract.sol";
+import {EventEmitter} from "../utils/EventEmitter.sol";
+import {Precision} from "../utils/Precision.sol";
+import {Permission} from "../utils/access/Permission.sol";
+import {IAuthority} from "../utils/interfaces/IAuthority.sol";
+import {IERC20Mintable} from "../utils/interfaces/IERC20Mintable.sol";
 
 /// @title PuppetToken
 /// @notice An ERC20 token with a mint rate limit designed to mitigate and provide feedback of a
-/// potential critical
-/// faults or bugs in the minting process.
-/// @dev The limit restricts the quantity of new tokens that can be minted within a given timeframe,
-/// proportional to the
-/// existing supply.
-/// The mintCore function in the contract is designed to allocate tokens to the core contributors
-/// over time, with the
-/// allocation amount decreasing
-/// as more time passes from the deployment of the contract. This is intended to gradually transfer
-/// governance power and
-/// incentivises broader ownership.
-contract PuppetToken is Permission, ERC20, IERC20Mintable {
-    /// @notice Emitted when the configuration is set or updated.
-    /// @param config The new configuration.
-    event Puppet__SetConfig(Config config);
-
+/// potential critical faults or bugs in the minting process.
+/// @dev The limit restricts the quantity of new tokens that can be minted within a given timeframe, proportional to the
+/// existing supply. The mintCore function in the contract is designed to allocate tokens to the core contributors over
+/// time, with the allocation amount decreasing as more time passes from the deployment of the contract. This is
+/// intended to gradually transfer governance power and incentivises broader ownership.
+contract PuppetToken is CoreContract, ERC20, IERC20Mintable {
     /// @notice Emitted when tokens are minted to the core.
     /// @param operator The address that triggered the minting.
     /// @param receiver The address that received the minted tokens.
@@ -69,10 +61,11 @@ contract PuppetToken is Permission, ERC20, IERC20Mintable {
     /// @param receiver The address to receive the genesis mint amount.
     constructor(
         IAuthority _authority,
+        EventEmitter _eventEmitter,
         Config memory _config,
         address receiver
-    ) Permission(_authority) ERC20("Puppet Test", "PUPPET-TEST") {
-        _setConfig(_config);
+    ) ERC20("Puppet Test", "PUPPET-TEST") CoreContract("PuppetToken", "1", _authority, _eventEmitter) {
+        setConfig(_config);
         _mint(receiver, GENESIS_MINT_AMOUNT);
 
         emissionRate = getLimitAmount();
@@ -156,21 +149,12 @@ contract PuppetToken is Permission, ERC20, IERC20Mintable {
         return _mintableAmount;
     }
 
-    /// @notice Set the mint rate limit for the token.
-    /// @param _config The new rate limit configuration.
-    function setConfig(Config calldata _config) external auth {
-        _setConfig(_config);
-    }
+    // governance
 
-    /// @dev Internal function to set the configuration.
-    /// @param _config The configuration to set.
-    function _setConfig(Config memory _config) internal {
-        if (_config.limitFactor == 0) revert Puppet__InvalidRate();
-
+    function setConfig(Config memory _config) public auth {
         config = _config;
-        emissionRate = 0; // Reset the mint count window on rate limit change
 
-        emit Puppet__SetConfig(_config);
+        logEvent("setConfig()", abi.encode(_config));
     }
 
     /// @dev Error for when the rate is invalid (zero).

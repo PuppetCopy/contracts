@@ -3,24 +3,27 @@ pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {PuppetLogic} from "./puppet/PuppetLogic.sol";
+import {PuppetStore} from "./puppet/store/PuppetStore.sol";
+import {CoreContract} from "./utils/CoreContract.sol";
+import {EventEmitter} from "./utils/EventEmitter.sol";
 import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
 import {Auth} from "./utils/access/Auth.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
-import {PuppetLogic} from "./puppet/PuppetLogic.sol";
-import {PuppetStore} from "./puppet/store/PuppetStore.sol";
-
-contract PuppetRouter is Auth, ReentrancyGuardTransient {
-    event PuppetRouter__SetConfig(uint timestamp, Config config);
-
+contract PuppetRouter is CoreContract, ReentrancyGuardTransient {
     struct Config {
         PuppetLogic logic;
     }
 
     Config config;
 
-    constructor(IAuthority _authority, Config memory _config) Auth(_authority) {
-        _setConfig(_config);
+    constructor(
+        IAuthority _authority,
+        EventEmitter _eventEmitter,
+        Config memory _config
+    ) CoreContract("PuppetRouter", "1", _authority, _eventEmitter) {
+        setConfig(_config);
     }
 
     function deposit(IERC20 token, uint amount) external nonReentrant {
@@ -49,17 +52,13 @@ contract PuppetRouter is Auth, ReentrancyGuardTransient {
 
     // governance
 
-    function setConfig(Config memory _config) external auth {
-        _setConfig(_config);
+    function setConfig(Config memory _config) public auth {
+        config = _config;
+
+        logEvent("setConfig()", abi.encode(_config));
     }
 
     // internal
-
-    function _setConfig(Config memory _config) internal {
-        config = _config;
-
-        emit PuppetRouter__SetConfig(block.timestamp, _config);
-    }
 
     error PuppetRouter__InvalidPuppet();
     error PuppetRouter__InvalidAllowance();

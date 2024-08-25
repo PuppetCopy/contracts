@@ -11,8 +11,6 @@ import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 import {PositionStore} from "./store/PositionStore.sol";
 
 contract ExecuteIncreasePositionLogic is CoreContract {
-    event ExecuteIncreasePositionLogic__SetConfig(uint timestamp, Config config);
-
     struct Config {
         PositionStore positionStore;
     }
@@ -24,7 +22,7 @@ contract ExecuteIncreasePositionLogic is CoreContract {
         EventEmitter _eventEmitter,
         Config memory _config
     ) CoreContract("ExecuteIncreasePositionLogic", "1", _authority, _eventEmitter) {
-        _setConfig(_config);
+        setConfig(_config);
     }
 
     function execute(bytes32 requestKey, GmxPositionUtils.Props memory order) external auth {
@@ -52,19 +50,13 @@ contract ExecuteIncreasePositionLogic is CoreContract {
         config.positionStore.setMirrorPosition(requestKey, mirrorPosition);
         config.positionStore.removeRequestAdjustment(requestKey);
 
-        eventEmitter.log("ExecuteIncreasePositionLogic", abi.encode(requestKey, request.positionKey));
+        logEvent("execute()", abi.encode(requestKey, request.positionKey));
     }
 
     // governance
 
-    function setConfig(Config memory _config) external auth {
-        _setConfig(_config);
-    }
-
-    function _setConfig(Config memory _config) internal {
-        config = _config;
-
-        emit ExecuteIncreasePositionLogic__SetConfig(block.timestamp, _config);
+    function setConfig(Config memory _config) public auth {
+        logEvent("setConfig()", abi.encode(_config));
     }
 
     error ExecuteIncreasePositionLogic__UnauthorizedCaller();

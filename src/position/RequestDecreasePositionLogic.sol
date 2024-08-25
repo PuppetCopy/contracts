@@ -17,8 +17,6 @@ import {SubaccountStore} from "./../shared/store/SubaccountStore.sol";
 import {PositionStore} from "./store/PositionStore.sol";
 
 contract RequestDecreasePositionLogic is CoreContract {
-    event RequestDecreasePositionLogic__SetConfig(uint timestamp, Config config);
-
     struct Config {
         IGmxExchangeRouter gmxExchangeRouter;
         PositionStore positionStore;
@@ -36,7 +34,7 @@ contract RequestDecreasePositionLogic is CoreContract {
         EventEmitter _eventEmitter,
         Config memory _config
     ) CoreContract("RequestDecreasePositionLogic", "1", _authority, _eventEmitter) {
-        _setConfig(_config);
+        setConfig(_config);
     }
 
     function traderDecrease(PositionUtils.TraderCallParams calldata traderCallParams, address user) external auth {
@@ -149,7 +147,7 @@ contract RequestDecreasePositionLogic is CoreContract {
 
         config.positionStore.setRequestAdjustment(requestKey, request);
 
-        eventEmitter.log(
+        logEvent(
             "RequestDecreasePositionLogic__Decrease",
             abi.encode(
                 traderCallParams.account,
@@ -163,14 +161,10 @@ contract RequestDecreasePositionLogic is CoreContract {
 
     // governance
 
-    function setConfig(Config memory _config) external auth {
-        _setConfig(_config);
-    }
-
-    function _setConfig(Config memory _config) internal {
+    function setConfig(Config memory _config) public auth {
         config = _config;
 
-        emit RequestDecreasePositionLogic__SetConfig(block.timestamp, _config);
+        logEvent("setConfig()", abi.encode(_config));
     }
 
     error RequestDecreasePositionLogic__SubaccountNotFound(address user);

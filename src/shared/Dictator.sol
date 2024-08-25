@@ -3,10 +3,10 @@ pragma solidity 0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
-
+import {EventEmitter} from "./../utils/EventEmitter.sol";
 import {Auth} from "./../utils/access/Auth.sol";
 import {Permission} from "./../utils/access/Permission.sol";
+import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 
 contract Dictator is Ownable, IAuthority {
     event UpdateAccess(address target, bool enabled);
@@ -20,29 +20,38 @@ contract Dictator is Ownable, IAuthority {
         return target.canCall(user, functionSig);
     }
 
-    constructor(address _owner) Ownable(_owner) {}
+    EventEmitter eventEmitter;
+
+    constructor(EventEmitter _eventEmitter, address _owner) Ownable(_owner) {
+        eventEmitter = _eventEmitter;
+    }
 
     function setAccess(Auth target, address user) public virtual onlyOwner {
         target.setAuth(user);
 
-        emit UpdateAccess(user, true);
+        eventEmitter.log("Dictator", "1", "setAccess()", abi.encode(user, true));
     }
 
     function removeAccess(Auth target, address user) public virtual onlyOwner {
         target.removeAuth(user);
 
-        emit UpdateAccess(user, false);
+        eventEmitter.log("Dictator", "1", "removeAccess()", abi.encode(user, false));
     }
 
     function setPermission(Permission target, address user, bytes4 functionSig) public virtual onlyOwner {
         target.setPermission(user, functionSig);
 
-        emit UpdatePermission(user, functionSig, true);
+        eventEmitter.log("Dictator", "1", "setPermission()", abi.encode(user, functionSig, true));
     }
 
     function removePermission(Permission target, address user, bytes4 functionSig) public virtual onlyOwner {
         target.removePermission(user, functionSig);
 
-        emit UpdatePermission(user, functionSig, false);
+        eventEmitter.log("Dictator", "1", "removePermission()", abi.encode(user, functionSig, false));
+    }
+
+    function _transferOwnership(address newOwner) internal virtual override {
+        eventEmitter.log("Dictator", "1", "_transferOwnership()", abi.encode(newOwner));
+        _transferOwnership(newOwner);
     }
 }

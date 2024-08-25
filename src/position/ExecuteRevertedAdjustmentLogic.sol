@@ -7,8 +7,6 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
 contract ExecuteRevertedAdjustmentLogic is CoreContract {
-    event ExecuteRevertedAdjustmentLogic__SetConfig(uint timestamp, Config config);
-
     struct Config {
         string handlehandle;
     }
@@ -20,7 +18,7 @@ contract ExecuteRevertedAdjustmentLogic is CoreContract {
         EventEmitter _eventEmitter,
         Config memory _config
     ) CoreContract("ExecuteRevertedAdjustmentLogic", "1", _authority, _eventEmitter) {
-        _setConfig(_config);
+        setConfig(_config);
     }
 
     function handleCancelled(bytes32 key, GmxPositionUtils.Props memory order) external auth {
@@ -32,13 +30,9 @@ contract ExecuteRevertedAdjustmentLogic is CoreContract {
 
     // governance
 
-    function setConfig(Config memory _config) external auth {
-        _setConfig(_config);
-    }
-
-    function _setConfig(Config memory _config) internal {
+    function setConfig(Config memory _config) public auth {
         config = _config;
 
-        emit ExecuteRevertedAdjustmentLogic__SetConfig(block.timestamp, config);
+        logEvent("setConfig()", abi.encode(_config));
     }
 }

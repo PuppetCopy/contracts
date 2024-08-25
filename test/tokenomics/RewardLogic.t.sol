@@ -23,7 +23,7 @@ import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
 import {TokenomicsRouter} from "src/TokenomicsRouter.sol";
 
 contract RewardLogicTest is BasicSetup {
-    VotingEscrowLogic votingEscrow;
+    VotingEscrowLogic veLogic;
     MockWeightedPoolVault primaryVaultPool;
     RewardStore rewardStore;
     RevenueStore revenueStore;
@@ -51,7 +51,7 @@ contract RewardLogicTest is BasicSetup {
         puppetVoteToken = new PuppetVoteToken(dictator);
         votingEscrowStore = new VotingEscrowStore(dictator, router);
 
-        votingEscrow = new VotingEscrowLogic(
+        veLogic = new VotingEscrowLogic(
             dictator,
             eventEmitter,
             votingEscrowStore,
@@ -59,7 +59,7 @@ contract RewardLogicTest is BasicSetup {
             puppetVoteToken,
             VotingEscrowLogic.Config({baseMultiplier: 0.6e30})
         );
-        dictator.setAccess(router, address(votingEscrow));
+        dictator.setAccess(router, address(veLogic));
 
         IERC20[] memory _buybackTokenList = new IERC20[](2);
         _buybackTokenList[0] = wnt;
@@ -85,18 +85,21 @@ contract RewardLogicTest is BasicSetup {
             config
         );
         dictator.setAccess(rewardStore, address(rewardLogic));
-        dictator.setAccess(votingEscrow, address(rewardLogic));
+        dictator.setPermission(veLogic, address(rewardLogic), veLogic.lock.selector);
+        dictator.setPermission(veLogic, address(rewardLogic), veLogic.vest.selector);
         dictator.setPermission(puppetToken, address(rewardLogic), puppetToken.mint.selector);
 
         tokenomicsRouter = new TokenomicsRouter(
             dictator,
-            TokenomicsRouter.Config({rewardLogic: rewardLogic, veLogic: votingEscrow, revenueLogic: revenueLogic})
+            eventEmitter,
+            TokenomicsRouter.Config({rewardLogic: rewardLogic, veLogic: veLogic, revenueLogic: revenueLogic})
         );
 
         // permissions used for testing
         vm.startPrank(users.owner);
         dictator.setAccess(revenueStore, users.owner);
-        dictator.setAccess(revenueLogic, users.owner);
+        dictator.setPermission(revenueLogic, users.owner, revenueLogic.buyback.selector);
+        dictator.setPermission(revenueLogic, users.owner, revenueLogic.claim.selector);
         wnt.approve(address(router), type(uint).max - 1);
         puppetToken.approve(address(router), type(uint).max - 1);
     }

@@ -3,17 +3,16 @@ pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {RevenueLogic} from "./tokenomics/RevenueLogic.sol";
+import {RewardLogic} from "./tokenomics/RewardLogic.sol";
+import {VotingEscrowLogic} from "./tokenomics/VotingEscrowLogic.sol";
+import {CoreContract} from "./utils/CoreContract.sol";
+import {EventEmitter} from "./utils/EventEmitter.sol";
 import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
 import {Auth} from "./utils/access/Auth.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
-import {RevenueLogic} from "./tokenomics/RevenueLogic.sol";
-import {RewardLogic} from "./tokenomics/RewardLogic.sol";
-import {VotingEscrowLogic} from "./tokenomics/VotingEscrowLogic.sol";
-
-contract TokenomicsRouter is Auth, ReentrancyGuardTransient {
-    event PuppetRouter__SetConfig(uint timestamp, Config config);
-
+contract TokenomicsRouter is CoreContract, ReentrancyGuardTransient {
     struct Config {
         RewardLogic rewardLogic;
         VotingEscrowLogic veLogic;
@@ -22,8 +21,12 @@ contract TokenomicsRouter is Auth, ReentrancyGuardTransient {
 
     Config config;
 
-    constructor(IAuthority _authority, Config memory _config) Auth(_authority) {
-        _setConfig(_config);
+    constructor(
+        IAuthority _authority,
+        EventEmitter _eventEmitter,
+        Config memory _config
+    ) CoreContract("TokenomicsRouter", "1", _authority, _eventEmitter) {
+        setConfig(_config);
     }
 
     function lockContribution(IERC20 token, uint amount, uint duration) external nonReentrant returns (uint reward) {
@@ -76,17 +79,13 @@ contract TokenomicsRouter is Auth, ReentrancyGuardTransient {
 
     // governance
 
-    function setConfig(Config memory _config) external auth {
-        _setConfig(_config);
+    function setConfig(Config memory _config) public auth {
+        config = _config;
+
+        logEvent("setConfig()", abi.encode(_config));
     }
 
     // internal
-
-    function _setConfig(Config memory _config) internal {
-        config = _config;
-
-        emit PuppetRouter__SetConfig(block.timestamp, _config);
-    }
 
     error PuppetRouter__InvalidPuppet();
     error PuppetRouter__InvalidAllowance();

@@ -3,22 +3,20 @@ pragma solidity 0.8.24;
 
 import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
 
-import {Permission} from "./utils/access/Permission.sol";
-import {IAuthority} from "./utils/interfaces/IAuthority.sol";
-
-import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
-import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
-
-import {PositionStore} from "./position/store/PositionStore.sol";
-import {PositionUtils} from "./position/utils/PositionUtils.sol";
-
 import {ExecuteDecreasePositionLogic} from "./position/ExecuteDecreasePositionLogic.sol";
 import {ExecuteIncreasePositionLogic} from "./position/ExecuteIncreasePositionLogic.sol";
 import {ExecuteRevertedAdjustmentLogic} from "./position/ExecuteRevertedAdjustmentLogic.sol";
 import {RequestDecreasePositionLogic} from "./position/RequestDecreasePositionLogic.sol";
 import {RequestIncreasePositionLogic} from "./position/RequestIncreasePositionLogic.sol";
+import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
+import {PositionStore} from "./position/store/PositionStore.sol";
+import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
+import {PositionUtils} from "./position/utils/PositionUtils.sol";
+import {CoreContract} from "./utils/CoreContract.sol";
+import {EventEmitter} from "./utils/EventEmitter.sol";
+import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
-contract PositionRouter is Permission, ReentrancyGuardTransient, IGmxOrderCallbackReceiver {
+contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallbackReceiver {
     struct Config {
         RequestIncreasePositionLogic requestIncrease;
         ExecuteIncreasePositionLogic executeIncrease;
@@ -27,17 +25,17 @@ contract PositionRouter is Permission, ReentrancyGuardTransient, IGmxOrderCallba
         ExecuteRevertedAdjustmentLogic executeRevertedAdjustment;
     }
 
-    event PositionRouter__SetConfig(uint timestamp, Config config);
-    event PositionRouter__UnhandledCallback(
-        GmxPositionUtils.OrderExecutionStatus status, bytes32 key, GmxPositionUtils.Props order, bytes eventData
-    );
-
     Config config;
     PositionStore positionStore;
 
-    constructor(IAuthority _authority, PositionStore _positionStore, Config memory _config) Permission(_authority) {
+    constructor(
+        IAuthority _authority,
+        EventEmitter _eventEmitter,
+        PositionStore _positionStore,
+        Config memory _config
+    ) CoreContract("PositionRouter", "1", _authority, _eventEmitter) {
         positionStore = _positionStore;
-        _setConfig(_config);
+        setConfig(_config);
     }
 
     function requestTraderIncrease(
@@ -130,8 +128,10 @@ contract PositionRouter is Permission, ReentrancyGuardTransient, IGmxOrderCallba
 
     // governance
 
-    function setConfig(Config memory _config) external auth {
-        _setConfig(_config);
+    function setConfig(Config memory _config) public auth {
+        config = _config;
+
+        logEvent("setConfig()", abi.encode(_config));
     }
 
     // internal
@@ -143,13 +143,7 @@ contract PositionRouter is Permission, ReentrancyGuardTransient, IGmxOrderCallba
         bytes calldata eventData
     ) internal auth {
         positionStore.setUnhandledCallback(status, order, key, eventData);
-        emit PositionRouter__UnhandledCallback(status, key, order, eventData);
-    }
-
-    function _setConfig(Config memory _config) internal {
-        config = _config;
-
-        emit PositionRouter__SetConfig(block.timestamp, config);
+        logEvent("storeUnhandledCallback()", abi.encode(status, key, order, eventData));
     }
 
     error PositionRouter__InvalidOrderType(GmxPositionUtils.OrderType orderType);

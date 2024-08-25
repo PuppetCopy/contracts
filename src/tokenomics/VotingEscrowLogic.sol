@@ -24,11 +24,6 @@ uint constant MAXTIME = 365 * 2 days;
 /// @dev The contract inherits from Permission and ERC20Votes to provide token locking and voting features.
 /// It uses a weighted average mechanism to adjust lock durations and vesting periods.
 contract VotingEscrowLogic is CoreContract {
-    /// @notice Emitted when the configuration for the RewardLogic is set.
-    /// @param timestamp The timestamp when the configuration was set.
-    /// @param config The configuration settings that were applied.
-    event RewardLogic__SetConfig(uint timestamp, Config config);
-
     /// @notice Struct to hold configuration parameters.
     struct Config {
         uint baseMultiplier;
@@ -110,7 +105,7 @@ contract VotingEscrowLogic is CoreContract {
         token = _token;
         vToken = _vToken;
 
-        _setConfig(_config);
+        setConfig(_config);
     }
 
     /// @notice Locks tokens for a user, granting them voting power and bonus rewards
@@ -138,7 +133,7 @@ contract VotingEscrowLogic is CoreContract {
         store.setLockDuration(user, nextDuration);
         vToken.mint(user, amount);
 
-        eventEmitter.log("VotingEscrowLogic__Lock", abi.encode(depositor, user, nextAmount, nextDuration, bonusAmount));
+        logEvent("lock()", abi.encode(depositor, user, nextAmount, nextDuration, bonusAmount));
     }
 
     /// @notice Begins the vesting process for a user's locked tokens.
@@ -167,22 +162,18 @@ contract VotingEscrowLogic is CoreContract {
         store.setVested(user, vested);
         store.transferOut(token, receiver, amount);
 
-        eventEmitter.log("VotingEscrowLogic__Claim", abi.encode(user, receiver, amount));
+        logEvent("claim()", abi.encode(user, receiver, amount));
     }
 
     // governance
 
-    function setConfig(Config memory _config) external auth {
-        _setConfig(_config);
+    function setConfig(Config memory _config) public auth {
+        config = _config;
+
+        logEvent("setConfig()", abi.encode(_config));
     }
 
     // internal
-
-    function _setConfig(Config memory _config) internal {
-        config = _config;
-
-        emit RewardLogic__SetConfig(block.timestamp, config);
-    }
 
     function _vest(address user, address receiver, uint amount, uint duration) internal {
         if (duration == 0) revert VotingEscrowLogic__NothingLocked();
@@ -198,7 +189,7 @@ contract VotingEscrowLogic is CoreContract {
         store.setVested(user, vested);
         vToken.burn(user, amount);
 
-        eventEmitter.log("VotingEscrowLogic__Vest", abi.encode(user, receiver, vested));
+        logEvent("vest()", abi.encode(user, receiver, vested));
     }
 
     error VotingEscrowLogic__ZeroAmount();

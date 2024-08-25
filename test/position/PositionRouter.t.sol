@@ -77,11 +77,10 @@ contract PositionRouterTest is BasicSetup {
         puppetLogic = new PuppetLogic(
             dictator,
             eventEmitter,
-            router,
             puppetStore,
             PuppetLogic.Config({minExpiryDuration: 0, minAllowanceRate: 100, maxAllowanceRate: 5000})
         );
-        puppetRouter = new PuppetRouter(dictator, PuppetRouter.Config({logic: puppetLogic}));
+        puppetRouter = new PuppetRouter(dictator, eventEmitter, PuppetRouter.Config({logic: puppetLogic}));
 
         dictator.setAccess(puppetStore, address(puppetRouter));
         dictator.setAccess(router, address(puppetStore));
@@ -143,6 +142,7 @@ contract PositionRouterTest is BasicSetup {
 
         positionRouter = new PositionRouter(
             dictator,
+            eventEmitter,
             positionStore,
             PositionRouter.Config({
                 requestIncrease: requestIncrease,

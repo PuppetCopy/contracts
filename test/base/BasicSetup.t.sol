@@ -42,11 +42,19 @@ contract BasicSetup is Test {
         });
         vm.startPrank(users.owner);
 
-        dictator = new Dictator(users.owner);
+        dictator = new Dictator(
+            EventEmitter(
+                computeCreateAddress(
+                    vm.envAddress("DEPLOYER_ADDRESS"), vm.getNonce(vm.envAddress("DEPLOYER_ADDRESS")) + 1
+                )
+            ),
+            users.owner
+        );
         eventEmitter = new EventEmitter(dictator);
         router = new Router(dictator, 200_000);
         puppetToken = new PuppetToken(
             dictator, //
+            eventEmitter,
             PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}),
             users.owner
         );

@@ -76,8 +76,8 @@ contract RevenueLogic is CoreContract {
         uint nextCumulativeTokenPerContrib =
             store.increaseCumulativeRewardPerContribution(token, Precision.toFactor(thresholdAmount, amount));
 
-        eventEmitter.log(
-            "RevenueLogic__Buyback",
+        logEvent(
+            "buyback()",
             abi.encode(token, depositor, receiver, nextCumulativeTokenPerContrib, thresholdAmount, amount)
         );
     }
@@ -95,7 +95,7 @@ contract RevenueLogic is CoreContract {
 
         store.setUserAccruedReward(token, contributor, nextAccruedReward);
 
-        eventEmitter.log("RevenueLogic__Claim", abi.encode(token, contributor, receiver, nextAccruedReward, amount));
+        logEvent("claim()", abi.encode(token, contributor, receiver, nextAccruedReward, amount));
     }
 
     // internal

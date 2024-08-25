@@ -11,7 +11,7 @@ import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 // Peripheral services like monitoring or analytics would be able to continue
 // to work without an update and without segregating historical data
 contract EventEmitter is Auth {
-    event Event(address msgSender, string name, bytes data);
+    event Event(address operator, string name, string version, string method, bytes data);
 
     constructor(IAuthority _authority) Auth(_authority) {
         authority = _authority;
@@ -20,7 +20,12 @@ contract EventEmitter is Auth {
     // @dev emit a general event log
     // @param eventName the name of the event
     // @param eventData the event data
-    function log(string memory name, bytes memory data) external auth {
-        emit Event(msg.sender, name, data);
+    function log(
+        string calldata name,
+        string calldata version,
+        string calldata method,
+        bytes calldata data
+    ) external auth {
+        emit Event(msg.sender, name, version, method, data);
     }
 }

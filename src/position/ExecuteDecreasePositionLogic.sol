@@ -18,8 +18,6 @@ import {RevenueStore} from "../tokenomics/store/RevenueStore.sol";
 import {PositionStore} from "./store/PositionStore.sol";
 
 contract ExecuteDecreasePositionLogic is CoreContract {
-    event ExecuteDecreasePositionLogic__SetConfig(uint timestamp, Config config);
-
     struct Config {
         Router router;
         PositionStore positionStore;
@@ -134,8 +132,8 @@ contract ExecuteDecreasePositionLogic is CoreContract {
             );
         }
 
-        eventEmitter.log(
-            "ExecuteDecreasePositionLogic",
+        logEvent(
+            "execute()",
             abi.encode(
                 requestKey,
                 request.positionKey,
@@ -175,7 +173,7 @@ contract ExecuteDecreasePositionLogic is CoreContract {
     function _setConfig(Config memory _config) internal {
         config = _config;
 
-        emit ExecuteDecreasePositionLogic__SetConfig(block.timestamp, _config);
+        logEvent("setConfig()", abi.encode(_config));
     }
 
     error ExecuteDecreasePositionLogic__InvalidRequest(bytes32 positionKey, bytes32 key);

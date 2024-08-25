@@ -2,8 +2,9 @@
 pragma solidity >=0.8.0;
 
 import {IAuthority} from "./../interfaces/IAuthority.sol";
+import {CoreContract} from "../CoreContract.sol";
 
-abstract contract Auth {
+abstract contract Auth is CoreContract {
     IAuthority public immutable authority;
 
     mapping(address => bool) public authMap;

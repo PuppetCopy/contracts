@@ -31,11 +31,6 @@ contract RewardLogic is CoreContract {
         uint distributionTimeframe;
     }
 
-    /// @notice Emitted when the configuration for the RewardLogic is set.
-    /// @param timestamp The timestamp when the configuration was set.
-    /// @param config The configuration settings that were applied.
-    event RewardLogic__SetConfig(uint timestamp, Config config);
-
     /// @notice The configuration parameters for the RewardLogic
     Config public config;
 
@@ -78,7 +73,7 @@ contract RewardLogic is CoreContract {
         // revenueStore = _revenueStore;
         rewardToken = _mintToken;
 
-        _setConfig(_config);
+        setConfig(_config);
     }
 
     /// @notice Locks tokens to participate in reward distribution and increases voting power in the VotingEscrow.
@@ -96,7 +91,7 @@ contract RewardLogic is CoreContract {
 
         rewardToken.mint(address(this), reward);
 
-        eventEmitter.log("RewardLogic__Lock", abi.encode(token, user, duration, reward));
+        logEvent("lock()", abi.encode(token, user, duration, reward));
 
         return reward;
     }
@@ -111,7 +106,7 @@ contract RewardLogic is CoreContract {
 
         rewardToken.mint(address(this), reward);
 
-        eventEmitter.log("RewardLogic__Exit", abi.encode(token, user, contribution, reward));
+        logEvent("exit()", abi.encode(token, user, contribution, reward));
 
         return reward;
     }
@@ -149,7 +144,7 @@ contract RewardLogic is CoreContract {
         store.setUserEmissionReward(contributionToken, user, userCursor);
         store.transferOut(rewardToken, receiver, amount);
 
-        eventEmitter.log("RewardLogic__Claim", abi.encode(user, receiver, amount));
+        logEvent("claimEmission()", abi.encode(user, receiver, amount));
 
         return reward;
     }
@@ -209,7 +204,7 @@ contract RewardLogic is CoreContract {
             Precision.toFactor(emission, supply)
         );
 
-        eventEmitter.log("RewardLogic__Distribute", abi.encode(token, rewardPerToken, emission));
+        logEvent("distribute()", abi.encode(token, rewardPerToken, emission));
 
         return rewardPerToken;
     }
@@ -237,14 +232,10 @@ contract RewardLogic is CoreContract {
 
     // governance
 
-    function setConfig(Config memory _config) external auth {
-        _setConfig(_config);
-    }
-
-    function _setConfig(Config memory _config) internal {
+    function setConfig(Config memory _config) public auth {
         config = _config;
 
-        emit RewardLogic__SetConfig(block.timestamp, config);
+        logEvent("setConfig()", abi.encode(_config));
     }
 
     /// @notice Error emitted when the claimable amount is insufficient
