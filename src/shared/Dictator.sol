@@ -29,25 +29,25 @@ contract Dictator is Ownable, IAuthority {
     function setAccess(Auth target, address user) public virtual onlyOwner {
         target.setAuth(user);
 
-        eventEmitter.log("Dictator", "1", "setAccess()", abi.encode(user, true));
+        eventEmitter.log("Dictator", "1", "setAccess()", abi.encode(target, user));
     }
 
     function removeAccess(Auth target, address user) public virtual onlyOwner {
         target.removeAuth(user);
 
-        eventEmitter.log("Dictator", "1", "removeAccess()", abi.encode(user, false));
+        eventEmitter.log("Dictator", "1", "removeAccess()", abi.encode(target, user));
     }
 
     function setPermission(Permission target, address user, bytes4 functionSig) public virtual onlyOwner {
         target.setPermission(user, functionSig);
 
-        eventEmitter.log("Dictator", "1", "setPermission()", abi.encode(user, functionSig, true));
+        eventEmitter.log("Dictator", "1", "setPermission()", abi.encode(target, user, functionSig));
     }
 
     function removePermission(Permission target, address user, bytes4 functionSig) public virtual onlyOwner {
         target.removePermission(user, functionSig);
 
-        eventEmitter.log("Dictator", "1", "removePermission()", abi.encode(user, functionSig, false));
+        eventEmitter.log("Dictator", "1", "removePermission()", abi.encode(target, user, functionSig));
     }
 
     function _transferOwnership(address newOwner) internal virtual override {
