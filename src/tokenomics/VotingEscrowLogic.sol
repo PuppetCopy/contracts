@@ -3,25 +3,24 @@ pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {PuppetToken} from "../tokenomics/PuppetToken.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
 import {Precision} from "../utils/Precision.sol";
 import {Permission} from "../utils/access/Permission.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-
-import {PuppetToken} from "../tokenomics/PuppetToken.sol";
 import {PuppetVoteToken} from "./PuppetVoteToken.sol";
 import {VotingEscrowStore} from "./store/VotingEscrowStore.sol";
 
 uint constant MAXTIME = 365 * 2 days;
 
 /// @title VotingEscrowLogic
-/// @notice lock tokens for a certain period to obtain governance voting power.
+/// @notice lock tokens for a certain period to obtain governance voting power and bonus rewards based on the lock duration
 /// The lock duration is subject to a weighted average adjustment when additional tokens are locked for a new duration.
 /// Upon unlocking, tokens enter a vesting period, the duration of which is determined by the weighted average of the
 /// lock durations. The vesting period is recalculated whenever
 /// additional tokens are locked, incorporating the new amount and duration into the weighted average.
-/// @dev The contract inherits from Permission and ERC20Votes to provide token locking and voting features.
+/// @dev The contract inherits from Permission which are used for access control for router contracts.
 /// It uses a weighted average mechanism to adjust lock durations and vesting periods.
 contract VotingEscrowLogic is CoreContract {
     /// @notice Struct to hold configuration parameters.
@@ -137,7 +136,6 @@ contract VotingEscrowLogic is CoreContract {
     }
 
     /// @notice Begins the vesting process for a user's locked tokens.
-    /// @dev Emits a VotingEscrowLogic__Vest event on successful vesting initiation.
     /// @param user The address of the user whose tokens are to begin vesting.
     /// @param receiver The address that will receive the vested tokens.
     /// @param amount The amount of tokens to begin vesting.
@@ -146,7 +144,6 @@ contract VotingEscrowLogic is CoreContract {
     }
 
     /// @notice Allows a user to claim their vested tokens.
-    /// @dev Emits a VotingEscrowLogic__Claim event on successful claim.
     /// @param user The address of the user claiming their tokens.
     /// @param receiver The address that will receive the claimed tokens.
     /// @param amount The amount of tokens to be claimed.
@@ -174,7 +171,6 @@ contract VotingEscrowLogic is CoreContract {
     }
 
     // internal
-
     function _vest(address user, address receiver, uint amount, uint duration) internal {
         if (duration == 0) revert VotingEscrowLogic__NothingLocked();
         if (amount == 0) revert VotingEscrowLogic__ZeroBalance();

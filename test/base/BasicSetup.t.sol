@@ -6,12 +6,11 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Test} from "forge-std/src/Test.sol";
 
-import {IWNT} from "./../../src/utils/interfaces/IWNT.sol";
 import {Dictator} from "src/shared/Dictator.sol";
-
 import {Router} from "src/shared/Router.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {EventEmitter} from "src/utils/EventEmitter.sol";
+import {IWNT} from "src/utils/interfaces/IWNT.sol";
 
 contract BasicSetup is Test {
     struct Users {
@@ -40,17 +39,8 @@ contract BasicSetup is Test {
             bob: _createUser("Bob"),
             yossi: _createUser("Yossi")
         });
-        vm.startPrank(users.owner);
-
-        dictator = new Dictator(
-            EventEmitter(
-                computeCreateAddress(
-                    vm.envAddress("DEPLOYER_ADDRESS"), vm.getNonce(vm.envAddress("DEPLOYER_ADDRESS")) + 1
-                )
-            ),
-            users.owner
-        );
-        eventEmitter = new EventEmitter(dictator);
+        eventEmitter = new EventEmitter(Dictator(computeCreateAddress(msg.sender, vm.getNonce(msg.sender) + 1)));
+        dictator = new Dictator(users.owner);
         router = new Router(dictator, 200_000);
         puppetToken = new PuppetToken(
             dictator, //
@@ -60,6 +50,8 @@ contract BasicSetup is Test {
         );
 
         skip(1 hours);
+
+        vm.startPrank(users.owner);
     }
 
     /// @dev Generates a user, labels its address, and funds it with test assets

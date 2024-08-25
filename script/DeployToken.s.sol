@@ -25,14 +25,15 @@ contract DeployToken is Script {
     }
 
     function deployContracts() internal {
-        Dictator dictator = new Dictator(
-            EventEmitter(
-                computeCreateAddress(
-                    vm.envAddress("DEPLOYER_ADDRESS"), vm.getNonce(vm.envAddress("DEPLOYER_ADDRESS")) + 1
-                )
-            ),
-            Address.dao
-        );
+        Dictator dictator = new Dictator(Address.dao);
+        // Dictator dictator = new Dictator(
+        //     EventEmitter(
+        //         computeCreateAddress(
+        //             vm.envAddress("DEPLOYER_ADDRESS"), vm.getNonce(vm.envAddress("DEPLOYER_ADDRESS")) + 1
+        //         )
+        //     ),
+        //     Address.dao
+        // );
         EventEmitter eventEmitter = new EventEmitter(dictator);
         PuppetToken puppetToken = new PuppetToken(
             dictator, eventEmitter, PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}), Address.dao

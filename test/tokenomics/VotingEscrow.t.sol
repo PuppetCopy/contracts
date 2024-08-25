@@ -22,7 +22,6 @@ contract VotingEscrowTest is BasicSetup {
 
         puppetVoteToken = new PuppetVoteToken(dictator);
         veStore = new VotingEscrowStore(dictator, router);
-
         veLogic = new VotingEscrowLogic(
             dictator, //
             eventEmitter,
@@ -53,18 +52,16 @@ contract VotingEscrowTest is BasicSetup {
         vm.stopPrank();
     }
 
-    // function testBonusMultiplier() public view {
-    //     uint amount = 100e18; // The locked amount
+    function testBonusMultiplier() public view {
+        uint amount = 100e18; // The locked amount
 
-    //     assertEq(veLogic.getBonusAmount(amount, 0), 0, "Bonus amount should be zero for zero duration");
-    //     assertEq(
-    //         veLogic.getBonusAmount(amount, 365 days / 2), 3.125e18, "Bonus amount should be zero for half duration"
-    //     );
-    //     assertEq(veLogic.getBonusAmount(amount, 1 * 365 days), 12.5e18, "Bonus amount should be zero for full
-    // duration");
-    //     assertEq(veLogic.getBonusAmount(amount, 2 * 365 days), 50e18, "Bonus amount should be zero for double
-    // duration");
-    // }
+        assertEq(veLogic.getBonusAmount(amount, 0), 0, "Bonus amount should be zero for zero duration");
+        assertEq(
+            veLogic.getBonusAmount(amount, 365 days / 2), 3.125e18, "Bonus amount should be zero for half duration"
+        );
+        assertEq(veLogic.getBonusAmount(amount, 1 * 365 days), 12.5e18, "Bonus amount should be zero for full duration");
+        assertEq(veLogic.getBonusAmount(amount, 2 * 365 days), 50e18, "Bonus amount should be zero for double duration");
+    }
 
     // function testLock() public {
     //     uint amount = 10 * 1e18;
