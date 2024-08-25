@@ -28,7 +28,7 @@ contract PuppetLogic is CoreContract {
     ) CoreContract("PuppetLogic", "1", _authority, _eventEmitter) {
         store = _store;
 
-        setConfig(_config);
+        _setConfig(_config);
     }
 
     function deposit(IERC20 token, address user, uint amount) external auth {
@@ -153,9 +153,16 @@ contract PuppetLogic is CoreContract {
 
     // governance
 
-    function setConfig(Config memory _config) public auth {
-        config = _config;
+    /// @notice Set the mint rate limit for the token.
+    /// @param _config The new rate limit configuration.
+    function setConfig(Config calldata _config) external auth {
+        _setConfig(_config);
+    }
 
+    /// @dev Internal function to set the configuration.
+    /// @param _config The configuration to set.
+    function _setConfig(Config memory _config) internal {
+        config = _config;
         logEvent("setConfig()", abi.encode(_config));
     }
 

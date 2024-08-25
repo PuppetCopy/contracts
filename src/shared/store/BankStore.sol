@@ -24,11 +24,10 @@ abstract contract BankStore is Auth {
     }
 
     function recordedTransferIn(IERC20 _token) public auth returns (uint) {
-        return _recordTransferIn(_token);
-    }
+        uint prevBalance = tokenBalanceMap[_token];
+        uint currentBalance = _syncTokenBalance(_token);
 
-    function syncTokenBalance(IERC20 _token) external auth {
-        tokenBalanceMap[_token] = _token.balanceOf(address(this));
+        return currentBalance - prevBalance;
     }
 
     function transferOut(IERC20 _token, address _receiver, uint _value) public auth {
@@ -41,12 +40,10 @@ abstract contract BankStore is Auth {
         tokenBalanceMap[_token] += _value;
     }
 
-    function _recordTransferIn(IERC20 _token) internal returns (uint) {
-        uint prevBalance = tokenBalanceMap[_token];
-        uint currentBalance = _syncTokenBalance(_token);
-
-        return currentBalance - prevBalance;
+    function syncTokenBalance(IERC20 _token) external auth {
+        tokenBalanceMap[_token] = _token.balanceOf(address(this));
     }
+
 
     function _syncTokenBalance(IERC20 _token) internal returns (uint) {
         uint currentBalance = _token.balanceOf(address(this));

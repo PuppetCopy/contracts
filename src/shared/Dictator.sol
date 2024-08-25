@@ -3,12 +3,15 @@ pragma solidity 0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-import {EventEmitter} from "./../utils/EventEmitter.sol";
-import {Auth} from "./../utils/access/Auth.sol";
-import {Permission} from "./../utils/access/Permission.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 
+import {Auth} from "./../utils/access/Auth.sol";
+import {Permission} from "./../utils/access/Permission.sol";
+
 contract Dictator is Ownable, IAuthority {
+    event UpdateAccess(address target, bool enabled);
+    event UpdatePermission(address target, bytes4 functionSig, bool enabled);
+
     function hasAccess(Auth target, address user) external view returns (bool) {
         return target.canCall(user);
     }
@@ -17,38 +20,29 @@ contract Dictator is Ownable, IAuthority {
         return target.canCall(user, functionSig);
     }
 
-    EventEmitter eventEmitter;
-
-    constructor(EventEmitter _eventEmitter, address _owner) Ownable(_owner) {
-        eventEmitter = _eventEmitter;
-    }
+    constructor(address _owner) Ownable(_owner) {}
 
     function setAccess(Auth target, address user) public virtual onlyOwner {
         target.setAuth(user);
 
-        eventEmitter.logEvent("Dictator", "1", "setAccess()", abi.encode(target, user));
+        emit UpdateAccess(user, true);
     }
 
     function removeAccess(Auth target, address user) public virtual onlyOwner {
         target.removeAuth(user);
 
-        eventEmitter.logEvent("Dictator", "1", "removeAccess()", abi.encode(target, user));
+        emit UpdateAccess(user, false);
     }
 
     function setPermission(Permission target, address user, bytes4 functionSig) public virtual onlyOwner {
         target.setPermission(user, functionSig);
 
-        eventEmitter.logEvent("Dictator", "1", "setPermission()", abi.encode(target, user, functionSig));
+        emit UpdatePermission(user, functionSig, true);
     }
 
     function removePermission(Permission target, address user, bytes4 functionSig) public virtual onlyOwner {
         target.removePermission(user, functionSig);
 
-        eventEmitter.logEvent("Dictator", "1", "removePermission()", abi.encode(target, user, functionSig));
-    }
-
-    function _transferOwnership(address newOwner) internal virtual override {
-        eventEmitter.logEvent("Dictator", "1", "_transferOwnership()", abi.encode(newOwner));
-        _transferOwnership(newOwner);
+        emit UpdatePermission(user, functionSig, false);
     }
 }

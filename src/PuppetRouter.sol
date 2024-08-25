@@ -23,7 +23,7 @@ contract PuppetRouter is CoreContract, ReentrancyGuardTransient {
         EventEmitter _eventEmitter,
         Config memory _config
     ) CoreContract("PuppetRouter", "1", _authority, _eventEmitter) {
-        setConfig(_config);
+        _setConfig(_config);
     }
 
     function deposit(IERC20 token, uint amount) external nonReentrant {
@@ -52,9 +52,16 @@ contract PuppetRouter is CoreContract, ReentrancyGuardTransient {
 
     // governance
 
-    function setConfig(Config memory _config) public auth {
-        config = _config;
+    /// @notice Set the mint rate limit for the token.
+    /// @param _config The new rate limit configuration.
+    function setConfig(Config calldata _config) external auth {
+        _setConfig(_config);
+    }
 
+    /// @dev Internal function to set the configuration.
+    /// @param _config The configuration to set.
+    function _setConfig(Config memory _config) internal {
+        config = _config;
         logEvent("setConfig()", abi.encode(_config));
     }
 

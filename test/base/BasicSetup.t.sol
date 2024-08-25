@@ -39,9 +39,14 @@ contract BasicSetup is Test {
             bob: _createUser("Bob"),
             yossi: _createUser("Yossi")
         });
-        eventEmitter = new EventEmitter(Dictator(computeCreateAddress(msg.sender, vm.getNonce(msg.sender) + 1)));
+
+        vm.startPrank(users.owner);
+
         dictator = new Dictator(users.owner);
+        eventEmitter = new EventEmitter(dictator);
         router = new Router(dictator, 200_000);
+
+        allowNextLoggerAccess();
         puppetToken = new PuppetToken(
             dictator, //
             eventEmitter,
@@ -50,8 +55,14 @@ contract BasicSetup is Test {
         );
 
         skip(1 hours);
+    }
 
-        vm.startPrank(users.owner);
+    function getNextContractAddress() internal view returns (address) {
+        return vm.computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1);
+    }
+
+    function allowNextLoggerAccess() internal {
+        dictator.setAccess(eventEmitter, vm.computeCreateAddress(users.owner, vm.getNonce(users.owner)));
     }
 
     /// @dev Generates a user, labels its address, and funds it with test assets

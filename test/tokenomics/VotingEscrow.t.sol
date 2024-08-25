@@ -4,15 +4,13 @@ pragma solidity 0.8.24;
 import {Router} from "src/shared/Router.sol";
 
 import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
-import {VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
+import {MAXTIME, VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
 import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
 contract VotingEscrowTest is BasicSetup {
-    uint private constant MAXTIME = 2 * 365 * 86400; // 4 years
-
-    PuppetVoteToken puppetVoteToken;
+    PuppetVoteToken vPuppet;
     VotingEscrowStore veStore;
     VotingEscrowLogic veLogic;
     VotingEscrowRouter veRouter;
@@ -20,242 +18,176 @@ contract VotingEscrowTest is BasicSetup {
     function setUp() public override {
         BasicSetup.setUp();
 
-        puppetVoteToken = new PuppetVoteToken(dictator);
+        vPuppet = new PuppetVoteToken(dictator);
         veStore = new VotingEscrowStore(dictator, router);
+
+        allowNextLoggerAccess();
         veLogic = new VotingEscrowLogic(
             dictator, //
             eventEmitter,
             veStore,
             puppetToken,
-            puppetVoteToken,
-            VotingEscrowLogic.Config({baseMultiplier: 0.5e30})
+            vPuppet,
+            VotingEscrowLogic.Config({baseMultiplier: 0.1e30})
         );
-        veRouter = new VotingEscrowRouter(veLogic);
+        dictator.setAccess(router, address(veStore));
 
         dictator.setAccess(eventEmitter, address(veLogic));
         dictator.setAccess(veStore, address(veLogic));
 
         dictator.setPermission(puppetToken, address(veLogic), puppetToken.mint.selector);
-        dictator.setAccess(puppetVoteToken, address(veLogic));
+        dictator.setAccess(vPuppet, address(veLogic));
 
         // test setup
+
+        veRouter = new VotingEscrowRouter(veLogic);
+        dictator.setPermission(veLogic, address(veRouter), veLogic.lock.selector);
+        dictator.setPermission(veLogic, address(veRouter), veLogic.vest.selector);
+        dictator.setPermission(veLogic, address(veRouter), veLogic.claim.selector);
+
         dictator.setPermission(puppetToken, users.owner, puppetToken.mint.selector);
 
         puppetToken.mint(users.alice, 100 * 1e18);
         puppetToken.mint(users.bob, 100 * 1e18);
         puppetToken.mint(users.yossi, 100 * 1e18);
-
-        dictator.setAccess(router, address(veLogic));
-        dictator.setPermission(veLogic, address(veRouter), veLogic.lock.selector);
-        dictator.setPermission(veLogic, address(veRouter), veLogic.vest.selector);
-
-        vm.stopPrank();
     }
 
     function testBonusMultiplier() public view {
         uint amount = 100e18; // The locked amount
 
-        assertEq(veLogic.getBonusAmount(amount, 0), 0, "Bonus amount should be zero for zero duration");
-        assertEq(
-            veLogic.getBonusAmount(amount, 365 days / 2), 3.125e18, "Bonus amount should be zero for half duration"
-        );
-        assertEq(veLogic.getBonusAmount(amount, 1 * 365 days), 12.5e18, "Bonus amount should be zero for full duration");
-        assertEq(veLogic.getBonusAmount(amount, 2 * 365 days), 50e18, "Bonus amount should be zero for double duration");
+        assertEq(veLogic.getVestedBonus(amount, 0), 0, "Bonus amount should be zero for zero duration");
+        assertEq(veLogic.getVestedBonus(amount, MAXTIME / 2), 2.5e18, "Bonus amount should be zero for half duration");
+        assertEq(veLogic.getVestedBonus(amount, 1 * MAXTIME), 10e18, "Bonus amount should be zero for full duration");
+        assertEq(veLogic.getVestedBonus(amount, 2 * MAXTIME), 40e18, "Bonus amount should be zero for double duration");
     }
 
-    // function testLock() public {
-    //     uint amount = 10 * 1e18;
-    //     uint duration = 365 days;
+    function testLock() public {
+        skip(MAXTIME);
 
-    //     vm.startPrank(users.alice);
-    //     puppetToken.approve(address(router), amount);
-    //     veRouter.lock(amount, duration);
-    //     vm.stopPrank();
+        uint amount = 10e18;
+        uint duration = MAXTIME;
 
-    //     uint bonusAmount = veLogic.getBonusAmount(amount, duration);
+        vm.startPrank(users.alice);
+        puppetToken.approve(address(router), amount);
 
-    //     uint lock = veStore.getLockDuration(users.alice);
-    //     assertEq(lock.amount, amount + bonusAmount, "Lock amount should match");
-    //     assertEq(lock.duration, duration, "Lock duration should match");
-    // }
+        veRouter.lock(amount, duration);
+        vm.stopPrank();
 
-    // function testLockAveraging() public {
-    //     uint initialAmount = 10 * 1e18;
-    //     uint additionalAmount = 20 * 1e18;
-    //     uint initialDuration = 365 days;
-    //     uint additionalDuration = 730 days; // 2 years
+        uint bonusAmount = veLogic.getVestedBonus(amount, duration);
 
-    //     // Alice locks an initial amount with a certain duration
-    //     vm.startPrank(users.alice);
-    //     puppetToken.approve(address(router), initialAmount + additionalAmount);
-    //     veRouter.lock(initialAmount, initialDuration);
+        assertEq(veLogic.getClaimable(users.alice), 0, "Vested amount should match");
+        assertEq(vPuppet.balanceOf(users.alice), amount, "Lock amount should match");
+        assertEq(veLogic.getVestingCursor(users.alice).amount, bonusAmount, "Bonus amount should match");
+        assertEq(veLogic.getVestingCursor(users.alice).remainingDuration, duration, "Bonus duration should match");
 
-    //     // Alice locks an additional amount with a different duration
-    //     veRouter.lock(additionalAmount, additionalDuration);
-    //     vm.stopPrank();
+        skip(duration);
 
-    //     // Calculate the expected average duration
-    //     uint expectedAverageDuration = (initialAmount * initialDuration + additionalAmount * additionalDuration)
-    //         / (initialAmount + additionalAmount);
+        assertEq(veStore.getLockDuration(users.alice), duration, "Lock duration should remain the same");
+        assertEq(vPuppet.balanceOf(users.alice), amount, "Lock amount should remain the same");
+        assertEq(veLogic.getClaimable(users.alice), bonusAmount, "Vested amount should match");
+    }
 
-    //     // Retrieve the lock information from the contract
-    //     VotingEscrowStore.Lock memory lock = veStore.getLocked(users.alice);
+    function testClaim() public {
+        uint amount = 100e18;
+        uint duration = MAXTIME;
+        uint halfDuration = duration / 2;
 
-    //     // Check that the total locked amount is the sum of the initial and additional amounts
-    //     assertEq(lock.amount, initialAmount + additionalAmount, "Total locked amount should match");
+        // Alice locks her tokens
+        vm.startPrank(users.alice);
+        puppetToken.approve(address(router), amount);
+        veRouter.lock(amount, duration);
+        vm.stopPrank();
 
-    //     // Check that the lock duration is correctly averaged
-    //     assertEq(lock.duration, expectedAverageDuration, "Lock duration should be correctly averaged");
-    // }
+        // Simulate time passing
+        skip(halfDuration);
 
-    // function testVest() public {
-    //     uint amount = 10 * 1e18;
-    //     uint duration = 365 days;
+        // Alice claims her vested tokens
+        vm.startPrank(users.alice);
+        uint claimableAmount = veLogic.getClaimable(users.alice);
+        veRouter.claim(claimableAmount);
+        vm.stopPrank();
 
-    //     // Alice locks tokens
-    //     vm.startPrank(users.alice);
-    //     puppetToken.approve(address(router), amount);
-    //     veRouter.lock(amount, duration);
+        // Check that Alice's claimable amount is now 0
+        assertEq(veLogic.getClaimable(users.alice), 0, "Alice should have no claimable tokens after claiming");
 
-    //     // Alice vests a portion of the locked tokens
-    //     uint vestAmount = 5 * 1e18;
-    //     veRouter.vest(vestAmount);
-    //     vm.stopPrank();
+        // Check that Alice received her tokens
+        assertEq(puppetToken.balanceOf(users.alice), claimableAmount, "Alice should have received her claimed tokens");
+    }
 
-    //     // Check the vesting schedule
-    //     VotingEscrowStore.Vested memory vest = veStore.getVested(users.alice);
-    //     assertEq(vest.amount, amount - vestAmount, "Vested amount should be reduced from total locked amount");
-    //     assertEq(vest.accrued, 0, "Accrued amount should be zero initially");
-    //     assertGt(vest.remainingDuration, 0, "Remaining duration should be greater than zero");
-    // }
+    function testRelockAndClaim() public {
+        uint amount = 100e18;
+        uint bonus = veLogic.getVestedBonus(amount / 2, MAXTIME);
 
-    // function testClaim() public {
-    //     uint amount = 10e18;
-    //     uint duration = 365 days;
+        vm.startPrank(users.alice);
+        puppetToken.approve(address(router), amount);
 
-    //     // Alice locks tokens
-    //     vm.startPrank(users.alice);
-    //     puppetToken.approve(address(router), amount);
-    //     veRouter.lock(amount, duration);
+        veRouter.lock(amount / 2, MAXTIME);
+        skip((MAXTIME / 2) + 1);
 
-    //     // Alice vests all locked tokens
-    //     veRouter.vest(amount);
+        veRouter.claim(bonus / 2);
 
-    //     // Simulate time passing
-    //     uint timePassed = duration / 2;
-    //     skip(timePassed);
+        veRouter.lock(amount / 2, MAXTIME);
 
-    //     // uint accruedAmount = votingEscrow.getVestingCursor(users.alice).accrued;
+        vm.expectRevert();
+        veRouter.claim(bonus);
 
-    //     // Alice claims a portion of the vested tokens
-    //     veRouter.claim(1);
+        skip(MAXTIME / 2);
 
-    //     // Check the vesting schedule after claiming
-    //     VotingEscrowStore.Vested memory vest = veStore.getVested(users.alice);
-    //     assertApproxEqAbs(amount / 2, amount / 2, 0.01e18, "Accrued amount should match the claimed amount");
-    //     assertEq(vest.remainingDuration, duration - timePassed, "Remaining duration should be reduced by time
-    // passed");
-    //     // vm.stopPrank();
-    // }
+        veRouter.claim(bonus / 2);
 
-    // function testFailClaimTooMuch() public {
-    //     uint amount = 10 * 1e18;
-    //     uint duration = 365 days;
+        assertEq(puppetToken.balanceOf(users.alice), bonus, "Alice should have received her claimed tokens");
 
-    //     // Alice locks tokens
-    //     vm.startPrank(users.alice);
-    //     puppetToken.approve(address(router), amount);
-    //     veRouter.lock(amount, duration);
+        veLogic.getClaimable(users.alice);
 
-    //     // Alice vests all locked tokens
-    //     veRouter.vest(amount);
+        assertEq(vPuppet.totalSupply(), amount, "vPuppet supply should be back to 0 after burning");
 
-    //     // Simulate time passing
-    //     uint timePassed = duration / 2;
-    //     vm.warp(block.timestamp + timePassed);
+        veRouter.vest(amount);
+        skip(MAXTIME);
 
-    //     // Alice tries to claim more than the vested amount
-    //     uint claimAmount = amount * 2; // Excessive claim amount
-    //     veRouter.claim(claimAmount); // This should fail
-    //     vm.stopPrank();
-    // }
+        veRouter.claim(amount);
 
-    // function testVestMoreThanLocked() public {
-    //     uint amount = 10 * 1e18;
-    //     uint duration = 365 days;
+        assertEq(vPuppet.totalSupply(), 0, "vPuppet supply should be back to 0 after burning");
+        assertEq(puppetToken.balanceOf(users.alice), amount + bonus, "Alice should have received her claimed tokens");
+    }
 
-    //     vm.startPrank(users.alice);
-    //     puppetToken.approve(address(router), amount);
-    //     veRouter.lock(amount, duration);
-    //     vm.expectRevert(
-    //         abi.encodeWithSelector(VotingEscrowLogic.VotingEscrowLogic__ExceedingLockAmount.selector, amount)
-    //     );
-    //     veRouter.vest(amount + 1); // Attempt to vest more than locked amount, should fail
-    //     vm.stopPrank();
-    // }
+    function testLockExceedMaxTimeReverts() public {
+        uint amount = 10 * 1e18;
+        uint durationExceedingMax = MAXTIME + 1;
 
-    // function testClaimMoreThanVested() public {
-    //     uint amount = 10 * 1e18;
-    //     uint duration = 365 days;
+        vm.startPrank(users.alice);
+        puppetToken.approve(address(router), amount);
 
-    //     vm.startPrank(users.alice);
-    //     puppetToken.approve(address(router), amount);
-    //     veRouter.lock(amount, duration);
-    //     veRouter.vest(amount);
-    //     skip(block.timestamp + duration + 10); // Fast-forward time
-    //     vm.expectRevert(
-    //         abi.encodeWithSelector(VotingEscrowLogic.VotingEscrowLogic__ExceedingAccruedAmount.selector, amount)
-    //     );
-    //     veRouter.claim(amount + 1); // Attempt to claim more than vested amount, should fail
-    //     vm.stopPrank();
-    // }
+        // Expect the transaction to revert because the duration exceeds MAXTIME
+        vm.expectRevert(VotingEscrowLogic.VotingEscrowLogic__ExceedMaxTime.selector);
+        veRouter.lock(amount, durationExceedingMax);
 
-    // function testZeroAmount() public {
-    //     uint zeroAmount = 0;
-    //     uint duration = 365 days;
+        vm.stopPrank();
+    }
 
-    //     vm.startPrank(users.alice);
-    //     puppetToken.approve(address(router), zeroAmount);
-    //     vm.expectRevert(abi.encodeWithSelector(VotingEscrowLogic.VotingEscrowLogic__ZeroAmount.selector));
-    //     veRouter.lock(zeroAmount, duration);
-    //     vm.stopPrank();
-    // }
+    function testClaimExceedsAccruedReverts() public {
+        uint amount = 10 * 1e18;
+        uint duration = MAXTIME / 2;
 
-    // function testAliceLockVestAndPartialClaimOverTime() public {
-    //     uint aliceAmount = 10e18;
-    //     uint aliceDuration = 365 days;
+        // Alice locks her tokens
+        vm.startPrank(users.alice);
+        puppetToken.approve(address(router), amount);
+        veRouter.lock(amount, duration);
+        vm.stopPrank();
 
-    //     vm.startPrank(users.alice);
+        // Simulate time passing
+        skip(duration / 4);
 
-    //     // Alice locks tokens
-    //     puppetToken.approve(address(router), aliceAmount);
-    //     veRouter.lock(aliceAmount, aliceDuration);
+        // Alice tries to claim more than her accrued amount
+        vm.startPrank(users.alice);
+        uint claimableAmount = veLogic.getClaimable(users.alice);
+        uint excessAmount = claimableAmount + 1e18; // Excess amount
 
-    //     // Alice vests some of her tokens
-    //     veRouter.vest(aliceAmount / 2);
-    //     skip(aliceDuration / 2);
-    //     veRouter.vest(aliceAmount / 2);
-    //     skip(aliceDuration);
+        // Expect the transaction to revert because the claim amount exceeds accrued tokens
+        vm.expectRevert();
+        veRouter.claim(excessAmount);
 
-    //     // Check that the claimed amount is correct
-    //     assertApproxEqAbs(
-    //         veStore.getVested(users.alice).accrued,
-    //         aliceAmount / 4,
-    //         1e8,
-    //         "Alice's accrued amount should match the first claimed amount"
-    //     );
-
-    //     // Simulate more time passing for Alice to claim the second portion
-    //     assertApproxEqAbs(
-    //         votingEscrow.getClaimable(users.alice),
-    //         aliceAmount,
-    //         1e8,
-    //         "Alice's total accrued amount should match the total claimed amount"
-    //     );
-
-    //     // Alice claims a portion of her vested tokens
-    //     veRouter.claim(aliceAmount);
-    // }
+        vm.stopPrank();
+    }
 }
 
 contract VotingEscrowRouter {

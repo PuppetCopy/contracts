@@ -10,8 +10,8 @@ import {IAuthority} from "./interfaces/IAuthority.sol";
 abstract contract CoreContract is Permission, EIP712 {
     EventEmitter eventEmitter;
 
-    string private name = _EIP712Name();
-    string private version = _EIP712Version();
+    string private name;
+    string private version;
 
     constructor(
         string memory _name,
@@ -20,6 +20,9 @@ abstract contract CoreContract is Permission, EIP712 {
         EventEmitter _eventEmitter
     ) EIP712(_name, _version) Permission(_authority) {
         eventEmitter = _eventEmitter;
+
+        name = _name;
+        version = _version;
     }
 
     function logEvent(string memory method, bytes memory data) internal {

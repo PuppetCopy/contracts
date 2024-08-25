@@ -33,10 +33,10 @@ contract PuppetToken is CoreContract, ERC20, IERC20Mintable {
 
     /// @notice The configuration for the mint rate limit.
     struct Config {
-        uint limitFactor; // Rate limit for minting new tokens in percentage of total supply, e.g.
-            // 0.01e30 (1%)
-            // circulating supply per durationWindow
-        uint durationWindow; // Time window for minting rate limit in seconds
+        // Rate limit for minting new tokens in percentage of total supply, e.g. 0.01e30 (1%)
+        uint limitFactor;
+        // circulating supply per durationWindow Time window for minting rate limit in seconds
+        uint durationWindow;
     }
 
     /// @notice The current configuration.
@@ -65,7 +65,7 @@ contract PuppetToken is CoreContract, ERC20, IERC20Mintable {
         Config memory _config,
         address receiver
     ) ERC20("Puppet Test", "PUPPET-TEST") CoreContract("PuppetToken", "1", _authority, _eventEmitter) {
-        setConfig(_config);
+        _setConfig(_config);
         _mint(receiver, GENESIS_MINT_AMOUNT);
 
         emissionRate = getLimitAmount();
@@ -151,7 +151,17 @@ contract PuppetToken is CoreContract, ERC20, IERC20Mintable {
 
     // governance
 
-    function setConfig(Config memory _config) public auth {
+    /// @notice Set the mint rate limit for the token.
+    /// @param _config The new rate limit configuration.
+    function setConfig(Config calldata _config) external auth {
+        _setConfig(_config);
+    }
+
+    /// @dev Internal function to set the configuration.
+    /// @param _config The configuration to set.
+    function _setConfig(Config memory _config) internal {
+        if (_config.limitFactor == 0) revert Puppet__InvalidRate();
+
         config = _config;
 
         logEvent("setConfig()", abi.encode(_config));

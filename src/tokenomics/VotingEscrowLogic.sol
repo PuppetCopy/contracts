@@ -12,16 +12,13 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {PuppetVoteToken} from "./PuppetVoteToken.sol";
 import {VotingEscrowStore} from "./store/VotingEscrowStore.sol";
 
-uint constant MAXTIME = 365 * 2 days;
+uint constant MAXTIME = 63120000; // 2 years
 
 /// @title VotingEscrowLogic
-/// @notice lock tokens for a certain period to obtain governance voting power and bonus rewards based on the lock duration
-/// The lock duration is subject to a weighted average adjustment when additional tokens are locked for a new duration.
-/// Upon unlocking, tokens enter a vesting period, the duration of which is determined by the weighted average of the
-/// lock durations. The vesting period is recalculated whenever
-/// additional tokens are locked, incorporating the new amount and duration into the weighted average.
-/// @dev The contract inherits from Permission which are used for access control for router contracts.
-/// It uses a weighted average mechanism to adjust lock durations and vesting periods.
+/// @notice Manages the locking of tokens to provide users with governance voting power and time-based rewards.
+/// This contract handles the logic for token vesting and voting power accrual based on the duration of token locks.
+/// @dev Inherits from CoreContract and utilizes a separate VotingEscrowStore for state management.
+/// It implements a weighted average mechanism for lock durations and vesting periods to calculate rewards.
 contract VotingEscrowLogic is CoreContract {
     /// @notice Struct to hold configuration parameters.
     struct Config {
@@ -35,58 +32,52 @@ contract VotingEscrowLogic is CoreContract {
     PuppetVoteToken public immutable vToken;
     VotingEscrowStore public immutable store;
 
-    /// @notice Calculates the amount of tokens that can be claimed by the user.
+    /// @notice Computes the current vesting state for a user, updating the amount and remaining duration.
+    /// @dev Returns a Vested struct reflecting the state after accounting for the time elapsed since the last accrual.
+    /// @param user The address of the user whose vesting state is to be calculated.
+    /// @return vested The updated vesting state for the user.
+    function getVestingCursor(address user) public view returns (VotingEscrowStore.Vested memory vested) {
+        vested = store.getVested(user);
+        uint timeElapsed = block.timestamp - vested.lastAccruedTime;
+        uint accruedDelta = timeElapsed >= vested.remainingDuration
+            ? vested.amount
+            : timeElapsed * vested.amount / vested.remainingDuration;
+
+        vested.remainingDuration = timeElapsed >= vested.remainingDuration ? 0 : vested.remainingDuration - timeElapsed;
+        vested.amount -= accruedDelta;
+        vested.accrued += accruedDelta;
+
+        vested.lastAccruedTime = block.timestamp;
+
+        return vested;
+    }
+
+    /// @notice Retrieves the claimable token amount for a given user, considering their vested tokens and time elapsed.
+    /// @dev The claimable amount is a sum of already accrued tokens and a portion of the locked tokens based on time
+    /// elapsed.
     /// @param user The address of the user whose claimable amount is to be calculated.
     /// @return The amount of tokens that can be claimed by the user.
     function getClaimable(address user) external view returns (uint) {
-        VotingEscrowStore.Vested memory vested = store.getVested(user);
-
-        uint timeElapsed = block.timestamp - vested.lastAccruedTime;
-
-        if (timeElapsed > vested.remainingDuration) {
-            return vested.accrued + vested.amount;
-        }
-
-        return vested.accrued + (vested.amount * timeElapsed / vested.remainingDuration);
+        return getVestingCursor(user).accrued;
     }
 
-    /// @notice Calculates the current vesting state for a given user.
-    /// @param user The address of the user whose vesting state is to be calculated.
-    /// @return The current vesting state of the specified user.
-    function getVestingCursor(address user) public view returns (VotingEscrowStore.Vested memory) {
-        VotingEscrowStore.Vested memory vested = store.getVested(user);
+    /// @notice Calculates the multiplier for rewards based on the lock duration.
+    /// @dev The multiplier follows an exponential scale to incentivize longer lock durations.
+    /// @param duration The lock duration in seconds.
+    /// @return The calculated duration multiplier.
+    function calcDurationMultiplier(uint duration) public view returns (uint) {
+        uint numerator = config.baseMultiplier * duration ** 2;
 
-        uint timeElapsed = block.timestamp - vested.lastAccruedTime;
-
-        if (timeElapsed > vested.remainingDuration) {
-            return VotingEscrowStore.Vested({
-                amount: 0,
-                remainingDuration: 0,
-                lastAccruedTime: block.timestamp,
-                accrued: vested.accrued + vested.amount
-            });
-        }
-
-        uint accruedDelta = timeElapsed * (vested.amount / vested.remainingDuration);
-
-        return VotingEscrowStore.Vested({
-            amount: vested.amount - accruedDelta,
-            remainingDuration: vested.remainingDuration - timeElapsed,
-            lastAccruedTime: block.timestamp,
-            accrued: vested.accrued + accruedDelta
-        });
-    }
-
-    // Exponential reward function
-    function getDurationMultiplier(uint duration) public view returns (uint) {
-        uint numerator = config.baseMultiplier * (duration ** 2);
-
-        // The result is scaled up by the baseMultiplier to maintain precision
         return numerator / MAXTIME ** 2;
     }
 
-    function getBonusAmount(uint amount, uint duration) public view returns (uint) {
-        return Precision.applyFactor(getDurationMultiplier(duration), amount);
+    /// @notice Determines the bonus amount of tokens to be minted based on the amount locked and the duration.
+    /// @dev Applies the duration multiplier to the locked amount to calculate the bonus.
+    /// @param amount The amount of tokens locked.
+    /// @param duration The duration for which the tokens are locked.
+    /// @return The bonus amount of tokens.
+    function getVestedBonus(uint amount, uint duration) public view returns (uint) {
+        return Precision.applyFactor(calcDurationMultiplier(duration), amount);
     }
 
     /// @notice Initializes the contract with the specified authority, router, and token.
@@ -104,46 +95,52 @@ contract VotingEscrowLogic is CoreContract {
         token = _token;
         vToken = _vToken;
 
-        setConfig(_config);
+        _setConfig(_config);
     }
 
-    /// @notice Locks tokens for a user, granting them voting power and bonus rewards
-    /// @dev Emits a VotingEscrowLogic__Lock event on successful lock.
-    /// @param depositor The address that provides the tokens to be locked.
+    /// @notice Locks tokens on behalf of a user, granting them voting power and bonus rewards.
+    /// the bonus reward are minted to enter the vesting schedule.
+    /// @dev Locks the tokens, mints bonus tokens, and updates the user's vesting schedule.
+    /// Emits a lock event upon successful execution.
+    /// @param depositor The address providing the tokens to be locked.
     /// @param user The address for whom the tokens are locked.
-    /// @param amount  The amount of tokens to be locked.
+    /// @param amount The amount of tokens to be locked.
     /// @param duration The duration for which the tokens are to be locked.
     function lock(address depositor, address user, uint amount, uint duration) external auth {
         if (amount == 0) revert VotingEscrowLogic__ZeroAmount();
         if (duration > MAXTIME) revert VotingEscrowLogic__ExceedMaxTime();
 
+        uint bonusAmount = getVestedBonus(amount, duration);
+
         store.transferIn(token, depositor, amount);
+        token.mint(address(store), bonusAmount);
+        store.syncTokenBalance(token);
 
-        uint bonusAmount = getBonusAmount(amount, duration);
-        token.mint(address(this), bonusAmount);
-        _vest(user, user, amount, duration);
+        _vest(user, user, bonusAmount, duration);
 
-        uint lockDuration = store.getLockDuration(user);
         uint vBalance = vToken.balanceOf(user);
-        uint amountWithBonus = vBalance + bonusAmount;
-        uint nextAmount = vBalance + amountWithBonus;
-        uint nextDuration = (lockDuration * vBalance + duration * amountWithBonus) / nextAmount;
+        uint nextAmount = vBalance + amount;
+        uint nextDuration = (vBalance * store.getLockDuration(user) + amount * duration) / nextAmount;
 
         store.setLockDuration(user, nextDuration);
         vToken.mint(user, amount);
 
-        logEvent("lock()", abi.encode(depositor, user, nextAmount, nextDuration, bonusAmount));
+        logEvent("lock()", abi.encode(depositor, user, nextAmount, nextDuration));
     }
 
-    /// @notice Begins the vesting process for a user's locked tokens.
+    /// @notice Initiates the vesting process for a user's locked tokens.
+    /// @dev Updates the user's vesting schedule and burns the corresponding voting tokens.
     /// @param user The address of the user whose tokens are to begin vesting.
     /// @param receiver The address that will receive the vested tokens.
     /// @param amount The amount of tokens to begin vesting.
     function vest(address user, address receiver, uint amount) external auth {
         _vest(user, receiver, amount, store.getLockDuration(user));
+
+        vToken.burn(user, amount);
     }
 
     /// @notice Allows a user to claim their vested tokens.
+    /// @dev Transfers the claimed tokens to the receiver and updates the user's vesting schedule.
     /// @param user The address of the user claiming their tokens.
     /// @param receiver The address that will receive the claimed tokens.
     /// @param amount The amount of tokens to be claimed.
@@ -164,15 +161,22 @@ contract VotingEscrowLogic is CoreContract {
 
     // governance
 
-    function setConfig(Config memory _config) public auth {
-        config = _config;
+    /// @notice Set the mint rate limit for the token.
+    /// @param _config The new rate limit configuration.
+    function setConfig(Config calldata _config) external auth {
+        _setConfig(_config);
+    }
 
+    /// @notice Sets the configuration parameters for the contract.
+    /// @dev Can only be called by an authorized entity. Updates the contract's configuration.
+    /// @param _config The new configuration parameters.
+    function _setConfig(Config memory _config) internal {
+        config = _config;
         logEvent("setConfig()", abi.encode(_config));
     }
 
     // internal
     function _vest(address user, address receiver, uint amount, uint duration) internal {
-        if (duration == 0) revert VotingEscrowLogic__NothingLocked();
         if (amount == 0) revert VotingEscrowLogic__ZeroBalance();
 
         VotingEscrowStore.Vested memory vested = getVestingCursor(user);
@@ -183,13 +187,11 @@ contract VotingEscrowLogic is CoreContract {
         vested.amount = amountNext;
 
         store.setVested(user, vested);
-        vToken.burn(user, amount);
 
         logEvent("vest()", abi.encode(user, receiver, vested));
     }
 
     error VotingEscrowLogic__ZeroAmount();
-    error VotingEscrowLogic__NothingLocked();
     error VotingEscrowLogic__ZeroBalance();
     error VotingEscrowLogic__ExceedMaxTime();
     error VotingEscrowLogic__ExceedingAccruedAmount(uint accrued);
