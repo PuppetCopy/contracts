@@ -72,8 +72,8 @@ contract RewardRouter is CoreContract, ReentrancyGuardTransient {
     /// @notice Allows a user to claim vested tokens.
     /// @param receiver The address where the claimed tokens should be sent.
     /// @param amount The amount of tokens to claim.
-    function claimEmission(address receiver, uint amount) external nonReentrant returns (uint) {
-        return config.rewardLogic.claimEmission(msg.sender, receiver, amount);
+    function claimEmission(address receiver, uint amount) external nonReentrant {
+        config.rewardLogic.claimEmission(msg.sender, receiver, amount);
     }
 
     // governance

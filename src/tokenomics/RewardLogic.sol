@@ -43,7 +43,7 @@ contract RewardLogic is CoreContract {
     /// @notice The token contract used for voting power
     IERC20 public immutable vToken;
 
-    function getClaimableEmission(IERC20 token, address user) public view returns (uint) {
+    function getClaimableEmission(IERC20 token, address user) external view returns (uint) {
         uint tokenEmissionRewardPerTokenCursor = store.tokenEmissionRewardPerTokenCursor();
         RewardStore.UserRewardCursor memory userCursor = getUserCursor(user, tokenEmissionRewardPerTokenCursor);
 
@@ -182,7 +182,7 @@ contract RewardLogic is CoreContract {
     /// If the reward is non-zero, it updates the user's emission cursor, sets their accrued reward to zero, and
     /// transfers the reward to the receiver.
     /// @param receiver The address where the claimed rewards should be sent.
-    function claimEmission(address user, address receiver, uint amount) public auth {
+    function claimEmission(address user, address receiver, uint amount) external auth {
         uint nextRewardPerTokenCursor = distribute();
 
         RewardStore.UserRewardCursor memory cursor = getUserCursor(user, nextRewardPerTokenCursor);
