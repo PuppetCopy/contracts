@@ -177,7 +177,7 @@ contract VotingEscrowLogic is CoreContract {
 
     // internal
     function _vest(address user, address receiver, uint amount, uint duration) internal {
-        if (amount == 0) revert VotingEscrowLogic__ZeroBalance();
+        if (amount == 0) revert VotingEscrowLogic__ZeroAmount();
 
         VotingEscrowStore.Vested memory vested = getVestingCursor(user);
 
@@ -192,7 +192,6 @@ contract VotingEscrowLogic is CoreContract {
     }
 
     error VotingEscrowLogic__ZeroAmount();
-    error VotingEscrowLogic__ZeroBalance();
     error VotingEscrowLogic__ExceedMaxTime();
     error VotingEscrowLogic__ExceedingAccruedAmount(uint accrued);
 }
