@@ -58,7 +58,7 @@ contract RewardRouter is CoreContract, ReentrancyGuardTransient {
     /// @notice Allows a user to vest their tokens.
     /// @param amount The amount of tokens to be vested by the caller.
     /// @param receiver The address where the vested tokens should be sent.
-    function vestTokens(uint amount, address receiver) external nonReentrant {
+    function vest(uint amount, address receiver) external nonReentrant {
         config.veLogic.vest(msg.sender, receiver, amount);
     }
 

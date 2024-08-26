@@ -5,7 +5,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IGmxReferralStorage} from "../position/interface/IGmxReferralStorage.sol";
-
 import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
 import {Precision} from "../utils/Precision.sol";
@@ -45,19 +44,21 @@ contract RewardLogic is CoreContract {
     IERC20 public immutable vToken;
 
     function getClaimableEmission(IERC20 token, address user) public view returns (uint) {
-        uint userBalance = vToken.balanceOf(user);
-        RewardStore.UserRewardCursor memory userCursor = store.getUserRewardCursor(user);
+        uint tokenEmissionRewardPerTokenCursor = store.tokenEmissionRewardPerTokenCursor();
+        RewardStore.UserRewardCursor memory userCursor = getUserCursor(user, tokenEmissionRewardPerTokenCursor);
 
-        if (userBalance == 0) {
-            return userCursor.accruedReward;
-        }
-
-        uint pendingEmission = getPendingEmission(token);
-        uint rewardPerTokenCursor =
-            store.tokenEmissionRewardPerTokenCursor() + Precision.toFactor(pendingEmission, vToken.totalSupply());
+        uint rewardPerTokenCursor = tokenEmissionRewardPerTokenCursor
+            + Precision.toFactor(
+                getPendingEmission(token), //
+                vToken.totalSupply()
+            );
 
         return userCursor.accruedReward
-            + getUserPendingReward(rewardPerTokenCursor, userCursor.rewardPerToken, vToken.balanceOf(user));
+            + getUserPendingReward(
+                rewardPerTokenCursor, //
+                userCursor.rewardPerToken,
+                vToken.balanceOf(user)
+            );
     }
 
     function getUserAccruedReward(
@@ -181,49 +182,28 @@ contract RewardLogic is CoreContract {
     /// If the reward is non-zero, it updates the user's emission cursor, sets their accrued reward to zero, and
     /// transfers the reward to the receiver.
     /// @param receiver The address where the claimed rewards should be sent.
-    /// @return reward The amount of rewards claimed.
-    function claimEmission(address user, address receiver, uint amount) public auth returns (uint) {
+    function claimEmission(address user, address receiver, uint amount) public auth {
         uint nextRewardPerTokenCursor = distribute();
 
-        RewardStore.UserRewardCursor memory userCursor = store.getUserRewardCursor(user);
+        RewardStore.UserRewardCursor memory cursor = getUserCursor(user, nextRewardPerTokenCursor);
 
-        uint reward = userCursor.accruedReward
-            + getUserPendingReward(
-                nextRewardPerTokenCursor, //
-                userCursor.rewardPerToken,
-                vToken.balanceOf(user)
-            );
+        if (amount > cursor.accruedReward) revert RewardLogic__NoClaimableAmount();
 
-        if (reward == 0) revert RewardLogic__NoClaimableAmount();
+        cursor.accruedReward -= amount;
 
-        userCursor.rewardPerToken = nextRewardPerTokenCursor;
-        userCursor.accruedReward -= amount;
-
-        store.setUserRewardCursor(user, userCursor);
+        store.setUserRewardCursor(user, cursor);
         store.transferOut(rewardToken, receiver, amount);
 
         logEvent("claimEmission()", abi.encode(user, receiver, amount));
-
-        return reward;
-    }
-
-    function getUserCursor(
-        address user,
-        uint rewardPerTokenCursor
-    ) internal view returns (RewardStore.UserRewardCursor memory cursor) {
-        cursor = store.getUserRewardCursor(user);
-        cursor.rewardPerToken = rewardPerTokenCursor;
-        cursor.accruedReward = cursor.accruedReward
-            + getUserPendingReward(rewardPerTokenCursor, cursor.rewardPerToken, vToken.balanceOf(user));
     }
 
     function userDistribute(address user) external auth returns (RewardStore.UserRewardCursor memory cursor) {
         uint nextRewardPerTokenCursor = distribute();
-
         cursor = getUserCursor(user, nextRewardPerTokenCursor);
-
         store.setUserRewardCursor(user, cursor);
     }
+
+    // internal
 
     function distribute() internal returns (uint) {
         uint timeElapsed = block.timestamp - store.tokenEmissionTimestamp();
@@ -254,7 +234,15 @@ contract RewardLogic is CoreContract {
         return rewardPerToken;
     }
 
-    // internal
+    function getUserCursor(
+        address user,
+        uint rewardPerTokenCursor
+    ) internal view returns (RewardStore.UserRewardCursor memory cursor) {
+        cursor = store.getUserRewardCursor(user);
+        cursor.rewardPerToken = rewardPerTokenCursor;
+        cursor.accruedReward = cursor.accruedReward
+            + getUserPendingReward(rewardPerTokenCursor, cursor.rewardPerToken, vToken.balanceOf(user));
+    }
 
     function getPendingEmission(IERC20 revenueToken) internal view returns (uint) {
         uint emissionBalance = store.getTokenBalance(revenueToken);
