@@ -4,44 +4,28 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {RewardRouter} from "src/RewardRouter.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
-
+import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
+import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
+import {MAXTIME, VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
+import {RewardStore} from "src/tokenomics/store/RewardStore.sol";
+import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
 import {Precision} from "src/utils/Precision.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 
-import {RevenueLogic} from "src/tokenomics/RevenueLogic.sol";
-import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
-import {MAXTIME, VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
-import {RevenueStore} from "src/tokenomics/store/RevenueStore.sol";
-import {RewardStore} from "src/tokenomics/store/RewardStore.sol";
-
-import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
-import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
-
-import {TokenomicsRouter} from "src/TokenomicsRouter.sol";
-
 contract RewardLogicTest is BasicSetup {
     VotingEscrowLogic veLogic;
     MockWeightedPoolVault primaryVaultPool;
     RewardStore rewardStore;
-    RevenueStore revenueStore;
-
     RewardLogic rewardLogic;
-    RevenueLogic revenueLogic;
-
     PuppetVoteToken puppetVoteToken;
     VotingEscrowStore votingEscrowStore;
+    RewardRouter rewardRouter;
 
-    TokenomicsRouter tokenomicsRouter;
-
-    RewardLogic.Config public config = RewardLogic.Config({
-        baselineEmissionRate: 1e30,
-        lockLiquidTokensBonusMultiplier: 1e30,
-        optionLockTokensBonusMultiplier: 1e30,
-        distributionTimeframe: 1 weeks
-    });
+    RewardLogic.Config public config = RewardLogic.Config({baselineEmissionRate: 1e30, distributionTimeframe: 1 weeks});
 
     function setUp() public override {
         vm.warp(1716671477);
@@ -69,13 +53,7 @@ contract RewardLogicTest is BasicSetup {
         _buybackOfferAmountList[0] = 1e18;
         _buybackOfferAmountList[1] = 1000e30;
 
-        revenueStore = new RevenueStore(dictator, router, _buybackTokenList, _buybackOfferAmountList);
-        dictator.setAccess(router, address(revenueStore));
-
-        rewardStore = new RewardStore(dictator, router);
-
-        revenueLogic = new RevenueLogic(dictator, eventEmitter, puppetToken, revenueStore);
-        dictator.setAccess(revenueStore, address(revenueLogic));
+        rewardStore = new RewardStore(dictator, router, _buybackTokenList, _buybackOfferAmountList);
 
         rewardLogic = new RewardLogic(
             dictator, //
@@ -87,19 +65,14 @@ contract RewardLogicTest is BasicSetup {
         dictator.setAccess(rewardStore, address(rewardLogic));
         dictator.setPermission(veLogic, address(rewardLogic), veLogic.lock.selector);
         dictator.setPermission(veLogic, address(rewardLogic), veLogic.vest.selector);
+        dictator.setPermission(veLogic, address(rewardLogic), veLogic.claim.selector);
         dictator.setPermission(puppetToken, address(rewardLogic), puppetToken.mint.selector);
 
-        tokenomicsRouter = new TokenomicsRouter(
-            dictator,
-            eventEmitter,
-            TokenomicsRouter.Config({rewardLogic: rewardLogic, veLogic: veLogic, revenueLogic: revenueLogic})
-        );
+        rewardRouter =
+            new RewardRouter(dictator, eventEmitter, RewardRouter.Config({rewardLogic: rewardLogic, veLogic: veLogic}));
 
         // permissions used for testing
         vm.startPrank(users.owner);
-        dictator.setAccess(revenueStore, users.owner);
-        dictator.setPermission(revenueLogic, users.owner, revenueLogic.buyback.selector);
-        dictator.setPermission(revenueLogic, users.owner, revenueLogic.claim.selector);
         wnt.approve(address(router), type(uint).max - 1);
         puppetToken.approve(address(router), type(uint).max - 1);
     }
@@ -255,52 +228,52 @@ contract RewardLogicTest is BasicSetup {
     //     assertApproxEqAbs(rewardRouter.getClaimable(wnt, users.bob), 1.525e18, 0.05e18);
     // }
 
-    function contributeEth(uint amount) public {
-        uint ethPerPuppet = 0.001e18;
-        uint thresholdAmount = revenueStore.getTokenBuybackOffer(wnt);
+    // function contributeEth(uint amount) public {
+    //     uint ethPerPuppet = 0.001e18;
+    //     uint thresholdAmount = revenueStore.getTokenBuybackOffer(wnt);
 
-        userContribute(wnt, amount);
-        buybackEth(amount);
-    }
+    //     userContribute(wnt, amount);
+    //     buybackEth(amount);
+    // }
 
-    function buybackEth(uint amount) public {
-        uint ethPerPuppet = 0.001e18;
-        uint thresholdAmount = revenueStore.getTokenBuybackOffer(wnt);
+    // function buybackEth(uint amount) public {
+    //     uint ethPerPuppet = 0.001e18;
+    //     uint thresholdAmount = revenueStore.getTokenBuybackOffer(wnt);
 
-        uint revenue = revenueLogic.getRevenueBalance(wnt);
+    //     uint revenue = revenueLogic.getRevenueBalance(wnt);
 
-        if ((revenue / ethPerPuppet) >= thresholdAmount) {
-            revenueLogic.buyback(users.owner, users.owner, wnt, amount);
-        }
-    }
+    //     if ((revenue / ethPerPuppet) >= thresholdAmount) {
+    //         revenueLogic.buyback(users.owner, users.owner, wnt, amount);
+    //     }
+    // }
 
-    function userContribute(IERC20 token, uint amount) public {
-        _dealERC20(address(token), users.owner, amount);
-        revenueStore.contribute(token, users.owner, msg.sender, amount);
+    // function userContribute(IERC20 token, uint amount) public {
+    //     _dealERC20(address(token), users.owner, amount);
+    //     revenueStore.contribute(token, users.owner, msg.sender, amount);
 
-        // skip block
-        vm.roll(block.number + 1);
-    }
+    //     // skip block
+    //     vm.roll(block.number + 1);
+    // }
 
-    function lock(IERC20 token, address user, uint lockDuration, uint amount) public returns (uint) {
-        // rewardLogic.distributeEmission(token);
+    // function lock(IERC20 token, address user, uint lockDuration, uint amount) public returns (uint) {
+    //     // rewardLogic.distributeEmission(token);
 
-        uint claimableInToken = tokenomicsRouter.lockContribution(token, amount, lockDuration);
+    //     uint claimableInToken = tokenomicsRouter.lockContribution(token, amount, lockDuration);
 
-        return claimableInToken;
-    }
+    //     return claimableInToken;
+    // }
 
-    function exit(IERC20 token, address user, uint cugarAmount) public returns (uint) {
-        // uint claimableInToken = rewardRouter.exitOption(token, cugarAmount, user);
+    // function exit(IERC20 token, address user, uint cugarAmount) public returns (uint) {
+    //     // uint claimableInToken = rewardRouter.exitOption(token, cugarAmount, user);
 
-        return 0;
-    }
+    //     return 0;
+    // }
 
-    function claim(IERC20 token, address user, uint amount) public returns (uint) {
-        vm.startPrank(user);
+    // function claim(IERC20 token, address user, uint amount) public returns (uint) {
+    //     vm.startPrank(user);
 
-        return tokenomicsRouter.claimEmission(token, user, amount);
-    }
+    //     return tokenomicsRouter.claimEmission(token, user, amount);
+    // }
 
     function fromPriceToSqrt(uint usdcPerWeth) public pure returns (uint160) {
         return uint160(Math.sqrt(usdcPerWeth * 1e12) << 96) / 1e12 + 1;

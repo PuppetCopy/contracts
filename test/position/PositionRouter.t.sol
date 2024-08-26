@@ -5,15 +5,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {IWNT} from "src/utils/interfaces/IWNT.sol";
+import {Address} from "script/Const.sol";
 
-import {PositionUtils} from "src/position/utils/PositionUtils.sol";
-
-import {BasicSetup} from "test/base/BasicSetup.t.sol";
-
-import {PuppetLogic} from "src/puppet/PuppetLogic.sol";
-import {RevenueStore} from "src/tokenomics/store/RevenueStore.sol";
-
+import {PositionRouter} from "src/PositionRouter.sol";
+import {PuppetRouter} from "src/PuppetRouter.sol";
 import {ExecuteDecreasePositionLogic} from "src/position/ExecuteDecreasePositionLogic.sol";
 import {ExecuteIncreasePositionLogic} from "src/position/ExecuteIncreasePositionLogic.sol";
 import {ExecuteRevertedAdjustmentLogic} from "src/position/ExecuteRevertedAdjustmentLogic.sol";
@@ -21,16 +16,15 @@ import {RequestDecreasePositionLogic} from "src/position/RequestDecreasePosition
 import {RequestIncreasePositionLogic} from "src/position/RequestIncreasePositionLogic.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxOracle} from "src/position/interface/IGmxOracle.sol";
-
-import {SubaccountStore} from "src/shared/store/SubaccountStore.sol";
-
-import {PuppetRouter} from "src/PuppetRouter.sol";
-import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
-
-import {PositionRouter} from "src/PositionRouter.sol";
 import {PositionStore} from "src/position/store/PositionStore.sol";
-
-import {Address} from "script/Const.sol";
+import {PositionUtils} from "src/position/utils/PositionUtils.sol";
+import {PuppetLogic} from "src/puppet/PuppetLogic.sol";
+import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
+import {SubaccountStore} from "src/shared/store/SubaccountStore.sol";
+import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
+import {RewardStore} from "src/tokenomics/store/RewardStore.sol";
+import {IWNT} from "src/utils/interfaces/IWNT.sol";
+import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
 contract PositionRouterTest is BasicSetup {
     uint arbitrumFork;
@@ -38,13 +32,10 @@ contract PositionRouterTest is BasicSetup {
     PuppetStore puppetStore;
     PuppetLogic puppetLogic;
     PositionStore positionStore;
-
+    RewardLogic rewardLogic;
     PuppetRouter puppetRouter;
     PositionRouter positionRouter;
     IGmxExchangeRouter gmxExchangeRouter;
-
-    RevenueStore revenueStore;
-
     SubaccountStore subaccountStore;
 
     IGmxOracle gmxOracle = IGmxOracle(Address.gmxOracle);
@@ -71,7 +62,13 @@ contract PositionRouterTest is BasicSetup {
         _tokenBuybackThresholdAmountList[0] = 0.2e18;
         _tokenBuybackThresholdAmountList[1] = 500e30;
 
-        revenueStore = new RevenueStore(dictator, router, _tokenBuybackThresholdList, _tokenBuybackThresholdAmountList);
+        rewardLogic = new RewardLogic(
+            dictator,
+            eventEmitter,
+            puppetToken,
+            RewardStore(address(0)),
+            RewardLogic.Config({distributionTimeframe: 1 weeks, baselineEmissionRate: 1e30})
+        );
 
         puppetStore = new PuppetStore(dictator, router, _tokenAllowanceCapList, _tokenAllowanceCapAmountList);
         puppetLogic = new PuppetLogic(
@@ -130,7 +127,7 @@ contract PositionRouterTest is BasicSetup {
                 router: router,
                 positionStore: positionStore,
                 puppetStore: puppetStore,
-                revenueStore: revenueStore,
+                rewardLogic: rewardLogic,
                 gmxOrderReciever: address(positionStore),
                 performanceFeeRate: 0.1e30, // 10%
                 traderPerformanceFeeShare: 0.5e30 // shared between trader and platform
@@ -155,7 +152,6 @@ contract PositionRouterTest is BasicSetup {
 
         dictator.setAccess(subaccountStore, address(positionRouter));
         dictator.setAccess(positionStore, address(positionRouter));
-        dictator.setAccess(revenueStore, address(positionRouter));
         dictator.setAccess(puppetStore, address(positionRouter));
         dictator.setAccess(router, address(positionRouter));
 

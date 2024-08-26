@@ -12,9 +12,9 @@ import {EventEmitter} from "../utils/EventEmitter.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "./../utils/Precision.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
+import {RewardLogic} from "../tokenomics/RewardLogic.sol";
 
 import {PuppetStore} from "../puppet/store/PuppetStore.sol";
-import {RevenueStore} from "../tokenomics/store/RevenueStore.sol";
 import {PositionStore} from "./store/PositionStore.sol";
 
 contract ExecuteDecreasePositionLogic is CoreContract {
@@ -22,7 +22,7 @@ contract ExecuteDecreasePositionLogic is CoreContract {
         Router router;
         PositionStore positionStore;
         PuppetStore puppetStore;
-        RevenueStore revenueStore;
+        RewardLogic rewardLogic;
         address gmxOrderReciever;
         uint performanceFeeRate;
         uint traderPerformanceFeeShare;
@@ -106,7 +106,7 @@ contract ExecuteDecreasePositionLogic is CoreContract {
         config.puppetStore.increaseBalanceList(outputToken, address(this), mirrorPosition.puppetList, outputAmountList);
 
         if (callParams.profit > 0) {
-            config.revenueStore.contributeMany(
+            config.rewardLogic.contributeMany(
                 outputToken, //
                 address(this),
                 mirrorPosition.puppetList,
