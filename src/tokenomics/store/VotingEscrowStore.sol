@@ -20,8 +20,6 @@ contract VotingEscrowStore is BankStore {
     mapping(address => uint) public lockDurationMap;
     mapping(address => Vested) public vestMap;
 
-    uint public totalSupply;
-
     constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
 
     function getLockDuration(address _user) external view returns (uint) {
@@ -38,17 +36,5 @@ contract VotingEscrowStore is BankStore {
 
     function setVested(address _user, Vested memory _vest) external auth {
         vestMap[_user] = _vest;
-    }
-
-    function setTotalLocked(uint _amount) external auth {
-        totalSupply = _amount;
-    }
-
-    function increaseUserBalance(address _user, uint _amount) external auth returns (uint) {
-        return userBalanceMap[_user] += _amount;
-    }
-
-    function decreaseUserBalance(address _user, uint _amount) external auth returns (uint) {
-        return userBalanceMap[_user] -= _amount;
     }
 }

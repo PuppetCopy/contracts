@@ -134,9 +134,9 @@ contract VotingEscrowLogic is CoreContract {
     /// @param receiver The address that will receive the vested tokens.
     /// @param amount The amount of tokens to begin vesting.
     function vest(address user, address receiver, uint amount) external auth {
-        _vest(user, receiver, amount, store.getLockDuration(user));
-
         vToken.burn(user, amount);
+
+        _vest(user, receiver, amount, store.getLockDuration(user));
     }
 
     /// @notice Allows a user to claim their vested tokens.
