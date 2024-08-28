@@ -9,10 +9,9 @@ import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {IERC20Mintable} from "../utils/interfaces/IERC20Mintable.sol";
 import {RewardStore} from "./store/RewardStore.sol";
 
-/// @title Reward Logic
+/// @title RewardLogic
 /// @notice contract features a token-based incentive buy-back, it has self-contained mechanism operates without relying
 /// on external price oracles or a single liquidity pool for each token like ETH, USDC etc. also Manages the
 /// distribution of rewards within the protocol, including locking mechanisms and bonus multipliers
@@ -28,14 +27,13 @@ contract RewardLogic is CoreContract {
     /// @notice Struct to hold configuration parameters.
     struct Config {
         uint distributionTimeframe;
-        uint baselineEmissionRate;
     }
 
     /// @notice The configuration parameters for the RewardLogic
     Config public config;
 
     /// @notice The contract used for minting rewards.
-    IERC20Mintable public immutable rewardToken;
+    IERC20 public immutable rewardToken;
 
     /// @notice The RewardStore contract used for tracking reward accruals
     RewardStore public immutable store;
@@ -43,13 +41,13 @@ contract RewardLogic is CoreContract {
     /// @notice The token contract used for voting power
     IERC20 public immutable vToken;
 
-    function getClaimableEmission(IERC20 token, address user) external view returns (uint) {
-        uint tokenEmissionRewardPerTokenCursor = store.tokenEmissionRewardPerTokenCursor();
-        RewardStore.UserRewardCursor memory userCursor = getUserCursor(user, tokenEmissionRewardPerTokenCursor);
+    function getClaimable(address user) external view returns (uint) {
+        uint cumulativeRewardPerContribution = store.cumulativeRewardPerToken();
+        RewardStore.UserRewardCursor memory userCursor = getUserCursor(user, cumulativeRewardPerContribution);
 
-        uint rewardPerTokenCursor = tokenEmissionRewardPerTokenCursor
+        uint rewardPerTokenCursor = cumulativeRewardPerContribution
             + Precision.toFactor(
-                getPendingEmission(token), //
+                getPendingReward(), //
                 vToken.totalSupply()
             );
 
@@ -61,119 +59,19 @@ contract RewardLogic is CoreContract {
             );
     }
 
-    function getUserAccruedReward(
-        IERC20 token,
-        address user,
-        uint cumulativeRewardPerContribution
-    ) public view returns (uint) {
-        uint userRewardPerContrib = store.getUserRewardPerContributionCursor(token, user);
-        uint accuredReward = store.getUserAccruedReward(token, user);
-
-        if (cumulativeRewardPerContribution > userRewardPerContrib) {
-            uint userCumContribution = store.getUserCumulativeContribution(token, user);
-
-            return accuredReward
-                + userCumContribution * (cumulativeRewardPerContribution - userRewardPerContrib) / Precision.FLOAT_PRECISION;
-        }
-
-        return accuredReward;
-    }
-
-    function getClaimable(IERC20 token, address contributor) external view returns (uint) {
-        return getUserAccruedReward(token, contributor, store.getCumulativeRewardPerContribution(token));
-    }
-
-    /// @notice Retrieves the revenue balance of a specific token in the revenue store.
-    /// @param token The address of the token whose balance is to be retrieved.
-    /// @return The balance of the specified token in the revenue store.
-    function getRevenueBalance(IERC20 token) external view returns (uint) {
-        return store.getTokenBalance(token);
-    }
-
     constructor(
         IAuthority _authority,
         EventEmitter _eventEmitter,
-        IERC20Mintable _rewardToken,
+        IERC20 _rewardToken,
+        IERC20 _vToken,
         RewardStore _store,
         Config memory _config
     ) CoreContract("RewardLogic", "1", _authority, _eventEmitter) {
-        store = _store;
-        // revenueStore = _revenueStore;
         rewardToken = _rewardToken;
+        vToken = _vToken;
+        store = _store;
 
         _setConfig(_config);
-    }
-
-    function contribute(
-        IERC20 _token, //
-        address _depositor,
-        address _user,
-        uint _value
-    ) external auth {
-        store.contribute(_token, _depositor, _user, _value);
-    }
-
-    function contributeMany(
-        IERC20 _token, //
-        address _depositor,
-        address[] calldata _userList,
-        uint[] calldata _valueList
-    ) external auth {
-        store.contributeMany(_token, _depositor, _userList, _valueList);
-    }
-
-    /// @notice Executes the buyback of revenue tokens using the protocol's accumulated fees.
-    /// @param depositor The address that deposits the buyback token.
-    /// @param receiver The address that will receive the revenue token.
-    /// @param token The address of the revenue token to be bought back.
-    /// @param amount The amount of revenue tokens to be bought back.
-    function buyback(address depositor, address receiver, IERC20 token, uint amount) external auth {
-        uint thresholdAmount = store.getBuybackQuote(token);
-
-        if (thresholdAmount == 0) revert RewardLogic__InvalidClaimToken();
-
-        store.transferIn(rewardToken, depositor, thresholdAmount);
-        store.transferOut(token, receiver, amount);
-
-        uint nextCumulativeTokenPerContrib = store.increaseCumulativeRewardPerContribution(
-            token, //
-            Precision.toFactor(thresholdAmount, amount)
-        );
-
-        logEvent(
-            "buyback()", abi.encode(token, depositor, receiver, nextCumulativeTokenPerContrib, thresholdAmount, amount)
-        );
-    }
-
-    /// @notice Claims the rewards for a specific token contribution.
-    /// @param token The address of the token for which the rewards are to be claimed.
-    /// @param contributor The address of the contributor for whom the rewards are to be claimed.
-    /// @param receiver The address that will receive the claimed rewards.
-    /// @param amount The amount of rewards to be claimed.
-    /// @return The amount of rewards claimed.
-    function claimContribution(
-        IERC20 token,
-        address contributor,
-        address receiver,
-        uint amount
-    ) external returns (uint) {
-        uint cumTokenPerContrib = store.getCumulativeRewardPerContribution(token);
-        uint accruedReward = getUserAccruedReward(token, contributor, cumTokenPerContrib);
-
-        if (amount > accruedReward) revert RewardLogic__InsufficientClaimableReward();
-
-        accruedReward -= amount;
-
-        store.setUserRewardPerContributionCursor(token, contributor, cumTokenPerContrib);
-        store.setUserAccruedReward(token, contributor, accruedReward);
-
-        uint reward = Precision.applyFactor(config.baselineEmissionRate, amount);
-
-        rewardToken.mint(receiver, amount);
-
-        logEvent("claimContribution()", abi.encode(token, contributor, amount, accruedReward, reward));
-
-        return reward;
     }
 
     /// @notice Claims emission rewards for the caller and sends them to the specified receiver.
@@ -182,7 +80,7 @@ contract RewardLogic is CoreContract {
     /// If the reward is non-zero, it updates the user's emission cursor, sets their accrued reward to zero, and
     /// transfers the reward to the receiver.
     /// @param receiver The address where the claimed rewards should be sent.
-    function claimEmission(address user, address receiver, uint amount) external auth {
+    function claim(address user, address receiver, uint amount) external auth {
         uint nextRewardPerTokenCursor = distribute();
 
         RewardStore.UserRewardCursor memory cursor = getUserCursor(user, nextRewardPerTokenCursor);
@@ -194,7 +92,7 @@ contract RewardLogic is CoreContract {
         store.setUserRewardCursor(user, cursor);
         store.transferOut(rewardToken, receiver, amount);
 
-        logEvent("claimEmission()", abi.encode(user, receiver, amount));
+        logEvent("claim()", abi.encode(user, receiver, amount));
     }
 
     function userDistribute(address user) external auth returns (RewardStore.UserRewardCursor memory cursor) {
@@ -205,31 +103,33 @@ contract RewardLogic is CoreContract {
 
     // internal
 
+    /// @notice Distributes the rewards to the users based on the current token emission rate and the time elapsed
+    /// @return The updated cumulative reward per contribution state
     function distribute() internal returns (uint) {
-        uint timeElapsed = block.timestamp - store.tokenEmissionTimestamp();
-        uint tokenBalance = store.getTokenBalance(rewardToken);
-        uint rate = store.tokenEmissionRate();
-        uint nextRate = tokenBalance / config.distributionTimeframe;
+        uint timeElapsed = block.timestamp - store.tokenRewardTimestamp();
+        uint rewardBalance = store.getTokenBalance(rewardToken);
+        uint rate = store.tokenRewardRate();
+        uint nextRate = rewardBalance / config.distributionTimeframe;
 
-        if (timeElapsed > config.distributionTimeframe) {
-            store.setTokenEmissionRate(0);
+        if (timeElapsed >= config.distributionTimeframe) {
+            store.setTokenRewardRate(0);
         } else if (nextRate > rate) {
             rate = nextRate;
-            store.setTokenEmissionRate(nextRate);
+            store.setTokenRewardRate(nextRate);
         }
 
-        store.setTokenEmissionTimestamp(block.timestamp);
+        store.setTokenRewardTimestamp(block.timestamp);
 
-        uint emission = Math.min(timeElapsed * rate, tokenBalance);
+        uint emission = Math.min(timeElapsed * rate, rewardBalance);
 
-        if (emission == 0 || tokenBalance == 0) {
-            return store.tokenEmissionRewardPerTokenCursor();
+        if (emission == 0 || rewardBalance == 0) {
+            return store.cumulativeRewardPerToken();
         }
 
         uint supply = vToken.totalSupply();
         uint rewardPerToken = store.incrementCumulativePerContribution(Precision.toFactor(emission, supply));
 
-        logEvent("distribute()", abi.encode(rewardPerToken, emission));
+        logEvent("distribute()", abi.encode(rewardPerToken, supply, emission));
 
         return rewardPerToken;
     }
@@ -242,21 +142,21 @@ contract RewardLogic is CoreContract {
         cursor.rewardPerToken = rewardPerTokenCursor;
         cursor.accruedReward = cursor.accruedReward
             + getUserPendingReward(rewardPerTokenCursor, cursor.rewardPerToken, vToken.balanceOf(user));
+
+        return cursor;
     }
 
-    function getPendingEmission(IERC20 revenueToken) internal view returns (uint) {
-        uint emissionBalance = store.getTokenBalance(revenueToken);
-        uint lastTimestamp = store.tokenEmissionTimestamp();
-        uint rate = store.tokenEmissionRate();
-
-        uint nextRate = emissionBalance / config.distributionTimeframe;
-        uint timeElapsed = block.timestamp - lastTimestamp;
+    function getPendingReward() internal view returns (uint) {
+        uint timeElapsed = block.timestamp - store.tokenRewardTimestamp();
+        uint rewardBalance = store.getTokenBalance(rewardToken);
+        uint rate = store.tokenRewardRate();
+        uint nextRate = rewardBalance / config.distributionTimeframe;
 
         if (nextRate > rate) {
             rate = nextRate;
         }
 
-        return Math.min(timeElapsed * nextRate, emissionBalance);
+        return Math.min(timeElapsed * nextRate, rewardBalance);
     }
 
     function getUserPendingReward(uint cursor, uint userCursor, uint userBalance) internal pure returns (uint) {
@@ -264,12 +164,6 @@ contract RewardLogic is CoreContract {
     }
 
     // governance
-
-    /// @notice Set the mint rate limit for the token.
-    /// @param _config The new rate limit configuration.
-    function setConfig(Config calldata _config) external auth {
-        _setConfig(_config);
-    }
 
     // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/mock/ReferralStorage.sol#L127
     function transferReferralOwnership(
@@ -279,6 +173,12 @@ contract RewardLogic is CoreContract {
     ) external auth {
         _referralStorage.setCodeOwner(_code, _newOwner);
     }
+    /// @notice Set the mint rate limit for the token.
+    /// @param _config The new rate limit configuration.
+
+    function setConfig(Config calldata _config) external auth {
+        _setConfig(_config);
+    }
 
     /// @dev Internal function to set the configuration.
     /// @param _config The configuration to set.
@@ -287,12 +187,6 @@ contract RewardLogic is CoreContract {
         logEvent("setConfig()", abi.encode(_config));
     }
 
-    /// @notice Error emitted when the claimable amount is insufficient
-    error RewardLogic__InssufficientClaimableAmount();
     /// @notice Error emitted when there is no claimable amount for a user
     error RewardLogic__NoClaimableAmount();
-    /// @notice Error emitted when the claim token is invalid
-    error RewardLogic__InvalidClaimToken();
-    /// @notice Error emitted when the claimable reward is insufficient
-    error RewardLogic__InsufficientClaimableReward();
 }

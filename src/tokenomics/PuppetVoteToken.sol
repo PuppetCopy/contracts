@@ -6,13 +6,13 @@ import {ERC20Votes} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Vo
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Auth} from "src/utils/access/Auth.sol";
+import {Permission} from "src/utils/access/Permission.sol";
 import {IAuthority} from "src/utils/interfaces/IAuthority.sol";
 
 /// @title PuppetVoteToken
-contract PuppetVoteToken is Auth, ERC20Votes {
+contract PuppetVoteToken is Permission, ERC20Votes {
     constructor(IAuthority _authority)
-        Auth(_authority)
+        Permission(_authority)
         ERC20("Puppet Voting Power", "vPUPPET")
         EIP712("PuppetVoteToken", "1")
     {}

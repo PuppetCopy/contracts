@@ -16,8 +16,8 @@ contract Dictator is Ownable, IAuthority {
         return target.canCall(user);
     }
 
-    function hasPermission(Permission target, address user, bytes4 functionSig) external view returns (bool) {
-        return target.canCall(user, functionSig);
+    function hasPermission(Permission target, bytes4 functionSig, address user) external view returns (bool) {
+        return target.canCall(functionSig, user);
     }
 
     constructor(address _owner) Ownable(_owner) {}
@@ -34,14 +34,14 @@ contract Dictator is Ownable, IAuthority {
         emit UpdateAccess(user, false);
     }
 
-    function setPermission(Permission target, address user, bytes4 functionSig) public virtual onlyOwner {
-        target.setPermission(user, functionSig);
+    function setPermission(Permission target, bytes4 functionSig, address user) public virtual onlyOwner {
+        target.setPermission(functionSig, user);
 
         emit UpdatePermission(user, functionSig, true);
     }
 
-    function removePermission(Permission target, address user, bytes4 functionSig) public virtual onlyOwner {
-        target.removePermission(user, functionSig);
+    function removePermission(Permission target, bytes4 functionSig, address user) public virtual onlyOwner {
+        target.removePermission(functionSig, user);
 
         emit UpdatePermission(user, functionSig, false);
     }

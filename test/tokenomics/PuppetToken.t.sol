@@ -14,8 +14,8 @@ contract PuppetTest is BasicSetup {
     function setUp() public override {
         super.setUp();
 
-        dictator.setPermission(puppetToken, users.owner, puppetToken.mint.selector);
-        dictator.setPermission(puppetToken, users.owner, puppetToken.mintCore.selector);
+        dictator.setPermission(puppetToken, puppetToken.mint.selector, users.owner);
+        dictator.setPermission(puppetToken, puppetToken.mintCore.selector, users.owner);
     }
 
     function testCanFrontRunToReduceMintAmountForOtherUsers() public {

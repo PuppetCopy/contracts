@@ -21,8 +21,8 @@ import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {PuppetLogic} from "src/puppet/PuppetLogic.sol";
 import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
 import {SubaccountStore} from "src/shared/store/SubaccountStore.sol";
-import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
-import {RewardStore} from "src/tokenomics/store/RewardStore.sol";
+import {ContributeLogic} from "src/tokenomics/ContributeLogic.sol";
+import {ContributeStore} from "src/tokenomics/store/ContributeStore.sol";
 import {IWNT} from "src/utils/interfaces/IWNT.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
@@ -32,7 +32,7 @@ contract PositionRouterTest is BasicSetup {
     PuppetStore puppetStore;
     PuppetLogic puppetLogic;
     PositionStore positionStore;
-    RewardLogic rewardLogic;
+    ContributeLogic contributeLogic;
     PuppetRouter puppetRouter;
     PositionRouter positionRouter;
     IGmxExchangeRouter gmxExchangeRouter;
@@ -62,15 +62,17 @@ contract PositionRouterTest is BasicSetup {
         _tokenBuybackThresholdAmountList[0] = 0.2e18;
         _tokenBuybackThresholdAmountList[1] = 500e30;
 
-        rewardLogic = new RewardLogic(
+        contributeLogic = new ContributeLogic(
             dictator,
             eventEmitter,
             puppetToken,
-            RewardStore(address(0)),
-            RewardLogic.Config({distributionTimeframe: 1 weeks, baselineEmissionRate: 1e30})
+            ContributeStore(address(0)),
+            ContributeLogic.Config({baselineEmissionRate: 1e30})
         );
 
         puppetStore = new PuppetStore(dictator, router, _tokenAllowanceCapList, _tokenAllowanceCapAmountList);
+        dictator.setPermission(router, router.transfer.selector, address(puppetStore));
+
         puppetLogic = new PuppetLogic(
             dictator,
             eventEmitter,
@@ -80,7 +82,6 @@ contract PositionRouterTest is BasicSetup {
         puppetRouter = new PuppetRouter(dictator, eventEmitter, PuppetRouter.Config({logic: puppetLogic}));
 
         dictator.setAccess(puppetStore, address(puppetRouter));
-        dictator.setAccess(router, address(puppetStore));
 
         subaccountStore = new SubaccountStore(dictator, computeCreateAddress(users.owner, vm.getNonce(users.owner) + 2));
         positionStore = new PositionStore(dictator, router);
@@ -127,7 +128,7 @@ contract PositionRouterTest is BasicSetup {
                 router: router,
                 positionStore: positionStore,
                 puppetStore: puppetStore,
-                rewardLogic: rewardLogic,
+                contributeLogic: contributeLogic,
                 gmxOrderReciever: address(positionStore),
                 performanceFeeRate: 0.1e30, // 10%
                 traderPerformanceFeeShare: 0.5e30 // shared between trader and platform
@@ -153,11 +154,11 @@ contract PositionRouterTest is BasicSetup {
         dictator.setAccess(subaccountStore, address(positionRouter));
         dictator.setAccess(positionStore, address(positionRouter));
         dictator.setAccess(puppetStore, address(positionRouter));
-        dictator.setAccess(router, address(positionRouter));
+        // dictator.setAccess(router, address(positionRouter));
 
-        dictator.setPermission(positionRouter, Address.gmxOrderHandler, positionRouter.afterOrderExecution.selector);
-        dictator.setPermission(positionRouter, Address.gmxOrderHandler, positionRouter.afterOrderCancellation.selector);
-        dictator.setPermission(positionRouter, Address.gmxOrderHandler, positionRouter.afterOrderFrozen.selector);
+        dictator.setPermission(positionRouter, positionRouter.afterOrderExecution.selector, Address.gmxOrderHandler);
+        dictator.setPermission(positionRouter, positionRouter.afterOrderCancellation.selector, Address.gmxOrderHandler);
+        dictator.setPermission(positionRouter, positionRouter.afterOrderFrozen.selector, Address.gmxOrderHandler);
     }
 
     function testIncreaseRequestInUsdc() public {

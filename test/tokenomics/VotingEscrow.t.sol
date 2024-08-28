@@ -2,15 +2,12 @@
 pragma solidity 0.8.24;
 
 import {Router} from "src/shared/Router.sol";
-
-import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
 import {MAXTIME, VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
 import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
 contract VotingEscrowTest is BasicSetup {
-    PuppetVoteToken vPuppet;
     VotingEscrowStore veStore;
     VotingEscrowLogic veLogic;
     VotingEscrowRouter veRouter;
@@ -18,8 +15,8 @@ contract VotingEscrowTest is BasicSetup {
     function setUp() public override {
         BasicSetup.setUp();
 
-        vPuppet = new PuppetVoteToken(dictator);
         veStore = new VotingEscrowStore(dictator, router);
+        dictator.setPermission(router, router.transfer.selector, address(veStore));
 
         allowNextLoggerAccess();
         veLogic = new VotingEscrowLogic(
@@ -27,25 +24,25 @@ contract VotingEscrowTest is BasicSetup {
             eventEmitter,
             veStore,
             puppetToken,
-            vPuppet,
+            vPuppetToken,
             VotingEscrowLogic.Config({baseMultiplier: 0.1e30})
         );
-        dictator.setAccess(router, address(veStore));
 
         dictator.setAccess(eventEmitter, address(veLogic));
         dictator.setAccess(veStore, address(veLogic));
 
-        dictator.setPermission(puppetToken, address(veLogic), puppetToken.mint.selector);
-        dictator.setAccess(vPuppet, address(veLogic));
+        dictator.setPermission(puppetToken, puppetToken.mint.selector, address(veLogic));
+        dictator.setPermission(vPuppetToken, vPuppetToken.mint.selector, address(veLogic));
+        dictator.setPermission(vPuppetToken, vPuppetToken.burn.selector, address(veLogic));
 
         // test setup
 
         veRouter = new VotingEscrowRouter(veLogic);
-        dictator.setPermission(veLogic, address(veRouter), veLogic.lock.selector);
-        dictator.setPermission(veLogic, address(veRouter), veLogic.vest.selector);
-        dictator.setPermission(veLogic, address(veRouter), veLogic.claim.selector);
+        dictator.setPermission(veLogic, veLogic.lock.selector, address(veRouter));
+        dictator.setPermission(veLogic, veLogic.vest.selector, address(veRouter));
+        dictator.setPermission(veLogic, veLogic.claim.selector, address(veRouter));
 
-        dictator.setPermission(puppetToken, users.owner, puppetToken.mint.selector);
+        dictator.setPermission(puppetToken, puppetToken.mint.selector, users.owner);
 
         puppetToken.mint(users.alice, 100 * 1e18);
         puppetToken.mint(users.bob, 100 * 1e18);
@@ -76,14 +73,14 @@ contract VotingEscrowTest is BasicSetup {
         uint bonusAmount = veLogic.getVestedBonus(amount, duration);
 
         assertEq(veLogic.getClaimable(users.alice), 0, "Vested amount should match");
-        assertEq(vPuppet.balanceOf(users.alice), amount, "Lock amount should match");
+        assertEq(vPuppetToken.balanceOf(users.alice), amount, "Lock amount should match");
         assertEq(veLogic.getVestingCursor(users.alice).amount, bonusAmount, "Bonus amount should match");
         assertEq(veLogic.getVestingCursor(users.alice).remainingDuration, duration, "Bonus duration should match");
 
         skip(duration);
 
         assertEq(veStore.getLockDuration(users.alice), duration, "Lock duration should remain the same");
-        assertEq(vPuppet.balanceOf(users.alice), amount, "Lock amount should remain the same");
+        assertEq(vPuppetToken.balanceOf(users.alice), amount, "Lock amount should remain the same");
         assertEq(veLogic.getClaimable(users.alice), bonusAmount, "Vested amount should match");
     }
 
@@ -139,14 +136,14 @@ contract VotingEscrowTest is BasicSetup {
 
         veLogic.getClaimable(users.alice);
 
-        assertEq(vPuppet.totalSupply(), amount, "vPuppet supply should be back to 0 after burning");
+        assertEq(vPuppetToken.totalSupply(), amount, "vPuppet supply should be back to 0 after burning");
 
         veRouter.vest(amount);
         skip(MAXTIME);
 
         veRouter.claim(amount);
 
-        assertEq(vPuppet.totalSupply(), 0, "vPuppet supply should be back to 0 after burning");
+        assertEq(vPuppetToken.totalSupply(), 0, "vPuppet supply should be back to 0 after burning");
         assertEq(puppetToken.balanceOf(users.alice), amount + bonus, "Alice should have received her claimed tokens");
     }
 

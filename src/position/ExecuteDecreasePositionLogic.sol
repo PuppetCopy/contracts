@@ -4,25 +4,23 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {IGmxEventUtils} from "./interface/IGmxEventUtils.sol";
-import {Router} from "src/shared/Router.sol";
-
+import {PuppetStore} from "../puppet/store/PuppetStore.sol";
+import {ContributeLogic} from "../tokenomics/ContributeLogic.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "./../utils/Precision.sol";
-import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
-import {RewardLogic} from "../tokenomics/RewardLogic.sol";
-
-import {PuppetStore} from "../puppet/store/PuppetStore.sol";
+import {IGmxEventUtils} from "./interface/IGmxEventUtils.sol";
 import {PositionStore} from "./store/PositionStore.sol";
+import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
+import {Router} from "src/shared/Router.sol";
 
 contract ExecuteDecreasePositionLogic is CoreContract {
     struct Config {
         Router router;
         PositionStore positionStore;
         PuppetStore puppetStore;
-        RewardLogic rewardLogic;
+        ContributeLogic contributeLogic;
         address gmxOrderReciever;
         uint performanceFeeRate;
         uint traderPerformanceFeeShare;
@@ -70,6 +68,7 @@ contract ExecuteDecreasePositionLogic is CoreContract {
         if (mirrorPosition.size == 0) {
             revert ExecuteDecreasePositionLogic__InvalidRequest(request.positionKey, requestKey);
         }
+
         IERC20 outputToken = IERC20(eventLogData.addressItems.items[0].value);
 
         if (callParams.totalAmountOut > order.numbers.initialCollateralDeltaAmount) {
@@ -106,7 +105,7 @@ contract ExecuteDecreasePositionLogic is CoreContract {
         config.puppetStore.increaseBalanceList(outputToken, address(this), mirrorPosition.puppetList, outputAmountList);
 
         if (callParams.profit > 0) {
-            config.rewardLogic.contributeMany(
+            config.contributeLogic.contributeMany(
                 outputToken, //
                 address(this),
                 mirrorPosition.puppetList,

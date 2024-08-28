@@ -6,10 +6,10 @@ import {IAuthority} from "./../interfaces/IAuthority.sol";
 abstract contract Permission {
     IAuthority public immutable authority;
 
-    mapping(address => mapping(bytes4 signatureHash => bool)) public permissionMap;
+    mapping(bytes4 signatureHash => mapping(address => bool)) public permissionMap;
 
-    function canCall(address user, bytes4 signatureHash) public view returns (bool) {
-        return permissionMap[user][signatureHash];
+    function canCall(bytes4 signatureHash, address user) public view returns (bool) {
+        return permissionMap[signatureHash][user];
     }
 
     constructor(IAuthority _authority) {
@@ -17,7 +17,7 @@ abstract contract Permission {
     }
 
     modifier auth() {
-        if (canCall(msg.sender, msg.sig)) {
+        if (canCall(msg.sig, msg.sender)) {
             _;
         } else {
             revert Auth_Unauthorized();
@@ -32,12 +32,12 @@ abstract contract Permission {
         }
     }
 
-    function setPermission(address user, bytes4 functionSig) external checkAuthority {
-        permissionMap[user][functionSig] = true;
+    function setPermission(bytes4 functionSig, address user) external checkAuthority {
+        permissionMap[functionSig][user] = true;
     }
 
-    function removePermission(address user, bytes4 functionSig) external checkAuthority {
-        delete permissionMap[user][functionSig];
+    function removePermission(bytes4 functionSig, address user) external checkAuthority {
+        delete permissionMap[functionSig][user];
     }
 
     error Auth_Unauthorized();

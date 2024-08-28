@@ -59,16 +59,16 @@
 //         );
 //         dictator.setAccess(oracleStore, address(oracle));
 
-//         RewardStore rewardStore = new RewardStore(dictator, router);
-//         dictator.setPermission(router, address(rewardStore), router.transfer.selector);
+//         RewardStore rewardStore = new RewardStore(dictator, rou, address(rewardStore)ter);
+//         dictator.setPermission(router, router.transfer.selector);
 //         RewardRouter rewardRouter = new RewardRouter(
 //             dictator, router, votingEscrow, puppetToken, rewardStore, RewardRouter.CallConfig({oracle: oracle, lockRate: 6000, exitRate: 3000})
 //         );
 //         dictator.setAccess(rewardStore, address(rewardRouter));
 
 //         dictator.setAccess(votingEscrow, address(rewardRouter));
-//         dictator.setPermission(oracle, address(rewardRouter), oracle.setPrimaryPrice.selector);
-//         dictator.setPermission(puppetToken, address(rewardRouter), puppetToken.mint.selector);
+//         dictator.setPermission(oracle, oracle.setPrimaryPrice.selector, address(rewardRouter));
+//         dictator.setPermission(puppetToken, puppetToken.mint.selector, address(rewardRouter));
 //     }
 // }
 

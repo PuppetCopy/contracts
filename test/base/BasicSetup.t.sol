@@ -9,6 +9,7 @@ import {Test} from "forge-std/src/Test.sol";
 import {Dictator} from "src/shared/Dictator.sol";
 import {Router} from "src/shared/Router.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
 import {EventEmitter} from "src/utils/EventEmitter.sol";
 import {IWNT} from "src/utils/interfaces/IWNT.sol";
 
@@ -23,12 +24,13 @@ contract BasicSetup is Test {
     Users users;
 
     IWNT wnt = IWNT(address(deployMockERC20("Wrapped Native", "WNT", 18)));
-    IERC20 usdc = IERC20(address(deployMockERC20("USDC", "USDC", 18)));
+    IERC20 usdc = IERC20(address(deployMockERC20("USDC", "USDC", 6)));
 
     Dictator dictator;
     EventEmitter eventEmitter;
     PuppetToken puppetToken;
     Router router;
+    PuppetVoteToken vPuppetToken;
 
     function setUp() public virtual {
         vm.deal(users.owner, 100 ether);
@@ -53,6 +55,7 @@ contract BasicSetup is Test {
             PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}),
             users.owner
         );
+        vPuppetToken = new PuppetVoteToken(dictator);
 
         skip(1 hours);
     }
