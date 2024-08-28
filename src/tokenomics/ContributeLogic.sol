@@ -13,7 +13,7 @@ import {ContributeStore} from "./store/ContributeStore.sol";
 
 /// @title ContributeLogic
 /// @notice contract features a token-based incentive buy-back, it has self-contained mechanism operates without relying
-/// on external price oracles or a single liquidity pool for each token like ETH, USDC etc. also Manages the
+/// on external price oracles or a single liquidity pool for each token contributed
 /// distribution of rewards within the protocol, including locking mechanisms and bonus multipliers
 /// for token holders.
 //// @dev It calculates rewards for contributors based on a cumulative distribution rate, which increases with each

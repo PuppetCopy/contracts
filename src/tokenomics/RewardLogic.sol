@@ -12,17 +12,9 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {RewardStore} from "./store/RewardStore.sol";
 
 /// @title RewardLogic
-/// @notice contract features a token-based incentive buy-back, it has self-contained mechanism operates without relying
-/// on external price oracles or a single liquidity pool for each token like ETH, USDC etc. also Manages the
-/// distribution of rewards within the protocol, including locking mechanisms and bonus multipliers
-/// for token holders.
-//// @dev It calculates rewards for contributors based on a cumulative distribution rate, which increases with each
-/// PUPPET token sale, enabling users to claim PUPPET rewards proportionate to their token contributions
-/// @dev This contract handles the logic for reward emissions, locking tokens for voting power, and distributing rewards
-/// to token holders.
-/// It integrates with VotingEscrow for locking mechanisms, PuppetToken for minting rewards, RewardStore for tracking
-/// reward accruals, and
-/// RevenueStore for managing revenue balances
+/// @notice Manages the distribution of rewards based VotingEscrow Voting Power for token holders.
+/// @dev This contract handles the logic for reward emissions based on voting power RewardStore for tracking reward
+/// tracking and accruals
 contract RewardLogic is CoreContract {
     /// @notice Struct to hold configuration parameters.
     struct Config {
@@ -43,7 +35,7 @@ contract RewardLogic is CoreContract {
 
     function getClaimable(address user) external view returns (uint) {
         uint cumulativeRewardPerContribution = store.cumulativeRewardPerToken();
-        RewardStore.UserRewardCursor memory userCursor = getUserCursor(user, cumulativeRewardPerContribution);
+        RewardStore.UserRewardCursor memory userCursor = getUserRewardCursor(user, cumulativeRewardPerContribution);
 
         uint rewardPerTokenCursor = cumulativeRewardPerContribution
             + Precision.toFactor(
@@ -74,16 +66,14 @@ contract RewardLogic is CoreContract {
         _setConfig(_config);
     }
 
-    /// @notice Claims emission rewards for the caller and sends them to the specified receiver.
-    /// @dev Calculates the claimable rewards for the caller based on the current reward cursor and the user's balance
-    /// in the VotingEscrow contract.
-    /// If the reward is non-zero, it updates the user's emission cursor, sets their accrued reward to zero, and
-    /// transfers the reward to the receiver.
-    /// @param receiver The address where the claimed rewards should be sent.
+    /// @notice Claims the accrued rewards for a user based on their voting power
+    /// @param user The address of the user to claim the rewards for
+    /// @param receiver The address to receive the claimed rewards
+    /// @param amount The amount of rewards to claim
     function claim(address user, address receiver, uint amount) external auth {
         uint nextRewardPerTokenCursor = distribute();
 
-        RewardStore.UserRewardCursor memory cursor = getUserCursor(user, nextRewardPerTokenCursor);
+        RewardStore.UserRewardCursor memory cursor = getUserRewardCursor(user, nextRewardPerTokenCursor);
 
         if (amount > cursor.accruedReward) revert RewardLogic__NoClaimableAmount();
 
@@ -97,7 +87,7 @@ contract RewardLogic is CoreContract {
 
     function userDistribute(address user) external auth returns (RewardStore.UserRewardCursor memory cursor) {
         uint nextRewardPerTokenCursor = distribute();
-        cursor = getUserCursor(user, nextRewardPerTokenCursor);
+        cursor = getUserRewardCursor(user, nextRewardPerTokenCursor);
         store.setUserRewardCursor(user, cursor);
     }
 
@@ -134,7 +124,7 @@ contract RewardLogic is CoreContract {
         return rewardPerToken;
     }
 
-    function getUserCursor(
+    function getUserRewardCursor(
         address user,
         uint rewardPerTokenCursor
     ) internal view returns (RewardStore.UserRewardCursor memory cursor) {

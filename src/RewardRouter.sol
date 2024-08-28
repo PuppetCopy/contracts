@@ -76,13 +76,15 @@ contract RewardRouter is CoreContract, ReentrancyGuardTransient, Multicall {
 
     /// @notice Claims the rewards for a specific token contribution.
     /// @param amount The amount of rewards to be claimed.
+    /// @param receiver The address where the claimed tokens should be sent.
     /// @return The amount of rewards claimed.
-    function claimContribution(uint amount) public nonReentrant returns (uint) {
-        return config.contributeLogic.claim(msg.sender, msg.sender, amount);
+    function claimContribution(uint amount, address receiver) public nonReentrant returns (uint) {
+        return config.contributeLogic.claim(msg.sender, receiver, amount);
     }
 
     /// @notice Executes the buyback of revenue tokens using the protocol's accumulated fees.
-    /// @param receiver The address where the claimed tokens should be sent.
+    /// @param token The address of the revenue token to be bought back.
+    /// @param receiver The address that will receive the revenue token.
     /// @param amount The amount of revenue tokens to be bought back.
     function buyback(IERC20 token, address receiver, uint amount) external nonReentrant {
         config.contributeLogic.buyback(msg.sender, receiver, token, amount);

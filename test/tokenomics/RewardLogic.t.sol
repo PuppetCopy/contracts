@@ -27,7 +27,7 @@ contract RewardLogicTest is BasicSetup {
     RewardRouter rewardRouter;
 
     RewardLogic.Config public emissionConfig = RewardLogic.Config({distributionTimeframe: 1 weeks});
-    ContributeLogic.Config public contributeConfig = ContributeLogic.Config({baselineEmissionRate: 0.5e18});
+    ContributeLogic.Config public contributeConfig = ContributeLogic.Config({baselineEmissionRate: 0.5e30});
 
     function setUp() public override {
         vm.warp(1716671477);
@@ -131,7 +131,7 @@ contract RewardLogicTest is BasicSetup {
         vm.startPrank(users.bob);
 
         rewardRouter.updateUserTokenRewardState(usdc, users.bob);
-        rewardRouter.claimContribution(expectedBobReward);
+        rewardRouter.claimContribution(quote, users.bob);
 
         assertEq(
             puppetToken.balanceOf(users.bob),
@@ -213,7 +213,7 @@ contract RewardLogicTest is BasicSetup {
 
         puppetToken.approve(address(router), type(uint).max - 1);
 
-        uint amount = rewardRouter.claimContribution(contribution);
+        uint amount = rewardRouter.claimContribution(contribution, user);
 
         rewardRouter.lock(amount, lockDuration);
 
