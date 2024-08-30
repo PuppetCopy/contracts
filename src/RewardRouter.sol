@@ -60,25 +60,11 @@ contract RewardRouter is CoreContract, ReentrancyGuardTransient, Multicall {
         config.rewardLogic.claim(msg.sender, receiver, amount);
     }
 
-    /// @notice Distributes the rewards to the user.
-    /// @param tokens The tokens to distribute the rewards for.
-    /// @param user The address of the user to distribute the rewards to.
-    function updateUserTokenRewardStateList(IERC20[] calldata tokens, address user) external nonReentrant {
-        config.contributeLogic.updateUserTokenRewardStateList(tokens, user);
-    }
-
-    /// @notice Distributes the rewards to the user.
-    /// @param token The token to distribute the rewards for.
-    /// @param user The address of the user to distribute the rewards to.
-    function updateUserTokenRewardState(IERC20 token, address user) external nonReentrant {
-        config.contributeLogic.updateUserTokenRewardState(token, user);
-    }
-
     /// @notice Claims the rewards for a specific token contribution.
-    /// @param amount The amount of rewards to be claimed.
     /// @param receiver The address where the claimed tokens should be sent.
+    /// @param amount The amount of rewards to be claimed.
     /// @return The amount of rewards claimed.
-    function claimContribution(uint amount, address receiver) public nonReentrant returns (uint) {
+    function claimContribution(address receiver, uint amount) public nonReentrant returns (uint) {
         return config.contributeLogic.claim(msg.sender, receiver, amount);
     }
 
@@ -87,7 +73,14 @@ contract RewardRouter is CoreContract, ReentrancyGuardTransient, Multicall {
     /// @param receiver The address that will receive the revenue token.
     /// @param amount The amount of revenue tokens to be bought back.
     function buyback(IERC20 token, address receiver, uint amount) external nonReentrant {
-        config.contributeLogic.buyback(msg.sender, receiver, token, amount);
+        config.contributeLogic.buyback(token, msg.sender, receiver, amount);
+    }
+
+    /// @notice Update user cursor which to the current cursor.
+    /// @param token The address of the token contribution.
+    /// @param user The address of the contributor.
+    function updateCursor(IERC20 token, address user) external nonReentrant {
+        config.contributeLogic.updateCursor(token, user);
     }
 
     // governance

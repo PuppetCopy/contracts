@@ -33,35 +33,8 @@ contract ContributeLogic is CoreContract {
     /// @notice The RewardStore contract used for tracking reward accruals
     ContributeStore public immutable store;
 
-    function getPendingUserTokenReward(IERC20 token, address user) public view returns (uint) {
-        uint userRewardPerContrib = store.getUserRewardPerContributionCursor(token, user);
-        uint cumulativeRewardPerContribution = store.getCumulativeRewardPerContribution(token);
-
-        if (cumulativeRewardPerContribution > userRewardPerContrib) {
-            uint userCumContribution = store.getUserCumulativeContribution(token, user);
-
-            return userCumContribution * (cumulativeRewardPerContribution - userRewardPerContrib)
-                / Precision.FLOAT_PRECISION;
-        }
-
-        return 0;
-    }
-
-    function getPendingUserTokenListRewardList(
-        address user,
-        IERC20[] calldata tokenList
-    ) public view returns (uint totalPendingReward, uint[] memory pendingRewardList) {
-        pendingRewardList = new uint[](tokenList.length);
-        totalPendingReward;
-
-        for (uint i; i < tokenList.length; i++) {
-            pendingRewardList[i] = getPendingUserTokenReward(tokenList[i], user);
-        }
-    }
-
-    function getClaimable(IERC20[] calldata tokenList, address user) external view returns (uint) {
-        (uint totalPendingReward,) = getPendingUserTokenListRewardList(user, tokenList);
-        return store.getUserAccruedReward(user) + totalPendingReward;
+    function getClaimable(address user) external view returns (uint) {
+        return store.getUserAccruedReward(user);
     }
 
     constructor(
@@ -77,59 +50,31 @@ contract ContributeLogic is CoreContract {
         _setConfig(_config);
     }
 
-    function contribute(
-        IERC20 _token, //
-        address _depositor,
-        address _user,
-        uint _value
-    ) external auth {
-        store.contribute(_token, _depositor, _user, _value);
-    }
-
-    function contributeMany(
-        IERC20 _token, //
-        address _depositor,
-        address[] calldata _userList,
-        uint[] calldata _valueList
-    ) external auth {
-        store.contributeMany(_token, _depositor, _userList, _valueList);
-    }
-
     /// @notice Executes the buyback of revenue tokens using the protocol's accumulated fees.
-    /// @param depositor The address that deposits the buyback token.
-    /// @param user The address that will receive the revenue token.
     /// @param token The address of the revenue token to be bought back.
-    /// @param amount The amount of revenue tokens to be bought back.
-    function buyback(address depositor, address user, IERC20 token, uint amount) external auth {
-        uint thresholdAmount = store.getBuybackQuote(token);
+    /// @param depositor The address that deposits the buyback token.
+    /// @param receiver The address that will receive the revenue token.
+    /// @param revenueAmount The amount of the revenue token to be bought back.
+    function buyback(IERC20 token, address depositor, address receiver, uint revenueAmount) external auth {
+        uint quoteAmount = store.getBuybackQuote(token);
 
-        if (thresholdAmount == 0) revert ContributeLogic__InvalidBuybackToken();
+        if (quoteAmount == 0) revert ContributeLogic__InvalidBuybackToken();
 
-        store.transferIn(rewardToken, depositor, thresholdAmount);
-        store.transferOut(token, user, amount);
+        store.transferIn(rewardToken, depositor, quoteAmount);
+        store.transferOut(token, receiver, revenueAmount);
 
-        uint nextCumulativeTokenPerContrib = store.increaseCumulativeRewardPerContribution(
-            token, //
-            Precision.toFactor(thresholdAmount, amount)
-        );
+        uint cursor = store.getCursor(token);
+        store.setCursorReward(token, cursor, quoteAmount * Precision.FLOAT_PRECISION / revenueAmount);
+        store.setCursor(token, cursor + 1);
 
-        logEvent(
-            "buyback()", abi.encode(token, depositor, user, nextCumulativeTokenPerContrib, thresholdAmount, amount)
-        );
+        logEvent("buyback()", abi.encode(token, depositor, receiver, cursor, revenueAmount, quoteAmount));
     }
 
-    /// @notice Updates the reward state for a user based on the token list and cumulative token per contribution list.
-    /// @param token The token for which the reward state is to be updated.
-    /// @param user The address of the user for whom the reward state is to be updated.
-    function updateUserTokenRewardState(IERC20 token, address user) external auth {
-        store.updateUserTokenRewardState(token, user);
-    }
-
-    /// @notice Updates the reward state for a user based on the token list and cumulative token per contribution list.
-    /// @param tokenList The list of tokens for which the reward state is to be updated.
-    /// @param user The address of the user for whom the reward state is to be updated.
-    function updateUserTokenRewardStateList(IERC20[] calldata tokenList, address user) external auth {
-        store.updateUserTokenRewardStateList(user, tokenList);
+    /// @notice Update user cursor which to the current cursor.
+    /// @param token The address of the token contribution.
+    /// @param user The address of the contributor.
+    function updateCursor(IERC20 token, address user) external auth {
+        store.updateCursor(token, user);
     }
 
     /// @notice Claims the rewards for a specific token contribution.
@@ -140,7 +85,7 @@ contract ContributeLogic is CoreContract {
     function claim(address user, address receiver, uint amount) external auth returns (uint) {
         uint accruedReward = store.getUserAccruedReward(user);
 
-        if (amount > accruedReward) revert ContributeLogic__InsufficientClaimableReward();
+        if (amount > accruedReward) revert ContributeLogic__InsufficientClaimableReward(accruedReward);
 
         uint nextAccruedReward = accruedReward - amount;
         uint reward = Precision.applyFactor(config.baselineEmissionRate, amount);
@@ -155,9 +100,15 @@ contract ContributeLogic is CoreContract {
 
     // governance
 
+    /// @notice Set the buyback quote for the token.
+    /// @param token The token for which the buyback quote is to be set.
+    /// @param value The value of the buyback quote.
+    function setBuybackQuote(IERC20 token, uint value) external auth {
+        store.setBuybackQuote(token, value);
+    }
+
     /// @notice Set the mint rate limit for the token.
     /// @param _config The new rate limit configuration.
-
     function setConfig(Config calldata _config) external auth {
         _setConfig(_config);
     }
@@ -173,5 +124,5 @@ contract ContributeLogic is CoreContract {
     error ContributeLogic__InvalidBuybackToken();
 
     /// @notice Error emitted when the claimable reward is insufficient
-    error ContributeLogic__InsufficientClaimableReward();
+    error ContributeLogic__InsufficientClaimableReward(uint accruedReward);
 }

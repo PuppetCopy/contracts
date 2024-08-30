@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {PuppetStore} from "../puppet/store/PuppetStore.sol";
-import {ContributeLogic} from "../tokenomics/ContributeLogic.sol";
+import {ContributeStore} from "../tokenomics/store/ContributeStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
@@ -20,7 +20,7 @@ contract ExecuteDecreasePositionLogic is CoreContract {
         Router router;
         PositionStore positionStore;
         PuppetStore puppetStore;
-        ContributeLogic contributeLogic;
+        ContributeStore contributeStore;
         address gmxOrderReciever;
         uint performanceFeeRate;
         uint traderPerformanceFeeShare;
@@ -105,7 +105,7 @@ contract ExecuteDecreasePositionLogic is CoreContract {
         config.puppetStore.increaseBalanceList(outputToken, address(this), mirrorPosition.puppetList, outputAmountList);
 
         if (callParams.profit > 0) {
-            config.contributeLogic.contributeMany(
+            config.contributeStore.contributeMany(
                 outputToken, //
                 address(this),
                 mirrorPosition.puppetList,

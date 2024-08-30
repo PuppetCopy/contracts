@@ -16,7 +16,7 @@ import {Precision} from "src/utils/Precision.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 
-contract RewardLogicTest is BasicSetup {
+contract RewardRouterTest is BasicSetup {
     VotingEscrowLogic veLogic;
     MockWeightedPoolVault primaryVaultPool;
     RewardStore rewardStore;
@@ -25,9 +25,6 @@ contract RewardLogicTest is BasicSetup {
     ContributeLogic contributeLogic;
     VotingEscrowStore veStore;
     RewardRouter rewardRouter;
-
-    RewardLogic.Config public emissionConfig = RewardLogic.Config({distributionTimeframe: 1 weeks});
-    ContributeLogic.Config public contributeConfig = ContributeLogic.Config({baselineEmissionRate: 0.5e30});
 
     function setUp() public override {
         vm.warp(1716671477);
@@ -51,28 +48,23 @@ contract RewardLogicTest is BasicSetup {
         dictator.setPermission(vPuppetToken, vPuppetToken.mint.selector, address(veLogic));
         dictator.setPermission(vPuppetToken, vPuppetToken.burn.selector, address(veLogic));
 
-        IERC20[] memory _buybackTokenList = new IERC20[](2);
-        _buybackTokenList[0] = wnt;
-        _buybackTokenList[1] = usdc;
-
-        uint[] memory _buybackOfferAmountList = new uint[](2);
-        _buybackOfferAmountList[0] = 100e18;
-        _buybackOfferAmountList[1] = 1_000e18;
-
-        contributeStore = new ContributeStore(dictator, router, _buybackTokenList, _buybackOfferAmountList);
-        dictator.setPermission(router, router.transfer.selector, address(contributeStore));
-
+        contributeStore = new ContributeStore(dictator, router);
         rewardStore = new RewardStore(dictator, router);
-        dictator.setPermission(router, router.transfer.selector, address(rewardStore));
 
         allowNextLoggerAccess();
-        contributeLogic = new ContributeLogic(dictator, eventEmitter, puppetToken, contributeStore, contributeConfig);
-        dictator.setAccess(contributeStore, address(contributeLogic));
-        dictator.setPermission(puppetToken, puppetToken.mint.selector, address(contributeLogic));
+        contributeLogic = new ContributeLogic(
+            dictator, eventEmitter, puppetToken, contributeStore, ContributeLogic.Config({baselineEmissionRate: 0.5e30})
+        );
 
         allowNextLoggerAccess();
-        rewardLogic = new RewardLogic(dictator, eventEmitter, puppetToken, vPuppetToken, rewardStore, emissionConfig);
-        dictator.setAccess(rewardStore, address(rewardLogic));
+        rewardLogic = new RewardLogic(
+            dictator,
+            eventEmitter,
+            puppetToken,
+            vPuppetToken,
+            rewardStore,
+            RewardLogic.Config({distributionStore: contributeStore, distributionTimeframe: 1 weeks})
+        );
 
         allowNextLoggerAccess();
         rewardRouter = new RewardRouter(
@@ -80,44 +72,69 @@ contract RewardLogicTest is BasicSetup {
             eventEmitter,
             RewardRouter.Config({contributeLogic: contributeLogic, rewardLogic: rewardLogic, veLogic: veLogic})
         );
+
+        dictator.setPermission(puppetToken, puppetToken.mint.selector, address(contributeLogic));
+        dictator.setPermission(puppetToken, puppetToken.mint.selector, address(veLogic));
+
+        dictator.setAccess(contributeStore, address(contributeLogic));
+        dictator.setAccess(rewardStore, address(rewardLogic));
+        dictator.setAccess(veStore, address(veLogic));
+        dictator.setAccess(contributeStore, address(rewardStore));
+
+        dictator.setPermission(router, router.transfer.selector, address(contributeStore));
+        dictator.setPermission(router, router.transfer.selector, address(rewardStore));
+        dictator.setPermission(router, router.transfer.selector, address(veStore));
+
         dictator.setPermission(contributeLogic, contributeLogic.buyback.selector, address(rewardRouter));
         dictator.setPermission(contributeLogic, contributeLogic.claim.selector, address(rewardRouter));
-        dictator.setPermission(
-            contributeLogic, contributeLogic.updateUserTokenRewardState.selector, address(rewardRouter)
-        );
-        dictator.setPermission(
-            contributeLogic, contributeLogic.updateUserTokenRewardStateList.selector, address(rewardRouter)
-        );
-
+        dictator.setPermission(contributeLogic, contributeLogic.updateCursor.selector, address(rewardRouter));
         dictator.setPermission(rewardLogic, rewardLogic.claim.selector, address(rewardRouter));
         dictator.setPermission(rewardLogic, rewardLogic.userDistribute.selector, address(rewardRouter));
-
         dictator.setPermission(veLogic, veLogic.lock.selector, address(rewardRouter));
         dictator.setPermission(veLogic, veLogic.vest.selector, address(rewardRouter));
+        dictator.setPermission(veLogic, veLogic.claim.selector, address(rewardRouter));
+
+        // store settings setup
+        dictator.setPermission(contributeLogic, contributeLogic.setBuybackQuote.selector, address(users.owner));
+        contributeLogic.setBuybackQuote(wnt, 100e18);
+        contributeLogic.setBuybackQuote(usdc, 100e18);
 
         // permissions used for testing
         vm.startPrank(users.owner);
+
         wnt.approve(address(router), type(uint).max - 1);
         usdc.approve(address(router), type(uint).max - 1);
         puppetToken.approve(address(router), type(uint).max - 1);
         dictator.setAccess(contributeStore, users.owner);
     }
 
-    function testBuybackAndExit() public {
-        uint contributionAmount = 1_000e6; // 1,000 USDC
+    // bob gets the distributed reward in Puppet based on the contribution and `baselineEmissionRate`
+    // uint baselineEmissionRate = contributeLogic.config();
+    // rewardRouter.updateUserTokenRewardState(usdc, users.bob);
+    // rewardRouter.claimContribution(users.bob, 20e18);
+    // assertEq(
+    //     puppetToken.balanceOf(users.bob),
+    //     Precision.applyFactor(baselineEmissionRate, 20e18),
+    //     "Bob should receive 500 Puppet tokens based on 50% baseline emission rate"
+    // );
+    function testBuybackDistribution() public {
+        uint contributionAmount = 100e6; // 100 USDC
         uint quote = contributeStore.getBuybackQuote(usdc);
 
-        // Bob contributes 1 WNT token
-        contribute(usdc, users.bob, contributionAmount);
+        contribute(usdc, users.bob, 20e6);
+        contribute(usdc, users.yossi, 80e6);
 
         // Alice selles her PUPPET tokens for the revenue in WNT tokens
         vm.startPrank(users.alice);
         _dealERC20(address(puppetToken), users.alice, quote);
         puppetToken.approve(address(router), type(uint).max - 1);
-
         vm.expectRevert();
         rewardRouter.buyback(usdc, users.alice, contributionAmount + 1);
         rewardRouter.buyback(usdc, users.alice, contributionAmount);
+        vm.expectRevert();
+        rewardRouter.buyback(usdc, users.alice, contributionAmount);
+        rewardRouter.updateCursor(usdc, users.bob);
+        rewardRouter.updateCursor(usdc, users.yossi);
 
         assertEq(
             usdc.balanceOf(users.alice),
@@ -125,32 +142,71 @@ contract RewardLogicTest is BasicSetup {
             "Other token balance should be reduced by the buyback amount"
         );
 
-        // bob gets the distributed reward in Puppet based on the contribution and `baselineEmissionRate`
-        uint expectedBobReward = Precision.applyFactor(contributeConfig.baselineEmissionRate, quote);
+        assertEq(contributeLogic.getClaimable(users.bob), 20e18);
+        assertEq(contributeLogic.getClaimable(users.yossi), 80e18);
 
-        vm.startPrank(users.bob);
+        contribute(usdc, users.bob, 80e6);
+        contribute(usdc, address(0), 20e6);
 
-        rewardRouter.updateUserTokenRewardState(usdc, users.bob);
-        rewardRouter.claimContribution(quote, users.bob);
+        vm.startPrank(users.alice);
+        _dealERC20(address(puppetToken), users.alice, quote);
+        rewardRouter.buyback(usdc, users.alice, contributionAmount);
 
-        assertEq(
-            puppetToken.balanceOf(users.bob),
-            expectedBobReward,
-            "Bob should receive 500 Puppet tokens based on 50% baseline emission rate"
-        );
+        rewardRouter.updateCursor(usdc, users.bob);
+        // rewardRouter.updateCursor(usdc, users.yossi);
+
+        assertEq(contributeLogic.getClaimable(users.yossi), 80e18);
+        assertEq(contributeLogic.getClaimable(users.bob), 100e18);
+
+        contribute(usdc, address(0), 123e6);
+        vm.startPrank(users.alice);
+        _dealERC20(address(puppetToken), users.alice, quote);
+        rewardRouter.buyback(usdc, users.alice, 50e6);
+
+        // possible case where contribution is lower in market value than the buyback amount
+        // this would result in premium value rewards for the contributors
+        contribute(usdc, users.yossi, 5e6);
+        contribute(usdc, users.yossi, 5e6);
+        contribute(usdc, users.owner, 40e6);
+
+        vm.startPrank(users.alice);
+        _dealERC20(address(puppetToken), users.alice, quote);
+        rewardRouter.buyback(usdc, users.alice, 50e6);
+
+        rewardRouter.updateCursor(usdc, users.yossi);
+
+        assertEq(contributeLogic.getClaimable(users.yossi), 100e18);
     }
 
     // function testLockOption() public {
-    //     lock(wnt, users.yossi, MAXTIME, 1e18);
-    //     skip(emissionConfig.distributionTimeframe);
+    //     (uint distributionTimeframe,) = rewardLogic.config();
 
-    //     assertApproxEqAbs(rewardLogic.getClaimable(users.yossi), 1.5e18, 0.1e18);
+    //     lock(wnt, users.yossi, MAXTIME, 1e18);
+    //     skip(distributionTimeframe / 2);
+    //     assertApproxEqAbs(rewardLogic.getClaimable(users.yossi), 50e18, 0.01e18);
+
+    //     lock(wnt, users.alice, MAXTIME, 1e18);
 
     //     // lock(wnt, users.alice, MAXTIME, 1e18);
-    //     // skip(config.distributionTimeframe);
+    //     assertApproxEqAbs(rewardLogic.getClaimable(users.yossi), 50e18, 0.01e18);
 
-    //     // assertApproxEqAbs(rewardLogic.getClaimableEmission(wnt, users.yossi), 1.5e18, 0.1e18);
-    //     // assertApproxEqAbs(rewardLogic.getClaimableEmission(wnt, users.alice), 0.5e18, 0.1e18);
+    //     // skip(distributionTimeframe);
+
+    //     // assertApproxEqAbs(rewardLogic.getClaimable(users.yossi), 50e18, 0.01e18);
+
+    //     // // rewardLogic.claim(users.yossi)
+
+    //     // rewardRouter.claimEmission(users.yossi, 50e18);
+
+    //     // assertApproxEqAbs(, 50e18, 0.01e18);
+
+    //     // skip(distributionTimeframe);
+
+    //     // rewardLogic.getClaimable(users.yossi);
+    //     // rewardLogic.getClaimable(users.alice);
+
+    //     // assertApproxEqAbs(rewardLogic.getClaimable(users.yossi), 100e18, 0.1e18);
+    //     // assertApproxEqAbs(rewardLogic.getClaimable(users.alice), 50e18, 0.1e18);
 
     //     // assertApproxEqAbs(
     //     //     rewardLogic.getClaimableEmission(wnt, users.alice) + rewardLogic.getClaimableEmission(wnt,
@@ -210,10 +266,9 @@ contract RewardLogicTest is BasicSetup {
         _dealERC20(address(token), users.owner, quote);
         rewardRouter.buyback(token, users.owner, contribution);
         vm.startPrank(user);
-
         puppetToken.approve(address(router), type(uint).max - 1);
-
-        uint amount = rewardRouter.claimContribution(contribution, user);
+        // rewardRouter.updateUserTokenRewardState(token, user);
+        uint amount = rewardRouter.claimContribution(user, quote);
 
         rewardRouter.lock(amount, lockDuration);
 

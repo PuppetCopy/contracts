@@ -13,10 +13,18 @@ contract RewardStore is BankStore {
         uint accruedReward;
     }
 
+    struct EmissionRate {
+        uint twa;
+        uint timestamp;
+    }
+
     uint public cumulativeRewardPerToken;
-    uint public tokenRewardRate;
-    uint public tokenRewardTimestamp;
     mapping(address user => UserRewardCursor) userRewardCursorMap;
+
+    uint public rewardRate;
+    uint public lastRewardTimestamp;
+
+    EmissionRate public emissionRate;
 
     constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
 
@@ -32,11 +40,19 @@ contract RewardStore is BankStore {
         userRewardCursorMap[_user] = cursor;
     }
 
-    function setTokenRewardRate(uint _value) external auth {
-        tokenRewardRate = _value;
+    function setRewardRate(uint _value) external auth {
+        rewardRate = _value;
     }
 
-    function setTokenRewardTimestamp(uint _value) external auth {
-        tokenRewardTimestamp = _value;
+    function setLastRewardTimestamp(uint _value) external auth {
+        lastRewardTimestamp = _value;
+    }
+
+    function setEmissionRate(EmissionRate calldata _value) external auth {
+        emissionRate = _value;
+    }
+
+    function getEmissionRate() external view returns (EmissionRate memory) {
+        return emissionRate;
     }
 }

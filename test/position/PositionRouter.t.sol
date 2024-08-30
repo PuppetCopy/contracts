@@ -21,7 +21,6 @@ import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {PuppetLogic} from "src/puppet/PuppetLogic.sol";
 import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
 import {SubaccountStore} from "src/shared/store/SubaccountStore.sol";
-import {ContributeLogic} from "src/tokenomics/ContributeLogic.sol";
 import {ContributeStore} from "src/tokenomics/store/ContributeStore.sol";
 import {IWNT} from "src/utils/interfaces/IWNT.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
@@ -32,7 +31,7 @@ contract PositionRouterTest is BasicSetup {
     PuppetStore puppetStore;
     PuppetLogic puppetLogic;
     PositionStore positionStore;
-    ContributeLogic contributeLogic;
+    ContributeStore contributeStore;
     PuppetRouter puppetRouter;
     PositionRouter positionRouter;
     IGmxExchangeRouter gmxExchangeRouter;
@@ -54,21 +53,7 @@ contract PositionRouterTest is BasicSetup {
         _tokenAllowanceCapAmountList[0] = 0.2e18;
         _tokenAllowanceCapAmountList[1] = 500e30;
 
-        IERC20[] memory _tokenBuybackThresholdList = new IERC20[](2);
-        _tokenBuybackThresholdList[0] = wnt;
-        _tokenBuybackThresholdList[1] = usdc;
-
-        uint[] memory _tokenBuybackThresholdAmountList = new uint[](2);
-        _tokenBuybackThresholdAmountList[0] = 0.2e18;
-        _tokenBuybackThresholdAmountList[1] = 500e30;
-
-        contributeLogic = new ContributeLogic(
-            dictator,
-            eventEmitter,
-            puppetToken,
-            ContributeStore(address(0)),
-            ContributeLogic.Config({baselineEmissionRate: 1e30})
-        );
+        contributeStore = new ContributeStore(dictator, router);
 
         puppetStore = new PuppetStore(dictator, router, _tokenAllowanceCapList, _tokenAllowanceCapAmountList);
         dictator.setPermission(router, router.transfer.selector, address(puppetStore));
@@ -128,7 +113,7 @@ contract PositionRouterTest is BasicSetup {
                 router: router,
                 positionStore: positionStore,
                 puppetStore: puppetStore,
-                contributeLogic: contributeLogic,
+                contributeStore: contributeStore,
                 gmxOrderReciever: address(positionStore),
                 performanceFeeRate: 0.1e30, // 10%
                 traderPerformanceFeeShare: 0.5e30 // shared between trader and platform
