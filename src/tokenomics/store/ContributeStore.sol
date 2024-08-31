@@ -12,9 +12,10 @@ import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 contract ContributeStore is BankStore {
     mapping(IERC20 => uint) buybackQuoteMap;
     mapping(IERC20 => uint) cursorMap;
-    mapping(IERC20 => mapping(uint => uint)) cursorRewardMap;
+    mapping(IERC20 => uint) cursorBalanceMap;
+    mapping(IERC20 => mapping(uint => uint)) cursorRateMap;
     mapping(IERC20 => mapping(address => uint)) userCursorMap;
-    mapping(IERC20 => mapping(address => mapping(uint => uint))) userCursorContributionBalanceMap;
+    mapping(IERC20 => mapping(address => uint)) userContributionBalanceMap;
     mapping(address => uint) userAccruedRewardMap;
 
     constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
@@ -35,12 +36,20 @@ contract ContributeStore is BankStore {
         cursorMap[_token] = _value;
     }
 
-    function getCursorReward(IERC20 _token, uint _cursor) external view returns (uint) {
-        return cursorRewardMap[_token][_cursor];
+    function getCursorBalance(IERC20 _token) external view returns (uint) {
+        return cursorBalanceMap[_token];
     }
 
-    function setCursorReward(IERC20 _token, uint _cursor, uint _value) external auth {
-        cursorRewardMap[_token][_cursor] = _value;
+    function setCursorBalance(IERC20 _token, uint _value) external auth {
+        cursorBalanceMap[_token] = _value;
+    }
+
+    function getCursorRate(IERC20 _token, uint _cursor) external view returns (uint) {
+        return cursorRateMap[_token][_cursor];
+    }
+
+    function setCursorRate(IERC20 _token, uint _cursor, uint _value) external auth {
+        cursorRateMap[_token][_cursor] = _value;
     }
 
     function getUserCursor(IERC20 _token, address _user) external view returns (uint) {
@@ -51,16 +60,12 @@ contract ContributeStore is BankStore {
         userCursorMap[_token][_user] = _value;
     }
 
-    function getUserContributionCursor(IERC20 _token, address _user, uint _cursor) external view returns (uint) {
-        return userCursorContributionBalanceMap[_token][_user][_cursor];
+    function getUserContributionBalanceMap(IERC20 _token, address _user) external view returns (uint) {
+        return userContributionBalanceMap[_token][_user];
     }
 
-    function setUserContributionCursor(IERC20 _token, address _user, uint _cursor, uint _value) external auth {
-        userCursorContributionBalanceMap[_token][_user][_cursor] = _value;
-    }
-
-    function settleUserContributionCursor(IERC20 _token, address _user, uint _cursor) external auth returns (uint) {
-        return userCursorContributionBalanceMap[_token][_user][_cursor] = 0;
+    function setUserContributionBalanceMap(IERC20 _token, address _user, uint _value) external auth {
+        userContributionBalanceMap[_token][_user] = _value;
     }
 
     function contribute(
@@ -69,11 +74,12 @@ contract ContributeStore is BankStore {
         address _user,
         uint _amount
     ) external auth {
-        uint cursor = cursorMap[_token];
-        uint userCursor = userCursorMap[_token][_user];
+        uint _cursor = cursorMap[_token];
+        uint _userCursor = userCursorMap[_token][_user];
 
-        updateCursor(_token, _user, cursor, userCursor);
-        userCursorContributionBalanceMap[_token][_user][cursor] += _amount;
+        _updateCursorReward(_token, _user, _cursor, _userCursor);
+        userContributionBalanceMap[_token][_user] += _amount;
+        cursorBalanceMap[_token] += _amount;
 
         transferIn(_token, _depositor, _amount);
     }
@@ -84,20 +90,22 @@ contract ContributeStore is BankStore {
         address[] calldata _userList,
         uint[] calldata _valueList
     ) external auth {
-        uint cursor = cursorMap[_token];
-        uint _toitalAmount = 0;
+        uint _cursor = cursorMap[_token];
+        uint _totalAmount = 0;
 
         for (uint i = 0; i < _userList.length; i++) {
             address user = _userList[i];
             uint value = _valueList[i];
+            uint userCursor = userCursorMap[_token][user];
 
-            updateCursor(_token, user, cursor, userCursorMap[_token][user]);
+            _updateCursorReward(_token, user, _cursor, userCursor);
 
-            userCursorContributionBalanceMap[_token][user][cursor] += value;
-            _toitalAmount += value;
+            userContributionBalanceMap[_token][user] += value;
+            cursorBalanceMap[_token] += value;
+            _totalAmount += value;
         }
 
-        transferIn(_token, _depositor, _toitalAmount);
+        transferIn(_token, _depositor, _totalAmount);
     }
 
     function getUserAccruedReward(address _user) external view returns (uint) {
@@ -112,17 +120,51 @@ contract ContributeStore is BankStore {
         userAccruedRewardMap[_user] += _value;
     }
 
-    function updateCursor(IERC20 _token, address _user, uint cursor, uint userCursor) public auth {
-        if (cursor > userCursor) {
-            userAccruedRewardMap[_user] += userCursorContributionBalanceMap[_token][_user][userCursor]
-                * cursorRewardMap[_token][userCursor] / Precision.FLOAT_PRECISION;
-            userCursorContributionBalanceMap[_token][_user][userCursor] = 0;
-            userCursorMap[_token][_user] = cursor;
+    function getPendingCursorReward(IERC20 _token, address _user) public view returns (uint) {
+        uint _cursor = cursorMap[_token];
+        uint _userCursor = userCursorMap[_token][_user];
+
+        if (_cursor > _userCursor) {
+            return userContributionBalanceMap[_token][_user] * cursorRateMap[_token][_userCursor]
+                / Precision.FLOAT_PRECISION;
+        }
+        return 0;
+    }
+
+    function getPendingCursorRewardList(
+        IERC20[] calldata _tokenList,
+        address _user
+    ) external view returns (uint[] memory) {
+        uint[] memory _cursorBalanceList = new uint[](_tokenList.length);
+
+        for (uint i = 0; i < _tokenList.length; i++) {
+            _cursorBalanceList[i] += getPendingCursorReward(_tokenList[i], _user);
+        }
+
+        return _cursorBalanceList;
+    }
+
+    function _updateCursorReward(IERC20 _token, address _user, uint _cursor, uint _userCursor) internal {
+        if (_cursor > _userCursor) {
+            userAccruedRewardMap[_user] += userContributionBalanceMap[_token][_user]
+                * cursorRateMap[_token][_userCursor] / Precision.FLOAT_PRECISION;
+            userContributionBalanceMap[_token][_user] = 0;
+            userCursorMap[_token][_user] = _cursor;
         }
     }
 
-    function updateCursor(IERC20 _token, address _user) external auth {
-        updateCursor(_token, _user, cursorMap[_token], userCursorMap[_token][_user]);
+    function _updateCursorReward(IERC20 _token, address _user) internal {
+        _updateCursorReward(_token, _user, cursorMap[_token], userCursorMap[_token][_user]);
+    }
+
+    function updateCursorRewardList(IERC20[] calldata _tokenList, address _user) external auth {
+        for (uint i = 0; i < _tokenList.length; i++) {
+            _updateCursorReward(_tokenList[i], _user);
+        }
+    }
+
+    function updateCursorReward(IERC20 _token, address _user) public auth {
+        _updateCursorReward(_token, _user);
     }
 
     error RewardStore__InvalidLength();

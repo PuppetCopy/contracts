@@ -22,7 +22,7 @@ contract RewardStore is BankStore {
     mapping(address user => UserRewardCursor) userRewardCursorMap;
 
     uint public rewardRate;
-    uint public lastRewardTimestamp;
+    uint public lastDistributionTimestamp;
 
     EmissionRate public emissionRate;
 
@@ -44,8 +44,8 @@ contract RewardStore is BankStore {
         rewardRate = _value;
     }
 
-    function setLastRewardTimestamp(uint _value) external auth {
-        lastRewardTimestamp = _value;
+    function setLastDistributionTimestamp(uint _value) external auth {
+        lastDistributionTimestamp = _value;
     }
 
     function setEmissionRate(EmissionRate calldata _value) external auth {

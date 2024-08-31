@@ -35,15 +35,21 @@ contract RewardLogic is CoreContract {
     /// @notice The token contract used for voting power
     IERC20 public immutable vToken;
 
-    function getClaimable(address user) external view returns (uint) {
-        uint pendingReward = getEmissionReward();
+    function getPendingEmission() public view returns (uint reward) {
+        uint timeElapsed = block.timestamp - store.lastDistributionTimestamp();
+        uint balance = config.distributionStore.getTokenBalance(rewardToken);
 
-        uint cumulativeRewardPerContribution =
-            store.cumulativeRewardPerToken() + Precision.toFactor(pendingReward, vToken.totalSupply());
+        reward = Math.min(balance * timeElapsed / config.distributionTimeframe, balance);
+    }
+
+    function getClaimable(address user) external view returns (uint) {
         RewardStore.UserRewardCursor memory cursor = store.getUserRewardCursor(user);
 
+        uint cumulativeRewardPerToken =
+            store.cumulativeRewardPerToken() + Precision.toFactor(getPendingEmission(), vToken.totalSupply());
+
         return cursor.accruedReward
-            + vToken.balanceOf(user) * (cumulativeRewardPerContribution - cursor.rewardPerToken) / Precision.FLOAT_PRECISION;
+            + getPendingReward(cumulativeRewardPerToken, cursor.rewardPerToken, vToken.balanceOf(user));
     }
 
     constructor(
@@ -66,7 +72,12 @@ contract RewardLogic is CoreContract {
     /// @param receiver The address to receive the claimed rewards
     /// @param amount The amount of rewards to claim
     function claim(address user, address receiver, uint amount) external auth {
-        RewardStore.UserRewardCursor memory cursor = userDistribute(user);
+        uint nextRewardPerTokenCursor = distribute();
+
+        RewardStore.UserRewardCursor memory cursor = store.getUserRewardCursor(user);
+        cursor.accruedReward +=
+            getPendingReward(nextRewardPerTokenCursor, cursor.rewardPerToken, vToken.balanceOf(user));
+        cursor.rewardPerToken = nextRewardPerTokenCursor;
 
         if (amount > cursor.accruedReward) revert RewardLogic__NoClaimableAmount(cursor.accruedReward);
 
@@ -78,42 +89,46 @@ contract RewardLogic is CoreContract {
         logEvent("claim()", abi.encode(user, receiver, amount));
     }
 
-    function userDistribute(address user) public auth returns (RewardStore.UserRewardCursor memory cursor) {
+    /// @notice Distributes the rewards to the users based on the current token emission rate and the time elapsed
+    /// @param user The address of the user to distribute the rewards for
+    function userDistribute(address user) public auth {
         uint nextRewardPerTokenCursor = distribute();
-        cursor = store.getUserRewardCursor(user);
+        uint userVBalance = vToken.balanceOf(user);
 
-        cursor.accruedReward +=
-            vToken.balanceOf(user) * (nextRewardPerTokenCursor - cursor.rewardPerToken) / Precision.FLOAT_PRECISION;
+        RewardStore.UserRewardCursor memory cursor = store.getUserRewardCursor(user);
+        cursor.accruedReward += getPendingReward(nextRewardPerTokenCursor, cursor.rewardPerToken, userVBalance);
+        cursor.rewardPerToken = nextRewardPerTokenCursor;
 
         store.setUserRewardCursor(user, cursor);
     }
 
-    // internal
-
     /// @notice Distributes the rewards to the users based on the current token emission rate and the time elapsed
     /// @return The updated cumulative reward per contribution state
-    function distribute() internal returns (uint) {
-        uint amount = getEmissionReward();
+    function distribute() public auth returns (uint) {
+        uint emission = getPendingEmission();
         uint supply = vToken.totalSupply();
 
-        store.setLastRewardTimestamp(block.timestamp);
+        store.setLastDistributionTimestamp(block.timestamp);
 
-        if (amount == 0 || supply == 0) return store.cumulativeRewardPerToken();
+        if (emission == 0) return store.cumulativeRewardPerToken();
 
-        store.interIn(config.distributionStore, rewardToken, amount);
+        store.interIn(config.distributionStore, rewardToken, emission);
 
-        uint rewardPerToken = store.incrementCumulativePerContribution(Precision.toFactor(amount, supply));
+        uint rewardPerToken = store.incrementCumulativePerContribution(Precision.toFactor(emission, supply));
 
-        logEvent("distribute()", abi.encode(rewardPerToken, supply, amount));
+        logEvent("distribute()", abi.encode(rewardPerToken, supply, emission));
 
         return rewardPerToken;
     }
 
-    function getEmissionReward() internal view returns (uint reward) {
-        uint timeElapsed = block.timestamp - store.lastRewardTimestamp();
-        uint balance = config.distributionStore.getTokenBalance(rewardToken);
+    // internal
 
-        reward = Math.min(balance * timeElapsed / config.distributionTimeframe, balance);
+    function getPendingReward(
+        uint cumulativeRewardPerToken,
+        uint userCursor,
+        uint userBalance
+    ) internal pure returns (uint) {
+        return userBalance * (cumulativeRewardPerToken - userCursor) / Precision.FLOAT_PRECISION;
     }
 
     // governance

@@ -33,8 +33,21 @@ contract ContributeLogic is CoreContract {
     /// @notice The RewardStore contract used for tracking reward accruals
     ContributeStore public immutable store;
 
-    function getClaimable(address user) external view returns (uint) {
-        return store.getUserAccruedReward(user);
+    function getCursorRewardList(IERC20[] calldata tokenList, address user) external view returns (uint[] memory) {
+        return store.getPendingCursorRewardList(tokenList, user);
+    }
+
+    function getClaimable(IERC20[] calldata tokenList, address user) external view returns (uint) {
+        uint total = 0;
+
+        uint[] memory balanceList = store.getPendingCursorRewardList(tokenList, user);
+        uint balanceListLength = balanceList.length;
+
+        for (uint i = 0; i < balanceListLength; i++) {
+            total += balanceList[i];
+        }
+
+        return store.getUserAccruedReward(user) + total;
     }
 
     constructor(
@@ -63,37 +76,42 @@ contract ContributeLogic is CoreContract {
         store.transferIn(rewardToken, depositor, quoteAmount);
         store.transferOut(token, receiver, revenueAmount);
 
+        uint cursorBalance = store.getCursorBalance(token);
+
         uint cursor = store.getCursor(token);
-        store.setCursorReward(token, cursor, quoteAmount * Precision.FLOAT_PRECISION / revenueAmount);
+        store.setCursorRate(token, cursor, quoteAmount * Precision.FLOAT_PRECISION / cursorBalance);
         store.setCursor(token, cursor + 1);
+        store.setCursorBalance(token, 0);
 
         logEvent("buyback()", abi.encode(token, depositor, receiver, cursor, revenueAmount, quoteAmount));
     }
 
-    /// @notice Update user cursor which to the current cursor.
-    /// @param token The address of the token contribution.
-    /// @param user The address of the contributor.
-    function updateCursor(IERC20 token, address user) external auth {
-        store.updateCursor(token, user);
-    }
-
     /// @notice Claims the rewards for a specific token contribution.
+    /// @param tokenList The list of token contributions that required updating the cursor.
     /// @param user The address of the contributor for whom the rewards are to be claimed.
     /// @param receiver The address that will receive the claimed rewards.
     /// @param amount The amount of rewards to be claimed.
     /// @return The amount of rewards claimed.
-    function claim(address user, address receiver, uint amount) external auth returns (uint) {
+    function claim(
+        IERC20[] calldata tokenList,
+        address user,
+        address receiver,
+        uint amount
+    ) external auth returns (uint) {
+        if (tokenList.length > 0) store.updateCursorRewardList(tokenList, user);
+
         uint accruedReward = store.getUserAccruedReward(user);
 
         if (amount > accruedReward) revert ContributeLogic__InsufficientClaimableReward(accruedReward);
 
-        uint nextAccruedReward = accruedReward - amount;
+        accruedReward -= amount;
+
         uint reward = Precision.applyFactor(config.baselineEmissionRate, amount);
 
-        store.setUserAccruedReward(user, nextAccruedReward);
+        store.setUserAccruedReward(user, accruedReward);
         rewardToken.mint(receiver, reward);
 
-        logEvent("claim()", abi.encode(user, nextAccruedReward, reward));
+        logEvent("claim()", abi.encode(user, accruedReward, reward));
 
         return reward;
     }
@@ -122,7 +140,6 @@ contract ContributeLogic is CoreContract {
 
     /// @notice Error emitted when the claim token is invalid
     error ContributeLogic__InvalidBuybackToken();
-
     /// @notice Error emitted when the claimable reward is insufficient
     error ContributeLogic__InsufficientClaimableReward(uint accruedReward);
 }
