@@ -8,7 +8,7 @@ import {RewardRouter} from "src/RewardRouter.sol";
 import {ContributeLogic} from "src/tokenomics/ContributeLogic.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
-import {MAXTIME, VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
+import {VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
 import {ContributeStore} from "src/tokenomics/store/ContributeStore.sol";
 import {RewardStore} from "src/tokenomics/store/RewardStore.sol";
 import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
@@ -16,6 +16,8 @@ import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 
 contract RewardRouterTest is BasicSetup {
+    uint constant MAXTIME = 63120000; // 2 years
+
     VotingEscrowLogic veLogic;
     MockWeightedPoolVault primaryVaultPool;
     RewardStore rewardStore;

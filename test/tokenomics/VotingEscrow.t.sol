@@ -2,12 +2,14 @@
 pragma solidity 0.8.24;
 
 import {Router} from "src/shared/Router.sol";
-import {MAXTIME, VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
+import {VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
 import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
 
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
 contract VotingEscrowTest is BasicSetup {
+    uint constant MAXTIME = 63120000; // 2 years
+
     VotingEscrowStore veStore;
     VotingEscrowLogic veLogic;
     VotingEscrowRouter veRouter;

@@ -12,10 +12,9 @@ import {IERC20Mintable} from "../utils/interfaces/IERC20Mintable.sol";
 import {ContributeStore} from "./store/ContributeStore.sol";
 
 /// @title ContributeLogic
-/// @notice contract features a token-based incentive buy-back, it has self-contained mechanism operates without relying
+/// @notice Contract features a token-based incentive buy-back, it has self-contained mechanism operates without relying
 /// on external price oracles or a single liquidity pool for each token contributed
-/// distribution of rewards within the protocol, including locking mechanisms and bonus multipliers
-/// for token holders.
+/// distribution of rewards
 //// @dev It calculates rewards for contributors based on a cumulative distribution rate, which increases with each
 /// PUPPET token sold, enabling users to claim PUPPET rewards proportionate to their token contributions
 contract ContributeLogic is CoreContract {

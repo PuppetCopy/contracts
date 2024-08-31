@@ -12,14 +12,14 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {PuppetVoteToken} from "./PuppetVoteToken.sol";
 import {VotingEscrowStore} from "./store/VotingEscrowStore.sol";
 
-uint constant MAXTIME = 63120000; // 2 years
-
 /// @title VotingEscrowLogic
 /// @notice Manages the locking of tokens to provide users with governance voting power and time-based rewards.
 /// This contract handles the logic for token vesting and voting power accrual based on the duration of token locks.
 /// @dev Inherits from CoreContract and utilizes a separate VotingEscrowStore for state management.
 /// It implements a weighted average mechanism for lock durations and vesting periods to calculate rewards.
 contract VotingEscrowLogic is CoreContract {
+    uint constant MAXTIME = 63120000; // 2 years
+
     /// @notice Struct to hold configuration parameters.
     struct Config {
         uint baseMultiplier;
