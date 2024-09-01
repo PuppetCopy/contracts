@@ -172,7 +172,7 @@ contract ExecuteDecreasePositionLogic is CoreContract {
     function _setConfig(Config memory _config) internal {
         config = _config;
 
-        logEvent("setConfig()", abi.encode(_config));
+        logEvent("setConfig", abi.encode(_config));
     }
 
     error ExecuteDecreasePositionLogic__InvalidRequest(bytes32 positionKey, bytes32 key);

@@ -65,7 +65,7 @@ contract ExecuteIncreasePositionLogic is CoreContract {
     /// @param _config The configuration to set.
     function _setConfig(Config memory _config) internal {
         config = _config;
-        logEvent("setConfig()", abi.encode(_config));
+        logEvent("setConfig", abi.encode(_config));
     }
 
     error ExecuteIncreasePositionLogic__UnauthorizedCaller();

@@ -25,7 +25,7 @@ abstract contract CoreContract is Permission, EIP712 {
         version = _version;
     }
 
-    function logEvent(string memory method, bytes memory data) internal {
-        eventEmitter.logEvent(name, version, method, data);
+    function logEvent(string memory eventName, bytes memory data) internal {
+        eventEmitter.logEvent(name, version, eventName, data);
     }
 }

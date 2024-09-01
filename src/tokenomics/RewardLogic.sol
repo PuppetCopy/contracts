@@ -152,7 +152,7 @@ contract RewardLogic is CoreContract {
     /// @param _config The configuration to set.
     function _setConfig(Config memory _config) internal {
         config = _config;
-        logEvent("setConfig()", abi.encode(_config));
+        logEvent("setConfig", abi.encode(_config));
     }
 
     /// @notice Error emitted when there is no claimable amount for a user

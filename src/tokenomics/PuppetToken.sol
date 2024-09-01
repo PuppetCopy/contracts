@@ -164,7 +164,7 @@ contract PuppetToken is CoreContract, ERC20, IERC20Mintable {
 
         config = _config;
 
-        logEvent("setConfig()", abi.encode(_config));
+        logEvent("setConfig", abi.encode(_config));
     }
 
     /// @dev Error for when the rate is invalid (zero).

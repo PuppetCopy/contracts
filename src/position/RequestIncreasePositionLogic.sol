@@ -256,7 +256,7 @@ contract RequestIncreasePositionLogic is CoreContract {
         bytes32 requestKey = _createOrder(request, traderCallParams, callParams.subaccountAddress);
 
         logEvent(
-            "RequestIncreasePositionLogic__Match",
+            "matchUp",
             abi.encode(
                 traderCallParams.account,
                 callParams.subaccountAddress,
@@ -336,7 +336,7 @@ contract RequestIncreasePositionLogic is CoreContract {
         }
 
         logEvent(
-            "RequestIncreasePositionLogic__Adjust",
+            "adjust",
             abi.encode(
                 traderCallParams.account,
                 callParams.subaccountAddress,
@@ -396,7 +396,7 @@ contract RequestIncreasePositionLogic is CoreContract {
     function _reducePuppetSizeDelta(
         PositionUtils.TraderCallParams calldata traderCallParams,
         address subaccountAddress,
-        uint puppetReduceSizeDelta,
+        uint sizeDeltaUsd,
         bytes32 positionKey
     ) internal returns (bytes32 requestKey) {
         GmxPositionUtils.CreateOrderParams memory params = GmxPositionUtils.CreateOrderParams({
@@ -410,7 +410,7 @@ contract RequestIncreasePositionLogic is CoreContract {
             }),
             numbers: GmxPositionUtils.CreateOrderParamsNumbers({
                 initialCollateralDeltaAmount: 0,
-                sizeDeltaUsd: puppetReduceSizeDelta,
+                sizeDeltaUsd: sizeDeltaUsd,
                 triggerPrice: traderCallParams.triggerPrice,
                 acceptablePrice: traderCallParams.acceptablePrice,
                 executionFee: traderCallParams.executionFee,
@@ -433,8 +433,8 @@ contract RequestIncreasePositionLogic is CoreContract {
         requestKey = abi.decode(orderReturnData, (bytes32));
 
         logEvent(
-            "RequestIncreasePositionLogic__ReducePuppetSize",
-            abi.encode(traderCallParams.account, subaccountAddress, requestKey, positionKey, puppetReduceSizeDelta)
+            "reducePuppetSizeDelta",
+            abi.encode(traderCallParams.account, subaccountAddress, requestKey, positionKey, sizeDeltaUsd)
         );
     }
 
@@ -443,7 +443,7 @@ contract RequestIncreasePositionLogic is CoreContract {
     function setConfig(Config memory _config) public auth {
         config = _config;
 
-        logEvent("setConfig()", abi.encode(_config));
+        logEvent("setConfig", abi.encode(_config));
     }
 
     error RequestIncreasePositionLogic__PuppetListLimitExceeded();

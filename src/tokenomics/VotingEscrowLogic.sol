@@ -172,7 +172,7 @@ contract VotingEscrowLogic is CoreContract {
     /// @param _config The new configuration parameters.
     function _setConfig(Config memory _config) internal {
         config = _config;
-        logEvent("setConfig()", abi.encode(_config));
+        logEvent("setConfig", abi.encode(_config));
     }
 
     // internal
