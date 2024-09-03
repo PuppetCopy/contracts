@@ -30,7 +30,7 @@ abstract contract BankStore is Auth {
         return currentBalance - prevBalance;
     }
 
-    function interIn(BankStore _bank, IERC20 _token, uint _value) public auth {
+    function interIn(BankStore _bank, IERC20 _token, uint _value) external auth {
         _bank.transferOut(_token, address(this), _value);
         tokenBalanceMap[_token] += _value;
     }
