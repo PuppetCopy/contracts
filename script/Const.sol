@@ -2,28 +2,30 @@
 pragma solidity 0.8.24;
 
 library Address {
-    address constant dao = 0x189b21eda0cff16461913D616a0A4F711Cd986cB;
+    address constant dao = 0x145E9Ee481Bb885A49E1fF4c1166222587D61916;
 
-    address constant Dictator = 0x406945E0BF3c6D3998d7A8E090B1D71960f55D36;
-    address constant PuppetToken = 0xD3f7bD9dA85AD2c985A16eFCE50b97942AD05094;
-    address constant Router = 0x3E00C677Ac69b68a21871b9EE0888EaA6046d37D;
-    address constant VotingEscrow = 0xA5648F9E5ee3a1aA5037fc529EC988AD813AAcf1;
+    // Puppet core
+    address constant Dictator = 0xECaC4151bF1d17eEC1e3b9bd3bc4a6f2e50E0AFA;
+    address constant EventEmitter = 0x3E62bDfCB20e8253478fe79981d46514949D2cF0;
+    address constant PuppetToken = 0x5FeCb50777A594149D3e4A96C48CD1c0032c9972;
+    address constant PuppetVoteToken = 0x9e40F0fee198AD9A3b97275606336d923d7197d8;
+    address constant Router = 0x039597eF5b22cC810676512aA23394c95119a312;
+
+    // Tokenomics
+    address constant ContributeStore = 0xD8f35E3F2F58579d0AFC937913539c06932Ca13D;
+    address constant VotingEscrowStore = 0x2A87123506E4459783A449f43224669d53B6EFB0;
+    address constant RewardStore = 0x9e2Ba591081B10612E8Fdf868EC20c3472CC15CF;
+
+    address constant VotingEscrowLogic = 0xA9233Fb481b6790199F39AE501B05d623Fa85A86;
+    address constant ContributeLogic = 0x2C78298cd4a7A2312547c94D6F9AABBB8c709A95;
+    address constant RewardLogic = 0x41b93E8265a963089579A944B77d78BF37dBac42;
+
+    address constant RewardRouter = 0x8192468Ab9852391734fA4862581Bb8D96168CE3;
 
     address constant BasePool = 0x19da41A2ccd0792b9b674777E72447903FE29074;
 
-    address constant OracleLogic = 0x412979f3210d8cf121971B0176cA3704b8bE0945;
-    address constant PriceStore = 0xe9e9ce24275Ec23257551Cbb62D79A4e9cfE2428;
-    address constant RewardLogic = 0x356Df7BE8a48d514c3A24A4b4cC0CB4AAd45B617;
-    address constant RewardStore = 0x8242D1541f53B6CB5801C8Ff38168B4b4e044039;
-    address constant RewardRouter = 0xeBE43819468Bc0B167Baa5224Fe46A9EaDCA67Ce;
-
-    address constant PuppetStore = 0x1eC471E44C863c355ea22b98993ecCD63E2BCDfb;
-    address constant PuppetRouter = 0xA9Bb45baA076056528e4eA78ccdeF9A587138111;
-    address constant SubaccountStore = 0xBbF470a2ad3eE91305f06704109D3bB7C1858F03;
-
     address constant nt = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     address constant wnt = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
-
     address constant usdc = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831;
     address constant dai = 0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1;
 

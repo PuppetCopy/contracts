@@ -95,9 +95,4 @@ contract RewardRouter is CoreContract, ReentrancyGuardTransient, Multicall {
         config = _config;
         logEvent("setConfig", abi.encode(_config));
     }
-
-    // internal
-
-    error PuppetRouter__InvalidPuppet();
-    error PuppetRouter__InvalidAllowance();
 }

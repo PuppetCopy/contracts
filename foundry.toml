@@ -49,7 +49,7 @@ ignore = ["**/interface/**/*.sol", "**/utils/**/*.sol", "**/shared/**/*.sol"]
 
 [rpc_endpoints]
   localhost = "http://localhost:8545"
-  arbitrum = "https://arbitrum.llamarpc.com/sk_llama_a804526772d0fa25160e6ca3a5e9d6fd"
+  arbitrum = "${ARBITRUM_RPC_URL}"
 
 [etherscan]
   arbitrum = { key = "${ARBISCAN_API_KEY}", chain = "arbitrum" }

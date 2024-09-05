@@ -16,7 +16,7 @@ import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 
 contract RewardRouterTest is BasicSetup {
-    uint constant MAXTIME = 63120000; // 2 years
+    uint constant MAXTIME = 105 weeks; // about 2 years
 
     VotingEscrowLogic veLogic;
     MockWeightedPoolVault primaryVaultPool;
@@ -56,11 +56,18 @@ contract RewardRouterTest is BasicSetup {
 
         contributeStore = new ContributeStore(dictator, router);
         rewardStore = new RewardStore(dictator, router);
+        dictator.setAccess(contributeStore, address(rewardStore));
 
         allowNextLoggerAccess();
         contributeLogic = new ContributeLogic(
             dictator, eventEmitter, puppetToken, contributeStore, ContributeLogic.Config({baselineEmissionRate: 0.5e30})
         );
+        dictator.setPermission(puppetToken, puppetToken.mint.selector, address(contributeLogic));
+        dictator.setAccess(contributeStore, address(contributeLogic));
+
+        dictator.setPermission(router, router.transfer.selector, address(contributeStore));
+        dictator.setPermission(router, router.transfer.selector, address(rewardStore));
+        dictator.setPermission(router, router.transfer.selector, address(veStore));
 
         allowNextLoggerAccess();
         rewardLogic = new RewardLogic(
@@ -71,6 +78,7 @@ contract RewardRouterTest is BasicSetup {
             rewardStore,
             RewardLogic.Config({distributionStore: contributeStore, distributionTimeframe: 1 weeks})
         );
+        dictator.setAccess(rewardStore, address(rewardLogic));
 
         allowNextLoggerAccess();
         rewardRouter = new RewardRouter(
@@ -78,18 +86,6 @@ contract RewardRouterTest is BasicSetup {
             eventEmitter,
             RewardRouter.Config({contributeLogic: contributeLogic, rewardLogic: rewardLogic, veLogic: veLogic})
         );
-
-        dictator.setPermission(puppetToken, puppetToken.mint.selector, address(contributeLogic));
-        dictator.setPermission(puppetToken, puppetToken.mint.selector, address(veLogic));
-
-        dictator.setAccess(contributeStore, address(contributeLogic));
-        dictator.setAccess(rewardStore, address(rewardLogic));
-        dictator.setAccess(veStore, address(veLogic));
-        dictator.setAccess(contributeStore, address(rewardStore));
-
-        dictator.setPermission(router, router.transfer.selector, address(contributeStore));
-        dictator.setPermission(router, router.transfer.selector, address(rewardStore));
-        dictator.setPermission(router, router.transfer.selector, address(veStore));
 
         dictator.setPermission(contributeLogic, contributeLogic.buyback.selector, address(rewardRouter));
         dictator.setPermission(contributeLogic, contributeLogic.claim.selector, address(rewardRouter));

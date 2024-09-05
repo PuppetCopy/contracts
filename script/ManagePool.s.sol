@@ -1,25 +1,21 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-
-import { Script } from "forge-std/src/Script.sol";
-
+import {WeightedPoolUserData} from "@balancer-labs/v2-interfaces/contracts/pool-weighted/WeightedPoolUserData.sol";
+import {IERC20 as IBERC20} from "@balancer-labs/v2-interfaces/contracts/solidity-utils/openzeppelin/IERC20.sol";
+import {IBasePool} from "@balancer-labs/v2-interfaces/contracts/vault/IBasePool.sol";
+import {IAsset, IVault} from "@balancer-labs/v2-interfaces/contracts/vault/IVault.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IVault, IAsset} from "@balancer-labs/v2-interfaces/contracts/vault/IVault.sol";
-import {WeightedPoolUserData} from "@balancer-labs/v2-interfaces/contracts/pool-weighted/WeightedPoolUserData.sol";
-import {IBasePool} from "@balancer-labs/v2-interfaces/contracts/vault/IBasePool.sol";
-import {IERC20 as IBERC20} from "@balancer-labs/v2-interfaces/contracts/solidity-utils/openzeppelin/IERC20.sol";
-
-import {Dictator} from "src/shared/Dictator.sol";
-import {IWNT} from "./../src/utils/interfaces/IWNT.sol";
-import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 
 import {Address} from "script/Const.sol";
+import {Dictator} from "src/shared/Dictator.sol";
+import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+import {IWNT} from "src/utils/interfaces/IWNT.sol";
 
-contract ManagePool is Script {
-    address internal DEPLOYER_ADDRESS = vm.envAddress("DEPLOYER_ADDRESS");
+import {BaseScript} from "./BaseScript.s.sol";
 
+contract ManagePool is BaseScript {
     IWNT wnt;
     Dictator dictator = Dictator(Address.Dictator);
     PuppetToken puppetToken = PuppetToken(Address.PuppetToken);
@@ -49,7 +45,9 @@ contract ManagePool is Script {
         rateProviders[1] = address(0);
 
         IBasePoolErc20 pool = IBasePoolErc20(
-            poolFactory.create("PUPPET-WETH", "PUPPET-WETH", tokens, normalizedWeights, rateProviders, 0.01e18, Address.dao, bytes32(0))
+            poolFactory.create(
+                "PUPPET-WETH", "PUPPET-WETH", tokens, normalizedWeights, rateProviders, 0.01e18, Address.dao, bytes32(0)
+            )
         );
 
         uint[] memory amounts = new uint[](2);
