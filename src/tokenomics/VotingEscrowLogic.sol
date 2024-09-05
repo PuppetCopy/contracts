@@ -18,7 +18,7 @@ import {VotingEscrowStore} from "./store/VotingEscrowStore.sol";
 /// @dev Inherits from CoreContract and utilizes a separate VotingEscrowStore for state management.
 /// It implements a weighted average mechanism for lock durations and vesting periods to calculate rewards.
 contract VotingEscrowLogic is CoreContract {
-    uint constant MAXTIME = 105 weeks; // about 2 years
+    uint constant MAXTIME = 110 weeks; // about 2 years
 
     /// @notice Struct to hold configuration parameters.
     struct Config {

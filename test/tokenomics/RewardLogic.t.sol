@@ -16,7 +16,7 @@ import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 
 contract RewardRouterTest is BasicSetup {
-    uint constant MAXTIME = 105 weeks; // about 2 years
+    uint constant MAXTIME = 110 weeks; // about 2 years
 
     VotingEscrowLogic veLogic;
     MockWeightedPoolVault primaryVaultPool;
