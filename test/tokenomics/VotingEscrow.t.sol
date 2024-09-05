@@ -8,7 +8,7 @@ import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
 contract VotingEscrowTest is BasicSetup {
-    uint constant MAXTIME = 110 weeks; // about 2 years
+    uint constant MAXTIME = 106 weeks; // about 2 years
 
     VotingEscrowStore veStore;
     VotingEscrowLogic veLogic;
