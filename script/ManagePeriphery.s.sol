@@ -11,11 +11,13 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Address} from "script/Const.sol";
 import {Dictator} from "src/shared/Dictator.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+import {Auth} from "src/utils/access/Auth.sol";
 import {IWNT} from "src/utils/interfaces/IWNT.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
+import {StubPublicContribute} from "./stub/StubPublicContribute.sol";
 
-contract ManagePool is BaseScript {
+contract ManagePeriphery is BaseScript {
     IWNT wnt;
     Dictator dictator = Dictator(Address.Dictator);
     PuppetToken puppetToken = PuppetToken(Address.PuppetToken);
@@ -27,7 +29,8 @@ contract ManagePool is BaseScript {
     function run() public {
         vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
         // initPool();
-        exitPool();
+        // exitPool();
+        deployStubPublicContributeContract();
         vm.stopBroadcast();
     }
 
@@ -84,30 +87,35 @@ contract ManagePool is BaseScript {
         IBasePoolErc20 pool = IBasePoolErc20(Address.BasePool);
         bytes32 poolId = pool.getPoolId();
 
-        // (IBERC20[] memory tokens,,) = vault.getPoolTokens(poolId);
+        (IBERC20[] memory tokens,,) = vault.getPoolTokens(poolId);
 
-        // IAsset[] memory assets = new IAsset[](tokens.length);
+        IAsset[] memory assets = new IAsset[](tokens.length);
 
-        // for (uint _i = 0; _i < tokens.length; _i++) {
-        //     assets[_i] = IAsset(address(tokens[_i]));
-        // }
+        for (uint _i = 0; _i < tokens.length; _i++) {
+            assets[_i] = IAsset(address(tokens[_i]));
+        }
 
-        // vault.getPoolTokens(poolId);
-        // uint bptBalance = pool.balanceOf(DEPLOYER_ADDRESS);
+        vault.getPoolTokens(poolId);
+        uint bptBalance = pool.balanceOf(DEPLOYER_ADDRESS);
 
-        // uint[] memory _amounts = new uint[](tokens.length);
+        uint[] memory _amounts = new uint[](tokens.length);
 
-        // vault.exitPool(
-        //     poolId,
-        //     DEPLOYER_ADDRESS, // sender
-        //     payable(DEPLOYER_ADDRESS), // recipient
-        //     IVault.ExitPoolRequest({
-        //         assets: assets,
-        //         minAmountsOut: _amounts,
-        //         userData: abi.encode(WeightedPoolUserData.ExitKind.EXACT_BPT_IN_FOR_TOKENS_OUT, bptBalance),
-        //         toInternalBalance: false
-        //     })
-        // );
+        vault.exitPool(
+            poolId,
+            DEPLOYER_ADDRESS, // sender
+            payable(DEPLOYER_ADDRESS), // recipient
+            IVault.ExitPoolRequest({
+                assets: assets,
+                minAmountsOut: _amounts,
+                userData: abi.encode(WeightedPoolUserData.ExitKind.EXACT_BPT_IN_FOR_TOKENS_OUT, bptBalance),
+                toInternalBalance: false
+            })
+        );
+    }
+
+    function deployStubPublicContributeContract() public {
+        StubPublicContribute stubPublicContribute = new StubPublicContribute();
+        dictator.setAccess(Auth(Address.ContributeStore), address(stubPublicContribute));
     }
 }
 
