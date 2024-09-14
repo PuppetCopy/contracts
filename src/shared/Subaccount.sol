@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {SubaccountStore} from "./store/SubaccountStore.sol";
+import {Auth} from "../utils/access/Auth.sol";
 
 contract Subaccount {
-    SubaccountStore store;
+    Auth store;
     address public account;
 
-    constructor(SubaccountStore _store, address _account) {
+    constructor(Auth _store, address _account) {
         store = _store;
         account = _account;
     }
 
-    modifier onlyOperator() {
-        if (msg.sender != store.operator()) revert Subaccount__UnauthorizedOperator();
-        _;
-    }
+    function execute(
+        address _contract,
+        bytes calldata _data
+    ) external payable returns (bool _success, bytes memory _returnData) {
+        if (!store.canCall(msg.sender)) revert Subaccount__UnauthorizedOperator();
 
-    function execute(address _contract, bytes calldata _data) external payable onlyOperator returns (bool _success, bytes memory _returnData) {
         return _contract.call{value: msg.value, gas: gasleft()}(_data);
     }
 
