@@ -18,7 +18,6 @@ import {PositionStore} from "src/position/store/PositionStore.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {PuppetLogic} from "src/puppet/PuppetLogic.sol";
 import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
-import {SubaccountStore} from "src/shared/store/SubaccountStore.sol";
 import {ContributeStore} from "src/tokenomics/store/ContributeStore.sol";
 
 import {Address} from "script/Const.sol";
@@ -26,7 +25,7 @@ import {Address} from "script/Const.sol";
 import {BasicSetup} from "../base/BasicSetup.t.sol";
 import {MockGmxExchangeRouter} from "../mock/MockGmxExchangeRouter.sol";
 
-contract PositionRouterTest is BasicSetup {
+contract TradingTest is BasicSetup {
     uint arbitrumFork;
 
     PuppetStore puppetStore;
@@ -36,7 +35,6 @@ contract PositionRouterTest is BasicSetup {
     PuppetRouter puppetRouter;
     PositionRouter positionRouter;
     IGmxExchangeRouter gmxExchangeRouter;
-    SubaccountStore subaccountStore;
     MockGmxExchangeRouter mockGmxExchangeRouter;
 
     RequestPositionLogic requestLogic;
@@ -49,42 +47,44 @@ contract PositionRouterTest is BasicSetup {
         mockGmxExchangeRouter = new MockGmxExchangeRouter();
         contributeStore = new ContributeStore(dictator, router);
 
-        IERC20[] memory _tokenAllowanceCapList = new IERC20[](2);
-        _tokenAllowanceCapList[0] = wnt;
-        _tokenAllowanceCapList[1] = usdc;
-
-        uint[] memory _tokenAllowanceCapAmountList = new uint[](2);
-        _tokenAllowanceCapAmountList[0] = 0.2e18;
-        _tokenAllowanceCapAmountList[1] = 500e30;
-
-        puppetStore = new PuppetStore(dictator, router, _tokenAllowanceCapList, _tokenAllowanceCapAmountList);
+        puppetStore = new PuppetStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(puppetStore));
+        positionStore = new PositionStore(dictator, router);
+        dictator.setPermission(router, router.transfer.selector, address(positionStore));
 
-        allowNextLoggerAccess();
-        puppetLogic = new PuppetLogic(
-            dictator,
-            eventEmitter,
-            puppetStore,
-            PuppetLogic.Config({minExpiryDuration: 0, minAllowanceRate: 100, maxAllowanceRate: 5000})
-        );
+        puppetLogic = new PuppetLogic(dictator, eventEmitter, puppetStore);
+        dictator.setAccess(eventEmitter, address(puppetLogic));
         dictator.setAccess(puppetStore, address(puppetLogic));
+        dictator.setPermission(puppetLogic, puppetLogic.setConfig.selector, users.owner);
+        IERC20[] memory tokenAllowanceCapList = new IERC20[](2);
+        tokenAllowanceCapList[0] = wnt;
+        tokenAllowanceCapList[1] = usdc;
+        uint[] memory tokenAllowanceCapAmountList = new uint[](2);
+        tokenAllowanceCapAmountList[0] = 0.2e18;
+        tokenAllowanceCapAmountList[1] = 500e30;
+        puppetLogic.setConfig(
+            PuppetLogic.Config({
+                minExpiryDuration: 1 days,
+                minAllowanceRate: 1000,
+                maxAllowanceRate: 10000,
+                tokenAllowanceList: tokenAllowanceCapList,
+                tokenAllowanceAmountList: tokenAllowanceCapAmountList
+            })
+        );
 
-        allowNextLoggerAccess();
-        puppetRouter = new PuppetRouter(dictator, eventEmitter, PuppetRouter.Config({logic: puppetLogic}));
+        puppetRouter = new PuppetRouter(dictator, eventEmitter);
+        dictator.setAccess(eventEmitter, address(puppetRouter));
+        dictator.setPermission(puppetRouter, puppetRouter.setConfig.selector, users.owner);
+        puppetRouter.setConfig(PuppetRouter.Config({logic: puppetLogic}));
+
         dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
         dictator.setPermission(puppetLogic, puppetLogic.setRule.selector, address(puppetRouter));
         dictator.setPermission(puppetLogic, puppetLogic.setRuleList.selector, address(puppetRouter));
 
-        positionStore = new PositionStore(dictator, router);
-        subaccountStore = new SubaccountStore(dictator, computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1));
-
-        allowNextLoggerAccess();
-        requestLogic = new RequestPositionLogic(
-            dictator,
-            eventEmitter,
-            subaccountStore,
-            puppetStore,
-            positionStore,
+        requestLogic = new RequestPositionLogic(dictator, eventEmitter, puppetStore, positionStore);
+        dictator.setAccess(eventEmitter, address(requestLogic));
+        dictator.setPermission(requestLogic, requestLogic.setConfig.selector, users.owner);
+        requestLogic.setConfig(
             RequestPositionLogic.Config({
                 gmxExchangeRouter: mockGmxExchangeRouter,
                 callbackHandler: address(positionRouter),
@@ -99,38 +99,35 @@ contract PositionRouterTest is BasicSetup {
         dictator.setAccess(puppetStore, address(requestLogic));
         dictator.setAccess(positionStore, address(requestLogic));
 
-        allowNextLoggerAccess();
-        ExecuteIncreasePositionLogic executeIncrease = new ExecuteIncreasePositionLogic(
-            dictator, eventEmitter, positionStore, ExecuteIncreasePositionLogic.Config({__: 0})
-        );
-        allowNextLoggerAccess();
-        ExecuteDecreasePositionLogic executeDecrease = new ExecuteDecreasePositionLogic(
-            dictator,
-            eventEmitter,
-            contributeStore,
-            puppetStore,
-            positionStore,
+        ExecuteIncreasePositionLogic executeIncreaseLogic =
+            new ExecuteIncreasePositionLogic(dictator, eventEmitter, positionStore);
+        dictator.setAccess(eventEmitter, address(executeIncreaseLogic));
+        dictator.setAccess(positionStore, address(executeIncreaseLogic));
+        ExecuteDecreasePositionLogic executeDecreaseLogic =
+            new ExecuteDecreasePositionLogic(dictator, eventEmitter, contributeStore, puppetStore, positionStore);
+        dictator.setAccess(eventEmitter, address(executeDecreaseLogic));
+        dictator.setAccess(positionStore, address(executeDecreaseLogic));
+        dictator.setAccess(contributeStore, address(executeDecreaseLogic));
+        dictator.setPermission(executeDecreaseLogic, executeDecreaseLogic.setConfig.selector, users.owner);
+        executeDecreaseLogic.setConfig(
             ExecuteDecreasePositionLogic.Config({
                 gmxOrderReciever: address(positionStore),
                 performanceFeeRate: 0.1e30, // 10%
                 traderPerformanceFeeShare: 0.5e30 // shared between trader and platform
             })
         );
-        dictator.setAccess(contributeStore, address(executeDecrease));
 
-        allowNextLoggerAccess();
-        ExecuteRevertedAdjustmentLogic executeRevertedAdjustment = new ExecuteRevertedAdjustmentLogic(
-            dictator, eventEmitter, ExecuteRevertedAdjustmentLogic.Config({handlehandle: "test"})
-        );
+        ExecuteRevertedAdjustmentLogic executeRevertedAdjustment =
+            new ExecuteRevertedAdjustmentLogic(dictator, eventEmitter);
+        dictator.setAccess(eventEmitter, address(executeRevertedAdjustment));
 
-        allowNextLoggerAccess();
-        positionRouter = new PositionRouter(
-            dictator,
-            eventEmitter,
-            positionStore,
+        positionRouter = new PositionRouter(dictator, eventEmitter, positionStore);
+        dictator.setAccess(eventEmitter, address(positionRouter));
+        dictator.setPermission(positionRouter, positionRouter.setConfig.selector, users.owner);
+        positionRouter.setConfig(
             PositionRouter.Config({
-                executeIncrease: executeIncrease,
-                executeDecrease: executeDecrease,
+                executeIncrease: executeIncreaseLogic,
+                executeDecrease: executeDecreaseLogic,
                 executeRevertedAdjustment: executeRevertedAdjustment
             })
         );
