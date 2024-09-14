@@ -19,11 +19,23 @@ library Address {
     address constant VotingEscrowLogic = 0xA9233Fb481b6790199F39AE501B05d623Fa85A86;
     address constant ContributeLogic = 0x2C78298cd4a7A2312547c94D6F9AABBB8c709A95;
     address constant RewardLogic = 0xf560b1f2dE1eb62e93FBA01Ee13578AACB8Fcd52;
-
     address constant RewardRouter = 0x8192468Ab9852391734fA4862581Bb8D96168CE3;
 
+    // Trading
+    address constant PuppetStore = address(0);
+    address constant PositionStore = address(0);
+    address constant PuppetRouter = address(0);
+    address constant PositionRouter = address(0);
+    address constant PuppetLogic = address(0);
+    address constant RequestPositionLogic = address(0);
+    address constant ExecuteIncreasePositionLogic = address(0);
+    address constant ExecuteDecreasePositionLogic = address(0);
+    address constant ExecuteRevertedAdjustmentLogic = address(0);
+
+    // Liquidity Pools
     address constant BasePool = 0x19da41A2ccd0792b9b674777E72447903FE29074;
 
+    // Periphery
     address constant permit2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
     address constant nt = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     address constant wnt = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
