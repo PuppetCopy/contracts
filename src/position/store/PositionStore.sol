@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Router} from "./../../shared/Router.sol";
+import {Subaccount} from "./../../shared/Subaccount.sol";
 import {BankStore} from "./../../shared/store/BankStore.sol";
 import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 import {GmxPositionUtils} from "./../utils/GmxPositionUtils.sol";
@@ -38,6 +39,8 @@ contract PositionStore is BankStore {
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
     mapping(bytes32 positionKey => MirrorPosition) public positionMap;
     mapping(bytes32 positionKey => UnhandledCallback) public unhandledCallbackMap;
+
+    mapping(address => Subaccount) public subaccountMap;
 
     constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
 
@@ -87,5 +90,13 @@ contract PositionStore is BankStore {
 
     function removeUnhandledCallback(bytes32 _key) external auth {
         delete unhandledCallbackMap[_key];
+    }
+
+    function getSubaccount(address _user) external view returns (Subaccount) {
+        return subaccountMap[_user];
+    }
+
+    function createSubaccount(address _user) external auth returns (Subaccount) {
+        return subaccountMap[_user] = new Subaccount(this, _user);
     }
 }

@@ -25,11 +25,9 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
     constructor(
         IAuthority _authority,
         EventEmitter _eventEmitter,
-        PositionStore _positionStore,
-        Config memory _config
+        PositionStore _positionStore
     ) CoreContract("PositionRouter", "1", _authority, _eventEmitter) {
         positionStore = _positionStore;
-        _setConfig(_config);
     }
 
     function afterOrderExecution(
@@ -93,12 +91,6 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
     /// @notice Set the mint rate limit for the token.
     /// @param _config The new rate limit configuration.
     function setConfig(Config calldata _config) external auth {
-        _setConfig(_config);
-    }
-
-    /// @dev Internal function to set the configuration.
-    /// @param _config The configuration to set.
-    function _setConfig(Config memory _config) internal {
         config = _config;
         logEvent("setConfig", abi.encode(_config));
     }

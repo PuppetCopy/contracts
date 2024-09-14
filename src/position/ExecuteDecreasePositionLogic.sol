@@ -39,14 +39,11 @@ contract ExecuteDecreasePositionLogic is CoreContract {
         EventEmitter _eventEmitter,
         ContributeStore _contributeStore,
         PuppetStore _puppetStore,
-        PositionStore _positionStore,
-        Config memory _config
+        PositionStore _positionStore
     ) CoreContract("ExecuteDecreasePositionLogic", "1", _authority, _eventEmitter) {
         contributeStore = _contributeStore;
         puppetStore = _puppetStore;
         positionStore = _positionStore;
-
-        _setConfig(_config);
     }
 
     function execute(
@@ -159,10 +156,6 @@ contract ExecuteDecreasePositionLogic is CoreContract {
     // governance
 
     function setConfig(Config memory _config) external auth {
-        _setConfig(_config);
-    }
-
-    function _setConfig(Config memory _config) internal {
         config = _config;
 
         logEvent("setConfig", abi.encode(_config));

@@ -20,11 +20,8 @@ contract PuppetRouter is CoreContract, ReentrancyGuardTransient {
 
     constructor(
         IAuthority _authority,
-        EventEmitter _eventEmitter,
-        Config memory _config
-    ) CoreContract("PuppetRouter", "1", _authority, _eventEmitter) {
-        _setConfig(_config);
-    }
+        EventEmitter _eventEmitter
+    ) CoreContract("PuppetRouter", "1", _authority, _eventEmitter) {}
 
     function deposit(IERC20 token, uint amount) external nonReentrant {
         config.logic.deposit(token, msg.sender, amount);
@@ -55,18 +52,7 @@ contract PuppetRouter is CoreContract, ReentrancyGuardTransient {
     /// @notice Set the mint rate limit for the token.
     /// @param _config The new rate limit configuration.
     function setConfig(Config calldata _config) external auth {
-        _setConfig(_config);
-    }
-
-    /// @dev Internal function to set the configuration.
-    /// @param _config The configuration to set.
-    function _setConfig(Config memory _config) internal {
         config = _config;
         logEvent("setConfig", abi.encode(_config));
     }
-
-    // internal
-
-    error PuppetRouter__InvalidPuppet();
-    error PuppetRouter__InvalidAllowance();
 }

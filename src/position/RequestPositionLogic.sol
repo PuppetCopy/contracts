@@ -8,7 +8,6 @@ import {EventEmitter} from "../utils/EventEmitter.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {PuppetStore} from "./../puppet/store/PuppetStore.sol";
 import {Subaccount} from "./../shared/Subaccount.sol";
-import {SubaccountStore} from "./../shared/store/SubaccountStore.sol";
 import {ErrorUtils} from "./../utils/ErrorUtils.sol";
 import {Precision} from "./../utils/Precision.sol";
 import {IGmxDatastore} from "./interface/IGmxDataStore.sol";
@@ -29,7 +28,6 @@ contract RequestPositionLogic is CoreContract {
         uint minimumMatchAmount;
     }
 
-    SubaccountStore subaccountStore;
     PuppetStore puppetStore;
     PositionStore positionStore;
     Config config;
@@ -37,16 +35,11 @@ contract RequestPositionLogic is CoreContract {
     constructor(
         IAuthority _authority,
         EventEmitter _eventEmitter,
-        SubaccountStore _subaccountStore,
         PuppetStore _puppetStore,
-        PositionStore _positionStore,
-        Config memory _config
+        PositionStore _positionStore
     ) CoreContract("RequestPositionLogic", "1", _authority, _eventEmitter) {
-        subaccountStore = _subaccountStore;
         puppetStore = _puppetStore;
         positionStore = _positionStore;
-
-        _setConfig(_config);
     }
 
     function submitOrder(
@@ -199,10 +192,10 @@ contract RequestPositionLogic is CoreContract {
         address[] calldata puppetList
     ) external payable auth returns (bytes32) {
         uint startGas = gasleft();
-        Subaccount subaccount = subaccountStore.getSubaccount(order.trader);
+        Subaccount subaccount = positionStore.getSubaccount(order.trader);
 
         if (address(subaccount) == address(0)) {
-            subaccount = subaccountStore.createSubaccount(order.trader);
+            subaccount = positionStore.createSubaccount(order.trader);
         }
 
         PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
@@ -236,12 +229,6 @@ contract RequestPositionLogic is CoreContract {
     /// @notice Set the mint rate limit for the token.
     /// @param _config The new rate limit configuration.
     function setConfig(Config calldata _config) external auth {
-        _setConfig(_config);
-    }
-
-    /// @dev Internal function to set the configuration.
-    /// @param _config The configuration to set.
-    function _setConfig(Config memory _config) internal {
         config = _config;
         logEvent("setConfig", abi.encode(_config));
     }

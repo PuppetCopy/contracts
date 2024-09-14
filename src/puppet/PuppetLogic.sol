@@ -15,6 +15,8 @@ contract PuppetLogic is CoreContract {
         uint minExpiryDuration;
         uint minAllowanceRate;
         uint maxAllowanceRate;
+        IERC20[] tokenAllowanceList;
+        uint[] tokenAllowanceAmountList;
     }
 
     Config config;
@@ -23,12 +25,9 @@ contract PuppetLogic is CoreContract {
     constructor(
         IAuthority _authority,
         EventEmitter _eventEmitter,
-        PuppetStore _store,
-        Config memory _config
+        PuppetStore _store
     ) CoreContract("PuppetLogic", "1", _authority, _eventEmitter) {
         store = _store;
-
-        _setConfig(_config);
     }
 
     function deposit(IERC20 token, address user, uint amount) external auth {
@@ -63,7 +62,7 @@ contract PuppetLogic is CoreContract {
 
         store.setRule(ruleKey, rule);
 
-        logEvent("setRule()", abi.encode(ruleKey, rule));
+        logEvent("setRule", abi.encode(ruleKey, rule));
     }
 
     function setRuleList(
@@ -89,7 +88,7 @@ contract PuppetLogic is CoreContract {
                 verifyAllowanceTokenList[verifyAllowanceTokenList.length] = collateralTokenList[i];
             }
 
-            logEvent("setRuleList()", abi.encode(keyList[i], storedRuleList[i]));
+            logEvent("setRuleList", abi.encode(keyList[i], storedRuleList[i]));
         }
 
         store.setRuleList(keyList, storedRuleList);
@@ -124,6 +123,8 @@ contract PuppetLogic is CoreContract {
         return storedRule;
     }
 
+    // internal
+
     function isArrayContains(IERC20[] memory array, IERC20 value) internal pure returns (bool) {
         for (uint i = 0; i < array.length; i++) {
             if (array[i] == value) {
@@ -155,12 +156,14 @@ contract PuppetLogic is CoreContract {
     /// @notice Set the mint rate limit for the token.
     /// @param _config The new rate limit configuration.
     function setConfig(Config calldata _config) external auth {
-        _setConfig(_config);
-    }
+        if (_config.tokenAllowanceList.length != _config.tokenAllowanceAmountList.length) {
+            revert PuppetLogic__InvalidLength();
+        }
 
-    /// @dev Internal function to set the configuration.
-    /// @param _config The configuration to set.
-    function _setConfig(Config memory _config) internal {
+        for (uint i; i < _config.tokenAllowanceList.length; i++) {
+            store.setTokenAllowanceCap(_config.tokenAllowanceList[i], _config.tokenAllowanceAmountList[i]);
+        }
+
         config = _config;
         logEvent("setConfig", abi.encode(_config));
     }
@@ -172,4 +175,5 @@ contract PuppetLogic is CoreContract {
     error PuppetLogic__AllowanceAboveLimit(uint allowanceCap);
     error PuppetLogic__InvalidAmount();
     error PuppetLogic__InsufficientBalance();
+    error PuppetLogic__InvalidLength();
 }

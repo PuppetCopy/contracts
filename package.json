@@ -5,8 +5,8 @@
   ],
   "scripts": {
     "test": "FOUNDRY_PROFILE=dev forge test -vvvvv",
-    "test:dev": "FOUNDRY_PROFILE=dev forge test --match-contract PositionRouterTest -vvvvv",
-    "test:dev:fork": "FOUNDRY_PROFILE=dev forge test --chain arbitrum --match-contract PositionRouterTest -vvvvv --fork-block-number 192315592 --fork-url=$ARBITRUM_RPC_URL",
+    "test:dev": "FOUNDRY_PROFILE=dev forge test --match-contract TradingTest -vvvvv",
+    "test:dev:fork": "FOUNDRY_PROFILE=dev forge test --chain arbitrum --match-contract TradingTest -vvvvv --fork-block-number 192315592 --fork-url=$ARBITRUM_RPC_URL",
     "build": "forge build --sizes",
     "build:dev": "FOUNDRY_PROFILE=dev forge build --sizes",
     "script:DeployPuppet": "forge script --chain arbitrum script/DeployPuppet.s.sol:DeployPuppet --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL",

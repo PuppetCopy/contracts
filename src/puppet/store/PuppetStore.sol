@@ -21,19 +21,7 @@ contract PuppetStore is BankStore {
     mapping(bytes32 ruleKey => Rule) public ruleMap; // ruleKey = keccak256(collateralToken, puppet, trader)
     mapping(address trader => mapping(address user => uint) name) public fundingActivityMap;
 
-    constructor(
-        IAuthority _authority,
-        Router _router,
-        IERC20[] memory _tokenAllowanceCapList,
-        uint[] memory _tokenAllowanceConfigList
-    ) BankStore(_authority, _router) {
-        if (_tokenAllowanceCapList.length != _tokenAllowanceConfigList.length) revert PuppetStore__InvalidLength();
-
-        for (uint i; i < _tokenAllowanceCapList.length; i++) {
-            IERC20 _token = _tokenAllowanceCapList[i];
-            tokenAllowanceCapMap[_token] = _tokenAllowanceConfigList[i];
-        }
-    }
+    constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
 
     function getTokenAllowanceCap(IERC20 _token) external view returns (uint) {
         return tokenAllowanceCapMap[_token];
