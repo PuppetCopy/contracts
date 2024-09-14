@@ -125,7 +125,7 @@ contract VotingEscrowLogic is CoreContract {
         store.setLockDuration(user, nextDuration);
         vToken.mint(user, amount);
 
-        logEvent("lock()", abi.encode(depositor, user, nextAmount, nextDuration));
+        logEvent("lock()", abi.encode(depositor, user, nextAmount, nextDuration, bonusAmount));
     }
 
     /// @notice Initiates the vesting process for a user's locked tokens.
