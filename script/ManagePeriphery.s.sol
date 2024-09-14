@@ -8,19 +8,19 @@ import {IAsset, IVault} from "@balancer-labs/v2-interfaces/contracts/vault/IVaul
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {Address} from "script/Const.sol";
 import {Dictator} from "src/shared/Dictator.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
-import {Auth} from "src/utils/access/Auth.sol";
+import {EventEmitter} from "src/utils/EventEmitter.sol";
 import {IWNT} from "src/utils/interfaces/IWNT.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
-import {StubPublicContribute} from "./stub/StubPublicContribute.sol";
+import {Address} from "script/Const.sol";
 
 contract ManagePeriphery is BaseScript {
     IWNT wnt;
     Dictator dictator = Dictator(Address.Dictator);
     PuppetToken puppetToken = PuppetToken(Address.PuppetToken);
+    EventEmitter eventEmitter = EventEmitter(Address.EventEmitter);
     IERC20 weth = IERC20(Address.wnt);
 
     IVault vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
@@ -30,7 +30,6 @@ contract ManagePeriphery is BaseScript {
         vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
         // initPool();
         // exitPool();
-        deployStubPublicContributeContract();
         vm.stopBroadcast();
     }
 
@@ -88,7 +87,6 @@ contract ManagePeriphery is BaseScript {
         bytes32 poolId = pool.getPoolId();
 
         (IBERC20[] memory tokens,,) = vault.getPoolTokens(poolId);
-
         IAsset[] memory assets = new IAsset[](tokens.length);
 
         for (uint _i = 0; _i < tokens.length; _i++) {
@@ -111,11 +109,6 @@ contract ManagePeriphery is BaseScript {
                 toInternalBalance: false
             })
         );
-    }
-
-    function deployStubPublicContributeContract() public {
-        StubPublicContribute stubPublicContribute = new StubPublicContribute();
-        dictator.setAccess(Auth(Address.ContributeStore), address(stubPublicContribute));
     }
 }
 

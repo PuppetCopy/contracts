@@ -71,13 +71,6 @@ contract PuppetToken is CoreContract, ERC20, IERC20Mintable {
         emissionRate = getLimitAmount();
     }
 
-    /// @notice Returns the locked amount for a user.
-    /// @param _user The address of the user.
-    /// @return The locked amount.
-    function getLockedAmount(address _user) public view returns (uint) {
-        return balanceOf(_user);
-    }
-
     /// @notice Returns the core share based on the last mint time.
     /// @return The core share.
     function getCoreShare() public view returns (uint) {
