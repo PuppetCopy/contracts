@@ -13,33 +13,39 @@ import {Precision} from "./../utils/Precision.sol";
 import {IGmxEventUtils} from "./interface/IGmxEventUtils.sol";
 import {PositionStore} from "./store/PositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
-import {Router} from "src/shared/Router.sol";
 
 contract ExecuteDecreasePositionLogic is CoreContract {
     struct Config {
-        Router router;
-        PositionStore positionStore;
-        PuppetStore puppetStore;
-        ContributeStore contributeStore;
         address gmxOrderReciever;
         uint performanceFeeRate;
         uint traderPerformanceFeeShare;
     }
 
     struct CallParams {
-        uint totalAmountOut;
+        uint totalAmountIn;
+        uint recordedAmountIn;
         uint profit;
         uint totalPerformanceFee;
         uint traderPerformanceCutoffFee;
     }
 
+    PositionStore positionStore;
+    PuppetStore puppetStore;
+    ContributeStore contributeStore;
     Config config;
 
     constructor(
         IAuthority _authority,
         EventEmitter _eventEmitter,
+        ContributeStore _contributeStore,
+        PuppetStore _puppetStore,
+        PositionStore _positionStore,
         Config memory _config
     ) CoreContract("ExecuteDecreasePositionLogic", "1", _authority, _eventEmitter) {
+        contributeStore = _contributeStore;
+        puppetStore = _puppetStore;
+        positionStore = _positionStore;
+
         _setConfig(_config);
     }
 
@@ -55,44 +61,40 @@ contract ExecuteDecreasePositionLogic is CoreContract {
             revert ExecuteDecreasePositionLogic__UnexpectedEventData();
         }
 
+        PositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
+        PositionStore.MirrorPosition memory mirrorPosition = positionStore.getMirrorPosition(request.positionKey);
         CallParams memory callParams = CallParams({
-            totalAmountOut: eventLogData.uintItems.items[0].value, //
+            totalAmountIn: eventLogData.uintItems.items[0].value,
+            recordedAmountIn: positionStore.recordedTransferIn(IERC20(eventLogData.addressItems.items[0].value)),
             totalPerformanceFee: 0,
             traderPerformanceCutoffFee: 0,
             profit: 0
         });
 
-        PositionStore.RequestAdjustment memory request = config.positionStore.getRequestAdjustment(requestKey);
-        PositionStore.MirrorPosition memory mirrorPosition = config.positionStore.getMirrorPosition(request.positionKey);
-
-        if (mirrorPosition.size == 0) {
+        if (mirrorPosition.traderSize == 0) {
             revert ExecuteDecreasePositionLogic__InvalidRequest(request.positionKey, requestKey);
         }
 
-        IERC20 outputToken = IERC20(eventLogData.addressItems.items[0].value);
-
-        if (callParams.totalAmountOut > order.numbers.initialCollateralDeltaAmount) {
-            callParams.profit = callParams.totalAmountOut - order.numbers.initialCollateralDeltaAmount;
+        if (callParams.totalAmountIn > order.numbers.initialCollateralDeltaAmount) {
+            callParams.profit = callParams.totalAmountIn - order.numbers.initialCollateralDeltaAmount;
         }
 
-        mirrorPosition.collateral -= request.collateralDelta;
-        mirrorPosition.size -= request.sizeDelta;
+        mirrorPosition.traderSize -= request.puppetSizeDelta;
+        mirrorPosition.traderCollateral -= request.puppetCollateralDelta;
         mirrorPosition.cumulativeTransactionCost += request.transactionCost;
 
-        uint[] memory outputAmountList = new uint[](mirrorPosition.puppetList.length);
-        uint[] memory contributionList = new uint[](mirrorPosition.puppetList.length);
+        uint puppetListLength = mirrorPosition.puppetList.length;
 
-        for (uint i = 0; i < mirrorPosition.puppetList.length; i++) {
-            if (request.collateralDeltaList[i] == 0) continue;
+        uint[] memory outputAmountList = new uint[](puppetListLength);
+        uint[] memory contributionList = new uint[](puppetListLength);
 
-            mirrorPosition.collateralList[i] -= request.collateralDeltaList[i];
+        for (uint i = 0; i < puppetListLength; i++) {
+            if (mirrorPosition.collateralList[i] == 0) continue;
 
             (uint performanceFee, uint traderCutoff, uint amountOutAfterFee) = getDistribution(
                 config.performanceFeeRate,
                 config.traderPerformanceFeeShare,
-                callParams.profit,
-                request.collateralDeltaList[i] * mirrorPosition.collateral / callParams.profit,
-                callParams.profit
+                mirrorPosition.collateralList[i] * callParams.profit / mirrorPosition.puppetCollateral
             );
 
             callParams.totalPerformanceFee += performanceFee;
@@ -102,41 +104,40 @@ contract ExecuteDecreasePositionLogic is CoreContract {
             outputAmountList[i] += amountOutAfterFee;
         }
 
-        config.puppetStore.increaseBalanceList(outputToken, address(this), mirrorPosition.puppetList, outputAmountList);
+        IERC20 outputToken = IERC20(eventLogData.addressItems.items[0].value);
+
+        puppetStore.increaseBalanceList(outputToken, address(this), mirrorPosition.puppetList, outputAmountList);
 
         if (callParams.profit > 0) {
-            config.contributeStore.contributeMany(
+            contributeStore.contributeMany(
                 outputToken, //
                 address(this),
                 mirrorPosition.puppetList,
                 contributionList
             );
-        }
 
-        // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
-        if (mirrorPosition.size == order.numbers.sizeDeltaUsd) {
-            config.positionStore.removeMirrorPosition(request.positionKey);
-        } else {
-            config.positionStore.setMirrorPosition(request.positionKey, mirrorPosition);
-        }
-
-        config.positionStore.removeRequestDecrease(requestKey);
-
-        if (request.collateralDelta > 0) {
-            config.router.transfer(
-                outputToken,
-                config.gmxOrderReciever,
+            contributeStore.contribute(
+                outputToken, //
+                address(this),
                 mirrorPosition.trader,
-                request.collateralDelta * mirrorPosition.collateral / callParams.totalAmountOut
+                callParams.traderPerformanceCutoffFee
             );
         }
 
+        // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
+        if (mirrorPosition.traderSize == order.numbers.sizeDeltaUsd) {
+            positionStore.removeMirrorPosition(request.positionKey);
+        } else {
+            positionStore.setMirrorPosition(request.positionKey, mirrorPosition);
+        }
+
+        positionStore.removeRequestDecrease(requestKey);
+
         logEvent(
-            "execute()",
+            "execute",
             abi.encode(
-                requestKey,
-                request.positionKey,
-                callParams.totalAmountOut,
+                mirrorPosition,
+                callParams.totalAmountIn,
                 callParams.profit,
                 callParams.totalPerformanceFee,
                 callParams.traderPerformanceCutoffFee
@@ -145,14 +146,10 @@ contract ExecuteDecreasePositionLogic is CoreContract {
     }
 
     function getDistribution(
-        uint performanceFeeRate, //
+        uint performanceFeeRate,
         uint traderPerformanceFeeShare,
-        uint totalProfit,
-        uint amountOut,
-        uint totalAmountOut
+        uint profit
     ) internal pure returns (uint performanceFee, uint traderPerformanceCutoffFee, uint amountOutAfterFee) {
-        uint profit = totalProfit * amountOut / totalAmountOut;
-
         performanceFee = Precision.applyFactor(performanceFeeRate, profit);
         amountOutAfterFee = profit - performanceFee;
 

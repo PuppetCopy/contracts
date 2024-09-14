@@ -5,15 +5,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Address} from "script/Const.sol";
-
 import {PositionRouter} from "src/PositionRouter.sol";
 import {PuppetRouter} from "src/PuppetRouter.sol";
 import {ExecuteDecreasePositionLogic} from "src/position/ExecuteDecreasePositionLogic.sol";
 import {ExecuteIncreasePositionLogic} from "src/position/ExecuteIncreasePositionLogic.sol";
 import {ExecuteRevertedAdjustmentLogic} from "src/position/ExecuteRevertedAdjustmentLogic.sol";
-import {RequestDecreasePositionLogic} from "src/position/RequestDecreasePositionLogic.sol";
-import {RequestIncreasePositionLogic} from "src/position/RequestIncreasePositionLogic.sol";
+import {RequestPositionLogic} from "src/position/RequestPositionLogic.sol";
+import {IGmxDatastore} from "src/position/interface/IGmxDataStore.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxOracle} from "src/position/interface/IGmxOracle.sol";
 import {PositionStore} from "src/position/store/PositionStore.sol";
@@ -23,6 +21,9 @@ import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
 import {SubaccountStore} from "src/shared/store/SubaccountStore.sol";
 import {ContributeStore} from "src/tokenomics/store/ContributeStore.sol";
 import {IWNT} from "src/utils/interfaces/IWNT.sol";
+
+import {Address} from "script/Const.sol";
+
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
 contract PositionRouterTest is BasicSetup {
@@ -37,13 +38,14 @@ contract PositionRouterTest is BasicSetup {
     IGmxExchangeRouter gmxExchangeRouter;
     SubaccountStore subaccountStore;
 
+    RequestPositionLogic requestLogic;
+
     IGmxOracle gmxOracle = IGmxOracle(Address.gmxOracle);
 
     function setUp() public override {
-        usdc = IERC20(Address.usdc);
-        wnt = IWNT(Address.wnt);
-
         super.setUp();
+
+        contributeStore = new ContributeStore(dictator, router);
 
         IERC20[] memory _tokenAllowanceCapList = new IERC20[](2);
         _tokenAllowanceCapList[0] = wnt;
@@ -53,97 +55,88 @@ contract PositionRouterTest is BasicSetup {
         _tokenAllowanceCapAmountList[0] = 0.2e18;
         _tokenAllowanceCapAmountList[1] = 500e30;
 
-        contributeStore = new ContributeStore(dictator, router);
-
         puppetStore = new PuppetStore(dictator, router, _tokenAllowanceCapList, _tokenAllowanceCapAmountList);
         dictator.setPermission(router, router.transfer.selector, address(puppetStore));
 
+        allowNextLoggerAccess();
         puppetLogic = new PuppetLogic(
             dictator,
             eventEmitter,
             puppetStore,
             PuppetLogic.Config({minExpiryDuration: 0, minAllowanceRate: 100, maxAllowanceRate: 5000})
         );
+        dictator.setAccess(puppetStore, address(puppetLogic));
+
+        allowNextLoggerAccess();
         puppetRouter = new PuppetRouter(dictator, eventEmitter, PuppetRouter.Config({logic: puppetLogic}));
+        dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.setRule.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.setRuleList.selector, address(puppetRouter));
 
-        dictator.setAccess(puppetStore, address(puppetRouter));
-
-        subaccountStore = new SubaccountStore(dictator, computeCreateAddress(users.owner, vm.getNonce(users.owner) + 2));
         positionStore = new PositionStore(dictator, router);
+        subaccountStore = new SubaccountStore(dictator, computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1));
 
-        RequestIncreasePositionLogic requestIncrease = new RequestIncreasePositionLogic(
+        allowNextLoggerAccess();
+        requestLogic = new RequestPositionLogic(
             dictator,
             eventEmitter,
-            RequestIncreasePositionLogic.Config({
-                wnt: wnt,
+            subaccountStore,
+            puppetStore,
+            positionStore,
+            RequestPositionLogic.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
-                router: router,
-                positionStore: positionStore,
-                subaccountStore: subaccountStore,
+                callbackHandler: address(positionRouter),
                 gmxOrderReciever: address(positionStore),
                 gmxOrderVault: Address.gmxOrderVault,
                 referralCode: Address.referralCode,
                 callbackGasLimit: 2_000_000,
-                puppetStore: puppetStore,
-                limitPuppetList: 20,
+                limitPuppetList: 60,
                 minimumMatchAmount: 100e30,
                 tokenTransferGasLimit: 200_000
             })
         );
+        dictator.setAccess(puppetStore, address(requestLogic));
+
+        allowNextLoggerAccess();
         ExecuteIncreasePositionLogic executeIncrease = new ExecuteIncreasePositionLogic(
-            dictator, eventEmitter, ExecuteIncreasePositionLogic.Config({positionStore: positionStore})
+            dictator, eventEmitter, positionStore, ExecuteIncreasePositionLogic.Config({__: 0})
         );
-        RequestDecreasePositionLogic requestDecrease = new RequestDecreasePositionLogic(
-            dictator,
-            eventEmitter,
-            RequestDecreasePositionLogic.Config({
-                gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
-                positionStore: positionStore,
-                subaccountStore: subaccountStore,
-                gmxOrderReciever: address(positionStore),
-                gmxOrderVault: Address.gmxOrderVault,
-                referralCode: Address.referralCode,
-                callbackGasLimit: 2_000_000
-            })
-        );
+        allowNextLoggerAccess();
         ExecuteDecreasePositionLogic executeDecrease = new ExecuteDecreasePositionLogic(
             dictator,
             eventEmitter,
+            contributeStore,
+            puppetStore,
+            positionStore,
             ExecuteDecreasePositionLogic.Config({
-                router: router,
-                positionStore: positionStore,
-                puppetStore: puppetStore,
-                contributeStore: contributeStore,
                 gmxOrderReciever: address(positionStore),
                 performanceFeeRate: 0.1e30, // 10%
                 traderPerformanceFeeShare: 0.5e30 // shared between trader and platform
             })
         );
+        dictator.setAccess(contributeStore, address(executeDecrease));
+
+        allowNextLoggerAccess();
         ExecuteRevertedAdjustmentLogic executeRevertedAdjustment = new ExecuteRevertedAdjustmentLogic(
             dictator, eventEmitter, ExecuteRevertedAdjustmentLogic.Config({handlehandle: "test"})
         );
 
+        allowNextLoggerAccess();
         positionRouter = new PositionRouter(
             dictator,
             eventEmitter,
             positionStore,
             PositionRouter.Config({
-                requestIncrease: requestIncrease,
-                requestDecrease: requestDecrease,
                 executeIncrease: executeIncrease,
                 executeDecrease: executeDecrease,
                 executeRevertedAdjustment: executeRevertedAdjustment
             })
         );
 
-        dictator.setAccess(subaccountStore, address(positionRouter));
-        dictator.setAccess(positionStore, address(positionRouter));
-        dictator.setAccess(puppetStore, address(positionRouter));
-        // dictator.setAccess(router, address(positionRouter));
-
         dictator.setPermission(positionRouter, positionRouter.afterOrderExecution.selector, Address.gmxOrderHandler);
         dictator.setPermission(positionRouter, positionRouter.afterOrderCancellation.selector, Address.gmxOrderHandler);
         dictator.setPermission(positionRouter, positionRouter.afterOrderFrozen.selector, Address.gmxOrderHandler);
+        dictator.setPermission(requestLogic, requestLogic.orderMirrorPosition.selector, users.owner);
     }
 
     function testIncreaseRequestInUsdc() public {
@@ -152,29 +145,29 @@ contract PositionRouterTest is BasicSetup {
         uint estimatedGasLimit = 5_000_000;
         uint executionFee = tx.gasprice * estimatedGasLimit;
 
-        address[] memory puppetList = getGeneratePuppetList(usdc, trader, 10);
+        address[] memory puppetList = getGeneratePuppetList(usdc, trader, 60);
 
-        gmxOracle.getStablePrice(Address.gmxDatastore, address(usdc));
-        gmxOracle.getStablePrice(Address.gmxDatastore, Address.wnt);
+        // gmxOracle.getStablePrice(Address.gmxDatastore, address(usdc));
+        // gmxOracle.getStablePrice(Address.gmxDatastore, Address.wnt);
 
-        vm.startPrank(trader);
-        _dealERC20(address(usdc), trader, 100e6);
-        usdc.approve(address(router), 100e6);
+        // vm.startPrank(trader);
+        vm.startPrank(users.owner);
 
-        // positionRouter.requestIncrease{value: executionFee}(
-        //     PositionUtils.TraderCallParams({
-        //         account: trader,
-        //         market: Address.gmxEthUsdcMarket,
-        //         collateralToken: usdc,
-        //         isLong: true,
-        //         executionFee: executionFee,
-        //         collateralDelta: 100e6,
-        //         sizeDelta: 1000e30,
-        //         acceptablePrice: 3320e12,
-        //         triggerPrice: 3420e6
-        //     }),
-        //     puppetList
-        // );
+        requestLogic.orderMirrorPosition{value: executionFee}(
+            PositionUtils.OrderMirrorPosition({
+                trader: trader,
+                market: Address.gmxEthUsdcMarket,
+                collateralToken: usdc,
+                isIncrease: true,
+                isLong: true,
+                executionFee: executionFee,
+                collateralDelta: 100e6,
+                sizeDelta: 1000e30,
+                acceptablePrice: 3320e12,
+                triggerPrice: 3420e6
+            }),
+            puppetList
+        );
     }
 
     function getGeneratePuppetList(

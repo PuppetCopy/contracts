@@ -2,10 +2,9 @@
 
 pragma solidity 0.8.24;
 
+import {Subaccount} from "../Subaccount.sol";
 import {Auth} from "./../../utils/access/Auth.sol";
 import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
-
-import {Subaccount} from "../Subaccount.sol";
 
 contract SubaccountStore is Auth {
     mapping(address => Subaccount) public subaccountMap;
@@ -20,12 +19,8 @@ contract SubaccountStore is Auth {
         return subaccountMap[_user];
     }
 
-    function setSubaccount(address _user) external auth returns (Subaccount) {
+    function createSubaccount(address _user) external returns (Subaccount) {
         return subaccountMap[_user] = new Subaccount(this, _user);
-    }
-
-    function removeSubaccount(address _user) external auth {
-        delete subaccountMap[_user];
     }
 
     function setOperator(address _operator) external auth {

@@ -12,45 +12,36 @@ import {PositionStore} from "./store/PositionStore.sol";
 
 contract ExecuteIncreasePositionLogic is CoreContract {
     struct Config {
-        PositionStore positionStore;
+        uint __;
     }
 
+    PositionStore positionStore;
     Config config;
 
     constructor(
         IAuthority _authority,
         EventEmitter _eventEmitter,
+        PositionStore _positionStore,
         Config memory _config
     ) CoreContract("ExecuteIncreasePositionLogic", "1", _authority, _eventEmitter) {
+        positionStore = _positionStore;
         _setConfig(_config);
     }
 
     function execute(bytes32 requestKey, GmxPositionUtils.Props memory order) external auth {
-        PositionStore.RequestAdjustment memory request = config.positionStore.getRequestAdjustment(requestKey);
-        PositionStore.MirrorPosition memory mirrorPosition = config.positionStore.getMirrorPosition(request.positionKey);
+        PositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
+        PositionStore.MirrorPosition memory mirrorPosition = positionStore.getMirrorPosition(request.positionKey);
 
-        if (mirrorPosition.size == 0) {
-            PositionStore.RequestMatch memory matchRequest = config.positionStore.getRequestMatch(request.positionKey);
-            mirrorPosition.trader = matchRequest.trader;
-            mirrorPosition.puppetList = matchRequest.puppetList;
-            mirrorPosition.collateralList = request.collateralDeltaList;
-
-            config.positionStore.removeRequestMatch(request.positionKey);
-        } else {
-            // fill mirror position collateralList list
-            for (uint i = 0; i < mirrorPosition.puppetList.length; i++) {
-                mirrorPosition.collateralList[i] += request.collateralDeltaList[i];
-            }
-        }
-
-        mirrorPosition.collateral += request.collateralDelta;
-        mirrorPosition.size += request.sizeDelta;
+        mirrorPosition.traderSize += request.traderSizeDelta;
+        mirrorPosition.traderCollateral += request.traderCollateralDelta;
+        mirrorPosition.puppetSize += request.puppetSizeDelta;
+        mirrorPosition.puppetCollateral += request.puppetCollateralDelta;
         mirrorPosition.cumulativeTransactionCost += request.transactionCost;
 
-        config.positionStore.setMirrorPosition(requestKey, mirrorPosition);
-        config.positionStore.removeRequestAdjustment(requestKey);
+        positionStore.removeRequestAdjustment(requestKey);
+        positionStore.setMirrorPosition(requestKey, mirrorPosition);
 
-        logEvent("execute()", abi.encode(requestKey, request.positionKey));
+        logEvent("execute", abi.encode(requestKey, mirrorPosition));
     }
 
     // governance

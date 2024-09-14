@@ -1,32 +1,31 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
-
 import {Router} from "./../../shared/Router.sol";
 import {BankStore} from "./../../shared/store/BankStore.sol";
+import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 import {GmxPositionUtils} from "./../utils/GmxPositionUtils.sol";
 
 contract PositionStore is BankStore {
-    struct RequestMatch {
-        address trader;
-        address[] puppetList;
-    }
-
     struct RequestAdjustment {
         bytes32 positionKey;
-        uint[] collateralDeltaList;
-        uint sizeDelta;
-        uint collateralDelta;
+        uint traderSizeDelta;
+        uint traderCollateralDelta;
+        uint puppetSizeDelta;
+        uint puppetCollateralDelta;
         uint transactionCost;
     }
 
     struct MirrorPosition {
+        // match
         address trader;
         address[] puppetList;
         uint[] collateralList;
-        uint size;
-        uint collateral;
+        // execution
+        uint puppetSize;
+        uint puppetCollateral;
+        uint traderSize;
+        uint traderCollateral;
         uint cumulativeTransactionCost;
     }
 
@@ -37,7 +36,6 @@ contract PositionStore is BankStore {
     }
 
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
-    mapping(bytes32 positionKey => RequestMatch) public requestMatchMap;
     mapping(bytes32 positionKey => MirrorPosition) public positionMap;
     mapping(bytes32 positionKey => UnhandledCallback) public unhandledCallbackMap;
 
@@ -53,18 +51,6 @@ contract PositionStore is BankStore {
 
     function removeRequestAdjustment(bytes32 _key) external auth {
         delete requestAdjustmentMap[_key];
-    }
-
-    function getRequestMatch(bytes32 _key) external view returns (RequestMatch memory) {
-        return requestMatchMap[_key];
-    }
-
-    function setRequestMatch(bytes32 _key, RequestMatch calldata _rm) external auth {
-        requestMatchMap[_key] = _rm;
-    }
-
-    function removeRequestMatch(bytes32 _key) external auth {
-        delete requestMatchMap[_key];
     }
 
     function removeRequestDecrease(bytes32 _key) external auth {
