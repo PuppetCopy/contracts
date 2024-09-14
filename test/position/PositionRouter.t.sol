@@ -20,11 +20,11 @@ import {PuppetLogic} from "src/puppet/PuppetLogic.sol";
 import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
 import {SubaccountStore} from "src/shared/store/SubaccountStore.sol";
 import {ContributeStore} from "src/tokenomics/store/ContributeStore.sol";
-import {IWNT} from "src/utils/interfaces/IWNT.sol";
 
 import {Address} from "script/Const.sol";
 
-import {BasicSetup} from "test/base/BasicSetup.t.sol";
+import {BasicSetup} from "../base/BasicSetup.t.sol";
+import {MockGmxExchangeRouter} from "../mock/MockGmxExchangeRouter.sol";
 
 contract PositionRouterTest is BasicSetup {
     uint arbitrumFork;
@@ -37,6 +37,7 @@ contract PositionRouterTest is BasicSetup {
     PositionRouter positionRouter;
     IGmxExchangeRouter gmxExchangeRouter;
     SubaccountStore subaccountStore;
+    MockGmxExchangeRouter mockGmxExchangeRouter;
 
     RequestPositionLogic requestLogic;
 
@@ -45,6 +46,7 @@ contract PositionRouterTest is BasicSetup {
     function setUp() public override {
         super.setUp();
 
+        mockGmxExchangeRouter = new MockGmxExchangeRouter();
         contributeStore = new ContributeStore(dictator, router);
 
         IERC20[] memory _tokenAllowanceCapList = new IERC20[](2);
@@ -84,18 +86,18 @@ contract PositionRouterTest is BasicSetup {
             puppetStore,
             positionStore,
             RequestPositionLogic.Config({
-                gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
+                gmxExchangeRouter: mockGmxExchangeRouter,
                 callbackHandler: address(positionRouter),
                 gmxOrderReciever: address(positionStore),
                 gmxOrderVault: Address.gmxOrderVault,
                 referralCode: Address.referralCode,
                 callbackGasLimit: 2_000_000,
                 limitPuppetList: 60,
-                minimumMatchAmount: 100e30,
-                tokenTransferGasLimit: 200_000
+                minimumMatchAmount: 100e30
             })
         );
         dictator.setAccess(puppetStore, address(requestLogic));
+        dictator.setAccess(positionStore, address(requestLogic));
 
         allowNextLoggerAccess();
         ExecuteIncreasePositionLogic executeIncrease = new ExecuteIncreasePositionLogic(
@@ -146,9 +148,6 @@ contract PositionRouterTest is BasicSetup {
         uint executionFee = tx.gasprice * estimatedGasLimit;
 
         address[] memory puppetList = getGeneratePuppetList(usdc, trader, 60);
-
-        // gmxOracle.getStablePrice(Address.gmxDatastore, address(usdc));
-        // gmxOracle.getStablePrice(Address.gmxDatastore, Address.wnt);
 
         // vm.startPrank(trader);
         vm.startPrank(users.owner);

@@ -36,7 +36,7 @@ contract PuppetLogic is CoreContract {
 
         uint balance = store.increaseBalance(token, user, amount);
 
-        logEvent("deposit()", abi.encode(token, user, balance));
+        logEvent("deposit", abi.encode(token, user, balance));
     }
 
     function withdraw(IERC20 token, address user, address receiver, uint amount) external auth {
@@ -46,7 +46,7 @@ contract PuppetLogic is CoreContract {
 
         uint balance = store.decreaseBalance(token, user, receiver, amount);
 
-        logEvent("withdraw()", abi.encode(token, user, balance));
+        logEvent("withdraw", abi.encode(token, user, balance));
     }
 
     function setRule(

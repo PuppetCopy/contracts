@@ -41,7 +41,17 @@ contract ExecuteIncreasePositionLogic is CoreContract {
         positionStore.removeRequestAdjustment(requestKey);
         positionStore.setMirrorPosition(requestKey, mirrorPosition);
 
-        logEvent("execute", abi.encode(requestKey, mirrorPosition));
+        logEvent(
+            "execute",
+            abi.encode(
+                requestKey,
+                mirrorPosition.traderSize,
+                mirrorPosition.traderCollateral,
+                mirrorPosition.puppetSize,
+                mirrorPosition.puppetCollateral,
+                mirrorPosition.cumulativeTransactionCost
+            )
+        );
     }
 
     // governance

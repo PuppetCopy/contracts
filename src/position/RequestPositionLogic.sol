@@ -27,7 +27,6 @@ contract RequestPositionLogic is CoreContract {
         uint callbackGasLimit;
         uint limitPuppetList;
         uint minimumMatchAmount;
-        uint tokenTransferGasLimit;
     }
 
     SubaccountStore subaccountStore;
@@ -137,11 +136,13 @@ contract RequestPositionLogic is CoreContract {
         (PuppetStore.Rule[] memory ruleList, uint[] memory activityList, uint[] memory balanceList) =
             puppetStore.getBalanceAndActivityList(order.collateralToken, order.trader, mirrorPosition.puppetList);
 
-        if (mirrorPosition.puppetList.length > config.limitPuppetList) {
+        uint puppetListLength = mirrorPosition.puppetList.length;
+
+        if (puppetListLength > config.limitPuppetList) {
             revert RequestPositionLogic__PuppetListLimitExceeded();
         }
 
-        for (uint i = 0; i < mirrorPosition.puppetList.length; i++) {
+        for (uint i = 0; i < puppetListLength; i++) {
             // validate that puppet list calldata is sorted and has no duplicates
             if (i > 0) {
                 if (mirrorPosition.puppetList[i - 1] > mirrorPosition.puppetList[i]) {

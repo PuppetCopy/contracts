@@ -22,10 +22,10 @@ contract PositionStore is BankStore {
         address[] puppetList;
         uint[] collateralList;
         // execution
-        uint puppetSize;
-        uint puppetCollateral;
         uint traderSize;
         uint traderCollateral;
+        uint puppetSize;
+        uint puppetCollateral;
         uint cumulativeTransactionCost;
     }
 

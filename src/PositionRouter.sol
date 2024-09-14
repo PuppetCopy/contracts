@@ -112,7 +112,7 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         bytes calldata eventData
     ) internal auth {
         positionStore.setUnhandledCallback(status, order, key, eventData);
-        logEvent("storeUnhandledCallback()", abi.encode(status, key, order, eventData));
+        logEvent("storeUnhandledCallback", abi.encode(status, key, order, eventData));
     }
 
     error PositionRouter__InvalidOrderType(GmxPositionUtils.OrderType orderType);

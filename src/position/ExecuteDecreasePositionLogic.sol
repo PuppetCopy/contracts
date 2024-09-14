@@ -109,18 +109,10 @@ contract ExecuteDecreasePositionLogic is CoreContract {
         puppetStore.increaseBalanceList(outputToken, address(this), mirrorPosition.puppetList, outputAmountList);
 
         if (callParams.profit > 0) {
-            contributeStore.contributeMany(
-                outputToken, //
-                address(this),
-                mirrorPosition.puppetList,
-                contributionList
-            );
+            contributeStore.contributeMany(outputToken, address(this), mirrorPosition.puppetList, contributionList);
 
             contributeStore.contribute(
-                outputToken, //
-                address(this),
-                mirrorPosition.trader,
-                callParams.traderPerformanceCutoffFee
+                outputToken, address(this), mirrorPosition.trader, callParams.traderPerformanceCutoffFee
             );
         }
 
@@ -136,7 +128,11 @@ contract ExecuteDecreasePositionLogic is CoreContract {
         logEvent(
             "execute",
             abi.encode(
-                mirrorPosition,
+                mirrorPosition.traderSize,
+                mirrorPosition.traderCollateral,
+                mirrorPosition.puppetSize,
+                mirrorPosition.puppetCollateral,
+                mirrorPosition.cumulativeTransactionCost,
                 callParams.totalAmountIn,
                 callParams.profit,
                 callParams.totalPerformanceFee,

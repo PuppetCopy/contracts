@@ -13,13 +13,11 @@ import {ContributeStore} from "src/tokenomics/store/ContributeStore.sol";
 import {RewardStore} from "src/tokenomics/store/RewardStore.sol";
 import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
-import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 
 contract RewardRouterTest is BasicSetup {
     uint constant MAXTIME = 106 weeks; // about 2 years
 
     VotingEscrowLogic veLogic;
-    MockWeightedPoolVault primaryVaultPool;
     RewardStore rewardStore;
     ContributeStore contributeStore;
     RewardLogic rewardLogic;
