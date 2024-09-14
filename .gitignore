@@ -13,3 +13,8 @@ forge-artifacts
 forge-artifacts-dev
 forge-cache
 forge-cache-dev
+
+Local files/
+out/
+yarn.lock
+cache/

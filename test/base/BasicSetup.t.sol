@@ -58,6 +58,7 @@ contract BasicSetup is Test {
         vPuppetToken = new PuppetVoteToken(dictator);
 
         skip(1 hours);
+
     }
 
     function getNextContractAddress() internal view returns (address) {
