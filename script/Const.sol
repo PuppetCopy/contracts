@@ -18,18 +18,17 @@ library Address {
 
     address constant VotingEscrowLogic = 0xA9233Fb481b6790199F39AE501B05d623Fa85A86;
     address constant ContributeLogic = 0x2C78298cd4a7A2312547c94D6F9AABBB8c709A95;
-    address constant RewardLogic = 0x41b93E8265a963089579A944B77d78BF37dBac42;
+    address constant RewardLogic = 0xf560b1f2dE1eb62e93FBA01Ee13578AACB8Fcd52;
 
     address constant RewardRouter = 0x8192468Ab9852391734fA4862581Bb8D96168CE3;
 
     address constant BasePool = 0x19da41A2ccd0792b9b674777E72447903FE29074;
 
+    address constant permit2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
     address constant nt = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     address constant wnt = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
     address constant usdc = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831;
     address constant dai = 0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1;
-
-    address constant datastore = 0x75236b405F460245999F70bc06978AB2B4116920;
 
     address constant gmxExchangeRouter = 0x7C68C7866A64FA2160F78EEaE12217FFbf871fa8;
     address constant gmxRouter = 0x7452c558d45f8afC8c83dAe62C3f8A5BE19c71f6;

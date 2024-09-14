@@ -110,7 +110,7 @@ contract RewardLogic is CoreContract {
 
         store.setLastDistributionTimestamp(block.timestamp);
 
-        if (emission == 0) return store.cumulativeRewardPerToken();
+        if (emission == 0 || supply == 0) return store.cumulativeRewardPerToken();
 
         store.interIn(config.distributionStore, rewardToken, emission);
 

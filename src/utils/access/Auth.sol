@@ -6,7 +6,7 @@ import {IAuthority} from "./../interfaces/IAuthority.sol";
 abstract contract Auth {
     IAuthority public immutable authority;
 
-    mapping(address => bool) public authMap;
+    mapping(address => bool) internal authMap;
 
     function canCall(address user) public view returns (bool) {
         return authMap[user];

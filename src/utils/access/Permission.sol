@@ -6,7 +6,7 @@ import {IAuthority} from "./../interfaces/IAuthority.sol";
 abstract contract Permission {
     IAuthority public immutable authority;
 
-    mapping(bytes4 signatureHash => mapping(address => bool)) public permissionMap;
+    mapping(bytes4 signatureHash => mapping(address => bool)) internal permissionMap;
 
     function canCall(bytes4 signatureHash, address user) public view returns (bool) {
         return permissionMap[signatureHash][user];

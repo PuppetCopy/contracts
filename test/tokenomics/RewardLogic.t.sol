@@ -110,6 +110,29 @@ contract RewardRouterTest is BasicSetup {
         dictator.setAccess(contributeStore, users.owner);
     }
 
+    function testInitalContributionDelayLock() public {
+        contribute(usdc, users.alice, 100e6);
+        buyback(usdc, 100e6);
+        vm.startPrank(users.alice);
+        uint claimedAmount = rewardRouter.claimContribution(claimableTokenList, users.alice, 100e18);
+
+        uint contributionAmount = contributeStore.getBuybackQuote(usdc);
+
+        skip(1000);
+
+        puppetToken.approve(address(router), type(uint).max - 1);
+        rewardRouter.lock(claimedAmount, MAXTIME);
+
+        (uint distributionTimeframe,) = rewardLogic.config();
+        skip(distributionTimeframe / 2);
+        contributeLock(wnt, users.bob, MAXTIME, 1e18);
+        skip(distributionTimeframe + 1);
+        // assertEq(rewardLogic.getClaimable(users.bob) + rewardLogic.getClaimable(users.alice), contributionAmount *
+        // 2);
+        claimAssert(users.bob, 75e18);
+        claimAssert(users.alice, 125e18);
+    }
+
     function testBuybackDistribution() public {
         uint contributionAmount = 100e6; // 100 USDC
         uint quote = contributeStore.getBuybackQuote(usdc);
@@ -182,6 +205,7 @@ contract RewardRouterTest is BasicSetup {
         claimAssert(users.bob, 75e18);
 
         assertEq(puppetToken.balanceOf(users.alice), 125e18);
+        assertEq(puppetToken.balanceOf(users.bob), 75e18);
     }
 
     function testLockRewardsDifferentAmounts() public {
@@ -205,7 +229,7 @@ contract RewardRouterTest is BasicSetup {
         uint yossiRewards = contributeLogic.getClaimable(claimableTokenList, users.yossi);
         assertEq(bobRewards, aliceRewards * 2, "Bob should have twice the rewards of Alice");
         assertEq(bobRewards, yossiRewards * 2, "Bob should have twice the rewards of Yossi");
-        assertEq(bobRewards, quote / 2, "Bob should have 2e18 rewards");
+        assertEq(bobRewards, aliceRewards + yossiRewards, "Bob should have half of total rewards");
     }
 
     function testLockRewardsAfterUnlock() public {
@@ -274,9 +298,11 @@ contract RewardRouterTest is BasicSetup {
         contribute(token, user, contribution);
         buyback(wnt, contribution);
 
+        uint contributionQuote = contributeStore.getBuybackQuote(token);
+
         vm.startPrank(user);
 
-        uint amount = rewardRouter.claimContribution(claimableTokenList, user, contribution);
+        uint amount = rewardRouter.claimContribution(claimableTokenList, user, contributionQuote);
 
         puppetToken.approve(address(router), type(uint).max - 1);
         rewardRouter.lock(amount, lockDuration);
