@@ -5,8 +5,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {PositionRouter} from "src/PositionRouter.sol";
 import {PuppetRouter} from "src/PuppetRouter.sol";
-import {RewardRouter} from "src/RewardRouter.sol";
-
 import {ExecuteDecreasePositionLogic} from "src/position/ExecuteDecreasePositionLogic.sol";
 import {ExecuteIncreasePositionLogic} from "src/position/ExecuteIncreasePositionLogic.sol";
 import {ExecuteRevertedAdjustmentLogic} from "src/position/ExecuteRevertedAdjustmentLogic.sol";
@@ -19,18 +17,15 @@ import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
 import {Dictator} from "src/shared/Dictator.sol";
 import {Router} from "src/shared/Router.sol";
 import {Router} from "src/shared/Router.sol";
-import {ContributeLogic} from "src/tokenomics/ContributeLogic.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
-import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
-import {VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
 import {ContributeStore} from "src/tokenomics/store/ContributeStore.sol";
 import {EventEmitter} from "src/utils/EventEmitter.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
 import {Address} from "./Const.sol";
 
-contract DeployTokenomics is BaseScript {
+contract DeployTrading is BaseScript {
     Dictator dictator = Dictator(Address.Dictator);
     EventEmitter eventEmitter = EventEmitter(Address.EventEmitter);
     PuppetToken puppetToken = PuppetToken(Address.PuppetToken);
@@ -41,7 +36,7 @@ contract DeployTokenomics is BaseScript {
         vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
         // deployImmutables();
 
-        deployPuppetLogic();
+        // deployPuppetLogic();
         deployPositionLogic();
 
         vm.stopBroadcast();
@@ -153,30 +148,5 @@ contract DeployTokenomics is BaseScript {
             })
         );
         dictator.setPermission(requestIncreaseLogic, requestIncreaseLogic.orderMirrorPosition.selector, Address.dao);
-    }
-
-    function deployRewardRouter(
-        ContributeLogic contributeLogic,
-        RewardLogic rewardLogic,
-        VotingEscrowLogic veLogic
-    ) internal returns (RewardRouter rewardRouter) {
-        dictator.setAccess(eventEmitter, getNextCreateAddress());
-        rewardRouter = new RewardRouter(
-            dictator,
-            eventEmitter,
-            RewardRouter.Config({contributeLogic: contributeLogic, rewardLogic: rewardLogic, veLogic: veLogic})
-        );
-        dictator.setPermission(rewardRouter, rewardRouter.setConfig.selector, Address.dao);
-
-        dictator.setPermission(contributeLogic, contributeLogic.buyback.selector, address(rewardRouter));
-        dictator.setPermission(contributeLogic, contributeLogic.claim.selector, address(rewardRouter));
-
-        dictator.setPermission(veLogic, veLogic.lock.selector, address(rewardRouter));
-        dictator.setPermission(veLogic, veLogic.vest.selector, address(rewardRouter));
-        dictator.setPermission(veLogic, veLogic.claim.selector, address(rewardRouter));
-
-        dictator.setPermission(rewardLogic, rewardLogic.claim.selector, address(rewardRouter));
-        dictator.setPermission(rewardLogic, rewardLogic.userDistribute.selector, address(rewardRouter));
-        dictator.setPermission(rewardLogic, rewardLogic.distribute.selector, address(rewardRouter));
     }
 }

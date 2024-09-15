@@ -26,8 +26,6 @@ import {BasicSetup} from "../base/BasicSetup.t.sol";
 import {MockGmxExchangeRouter} from "../mock/MockGmxExchangeRouter.sol";
 
 contract TradingTest is BasicSetup {
-    uint arbitrumFork;
-
     PuppetStore puppetStore;
     PuppetLogic puppetLogic;
     PositionStore positionStore;
@@ -55,6 +53,38 @@ contract TradingTest is BasicSetup {
         puppetLogic = new PuppetLogic(dictator, eventEmitter, puppetStore);
         dictator.setAccess(eventEmitter, address(puppetLogic));
         dictator.setAccess(puppetStore, address(puppetLogic));
+
+        positionRouter = new PositionRouter(dictator, eventEmitter, positionStore);
+        dictator.setAccess(eventEmitter, address(positionRouter));
+
+        puppetRouter = new PuppetRouter(dictator, eventEmitter);
+        dictator.setAccess(eventEmitter, address(puppetRouter));
+
+        dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.setRule.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.setRuleList.selector, address(puppetRouter));
+
+        requestLogic = new RequestPositionLogic(dictator, eventEmitter, puppetStore, positionStore);
+        dictator.setAccess(eventEmitter, address(requestLogic));
+        dictator.setAccess(puppetStore, address(requestLogic));
+        dictator.setAccess(positionStore, address(requestLogic));
+
+        ExecuteIncreasePositionLogic executeIncreaseLogic =
+            new ExecuteIncreasePositionLogic(dictator, eventEmitter, positionStore);
+        dictator.setAccess(eventEmitter, address(executeIncreaseLogic));
+        dictator.setAccess(positionStore, address(executeIncreaseLogic));
+        ExecuteDecreasePositionLogic executeDecreaseLogic =
+            new ExecuteDecreasePositionLogic(dictator, eventEmitter, contributeStore, puppetStore, positionStore);
+        dictator.setAccess(eventEmitter, address(executeDecreaseLogic));
+        dictator.setAccess(positionStore, address(executeDecreaseLogic));
+        dictator.setAccess(contributeStore, address(executeDecreaseLogic));
+
+        ExecuteRevertedAdjustmentLogic executeRevertedAdjustment =
+            new ExecuteRevertedAdjustmentLogic(dictator, eventEmitter);
+        dictator.setAccess(eventEmitter, address(executeRevertedAdjustment));
+
+        // config
+
         dictator.setPermission(puppetLogic, puppetLogic.setConfig.selector, users.owner);
         IERC20[] memory tokenAllowanceCapList = new IERC20[](2);
         tokenAllowanceCapList[0] = wnt;
@@ -72,17 +102,6 @@ contract TradingTest is BasicSetup {
             })
         );
 
-        puppetRouter = new PuppetRouter(dictator, eventEmitter);
-        dictator.setAccess(eventEmitter, address(puppetRouter));
-        dictator.setPermission(puppetRouter, puppetRouter.setConfig.selector, users.owner);
-        puppetRouter.setConfig(PuppetRouter.Config({logic: puppetLogic}));
-
-        dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
-        dictator.setPermission(puppetLogic, puppetLogic.setRule.selector, address(puppetRouter));
-        dictator.setPermission(puppetLogic, puppetLogic.setRuleList.selector, address(puppetRouter));
-
-        requestLogic = new RequestPositionLogic(dictator, eventEmitter, puppetStore, positionStore);
-        dictator.setAccess(eventEmitter, address(requestLogic));
         dictator.setPermission(requestLogic, requestLogic.setConfig.selector, users.owner);
         requestLogic.setConfig(
             RequestPositionLogic.Config({
@@ -96,18 +115,7 @@ contract TradingTest is BasicSetup {
                 minimumMatchAmount: 100e30
             })
         );
-        dictator.setAccess(puppetStore, address(requestLogic));
-        dictator.setAccess(positionStore, address(requestLogic));
 
-        ExecuteIncreasePositionLogic executeIncreaseLogic =
-            new ExecuteIncreasePositionLogic(dictator, eventEmitter, positionStore);
-        dictator.setAccess(eventEmitter, address(executeIncreaseLogic));
-        dictator.setAccess(positionStore, address(executeIncreaseLogic));
-        ExecuteDecreasePositionLogic executeDecreaseLogic =
-            new ExecuteDecreasePositionLogic(dictator, eventEmitter, contributeStore, puppetStore, positionStore);
-        dictator.setAccess(eventEmitter, address(executeDecreaseLogic));
-        dictator.setAccess(positionStore, address(executeDecreaseLogic));
-        dictator.setAccess(contributeStore, address(executeDecreaseLogic));
         dictator.setPermission(executeDecreaseLogic, executeDecreaseLogic.setConfig.selector, users.owner);
         executeDecreaseLogic.setConfig(
             ExecuteDecreasePositionLogic.Config({
@@ -117,12 +125,9 @@ contract TradingTest is BasicSetup {
             })
         );
 
-        ExecuteRevertedAdjustmentLogic executeRevertedAdjustment =
-            new ExecuteRevertedAdjustmentLogic(dictator, eventEmitter);
-        dictator.setAccess(eventEmitter, address(executeRevertedAdjustment));
+        dictator.setPermission(puppetRouter, puppetRouter.setConfig.selector, users.owner);
+        puppetRouter.setConfig(PuppetRouter.Config({logic: puppetLogic}));
 
-        positionRouter = new PositionRouter(dictator, eventEmitter, positionStore);
-        dictator.setAccess(eventEmitter, address(positionRouter));
         dictator.setPermission(positionRouter, positionRouter.setConfig.selector, users.owner);
         positionRouter.setConfig(
             PositionRouter.Config({
@@ -150,7 +155,7 @@ contract TradingTest is BasicSetup {
         vm.startPrank(users.owner);
 
         requestLogic.orderMirrorPosition{value: executionFee}(
-            PositionUtils.OrderMirrorPosition({
+            RequestPositionLogic.OrderMirrorPosition({
                 trader: trader,
                 market: Address.gmxEthUsdcMarket,
                 collateralToken: usdc,

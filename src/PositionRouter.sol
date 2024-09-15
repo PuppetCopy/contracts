@@ -7,6 +7,7 @@ import {ExecuteRevertedAdjustmentLogic} from "./position/ExecuteRevertedAdjustme
 import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
 import {PositionStore} from "./position/store/PositionStore.sol";
 import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
+import {Error} from "./shared/Error.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
 import {EventEmitter} from "./utils/EventEmitter.sol";
 import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
@@ -46,7 +47,7 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
                 storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.ExecutedDecrease, order, key, eventData);
             }
         } else {
-            revert PositionRouter__InvalidOrderType(order.numbers.orderType);
+            revert Error.PositionRouter__InvalidOrderType(order.numbers.orderType);
         }
     }
 
@@ -106,7 +107,4 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         positionStore.setUnhandledCallback(status, order, key, eventData);
         logEvent("storeUnhandledCallback", abi.encode(status, key, order, eventData));
     }
-
-    error PositionRouter__InvalidOrderType(GmxPositionUtils.OrderType orderType);
-    error PositionRouter__SenderNotMatchingTrader();
 }

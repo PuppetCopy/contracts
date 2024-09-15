@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {PuppetStore} from "../puppet/store/PuppetStore.sol";
+import {Error} from "../shared/Error.sol";
 import {ContributeStore} from "../tokenomics/store/ContributeStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
@@ -55,7 +56,7 @@ contract ExecuteDecreasePositionLogic is CoreContract {
 
         // Check if there is at least one uint item available
         if (eventLogData.uintItems.items.length == 0 && eventLogData.uintItems.arrayItems.length == 0) {
-            revert ExecuteDecreasePositionLogic__UnexpectedEventData();
+            revert Error.ExecuteDecreasePositionLogic__UnexpectedEventData();
         }
 
         PositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
@@ -69,7 +70,7 @@ contract ExecuteDecreasePositionLogic is CoreContract {
         });
 
         if (mirrorPosition.traderSize == 0) {
-            revert ExecuteDecreasePositionLogic__InvalidRequest(request.positionKey, requestKey);
+            revert Error.ExecuteDecreasePositionLogic__InvalidRequest(request.positionKey, requestKey);
         }
 
         if (callParams.totalAmountIn > order.numbers.initialCollateralDeltaAmount) {
@@ -160,7 +161,4 @@ contract ExecuteDecreasePositionLogic is CoreContract {
 
         logEvent("setConfig", abi.encode(_config));
     }
-
-    error ExecuteDecreasePositionLogic__InvalidRequest(bytes32 positionKey, bytes32 key);
-    error ExecuteDecreasePositionLogic__UnexpectedEventData();
 }

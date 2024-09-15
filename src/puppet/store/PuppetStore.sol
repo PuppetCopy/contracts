@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {PositionUtils} from "../../position/utils/PositionUtils.sol";
+import {Error} from "../../shared/Error.sol";
 import {Router} from "./../../shared/Router.sol";
 import {BankStore} from "./../../shared/store/BankStore.sol";
 import {Auth} from "./../../utils/access/Auth.sol";
@@ -59,7 +60,7 @@ contract PuppetStore is BankStore {
         uint _accountListLength = _accountList.length;
         uint totalAmountIn;
 
-        if (_accountListLength != _valueList.length) revert PuppetStore__InvalidLength();
+        if (_accountListLength != _valueList.length) revert Error.PuppetStore__InvalidLength();
 
         for (uint i = 0; i < _accountListLength; i++) {
             userBalanceMap[_token][_accountList[i]] += _valueList[i];
@@ -94,7 +95,7 @@ contract PuppetStore is BankStore {
         uint _accountListLength = _accountList.length;
         uint totalAmountOut;
 
-        if (_accountListLength != _valueList.length) revert PuppetStore__InvalidLength();
+        if (_accountListLength != _valueList.length) revert Error.PuppetStore__InvalidLength();
 
         for (uint i = 0; i < _accountListLength; i++) {
             userBalanceMap[_token][_accountList[i]] -= _valueList[i];
@@ -117,7 +118,7 @@ contract PuppetStore is BankStore {
         uint _keyListLength = _keyList.length;
         uint _ruleLength = _rules.length;
 
-        if (_keyListLength != _ruleLength) revert PuppetStore__InvalidLength();
+        if (_keyListLength != _ruleLength) revert Error.PuppetStore__InvalidLength();
 
         for (uint i = 0; i < _keyListLength; i++) {
             ruleMap[_keyList[i]] = _rules[i];
@@ -143,7 +144,7 @@ contract PuppetStore is BankStore {
     ) external auth {
         uint _puppetListLength = puppetList.length;
 
-        if (_puppetListLength != _timeList.length) revert PuppetStore__InvalidLength();
+        if (_puppetListLength != _timeList.length) revert Error.PuppetStore__InvalidLength();
 
         for (uint i = 0; i < _puppetListLength; i++) {
             fundingActivityMap[trader][puppetList[i]] = _timeList[i];
@@ -188,7 +189,7 @@ contract PuppetStore is BankStore {
         uint _puppetListLength = _puppetList.length;
         uint totalAmountOut;
 
-        if (_puppetListLength != _valueList.length) revert PuppetStore__InvalidLength();
+        if (_puppetListLength != _valueList.length) revert Error.PuppetStore__InvalidLength();
 
         for (uint i = 0; i < _puppetListLength; i++) {
             uint _amount = _valueList[i];
@@ -203,6 +204,4 @@ contract PuppetStore is BankStore {
 
         transferOut(_token, _receiver, totalAmountOut);
     }
-
-    error PuppetStore__InvalidLength();
 }

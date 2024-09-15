@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {PuppetStore} from "./../puppet/store/PuppetStore.sol";
+import {Error} from "./../shared/Error.sol";
 import {Subaccount} from "./../shared/Subaccount.sol";
 import {ErrorUtils} from "./../utils/ErrorUtils.sol";
 import {Precision} from "./../utils/Precision.sol";
@@ -14,7 +16,6 @@ import {IGmxDatastore} from "./interface/IGmxDataStore.sol";
 import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
 import {PositionStore} from "./store/PositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
-import {PositionUtils} from "./utils/PositionUtils.sol";
 
 contract RequestPositionLogic is CoreContract {
     struct Config {
@@ -26,6 +27,19 @@ contract RequestPositionLogic is CoreContract {
         uint callbackGasLimit;
         uint limitPuppetList;
         uint minimumMatchAmount;
+    }
+
+    struct OrderMirrorPosition {
+        address trader;
+        address market;
+        IERC20 collateralToken;
+        bool isIncrease;
+        bool isLong;
+        uint executionFee;
+        uint collateralDelta;
+        uint sizeDelta;
+        uint acceptablePrice;
+        uint triggerPrice;
     }
 
     PuppetStore puppetStore;
@@ -45,7 +59,7 @@ contract RequestPositionLogic is CoreContract {
     function submitOrder(
         Subaccount subaccount,
         PositionStore.RequestAdjustment memory request,
-        PositionUtils.OrderMirrorPosition calldata order,
+        OrderMirrorPosition calldata order,
         GmxPositionUtils.OrderType orderType
     ) internal returns (bytes32 requestKey) {
         (bool orderSuccess, bytes memory orderReturnData) = subaccount.execute(
@@ -90,7 +104,7 @@ contract RequestPositionLogic is CoreContract {
 
     function adjust(
         PositionStore.MirrorPosition memory mirrorPosition,
-        PositionUtils.OrderMirrorPosition calldata order,
+        OrderMirrorPosition calldata order,
         PositionStore.RequestAdjustment memory request,
         Subaccount subaccount
     ) internal returns (bytes32 requestKey) {
@@ -122,7 +136,7 @@ contract RequestPositionLogic is CoreContract {
 
     function matchUp(
         PositionStore.MirrorPosition memory mirrorPosition,
-        PositionUtils.OrderMirrorPosition calldata order,
+        OrderMirrorPosition calldata order,
         PositionStore.RequestAdjustment memory request,
         Subaccount subaccount
     ) internal returns (bytes32 requestKey) {
@@ -132,17 +146,17 @@ contract RequestPositionLogic is CoreContract {
         uint puppetListLength = mirrorPosition.puppetList.length;
 
         if (puppetListLength > config.limitPuppetList) {
-            revert RequestPositionLogic__PuppetListLimitExceeded();
+            revert Error.RequestPositionLogic__PuppetListLimitExceeded();
         }
 
         for (uint i = 0; i < puppetListLength; i++) {
             // validate that puppet list calldata is sorted and has no duplicates
             if (i > 0) {
                 if (mirrorPosition.puppetList[i - 1] > mirrorPosition.puppetList[i]) {
-                    revert RequestPositionLogic__UnsortedPuppetList();
+                    revert Error.RequestPositionLogic__UnsortedPuppetList();
                 }
                 if (mirrorPosition.puppetList[i - 1] == mirrorPosition.puppetList[i]) {
-                    revert RequestPositionLogic__DuplicatesInPuppetList();
+                    revert Error.RequestPositionLogic__DuplicatesInPuppetList();
                 }
             }
 
@@ -188,7 +202,7 @@ contract RequestPositionLogic is CoreContract {
     }
 
     function orderMirrorPosition(
-        PositionUtils.OrderMirrorPosition calldata order,
+        OrderMirrorPosition calldata order,
         address[] calldata puppetList
     ) external payable auth returns (bytes32) {
         uint startGas = gasleft();
@@ -211,7 +225,7 @@ contract RequestPositionLogic is CoreContract {
 
         if (mirrorPosition.puppetSize == 0) {
             if (mirrorPosition.trader != address(0)) {
-                revert RequestPositionLogic__PendingRequestMatch();
+                revert Error.RequestPositionLogic__PendingRequestMatch();
             }
 
             mirrorPosition.trader = order.trader;
@@ -232,9 +246,4 @@ contract RequestPositionLogic is CoreContract {
         config = _config;
         logEvent("setConfig", abi.encode(_config));
     }
-
-    error RequestPositionLogic__PuppetListLimitExceeded();
-    error RequestPositionLogic__PendingRequestMatch();
-    error RequestPositionLogic__UnsortedPuppetList();
-    error RequestPositionLogic__DuplicatesInPuppetList();
 }

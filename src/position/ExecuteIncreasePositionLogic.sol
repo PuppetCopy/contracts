@@ -3,12 +3,12 @@ pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {Error} from "../shared/Error.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
-
 import {PositionStore} from "./store/PositionStore.sol";
+import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
 contract ExecuteIncreasePositionLogic is CoreContract {
     PositionStore positionStore;
@@ -46,6 +46,4 @@ contract ExecuteIncreasePositionLogic is CoreContract {
             )
         );
     }
-
-    error ExecuteIncreasePositionLogic__UnauthorizedCaller();
 }
