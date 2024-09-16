@@ -110,12 +110,12 @@ library GmxPositionUtils {
     }
 
     function getPositionKey(
-        Subaccount subaccount,
+        address account,
         address market,
         IERC20 collateralToken,
         bool isLong
     ) internal pure returns (bytes32) {
-        return keccak256(abi.encode(subaccount, market, collateralToken, isLong));
+        return keccak256(abi.encode(account, market, collateralToken, isLong));
     }
 
     function getCurrentNonce(IGmxDatastore dataStore) internal view returns (uint) {

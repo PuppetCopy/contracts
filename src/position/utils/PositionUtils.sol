@@ -7,4 +7,8 @@ library PositionUtils {
     function getRuleKey(IERC20 token, address puppet, address trader) internal pure returns (bytes32) {
         return keccak256(abi.encode(token, puppet, trader));
     }
+
+    function getAllocationKey(IERC20 token, address trader) internal pure returns (bytes32) {
+        return keccak256(abi.encode(token, trader));
+    }
 }

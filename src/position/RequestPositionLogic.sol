@@ -14,14 +14,15 @@ import {ErrorUtils} from "./../utils/ErrorUtils.sol";
 import {Precision} from "./../utils/Precision.sol";
 import {IGmxDatastore} from "./interface/IGmxDataStore.sol";
 import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
-import {PositionStore} from "./store/PositionStore.sol";
+import {MirrorPositionStore} from "./store/MirrorPositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
+import {PositionUtils} from "./utils/PositionUtils.sol";
 
 contract RequestPositionLogic is CoreContract {
     struct Config {
         IGmxExchangeRouter gmxExchangeRouter;
         address callbackHandler;
-        address gmxOrderReciever;
+        address gmxFundsReciever;
         address gmxOrderVault;
         bytes32 referralCode;
         uint callbackGasLimit;
@@ -30,6 +31,7 @@ contract RequestPositionLogic is CoreContract {
     }
 
     struct OrderMirrorPosition {
+        address[] puppetList;
         address trader;
         address market;
         IERC20 collateralToken;
@@ -43,24 +45,24 @@ contract RequestPositionLogic is CoreContract {
     }
 
     PuppetStore puppetStore;
-    PositionStore positionStore;
+    MirrorPositionStore positionStore;
     Config config;
 
     constructor(
         IAuthority _authority,
         EventEmitter _eventEmitter,
         PuppetStore _puppetStore,
-        PositionStore _positionStore
+        MirrorPositionStore _positionStore
     ) CoreContract("RequestPositionLogic", "1", _authority, _eventEmitter) {
         puppetStore = _puppetStore;
         positionStore = _positionStore;
     }
 
     function submitOrder(
-        Subaccount subaccount,
-        PositionStore.RequestAdjustment memory request,
         OrderMirrorPosition calldata order,
-        GmxPositionUtils.OrderType orderType
+        Subaccount subaccount,
+        GmxPositionUtils.OrderType orderType,
+        MirrorPositionStore.RequestAdjustment memory request
     ) internal returns (bytes32 requestKey) {
         (bool orderSuccess, bytes memory orderReturnData) = subaccount.execute(
             address(config.gmxExchangeRouter),
@@ -68,7 +70,7 @@ contract RequestPositionLogic is CoreContract {
                 config.gmxExchangeRouter.createOrder.selector,
                 GmxPositionUtils.CreateOrderParams({
                     addresses: GmxPositionUtils.CreateOrderParamsAddresses({
-                        receiver: config.gmxOrderReciever,
+                        receiver: config.gmxFundsReciever,
                         callbackContract: config.callbackHandler,
                         uiFeeReceiver: address(0),
                         market: order.market,
@@ -103,10 +105,9 @@ contract RequestPositionLogic is CoreContract {
     }
 
     function adjust(
-        PositionStore.MirrorPosition memory mirrorPosition,
         OrderMirrorPosition calldata order,
-        PositionStore.RequestAdjustment memory request,
-        Subaccount subaccount
+        MirrorPositionStore.Position memory mirrorPosition,
+        MirrorPositionStore.RequestAdjustment memory request
     ) internal returns (bytes32 requestKey) {
         uint leverage = Precision.toBasisPoints(mirrorPosition.traderSize, mirrorPosition.traderCollateral);
         uint targetLeverage = order.isIncrease
@@ -123,27 +124,35 @@ contract RequestPositionLogic is CoreContract {
             uint deltaLeverage = targetLeverage - leverage;
             request.puppetSizeDelta = mirrorPosition.traderSize * deltaLeverage / targetLeverage;
 
-            requestKey = submitOrder(subaccount, request, order, GmxPositionUtils.OrderType.MarketIncrease);
-            logEvent("increase", abi.encode(order.trader, requestKey, request));
+            requestKey = submitOrder(order, request.subaccount, GmxPositionUtils.OrderType.MarketIncrease, request);
+            logEvent(
+                "requestIncrease",
+                abi.encode(order.trader, requestKey, request.positionKey, targetLeverage, request.puppetSizeDelta)
+            );
         } else {
             uint deltaLeverage = leverage - targetLeverage;
             request.puppetSizeDelta = mirrorPosition.traderSize * deltaLeverage / leverage;
 
-            requestKey = submitOrder(subaccount, request, order, GmxPositionUtils.OrderType.MarketDecrease);
-            logEvent("decrease", abi.encode(order.trader, requestKey, request));
+            requestKey = submitOrder(order, request.subaccount, GmxPositionUtils.OrderType.MarketDecrease, request);
+            logEvent(
+                "requestDecrease",
+                abi.encode(order.trader, requestKey, request.positionKey, targetLeverage, request.puppetSizeDelta)
+            );
         }
     }
 
     function matchUp(
-        PositionStore.MirrorPosition memory mirrorPosition,
         OrderMirrorPosition calldata order,
-        PositionStore.RequestAdjustment memory request,
-        Subaccount subaccount
+        MirrorPositionStore.AllocationMatch memory allocation,
+        MirrorPositionStore.RequestAdjustment memory request
     ) internal returns (bytes32 requestKey) {
-        (PuppetStore.Rule[] memory ruleList, uint[] memory activityList, uint[] memory balanceList) =
-            puppetStore.getBalanceAndActivityList(order.collateralToken, order.trader, mirrorPosition.puppetList);
+        (
+            PuppetStore.AllocationRule[] memory ruleList,
+            uint[] memory activityList,
+            uint[] memory balanceToAllocationList
+        ) = puppetStore.getBalanceAndActivityList(order.collateralToken, order.trader, order.puppetList);
 
-        uint puppetListLength = mirrorPosition.puppetList.length;
+        uint puppetListLength = order.puppetList.length;
 
         if (puppetListLength > config.limitPuppetList) {
             revert Error.RequestPositionLogic__PuppetListLimitExceeded();
@@ -152,15 +161,15 @@ contract RequestPositionLogic is CoreContract {
         for (uint i = 0; i < puppetListLength; i++) {
             // validate that puppet list calldata is sorted and has no duplicates
             if (i > 0) {
-                if (mirrorPosition.puppetList[i - 1] > mirrorPosition.puppetList[i]) {
+                if (order.puppetList[i - 1] > order.puppetList[i]) {
                     revert Error.RequestPositionLogic__UnsortedPuppetList();
                 }
-                if (mirrorPosition.puppetList[i - 1] == mirrorPosition.puppetList[i]) {
+                if (order.puppetList[i - 1] == order.puppetList[i]) {
                     revert Error.RequestPositionLogic__DuplicatesInPuppetList();
                 }
             }
 
-            PuppetStore.Rule memory rule = ruleList[i];
+            PuppetStore.AllocationRule memory rule = ruleList[i];
 
             // puppet rule expired or not set
             if (
@@ -168,19 +177,19 @@ contract RequestPositionLogic is CoreContract {
                 // current time is greater than  throttle activity period
                 || activityList[i] + rule.throttleActivity < block.timestamp
                 // has enough allowance or token allowance cap exists
-                || balanceList[i] > config.minimumMatchAmount
+                || balanceToAllocationList[i] > config.minimumMatchAmount
             ) {
                 // the lowest of either the allowance or the trader's deposit
                 uint collateralDelta = Math.min(
-                    Precision.applyBasisPoints(rule.allowanceRate, balanceList[i]),
+                    Precision.applyBasisPoints(rule.allowanceRate, balanceToAllocationList[i]),
                     order.collateralDelta // trader own deposit
                 );
-                mirrorPosition.puppetCollateral += collateralDelta;
-                mirrorPosition.puppetSize += collateralDelta * order.sizeDelta / order.collateralDelta;
+                request.puppetCollateralDelta += collateralDelta;
+                request.puppetSizeDelta += collateralDelta * order.sizeDelta / order.collateralDelta;
 
-                balanceList[i] = collateralDelta;
+                balanceToAllocationList[i] = collateralDelta;
             } else {
-                balanceList[i] = 0;
+                balanceToAllocationList[i] = 0;
             }
 
             activityList[i] = block.timestamp;
@@ -191,20 +200,23 @@ contract RequestPositionLogic is CoreContract {
             config.gmxOrderVault,
             order.trader,
             block.timestamp,
-            mirrorPosition.puppetList,
-            balanceList
+            order.puppetList,
+            balanceToAllocationList
         );
 
-        requestKey = submitOrder(subaccount, request, order, GmxPositionUtils.OrderType.MarketIncrease);
-        positionStore.setMirrorPosition(requestKey, mirrorPosition);
+        allocation.collateralToken = order.collateralToken;
+        allocation.trader = order.trader;
+        allocation.puppetList = order.puppetList;
+        allocation.collateralList = balanceToAllocationList;
 
-        logEvent("match", abi.encode(order.trader, requestKey, request.positionKey, mirrorPosition));
+        positionStore.setAllocationMatchMap(request.allocationKey, allocation);
+
+        requestKey = submitOrder(order, request.subaccount, GmxPositionUtils.OrderType.MarketIncrease, request);
+
+        logEvent("requestMatch", abi.encode(allocation, order, requestKey, request.positionKey));
     }
 
-    function orderMirrorPosition(
-        OrderMirrorPosition calldata order,
-        address[] calldata puppetList
-    ) external payable auth returns (bytes32) {
+    function orderMirrorPosition(OrderMirrorPosition calldata order) external payable auth returns (bytes32) {
         uint startGas = gasleft();
         Subaccount subaccount = positionStore.getSubaccount(order.trader);
 
@@ -212,8 +224,10 @@ contract RequestPositionLogic is CoreContract {
             subaccount = positionStore.createSubaccount(order.trader);
         }
 
-        PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
-            positionKey: GmxPositionUtils.getPositionKey(subaccount, order.market, order.collateralToken, order.isLong),
+        MirrorPositionStore.RequestAdjustment memory request = MirrorPositionStore.RequestAdjustment({
+            subaccount: subaccount,
+            allocationKey: PositionUtils.getAllocationKey(order.collateralToken, order.trader),
+            positionKey: GmxPositionUtils.getPositionKey(order.trader, order.market, order.collateralToken, order.isLong),
             traderSizeDelta: order.sizeDelta,
             traderCollateralDelta: order.collateralDelta,
             puppetSizeDelta: 0,
@@ -221,20 +235,20 @@ contract RequestPositionLogic is CoreContract {
             transactionCost: startGas
         });
 
-        PositionStore.MirrorPosition memory mirrorPosition = positionStore.getMirrorPosition(request.positionKey);
+        MirrorPositionStore.Position memory mirrorPosition = positionStore.getPosition(request.positionKey);
 
         if (mirrorPosition.puppetSize == 0) {
-            if (mirrorPosition.trader != address(0)) {
-                revert Error.RequestPositionLogic__PendingRequestMatch();
+            // TODO: large allocations might exceed blockspace, we possibly need to handle it in a separate process
+            MirrorPositionStore.AllocationMatch memory allocation =
+                positionStore.getAllocationMatchMap(request.allocationKey);
+
+            if (allocation.trader != address(0)) {
+                revert Error.RequestPositionLogic__ExistingRequestPending();
             }
 
-            mirrorPosition.trader = order.trader;
-            mirrorPosition.puppetList = puppetList;
-            mirrorPosition.collateralList = new uint[](puppetList.length);
-
-            return matchUp(mirrorPosition, order, request, subaccount);
+            return matchUp(order, allocation, request);
         } else {
-            return adjust(mirrorPosition, order, request, subaccount);
+            return adjust(order, mirrorPosition, request);
         }
     }
 
