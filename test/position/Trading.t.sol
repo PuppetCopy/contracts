@@ -14,7 +14,7 @@ import {RequestPositionLogic} from "src/position/RequestPositionLogic.sol";
 import {IGmxDatastore} from "src/position/interface/IGmxDataStore.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxOracle} from "src/position/interface/IGmxOracle.sol";
-import {PositionStore} from "src/position/store/PositionStore.sol";
+import {MirrorPositionStore} from "src/position/store/MirrorPositionStore.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {PuppetLogic} from "src/puppet/PuppetLogic.sol";
 import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
@@ -28,7 +28,7 @@ import {MockGmxExchangeRouter} from "../mock/MockGmxExchangeRouter.sol";
 contract TradingTest is BasicSetup {
     PuppetStore puppetStore;
     PuppetLogic puppetLogic;
-    PositionStore positionStore;
+    MirrorPositionStore positionStore;
     ContributeStore contributeStore;
     PuppetRouter puppetRouter;
     PositionRouter positionRouter;
@@ -47,7 +47,7 @@ contract TradingTest is BasicSetup {
 
         puppetStore = new PuppetStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(puppetStore));
-        positionStore = new PositionStore(dictator, router);
+        positionStore = new MirrorPositionStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(positionStore));
 
         puppetLogic = new PuppetLogic(dictator, eventEmitter, puppetStore);
@@ -61,8 +61,8 @@ contract TradingTest is BasicSetup {
         dictator.setAccess(eventEmitter, address(puppetRouter));
 
         dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
-        dictator.setPermission(puppetLogic, puppetLogic.setRule.selector, address(puppetRouter));
-        dictator.setPermission(puppetLogic, puppetLogic.setRuleList.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.setAllocationRule.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.setAllocationRuleList.selector, address(puppetRouter));
 
         requestLogic = new RequestPositionLogic(dictator, eventEmitter, puppetStore, positionStore);
         dictator.setAccess(eventEmitter, address(requestLogic));
@@ -107,7 +107,7 @@ contract TradingTest is BasicSetup {
             RequestPositionLogic.Config({
                 gmxExchangeRouter: mockGmxExchangeRouter,
                 callbackHandler: address(positionRouter),
-                gmxOrderReciever: address(positionStore),
+                gmxFundsReciever: address(puppetStore),
                 gmxOrderVault: Address.gmxOrderVault,
                 referralCode: Address.referralCode,
                 callbackGasLimit: 2_000_000,
@@ -149,7 +149,7 @@ contract TradingTest is BasicSetup {
         uint estimatedGasLimit = 5_000_000;
         uint executionFee = tx.gasprice * estimatedGasLimit;
 
-        address[] memory puppetList = getGeneratePuppetList(usdc, trader, 60);
+        address[] memory puppetList = getGeneratePuppetList(usdc, trader, 10);
 
         // vm.startPrank(trader);
         vm.startPrank(users.owner);
@@ -165,9 +165,9 @@ contract TradingTest is BasicSetup {
                 collateralDelta: 100e6,
                 sizeDelta: 1000e30,
                 acceptablePrice: 3320e12,
-                triggerPrice: 3420e6
-            }),
-            puppetList
+                triggerPrice: 3420e6,
+                puppetList: puppetList
+            })
         );
     }
 
@@ -198,10 +198,10 @@ contract TradingTest is BasicSetup {
 
         puppetRouter.deposit(collateralToken, fundValue);
 
-        puppetRouter.setRule(
+        puppetRouter.setAllocationRule(
             collateralToken, //
             trader,
-            PuppetStore.Rule({throttleActivity: 0, allowanceRate: 1000, expiry: block.timestamp + 28 days})
+            PuppetStore.AllocationRule({throttleActivity: 0, allowanceRate: 1000, expiry: block.timestamp + 28 days})
         );
 
         return user;

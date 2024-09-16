@@ -5,7 +5,7 @@ import {ExecuteDecreasePositionLogic} from "./position/ExecuteDecreasePositionLo
 import {ExecuteIncreasePositionLogic} from "./position/ExecuteIncreasePositionLogic.sol";
 import {ExecuteRevertedAdjustmentLogic} from "./position/ExecuteRevertedAdjustmentLogic.sol";
 import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
-import {PositionStore} from "./position/store/PositionStore.sol";
+import {MirrorPositionStore} from "./position/store/MirrorPositionStore.sol";
 import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
 import {Error} from "./shared/Error.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
@@ -21,12 +21,12 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
     }
 
     Config config;
-    PositionStore positionStore;
+    MirrorPositionStore positionStore;
 
     constructor(
         IAuthority _authority,
         EventEmitter _eventEmitter,
-        PositionStore _positionStore
+        MirrorPositionStore _positionStore
     ) CoreContract("PositionRouter", "1", _authority, _eventEmitter) {
         positionStore = _positionStore;
     }
@@ -74,7 +74,7 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
     }
 
     function executeUnhandledExecutionCallback(bytes32 key) external nonReentrant auth {
-        PositionStore.UnhandledCallback memory callbackData = positionStore.getUnhandledCallback(key);
+        MirrorPositionStore.UnhandledCallback memory callbackData = positionStore.getUnhandledCallback(key);
 
         if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.ExecutedIncrease) {
             config.executeIncrease.execute(key, callbackData.order);

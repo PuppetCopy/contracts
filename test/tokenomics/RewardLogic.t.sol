@@ -106,6 +106,7 @@ contract RewardRouterTest is BasicSetup {
         usdc.approve(address(router), type(uint).max - 1);
         puppetToken.approve(address(router), type(uint).max - 1);
         dictator.setAccess(contributeStore, users.owner);
+        dictator.setAccess(contributeStore, address(contributeStore));
     }
 
     function testInitalContributionDelayLock() public {
@@ -289,7 +290,8 @@ contract RewardRouterTest is BasicSetup {
     function contribute(IERC20 token, address user, uint amount) public {
         vm.startPrank(users.owner);
         _dealERC20(address(token), users.owner, amount);
-        contributeStore.contribute(token, users.owner, user, amount);
+        contributeStore.transferIn(token, users.owner, amount);
+        contributeStore.contribute(token, contributeStore, user, amount);
     }
 
     function contributeLock(IERC20 token, address user, uint lockDuration, uint contribution) public returns (uint) {

@@ -31,20 +31,20 @@ contract PuppetRouter is CoreContract, ReentrancyGuardTransient {
         config.logic.withdraw(token, msg.sender, receiver, amount);
     }
 
-    function setRule(
+    function setAllocationRule(
         IERC20 collateralToken,
         address trader,
-        PuppetStore.Rule calldata ruleParams //
+        PuppetStore.AllocationRule calldata ruleParams //
     ) external nonReentrant {
-        config.logic.setRule(collateralToken, msg.sender, trader, ruleParams);
+        config.logic.setAllocationRule(collateralToken, msg.sender, trader, ruleParams);
     }
 
-    function setRuleList(
-        PuppetStore.Rule[] calldata ruleParams, //
+    function setAllocationRuleList(
+        PuppetStore.AllocationRule[] calldata ruleParams, //
         address[] calldata traderList,
         IERC20[] calldata collateralTokenList
     ) external nonReentrant {
-        config.logic.setRuleList(msg.sender, traderList, collateralTokenList, ruleParams);
+        config.logic.setAllocationRuleList(collateralTokenList, msg.sender, traderList, ruleParams);
     }
 
     // governance

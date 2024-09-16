@@ -16,14 +16,18 @@ library Error {
     error PuppetLogic__InvalidLength();
 
     error RequestPositionLogic__PuppetListLimitExceeded();
-    error RequestPositionLogic__PendingRequestMatch();
+    error RequestPositionLogic__ExistingRequestPending();
     error RequestPositionLogic__UnsortedPuppetList();
     error RequestPositionLogic__DuplicatesInPuppetList();
 
-    error ExecuteIncreasePositionLogic__UnauthorizedCaller();
+    error ExecuteIncreasePositionLogic__RequestDoesNotExist();
 
+    error ExecuteDecreasePositionLogic__RequestDoesNotExist();
     error ExecuteDecreasePositionLogic__InvalidRequest(bytes32 positionKey, bytes32 key);
     error ExecuteDecreasePositionLogic__UnexpectedEventData();
+    error ExecuteDecreasePositionLogic__MismatchedRecordedAmountIn(uint recordedAmountIn, uint totalAmountIn);
 
     error PositionRouter__InvalidOrderType(GmxPositionUtils.OrderType orderType);
+
+
 }

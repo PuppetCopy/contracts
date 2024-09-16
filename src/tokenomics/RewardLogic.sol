@@ -112,7 +112,7 @@ contract RewardLogic is CoreContract {
 
         if (emission == 0 || supply == 0) return store.cumulativeRewardPerToken();
 
-        store.interIn(config.distributionStore, rewardToken, emission);
+        store.interIn(rewardToken, config.distributionStore, emission);
 
         uint rewardPerToken = store.incrementCumulativePerContribution(Precision.toFactor(emission, supply));
 
