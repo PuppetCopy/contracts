@@ -55,7 +55,7 @@ contract ExecuteDecreasePositionLogic is CoreContract {
             revert Error.ExecuteDecreasePositionLogic__RequestDoesNotExist();
         }
 
-        MirrorPositionStore.AllocationMatch memory allocation = positionStore.getAllocationMatchMap(request.allocationKey);
+        MirrorPositionStore.AllocationMatch memory allocation = positionStore.getAllocationMatch(request.positionKey);
         MirrorPositionStore.Position memory position = positionStore.getPosition(request.positionKey);
 
         CallParams memory callParams = CallParams({
@@ -73,8 +73,10 @@ contract ExecuteDecreasePositionLogic is CoreContract {
             callParams.profit = callParams.recordedAmountIn - position.puppetCollateral;
         }
 
-        position.traderSize -= request.puppetSizeDelta;
-        position.traderCollateral -= request.puppetCollateralDelta;
+        position.traderSize -= request.traderSizeDelta;
+        position.traderCollateral -= request.traderCollateralDelta;
+        position.puppetSize -= request.puppetSizeDelta;
+        position.puppetCollateral -= request.puppetCollateralDelta;
         position.cumulativeTransactionCost += request.transactionCost;
 
         uint puppetListLength = allocation.puppetList.length;
@@ -113,6 +115,7 @@ contract ExecuteDecreasePositionLogic is CoreContract {
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
         if (request.traderSizeDelta >= position.traderSize) {
             positionStore.removePosition(request.positionKey);
+            positionStore.removeAllocationMatch(request.positionKey);
         } else {
             positionStore.setPosition(request.positionKey, position);
         }

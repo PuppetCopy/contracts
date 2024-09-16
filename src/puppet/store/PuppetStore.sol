@@ -19,7 +19,7 @@ contract PuppetStore is BankStore {
 
     mapping(IERC20 token => uint) public tokenAllowanceCapMap;
     mapping(IERC20 token => mapping(address user => uint) name) userBalanceMap;
-    mapping(bytes32 ruleKey => AllocationRule) public allocationRuleMap; // ruleKey = keccak256(collateralToken, puppet, trader)
+    mapping(bytes32 ruleKey => AllocationRule) public allocationRuleMap;
     mapping(address trader => mapping(address user => uint) name) public fundingActivityMap;
 
     constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
@@ -160,7 +160,11 @@ contract PuppetStore is BankStore {
         IERC20 collateralToken,
         address trader,
         address[] calldata _puppetList
-    ) external view returns (AllocationRule[] memory _ruleList, uint[] memory _fundingActivityList, uint[] memory _valueList) {
+    )
+        external
+        view
+        returns (AllocationRule[] memory _ruleList, uint[] memory _fundingActivityList, uint[] memory _valueList)
+    {
         uint _puppetListLength = _puppetList.length;
 
         _ruleList = new AllocationRule[](_puppetListLength);

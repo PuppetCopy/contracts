@@ -12,8 +12,9 @@ import {GmxPositionUtils} from "./../utils/GmxPositionUtils.sol";
 contract MirrorPositionStore is BankStore {
     struct RequestAdjustment {
         Subaccount subaccount;
-        bytes32 allocationKey;
+        // bytes32 allocationKey;
         bytes32 positionKey;
+        bytes32 mirrorPositionKey;
         uint traderSizeDelta;
         uint traderCollateralDelta;
         uint puppetSizeDelta;
@@ -22,6 +23,8 @@ contract MirrorPositionStore is BankStore {
     }
 
     struct AllocationMatch {
+        bytes32 positionKey;
+        bytes32 mirrorPositionKey;
         IERC20 collateralToken;
         address trader;
         address[] puppetList;
@@ -52,12 +55,16 @@ contract MirrorPositionStore is BankStore {
 
     constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
 
-    function getAllocationMatchMap(bytes32 _key) external view returns (AllocationMatch memory) {
+    function getAllocationMatch(bytes32 _key) external view returns (AllocationMatch memory) {
         return allocationMatchMap[_key];
     }
 
-    function setAllocationMatchMap(bytes32 _key, AllocationMatch calldata _val) external auth {
+    function setAllocationMatch(bytes32 _key, AllocationMatch calldata _val) external auth {
         allocationMatchMap[_key] = _val;
+    }
+
+    function removeAllocationMatch(bytes32 _key) external auth {
+        delete allocationMatchMap[_key];
     }
 
     function getRequestAdjustment(bytes32 _key) external view returns (RequestAdjustment memory) {

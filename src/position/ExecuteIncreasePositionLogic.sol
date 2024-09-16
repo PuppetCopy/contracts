@@ -28,27 +28,27 @@ contract ExecuteIncreasePositionLogic is CoreContract {
             revert Error.ExecuteIncreasePositionLogic__RequestDoesNotExist();
         }
 
-        MirrorPositionStore.Position memory mirrorPosition = positionStore.getPosition(request.positionKey);
+        MirrorPositionStore.Position memory position = positionStore.getPosition(request.positionKey);
 
-        mirrorPosition.traderSize += request.traderSizeDelta;
-        mirrorPosition.traderCollateral += request.traderCollateralDelta;
-        mirrorPosition.puppetSize += request.puppetSizeDelta;
-        mirrorPosition.puppetCollateral += request.puppetCollateralDelta;
-        mirrorPosition.cumulativeTransactionCost += request.transactionCost;
+        position.traderSize += request.traderSizeDelta;
+        position.traderCollateral += request.traderCollateralDelta;
+        position.puppetSize += request.puppetSizeDelta;
+        position.puppetCollateral += request.puppetCollateralDelta;
+        position.cumulativeTransactionCost += request.transactionCost;
 
         positionStore.removeRequestAdjustment(requestKey);
-        positionStore.setPosition(requestKey, mirrorPosition);
+        positionStore.setPosition(requestKey, position);
 
         logEvent(
             "execute",
             abi.encode(
                 requestKey,
                 request.positionKey,
-                mirrorPosition.traderSize,
-                mirrorPosition.traderCollateral,
-                mirrorPosition.puppetSize,
-                mirrorPosition.puppetCollateral,
-                mirrorPosition.cumulativeTransactionCost
+                position.traderSize,
+                position.traderCollateral,
+                position.puppetSize,
+                position.puppetCollateral,
+                position.cumulativeTransactionCost
             )
         );
     }

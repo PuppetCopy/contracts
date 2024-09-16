@@ -126,8 +126,7 @@ contract RequestPositionLogic is CoreContract {
 
             requestKey = submitOrder(order, request.subaccount, GmxPositionUtils.OrderType.MarketIncrease, request);
             logEvent(
-                "requestIncrease",
-                abi.encode(order.trader, requestKey, request.positionKey, targetLeverage, request.puppetSizeDelta)
+                "requestIncrease", abi.encode(order.trader, requestKey, request.positionKey, request.puppetSizeDelta)
             );
         } else {
             uint deltaLeverage = leverage - targetLeverage;
@@ -135,8 +134,7 @@ contract RequestPositionLogic is CoreContract {
 
             requestKey = submitOrder(order, request.subaccount, GmxPositionUtils.OrderType.MarketDecrease, request);
             logEvent(
-                "requestDecrease",
-                abi.encode(order.trader, requestKey, request.positionKey, targetLeverage, request.puppetSizeDelta)
+                "requestDecrease", abi.encode(order.trader, requestKey, request.positionKey, request.puppetSizeDelta)
             );
         }
     }
@@ -204,29 +202,45 @@ contract RequestPositionLogic is CoreContract {
             balanceToAllocationList
         );
 
+        allocation.positionKey = request.positionKey;
+        allocation.mirrorPositionKey = request.mirrorPositionKey;
         allocation.collateralToken = order.collateralToken;
         allocation.trader = order.trader;
         allocation.puppetList = order.puppetList;
         allocation.collateralList = balanceToAllocationList;
 
-        positionStore.setAllocationMatchMap(request.allocationKey, allocation);
+        positionStore.setAllocationMatch(request.positionKey, allocation);
 
         requestKey = submitOrder(order, request.subaccount, GmxPositionUtils.OrderType.MarketIncrease, request);
 
-        logEvent("requestMatch", abi.encode(allocation, order, requestKey, request.positionKey));
+        logEvent(
+            "requestMatch",
+            abi.encode(
+                allocation.collateralToken,
+                allocation.trader,
+                allocation.puppetList,
+                allocation.collateralList,
+                requestKey,
+                request.positionKey,
+                request.puppetCollateralDelta,
+                request.puppetSizeDelta
+            )
+        );
     }
 
     function orderMirrorPosition(OrderMirrorPosition calldata order) external payable auth returns (bytes32) {
         uint startGas = gasleft();
         Subaccount subaccount = positionStore.getSubaccount(order.trader);
+        address subaccountAddress = address(subaccount);
 
-        if (address(subaccount) == address(0)) {
+        if (subaccountAddress == address(0)) {
             subaccount = positionStore.createSubaccount(order.trader);
         }
 
         MirrorPositionStore.RequestAdjustment memory request = MirrorPositionStore.RequestAdjustment({
             subaccount: subaccount,
-            allocationKey: PositionUtils.getAllocationKey(order.collateralToken, order.trader),
+            mirrorPositionKey: GmxPositionUtils.getPositionKey(subaccountAddress, order.market, order.collateralToken, order.isLong),
+            // allocationKey: PositionUtils.getAllocationKey(order.collateralToken, order.trader),
             positionKey: GmxPositionUtils.getPositionKey(order.trader, order.market, order.collateralToken, order.isLong),
             traderSizeDelta: order.sizeDelta,
             traderCollateralDelta: order.collateralDelta,
@@ -240,7 +254,7 @@ contract RequestPositionLogic is CoreContract {
         if (mirrorPosition.puppetSize == 0) {
             // TODO: large allocations might exceed blockspace, we possibly need to handle it in a separate process
             MirrorPositionStore.AllocationMatch memory allocation =
-                positionStore.getAllocationMatchMap(request.allocationKey);
+                positionStore.getAllocationMatch(request.positionKey);
 
             if (allocation.trader != address(0)) {
                 revert Error.RequestPositionLogic__ExistingRequestPending();
