@@ -10,8 +10,8 @@ import {ExecuteIncreasePositionLogic} from "src/position/ExecuteIncreasePosition
 import {ExecuteRevertedAdjustmentLogic} from "src/position/ExecuteRevertedAdjustmentLogic.sol";
 import {RequestPositionLogic} from "src/position/RequestPositionLogic.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
-import {PositionStore} from "src/position/store/PositionStore.sol";
-import {PositionStore} from "src/position/store/PositionStore.sol";
+import {MirrorPositionStore} from "src/position/store/MirrorPositionStore.sol";
+import {MirrorPositionStore} from "src/position/store/MirrorPositionStore.sol";
 import {PuppetLogic} from "src/puppet/PuppetLogic.sol";
 import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
 import {Dictator} from "src/shared/Dictator.sol";
@@ -45,7 +45,7 @@ contract DeployTrading is BaseScript {
     function deployImmutables() internal {
         PuppetStore puppetStore = new PuppetStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(puppetStore));
-        PositionStore positionStore = new PositionStore(dictator, router);
+        MirrorPositionStore positionStore = new MirrorPositionStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(positionStore));
 
         PuppetRouter puppetRouter = new PuppetRouter(dictator, eventEmitter);
@@ -81,8 +81,8 @@ contract DeployTrading is BaseScript {
         );
 
         dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
-        dictator.setPermission(puppetLogic, puppetLogic.setRule.selector, address(puppetRouter));
-        dictator.setPermission(puppetLogic, puppetLogic.setRuleList.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.setAllocationRule.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.setAllocationRuleList.selector, address(puppetRouter));
 
         dictator.setPermission(puppetRouter, puppetRouter.setConfig.selector, Address.dao);
         puppetRouter.setConfig(PuppetRouter.Config({logic: puppetLogic}));
@@ -90,7 +90,7 @@ contract DeployTrading is BaseScript {
 
     function deployPositionLogic() internal {
         PuppetStore puppetStore = PuppetStore(Address.PuppetStore);
-        PositionStore positionStore = PositionStore(Address.PositionStore);
+        MirrorPositionStore positionStore = MirrorPositionStore(Address.MirrorPositionStore);
         ContributeStore contributeStore = ContributeStore(Address.ContributeStore);
         PositionRouter positionRouter = PositionRouter(Address.PositionRouter);
 
@@ -123,7 +123,7 @@ contract DeployTrading is BaseScript {
             RequestPositionLogic.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
                 callbackHandler: Address.PositionRouter,
-                gmxOrderReciever: Address.PositionStore,
+                gmxFundsReciever: Address.PuppetStore,
                 gmxOrderVault: Address.gmxOrderVault,
                 referralCode: Address.referralCode,
                 callbackGasLimit: 2_000_000,

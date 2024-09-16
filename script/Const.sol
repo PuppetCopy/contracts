@@ -23,7 +23,7 @@ library Address {
 
     // Trading
     address constant PuppetStore = 0xae985FF3f398c403a1e4f8b770E91fDD3F2D44A3;
-    address constant PositionStore = 0x5F5C9d9272b4Bae556e0F83BE2c488B6E77F03EC;
+    address constant MirrorPositionStore = 0x5F5C9d9272b4Bae556e0F83BE2c488B6E77F03EC;
     address constant PuppetRouter = 0x8F7d6b64264968D7b61DebbEAE6331af230fa860;
     address constant PositionRouter = 0xe24B30FB459656425c8215eDf555585fc6b1F711;
     address constant PuppetLogic = 0x3E0894BE6984Ff281e0dd142F3606734F7A9CE94;
