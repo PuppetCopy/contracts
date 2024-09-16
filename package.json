@@ -4,15 +4,15 @@
     "src/**/*"
   ],
   "scripts": {
-    "test": "FOUNDRY_PROFILE=dev forge test -vvvvv",
-    "test:dev": "FOUNDRY_PROFILE=dev forge test --match-contract RewardRouterTest -vvvvv",
-    "test:dev:fork": "FOUNDRY_PROFILE=dev forge test --chain arbitrum --match-contract PositionRouterTest -vvvvv --fork-block-number 192315592",
+    "test": "forge test --match-contract TradingTest -vvvvv",
+    "test:dev": "FOUNDRY_PROFILE=dev forge test --match-contract TradingTest -vvvvv",
+    "test:dev:fork": "FOUNDRY_PROFILE=dev forge test --chain arbitrum --match-contract TradingTest -vvvvv --fork-block-number 192315592 --fork-url=$ARBITRUM_RPC_URL",
     "build": "forge build --sizes",
     "build:dev": "FOUNDRY_PROFILE=dev forge build --sizes",
-    "script:DeployPuppet": "forge script --chain arbitrum script/DeployPuppet.s.sol:DeployPuppet --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL",
-    "script:Tokenomics": "forge script script/DeployTokenomics.s.sol:DeployTokenomics --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL",
-    "script:Trading": "forge script script/DeployPuppetRouter.s.sol:DeployPuppetRouter --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL",
-    "script:ManagePeriphery": "forge script --chain arbitrum script/ManagePeriphery.s.sol:ManagePeriphery --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL",
+    "script:DeployPuppet": "forge script script/DeployPuppet.s.sol:DeployPuppet --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL",
+    "script:Tokenomics": "forge script script/DeployTokenomics.s.sol:DeployTokenomics --broadcast --verify -vvvv --rpc-url ARBITRUM_RPC_URL=$ARBITRUM_RPC_URL",
+    "script:Trading": "forge script script/DeployTrading.s.sol:DeployTrading --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL",
+    "script:ManagePeriphery": "forge script script/ManagePeriphery.s.sol:ManagePeriphery --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL",
     "docgen": "forge doc --out '.docgen' --build",
     "gas-report": "forge test --gas-report",
     "lint": "bun run lint:sol",
@@ -27,5 +27,6 @@
     "forge-std": "github:foundry-rs/forge-std#v1.9.2",
     "solhint": "5.0.3",
     "typescript": "5.5.4"
-  }
+  },
+  "packageManager": "bun@1.1.22"
 }

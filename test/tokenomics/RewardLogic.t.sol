@@ -13,13 +13,11 @@ import {ContributeStore} from "src/tokenomics/store/ContributeStore.sol";
 import {RewardStore} from "src/tokenomics/store/RewardStore.sol";
 import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
-import {MockWeightedPoolVault} from "test/mocks/MockWeightedPoolVault.sol";
 
 contract RewardRouterTest is BasicSetup {
     uint constant MAXTIME = 106 weeks; // about 2 years
 
     VotingEscrowLogic veLogic;
-    MockWeightedPoolVault primaryVaultPool;
     RewardStore rewardStore;
     ContributeStore contributeStore;
     RewardLogic rewardLogic;
@@ -108,6 +106,7 @@ contract RewardRouterTest is BasicSetup {
         usdc.approve(address(router), type(uint).max - 1);
         puppetToken.approve(address(router), type(uint).max - 1);
         dictator.setAccess(contributeStore, users.owner);
+        dictator.setAccess(contributeStore, address(contributeStore));
     }
 
     function testInitalContributionDelayLock() public {
@@ -291,7 +290,8 @@ contract RewardRouterTest is BasicSetup {
     function contribute(IERC20 token, address user, uint amount) public {
         vm.startPrank(users.owner);
         _dealERC20(address(token), users.owner, amount);
-        contributeStore.contribute(token, users.owner, user, amount);
+        contributeStore.transferIn(token, users.owner, amount);
+        contributeStore.contribute(token, contributeStore, user, amount);
     }
 
     function contributeLock(IERC20 token, address user, uint lockDuration, uint contribution) public returns (uint) {

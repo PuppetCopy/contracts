@@ -3,70 +3,53 @@ pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {Error} from "../shared/Error.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
+import {MirrorPositionStore} from "./store/MirrorPositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
-import {PositionStore} from "./store/PositionStore.sol";
-
 contract ExecuteIncreasePositionLogic is CoreContract {
-    struct Config {
-        PositionStore positionStore;
-    }
-
-    Config config;
+    MirrorPositionStore positionStore;
 
     constructor(
         IAuthority _authority,
         EventEmitter _eventEmitter,
-        Config memory _config
+        MirrorPositionStore _positionStore
     ) CoreContract("ExecuteIncreasePositionLogic", "1", _authority, _eventEmitter) {
-        _setConfig(_config);
+        positionStore = _positionStore;
     }
 
-    function execute(bytes32 requestKey, GmxPositionUtils.Props memory order) external auth {
-        PositionStore.RequestAdjustment memory request = config.positionStore.getRequestAdjustment(requestKey);
-        PositionStore.MirrorPosition memory mirrorPosition = config.positionStore.getMirrorPosition(request.positionKey);
+    function execute(bytes32 requestKey, GmxPositionUtils.Props memory /*order*/ ) external auth {
+        MirrorPositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
 
-        if (mirrorPosition.size == 0) {
-            PositionStore.RequestMatch memory matchRequest = config.positionStore.getRequestMatch(request.positionKey);
-            mirrorPosition.trader = matchRequest.trader;
-            mirrorPosition.puppetList = matchRequest.puppetList;
-            mirrorPosition.collateralList = request.collateralDeltaList;
-
-            config.positionStore.removeRequestMatch(request.positionKey);
-        } else {
-            // fill mirror position collateralList list
-            for (uint i = 0; i < mirrorPosition.puppetList.length; i++) {
-                mirrorPosition.collateralList[i] += request.collateralDeltaList[i];
-            }
+        if (request.positionKey == bytes32(0)) {
+            revert Error.ExecuteIncreasePositionLogic__RequestDoesNotExist();
         }
 
-        mirrorPosition.collateral += request.collateralDelta;
-        mirrorPosition.size += request.sizeDelta;
+        MirrorPositionStore.Position memory mirrorPosition = positionStore.getPosition(request.positionKey);
+
+        mirrorPosition.traderSize += request.traderSizeDelta;
+        mirrorPosition.traderCollateral += request.traderCollateralDelta;
+        mirrorPosition.puppetSize += request.puppetSizeDelta;
+        mirrorPosition.puppetCollateral += request.puppetCollateralDelta;
         mirrorPosition.cumulativeTransactionCost += request.transactionCost;
 
-        config.positionStore.setMirrorPosition(requestKey, mirrorPosition);
-        config.positionStore.removeRequestAdjustment(requestKey);
+        positionStore.removeRequestAdjustment(requestKey);
+        positionStore.setPosition(requestKey, mirrorPosition);
 
-        logEvent("execute()", abi.encode(requestKey, request.positionKey));
+        logEvent(
+            "execute",
+            abi.encode(
+                requestKey,
+                request.positionKey,
+                mirrorPosition.traderSize,
+                mirrorPosition.traderCollateral,
+                mirrorPosition.puppetSize,
+                mirrorPosition.puppetCollateral,
+                mirrorPosition.cumulativeTransactionCost
+            )
+        );
     }
-
-    // governance
-
-    /// @notice Set the mint rate limit for the token.
-    /// @param _config The new rate limit configuration.
-    function setConfig(Config calldata _config) external auth {
-        _setConfig(_config);
-    }
-
-    /// @dev Internal function to set the configuration.
-    /// @param _config The configuration to set.
-    function _setConfig(Config memory _config) internal {
-        config = _config;
-        logEvent("setConfig", abi.encode(_config));
-    }
-
-    error ExecuteIncreasePositionLogic__UnauthorizedCaller();
 }

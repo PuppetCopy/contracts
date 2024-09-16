@@ -1,73 +1,36 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
-
 import {ExecuteDecreasePositionLogic} from "./position/ExecuteDecreasePositionLogic.sol";
 import {ExecuteIncreasePositionLogic} from "./position/ExecuteIncreasePositionLogic.sol";
 import {ExecuteRevertedAdjustmentLogic} from "./position/ExecuteRevertedAdjustmentLogic.sol";
-import {RequestDecreasePositionLogic} from "./position/RequestDecreasePositionLogic.sol";
-import {RequestIncreasePositionLogic} from "./position/RequestIncreasePositionLogic.sol";
 import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
-import {PositionStore} from "./position/store/PositionStore.sol";
+import {MirrorPositionStore} from "./position/store/MirrorPositionStore.sol";
 import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
-import {PositionUtils} from "./position/utils/PositionUtils.sol";
+import {Error} from "./shared/Error.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
 import {EventEmitter} from "./utils/EventEmitter.sol";
+import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
 contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallbackReceiver {
     struct Config {
-        RequestIncreasePositionLogic requestIncrease;
         ExecuteIncreasePositionLogic executeIncrease;
-        RequestDecreasePositionLogic requestDecrease;
         ExecuteDecreasePositionLogic executeDecrease;
         ExecuteRevertedAdjustmentLogic executeRevertedAdjustment;
     }
 
     Config config;
-    PositionStore positionStore;
+    MirrorPositionStore positionStore;
 
     constructor(
         IAuthority _authority,
         EventEmitter _eventEmitter,
-        PositionStore _positionStore,
-        Config memory _config
+        MirrorPositionStore _positionStore
     ) CoreContract("PositionRouter", "1", _authority, _eventEmitter) {
         positionStore = _positionStore;
-        _setConfig(_config);
     }
 
-    function requestTraderIncrease(
-        PositionUtils.TraderCallParams calldata traderCallParams, //
-        address[] calldata puppetList
-    ) external nonReentrant {
-        config.requestIncrease.traderIncrease(traderCallParams, puppetList, msg.sender);
-    }
-
-    function requestTraderDecrease(PositionUtils.TraderCallParams calldata traderCallParams) external nonReentrant {
-        config.requestDecrease.traderDecrease(traderCallParams, msg.sender);
-    }
-
-    function requestProxyIncrease(
-        PositionUtils.TraderCallParams calldata traderCallParams, //
-        address[] calldata puppetList,
-        address user
-    ) external nonReentrant auth {
-        config.requestIncrease.proxyIncrease(traderCallParams, puppetList, user);
-    }
-
-    function requestProxyDecrease(
-        PositionUtils.TraderCallParams calldata traderCallParams,
-        address user
-    ) external nonReentrant auth {
-        config.requestDecrease.proxyDecrease(traderCallParams, user);
-    }
-
-    // external integration
-
-    // attempt to execute the callback, if
-    // in case of failure we can recover the callback to later attempt to execute it again
     function afterOrderExecution(
         bytes32 key,
         GmxPositionUtils.Props calldata order,
@@ -84,7 +47,7 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
                 storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.ExecutedDecrease, order, key, eventData);
             }
         } else {
-            revert PositionRouter__InvalidOrderType(order.numbers.orderType);
+            revert Error.PositionRouter__InvalidOrderType(order.numbers.orderType);
         }
     }
 
@@ -110,10 +73,8 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         }
     }
 
-    // integration
-
     function executeUnhandledExecutionCallback(bytes32 key) external nonReentrant auth {
-        PositionStore.UnhandledCallback memory callbackData = positionStore.getUnhandledCallback(key);
+        MirrorPositionStore.UnhandledCallback memory callbackData = positionStore.getUnhandledCallback(key);
 
         if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.ExecutedIncrease) {
             config.executeIncrease.execute(key, callbackData.order);
@@ -131,12 +92,6 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
     /// @notice Set the mint rate limit for the token.
     /// @param _config The new rate limit configuration.
     function setConfig(Config calldata _config) external auth {
-        _setConfig(_config);
-    }
-
-    /// @dev Internal function to set the configuration.
-    /// @param _config The configuration to set.
-    function _setConfig(Config memory _config) internal {
         config = _config;
         logEvent("setConfig", abi.encode(_config));
     }
@@ -150,9 +105,6 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         bytes calldata eventData
     ) internal auth {
         positionStore.setUnhandledCallback(status, order, key, eventData);
-        logEvent("storeUnhandledCallback()", abi.encode(status, key, order, eventData));
+        logEvent("storeUnhandledCallback", abi.encode(status, key, order, eventData));
     }
-
-    error PositionRouter__InvalidOrderType(GmxPositionUtils.OrderType orderType);
-    error PositionRouter__SenderNotMatchingTrader();
 }

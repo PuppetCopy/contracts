@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IGmxDatastore} from "../interface/IGmxDatastore.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import {Subaccount} from "../../shared/Subaccount.sol";
+import {IGmxDatastore} from "../interface/IGmxDatastore.sol";
 
 library GmxPositionUtils {
     enum OrderType {
@@ -107,8 +109,13 @@ library GmxPositionUtils {
         return orderType == OrderType.Liquidation;
     }
 
-    function getPositionKey(address trader, address market, IERC20 collateralToken, bool isLong) internal pure returns (bytes32) {
-        return keccak256(abi.encode(trader, market, collateralToken, isLong));
+    function getPositionKey(
+        address account,
+        address market,
+        IERC20 collateralToken,
+        bool isLong
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encode(account, market, collateralToken, isLong));
     }
 
     function getCurrentNonce(IGmxDatastore dataStore) internal view returns (uint) {

@@ -3,11 +3,11 @@ pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {PositionUtils} from "../position/utils/PositionUtils.sol";
+import {Error} from "../shared/Error.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-
-import {PositionUtils} from "../position/utils/PositionUtils.sol";
 import {PuppetStore} from "./store/PuppetStore.sol";
 
 contract PuppetLogic is CoreContract {
@@ -15,6 +15,8 @@ contract PuppetLogic is CoreContract {
         uint minExpiryDuration;
         uint minAllowanceRate;
         uint maxAllowanceRate;
+        IERC20[] tokenAllowanceList;
+        uint[] tokenAllowanceAmountList;
     }
 
     Config config;
@@ -23,55 +25,51 @@ contract PuppetLogic is CoreContract {
     constructor(
         IAuthority _authority,
         EventEmitter _eventEmitter,
-        PuppetStore _store,
-        Config memory _config
+        PuppetStore _store
     ) CoreContract("PuppetLogic", "1", _authority, _eventEmitter) {
         store = _store;
-
-        _setConfig(_config);
     }
 
     function deposit(IERC20 token, address user, uint amount) external auth {
-        if (amount == 0) revert PuppetLogic__InvalidAmount();
+        if (amount == 0) revert Error.PuppetLogic__InvalidAmount();
 
-        store.increaseBalance(token, user, amount);
+        uint balance = store.increaseBalance(token, user, amount);
 
-        logEvent("deposit()", abi.encode(token, user, amount));
+        logEvent("deposit", abi.encode(token, user, balance));
     }
 
     function withdraw(IERC20 token, address user, address receiver, uint amount) external auth {
-        if (amount == 0) revert PuppetLogic__InvalidAmount();
+        if (amount == 0) revert Error.PuppetLogic__InvalidAmount();
 
-        uint balance = store.getBalance(token, user);
-        if (amount > balance) revert PuppetLogic__InsufficientBalance();
+        if (amount > store.getBalance(token, user)) revert Error.PuppetLogic__InsufficientBalance();
 
-        store.decreaseBalance(token, user, receiver, amount);
+        uint balance = store.decreaseBalance(token, user, receiver, amount);
 
-        logEvent("withdraw()", abi.encode(token, user, amount));
+        logEvent("withdraw", abi.encode(token, user, balance));
     }
 
-    function setRule(
+    function setAllocationRule(
         IERC20 collateralToken,
         address puppet,
         address trader,
-        PuppetStore.Rule calldata ruleParams
+        PuppetStore.AllocationRule calldata ruleParams
     ) external auth {
-        bytes32 ruleKey = PositionUtils.getRuleKey(collateralToken, puppet, trader);
+        bytes32 key = PositionUtils.getRuleKey(collateralToken, puppet, trader);
         _validatePuppetTokenAllowance(collateralToken, puppet);
 
-        PuppetStore.Rule memory storedRule = store.getRule(ruleKey);
-        PuppetStore.Rule memory rule = _setRule(storedRule, ruleParams);
+        PuppetStore.AllocationRule memory storedRule = store.getAllocationRule(key);
+        PuppetStore.AllocationRule memory rule = _setRule(storedRule, ruleParams);
 
-        store.setRule(ruleKey, rule);
+        store.setAllocationRule(key, rule);
 
-        logEvent("setRule()", abi.encode(ruleKey, rule));
+        logEvent("setRule", abi.encode(key, collateralToken, puppet, trader, rule));
     }
 
-    function setRuleList(
+    function setAllocationRuleList(
+        IERC20[] calldata collateralTokenList,
         address puppet,
         address[] calldata traderList,
-        IERC20[] calldata collateralTokenList,
-        PuppetStore.Rule[] calldata ruleParams
+        PuppetStore.AllocationRule[] calldata ruleParams
     ) external auth {
         IERC20[] memory verifyAllowanceTokenList = new IERC20[](0);
         uint length = traderList.length;
@@ -81,16 +79,18 @@ contract PuppetLogic is CoreContract {
             keyList[i] = PositionUtils.getRuleKey(collateralTokenList[i], puppet, traderList[i]);
         }
 
-        PuppetStore.Rule[] memory storedRuleList = store.getRuleList(keyList);
+        PuppetStore.AllocationRule[] memory storedRuleList = store.getRuleList(keyList);
 
         for (uint i = 0; i < length; i++) {
             storedRuleList[i] = _setRule(storedRuleList[i], ruleParams[i]);
 
-            if (isArrayContains(verifyAllowanceTokenList, collateralTokenList[i])) {
-                verifyAllowanceTokenList[verifyAllowanceTokenList.length] = collateralTokenList[i];
+            IERC20 collateralToken = collateralTokenList[i];
+
+            if (isArrayContains(verifyAllowanceTokenList, collateralToken)) {
+                verifyAllowanceTokenList[verifyAllowanceTokenList.length] = collateralToken;
             }
 
-            logEvent("setRuleList()", abi.encode(keyList[i], storedRuleList[i]));
+            logEvent("setRuleList", abi.encode(keyList[i], collateralToken, puppet, traderList, storedRuleList[i]));
         }
 
         store.setRuleList(keyList, storedRuleList);
@@ -99,11 +99,11 @@ contract PuppetLogic is CoreContract {
     }
 
     function _setRule(
-        PuppetStore.Rule memory storedRule,
-        PuppetStore.Rule calldata ruleParams
-    ) internal view returns (PuppetStore.Rule memory) {
+        PuppetStore.AllocationRule memory storedRule,
+        PuppetStore.AllocationRule calldata ruleParams
+    ) internal view returns (PuppetStore.AllocationRule memory) {
         if (ruleParams.expiry == 0) {
-            if (storedRule.expiry == 0) revert PuppetLogic__NotFound();
+            if (storedRule.expiry == 0) revert Error.PuppetLogic__NotFound();
 
             storedRule.expiry = 0;
 
@@ -111,11 +111,11 @@ contract PuppetLogic is CoreContract {
         }
 
         if (ruleParams.expiry < block.timestamp + config.minExpiryDuration) {
-            revert PuppetLogic__ExpiredDate();
+            revert Error.PuppetLogic__ExpiredDate();
         }
 
         if (ruleParams.allowanceRate < config.minAllowanceRate || ruleParams.allowanceRate > config.maxAllowanceRate) {
-            revert PuppetLogic__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate);
+            revert Error.PuppetLogic__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate);
         }
 
         storedRule.throttleActivity = ruleParams.throttleActivity;
@@ -124,6 +124,8 @@ contract PuppetLogic is CoreContract {
 
         return storedRule;
     }
+
+    // internal
 
     function isArrayContains(IERC20[] memory array, IERC20 value) internal pure returns (bool) {
         for (uint i = 0; i < array.length; i++) {
@@ -145,8 +147,8 @@ contract PuppetLogic is CoreContract {
         uint tokenAllowance = store.getBalance(token, puppet);
         uint allowanceCap = store.getTokenAllowanceCap(token);
 
-        if (allowanceCap == 0) revert PuppetLogic__TokenNotAllowed();
-        if (tokenAllowance > allowanceCap) revert PuppetLogic__AllowanceAboveLimit(allowanceCap);
+        if (allowanceCap == 0) revert Error.PuppetLogic__TokenNotAllowed();
+        if (tokenAllowance > allowanceCap) revert Error.PuppetLogic__AllowanceAboveLimit(allowanceCap);
 
         return tokenAllowance;
     }
@@ -156,21 +158,15 @@ contract PuppetLogic is CoreContract {
     /// @notice Set the mint rate limit for the token.
     /// @param _config The new rate limit configuration.
     function setConfig(Config calldata _config) external auth {
-        _setConfig(_config);
-    }
+        if (_config.tokenAllowanceList.length != _config.tokenAllowanceAmountList.length) {
+            revert Error.PuppetLogic__InvalidLength();
+        }
 
-    /// @dev Internal function to set the configuration.
-    /// @param _config The configuration to set.
-    function _setConfig(Config memory _config) internal {
+        for (uint i; i < _config.tokenAllowanceList.length; i++) {
+            store.setTokenAllowanceCap(_config.tokenAllowanceList[i], _config.tokenAllowanceAmountList[i]);
+        }
+
         config = _config;
         logEvent("setConfig", abi.encode(_config));
     }
-
-    error PuppetLogic__InvalidAllowanceRate(uint min, uint max);
-    error PuppetLogic__ExpiredDate();
-    error PuppetLogic__NotFound();
-    error PuppetLogic__TokenNotAllowed();
-    error PuppetLogic__AllowanceAboveLimit(uint allowanceCap);
-    error PuppetLogic__InvalidAmount();
-    error PuppetLogic__InsufficientBalance();
 }

@@ -70,7 +70,7 @@ contract ContributeStore is BankStore {
 
     function contribute(
         IERC20 _token, //
-        address _depositor,
+        BankStore _bank,
         address _user,
         uint _amount
     ) external auth {
@@ -81,12 +81,12 @@ contract ContributeStore is BankStore {
         userContributionBalanceMap[_token][_user] += _amount;
         cursorBalanceMap[_token] += _amount;
 
-        transferIn(_token, _depositor, _amount);
+        interIn(_token, _bank, _amount);
     }
 
     function contributeMany(
-        IERC20 _token, //
-        address _depositor,
+        IERC20 _token,
+        BankStore _bank,
         address[] calldata _userList,
         uint[] calldata _valueList
     ) external auth {
@@ -105,7 +105,7 @@ contract ContributeStore is BankStore {
             _totalAmount += value;
         }
 
-        transferIn(_token, _depositor, _totalAmount);
+        interIn(_token, _bank, _totalAmount);
     }
 
     function getUserAccruedReward(address _user) external view returns (uint) {
