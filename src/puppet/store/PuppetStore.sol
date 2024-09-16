@@ -11,7 +11,7 @@ import {Auth} from "./../../utils/access/Auth.sol";
 import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 
 contract PuppetStore is BankStore {
-    struct Rule {
+    struct AllocationRule {
         uint throttleActivity;
         uint allowanceRate;
         uint expiry;
@@ -19,7 +19,7 @@ contract PuppetStore is BankStore {
 
     mapping(IERC20 token => uint) public tokenAllowanceCapMap;
     mapping(IERC20 token => mapping(address user => uint) name) userBalanceMap;
-    mapping(bytes32 ruleKey => Rule) public ruleMap; // ruleKey = keccak256(collateralToken, puppet, trader)
+    mapping(bytes32 ruleKey => AllocationRule) public allocationRuleMap; // ruleKey = keccak256(collateralToken, puppet, trader)
     mapping(address trader => mapping(address user => uint) name) public fundingActivityMap;
 
     constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
@@ -53,7 +53,6 @@ contract PuppetStore is BankStore {
 
     function increaseBalanceList(
         IERC20 _token,
-        address _depositor,
         address[] calldata _accountList,
         uint[] calldata _valueList
     ) external auth returns (uint) {
@@ -67,8 +66,6 @@ contract PuppetStore is BankStore {
             totalAmountIn += _valueList[i];
         }
 
-        transferIn(_token, _depositor, totalAmountIn);
-
         return totalAmountIn;
     }
 
@@ -78,12 +75,12 @@ contract PuppetStore is BankStore {
         return userBalanceMap[_token][_user] -= _value;
     }
 
-    function getRule(bytes32 _key) external view returns (Rule memory) {
-        return ruleMap[_key];
+    function getAllocationRule(bytes32 _key) external view returns (AllocationRule memory) {
+        return allocationRuleMap[_key];
     }
 
-    function setRule(bytes32 _key, Rule calldata _rule) external auth {
-        ruleMap[_key] = _rule;
+    function setAllocationRule(bytes32 _key, AllocationRule calldata _rule) external auth {
+        allocationRuleMap[_key] = _rule;
     }
 
     function decreaseBalanceList(
@@ -105,23 +102,23 @@ contract PuppetStore is BankStore {
         transferOut(_token, _receiver, totalAmountOut);
     }
 
-    function getRuleList(bytes32[] calldata _keyList) external view returns (Rule[] memory) {
+    function getRuleList(bytes32[] calldata _keyList) external view returns (AllocationRule[] memory) {
         uint _keyListLength = _keyList.length;
-        Rule[] memory _rules = new Rule[](_keyList.length);
+        AllocationRule[] memory _rules = new AllocationRule[](_keyList.length);
         for (uint i = 0; i < _keyListLength; i++) {
-            _rules[i] = ruleMap[_keyList[i]];
+            _rules[i] = allocationRuleMap[_keyList[i]];
         }
         return _rules;
     }
 
-    function setRuleList(bytes32[] calldata _keyList, Rule[] calldata _rules) external auth {
+    function setRuleList(bytes32[] calldata _keyList, AllocationRule[] calldata _rules) external auth {
         uint _keyListLength = _keyList.length;
         uint _ruleLength = _rules.length;
 
         if (_keyListLength != _ruleLength) revert Error.PuppetStore__InvalidLength();
 
         for (uint i = 0; i < _keyListLength; i++) {
-            ruleMap[_keyList[i]] = _rules[i];
+            allocationRuleMap[_keyList[i]] = _rules[i];
         }
     }
 
@@ -163,15 +160,15 @@ contract PuppetStore is BankStore {
         IERC20 collateralToken,
         address trader,
         address[] calldata _puppetList
-    ) external view returns (Rule[] memory _ruleList, uint[] memory _fundingActivityList, uint[] memory _valueList) {
+    ) external view returns (AllocationRule[] memory _ruleList, uint[] memory _fundingActivityList, uint[] memory _valueList) {
         uint _puppetListLength = _puppetList.length;
 
-        _ruleList = new Rule[](_puppetListLength);
+        _ruleList = new AllocationRule[](_puppetListLength);
         _fundingActivityList = new uint[](_puppetListLength);
         _valueList = new uint[](_puppetListLength);
 
         for (uint i = 0; i < _puppetListLength; i++) {
-            _ruleList[i] = ruleMap[PositionUtils.getRuleKey(collateralToken, _puppetList[i], trader)];
+            _ruleList[i] = allocationRuleMap[PositionUtils.getRuleKey(collateralToken, _puppetList[i], trader)];
             _fundingActivityList[i] = fundingActivityMap[trader][_puppetList[i]];
             _valueList[i] = userBalanceMap[collateralToken][_puppetList[i]];
         }

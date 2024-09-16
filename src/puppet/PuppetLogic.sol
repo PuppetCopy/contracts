@@ -48,28 +48,28 @@ contract PuppetLogic is CoreContract {
         logEvent("withdraw", abi.encode(token, user, balance));
     }
 
-    function setRule(
+    function setAllocationRule(
         IERC20 collateralToken,
         address puppet,
         address trader,
-        PuppetStore.Rule calldata ruleParams
+        PuppetStore.AllocationRule calldata ruleParams
     ) external auth {
-        bytes32 ruleKey = PositionUtils.getRuleKey(collateralToken, puppet, trader);
+        bytes32 key = PositionUtils.getRuleKey(collateralToken, puppet, trader);
         _validatePuppetTokenAllowance(collateralToken, puppet);
 
-        PuppetStore.Rule memory storedRule = store.getRule(ruleKey);
-        PuppetStore.Rule memory rule = _setRule(storedRule, ruleParams);
+        PuppetStore.AllocationRule memory storedRule = store.getAllocationRule(key);
+        PuppetStore.AllocationRule memory rule = _setRule(storedRule, ruleParams);
 
-        store.setRule(ruleKey, rule);
+        store.setAllocationRule(key, rule);
 
-        logEvent("setRule", abi.encode(ruleKey, rule));
+        logEvent("setRule", abi.encode(key, collateralToken, puppet, trader, rule));
     }
 
-    function setRuleList(
+    function setAllocationRuleList(
+        IERC20[] calldata collateralTokenList,
         address puppet,
         address[] calldata traderList,
-        IERC20[] calldata collateralTokenList,
-        PuppetStore.Rule[] calldata ruleParams
+        PuppetStore.AllocationRule[] calldata ruleParams
     ) external auth {
         IERC20[] memory verifyAllowanceTokenList = new IERC20[](0);
         uint length = traderList.length;
@@ -79,16 +79,18 @@ contract PuppetLogic is CoreContract {
             keyList[i] = PositionUtils.getRuleKey(collateralTokenList[i], puppet, traderList[i]);
         }
 
-        PuppetStore.Rule[] memory storedRuleList = store.getRuleList(keyList);
+        PuppetStore.AllocationRule[] memory storedRuleList = store.getRuleList(keyList);
 
         for (uint i = 0; i < length; i++) {
             storedRuleList[i] = _setRule(storedRuleList[i], ruleParams[i]);
 
-            if (isArrayContains(verifyAllowanceTokenList, collateralTokenList[i])) {
-                verifyAllowanceTokenList[verifyAllowanceTokenList.length] = collateralTokenList[i];
+            IERC20 collateralToken = collateralTokenList[i];
+
+            if (isArrayContains(verifyAllowanceTokenList, collateralToken)) {
+                verifyAllowanceTokenList[verifyAllowanceTokenList.length] = collateralToken;
             }
 
-            logEvent("setRuleList", abi.encode(keyList[i], storedRuleList[i]));
+            logEvent("setRuleList", abi.encode(keyList[i], collateralToken, puppet, traderList, storedRuleList[i]));
         }
 
         store.setRuleList(keyList, storedRuleList);
@@ -97,9 +99,9 @@ contract PuppetLogic is CoreContract {
     }
 
     function _setRule(
-        PuppetStore.Rule memory storedRule,
-        PuppetStore.Rule calldata ruleParams
-    ) internal view returns (PuppetStore.Rule memory) {
+        PuppetStore.AllocationRule memory storedRule,
+        PuppetStore.AllocationRule calldata ruleParams
+    ) internal view returns (PuppetStore.AllocationRule memory) {
         if (ruleParams.expiry == 0) {
             if (storedRule.expiry == 0) revert Error.PuppetLogic__NotFound();
 
