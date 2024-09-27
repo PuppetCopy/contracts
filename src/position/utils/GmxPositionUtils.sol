@@ -2,20 +2,18 @@
 pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-import {Subaccount} from "../../shared/Subaccount.sol";
 import {IGmxDatastore} from "../interface/IGmxDatastore.sol";
 
 library GmxPositionUtils {
     enum OrderType {
-        MarketSwap,
-        LimitSwap,
-        MarketIncrease,
-        LimitIncrease,
-        MarketDecrease,
-        LimitDecrease,
-        StopLossDecrease,
-        Liquidation
+        MarketSwap, // 0
+        LimitSwap, // 1
+        MarketIncrease, // 2
+        LimitIncrease, // 3
+        MarketDecrease, // 4
+        LimitDecrease, // 5
+        StopLossDecrease, // 6
+        Liquidation // 7
     }
 
     enum OrderExecutionStatus {

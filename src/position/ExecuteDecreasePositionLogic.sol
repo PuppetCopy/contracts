@@ -14,32 +14,15 @@ import {MirrorPositionStore} from "./store/MirrorPositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
 contract ExecuteDecreasePositionLogic is CoreContract {
-    struct Config {
-        address gmxOrderReciever;
-        uint performanceFeeRate;
-        uint traderPerformanceFeeShare;
-    }
-
-    struct CallParams {
-        uint recordedAmountIn;
-        uint profit;
-        uint performanceFee;
-        uint traderPerformanceFee;
-    }
-
     MirrorPositionStore positionStore;
     PuppetStore puppetStore;
-    ContributeStore contributeStore;
-    Config config;
 
     constructor(
         IAuthority _authority,
         EventEmitter _eventEmitter,
-        ContributeStore _contributeStore,
         PuppetStore _puppetStore,
         MirrorPositionStore _positionStore
     ) CoreContract("ExecuteDecreasePositionLogic", "1", _authority, _eventEmitter) {
-        contributeStore = _contributeStore;
         puppetStore = _puppetStore;
         positionStore = _positionStore;
     }
@@ -55,113 +38,33 @@ contract ExecuteDecreasePositionLogic is CoreContract {
             revert Error.ExecuteDecreasePositionLogic__RequestDoesNotExist();
         }
 
-        MirrorPositionStore.AllocationMatch memory allocation = positionStore.getAllocationMatch(request.positionKey);
         MirrorPositionStore.Position memory position = positionStore.getPosition(request.positionKey);
 
-        CallParams memory callParams = CallParams({
-            recordedAmountIn: puppetStore.recordedTransferIn(allocation.collateralToken),
-            performanceFee: 0,
-            traderPerformanceFee: 0,
-            profit: 0
-        });
-
-        if (position.traderSize == 0) {
-            revert Error.ExecuteDecreasePositionLogic__InvalidRequest(request.positionKey, requestKey);
+        if (position.size == 0) {
+            revert Error.ExecuteDecreasePositionLogic__PositionDoesNotExist();
         }
 
-        if (callParams.recordedAmountIn > position.puppetCollateral) {
-            callParams.profit = callParams.recordedAmountIn - position.puppetCollateral;
-        }
+        PuppetStore.AllocationMatch memory allocation = puppetStore.getAllocationMatch(request.routeKey);
 
-        position.traderSize -= request.traderSizeDelta;
-        position.traderCollateral -= request.traderCollateralDelta;
-        position.puppetSize -= request.puppetSizeDelta;
-        position.puppetCollateral -= request.puppetCollateralDelta;
+        uint recordedAmountIn = puppetStore.recordedTransferIn(position.collateralToken);
+        uint adjustedAmountOut = allocation.amountOut * request.sizeDelta / position.size;
+        uint profit = recordedAmountIn > adjustedAmountOut ? recordedAmountIn - adjustedAmountOut : 0;
+
+        puppetStore.setSettlement(request.routeKey, recordedAmountIn, profit);
+
+        position.size -= request.sizeDelta;
         position.cumulativeTransactionCost += request.transactionCost;
 
-        uint puppetListLength = allocation.puppetList.length;
-
-        uint[] memory collateralList = new uint[](puppetListLength);
-        uint[] memory contributionList = new uint[](puppetListLength);
-
-        for (uint i = 0; i < puppetListLength; i++) {
-            if (allocation.collateralList[i] == 0) continue;
-
-            (uint performanceFee, uint traderCutoff, uint amountOutAfterFee) = getDistribution(
-                allocation.collateralList[i] * callParams.profit / position.puppetCollateral,
-                config.performanceFeeRate,
-                config.traderPerformanceFeeShare
-            );
-
-            callParams.performanceFee += performanceFee;
-            callParams.traderPerformanceFee += traderCutoff;
-
-            collateralList[i] += amountOutAfterFee;
-            contributionList[i] = performanceFee;
-        }
-
-        puppetStore.increaseBalanceList(allocation.collateralToken, allocation.puppetList, collateralList);
-
-        if (callParams.profit > 0) {
-            contributeStore.contributeMany(
-                allocation.collateralToken, puppetStore, allocation.puppetList, contributionList
-            );
-
-            contributeStore.contribute(
-                allocation.collateralToken, puppetStore, allocation.trader, callParams.traderPerformanceFee
-            );
-        }
-
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
-        if (request.traderSizeDelta >= position.traderSize) {
-            positionStore.removePosition(request.positionKey);
-            positionStore.removeAllocationMatch(request.positionKey);
-        } else {
+        if (request.sizeDelta < position.size) {
             positionStore.setPosition(request.positionKey, position);
+        } else {
+            positionStore.removePosition(request.positionKey);
+            puppetStore.removeAllocationMatch(request.positionKey);
         }
 
         positionStore.removeRequestDecrease(requestKey);
 
-        logEvent(
-            "execute",
-            abi.encode(
-                requestKey,
-                request.positionKey,
-                position.traderSize,
-                position.traderCollateral,
-                position.puppetSize,
-                position.puppetCollateral,
-                position.cumulativeTransactionCost,
-                callParams.recordedAmountIn,
-                callParams.profit,
-                callParams.performanceFee,
-                callParams.traderPerformanceFee
-            )
-        );
-    }
-
-    function getDistribution(
-        uint profit,
-        uint performanceFeeRate,
-        uint traderPerformanceFeeShare
-    ) internal pure returns (uint performanceFee, uint traderPerformanceFee, uint amountOutAfterFee) {
-        if (profit == 0) return (0, 0, 0);
-
-        performanceFee = Precision.applyFactor(performanceFeeRate, profit);
-        amountOutAfterFee = profit - performanceFee;
-
-        traderPerformanceFee = Precision.applyFactor(traderPerformanceFeeShare, performanceFee);
-
-        performanceFee -= traderPerformanceFee;
-
-        return (performanceFee, traderPerformanceFee, amountOutAfterFee);
-    }
-
-    // governance
-
-    function setConfig(Config memory _config) external auth {
-        config = _config;
-
-        logEvent("setConfig", abi.encode(_config));
+        logEvent("Execute", abi.encode(requestKey, request.positionKey, position.size, recordedAmountIn, profit));
     }
 }

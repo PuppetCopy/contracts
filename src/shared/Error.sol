@@ -5,6 +5,8 @@ import {GmxPositionUtils} from "../position/utils/GmxPositionUtils.sol";
 
 library Error {
     error PuppetStore__InvalidLength();
+    error PuppetStore__TransferredOutAlready();
+    error PuppetStore__ZeroAllocation();
 
     error PuppetLogic__InvalidAllowanceRate(uint min, uint max);
     error PuppetLogic__ExpiredDate();
@@ -15,8 +17,9 @@ library Error {
     error PuppetLogic__InsufficientBalance();
     error PuppetLogic__InvalidLength();
 
-    error RequestPositionLogic__PuppetListLimitExceeded();
-    error RequestPositionLogic__ExistingRequestPending();
+    error RequestPositionLogic__ValueNotFound();
+    error RequestPositionLogic__PuppetListLimit();
+    error RequestPositionLogic__PendingAllocation();
     error RequestPositionLogic__UnsortedPuppetList();
     error RequestPositionLogic__DuplicatesInPuppetList();
 
@@ -25,9 +28,8 @@ library Error {
     error ExecuteDecreasePositionLogic__RequestDoesNotExist();
     error ExecuteDecreasePositionLogic__InvalidRequest(bytes32 positionKey, bytes32 key);
     error ExecuteDecreasePositionLogic__UnexpectedEventData();
-    error ExecuteDecreasePositionLogic__MismatchedRecordedAmountIn(uint recordedAmountIn, uint totalAmountIn);
+    error ExecuteDecreasePositionLogic__MismatchedAmountIn(uint recordedAmountIn, uint amountIn);
+    error ExecuteDecreasePositionLogic__PositionDoesNotExist();
 
     error PositionRouter__InvalidOrderType(GmxPositionUtils.OrderType orderType);
-
-
 }

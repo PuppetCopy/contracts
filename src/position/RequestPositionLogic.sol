@@ -12,15 +12,19 @@ import {Error} from "./../shared/Error.sol";
 import {Subaccount} from "./../shared/Subaccount.sol";
 import {ErrorUtils} from "./../utils/ErrorUtils.sol";
 import {Precision} from "./../utils/Precision.sol";
-import {IGmxDatastore} from "./interface/IGmxDataStore.sol";
+import {IGmxDatastore} from "./interface/IGmxDatastore.sol";
 import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
 import {MirrorPositionStore} from "./store/MirrorPositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
 contract RequestPositionLogic is CoreContract {
+    bytes32 constant GMX_DATASTORE_SIZE_IN_USD = keccak256(abi.encode("SIZE_IN_USD"));
+    bytes32 constant GMX_DATASTORE_COLLATERAL_AMOUNT = keccak256(abi.encode("COLLATERAL_AMOUNT"));
+
     struct Config {
         IGmxExchangeRouter gmxExchangeRouter;
+        IGmxDatastore gmxDatastore;
         address callbackHandler;
         address gmxFundsReciever;
         address gmxOrderVault;
@@ -30,23 +34,25 @@ contract RequestPositionLogic is CoreContract {
         uint minimumMatchAmount;
     }
 
-    struct OrderMirrorPosition {
-        address[] puppetList;
+    struct RequestMirrorPosition {
+        IERC20 collateralToken;
+        bytes32 originRequestKey;
+        bytes32 routeKey;
         address trader;
         address market;
-        IERC20 collateralToken;
         bool isIncrease;
         bool isLong;
+        GmxPositionUtils.OrderType orderType;
         uint executionFee;
         uint collateralDelta;
-        uint sizeDelta;
+        uint sizeDeltaInUsd;
         uint acceptablePrice;
         uint triggerPrice;
     }
 
     PuppetStore puppetStore;
     MirrorPositionStore positionStore;
-    Config config;
+    Config public config;
 
     constructor(
         IAuthority _authority,
@@ -59,10 +65,11 @@ contract RequestPositionLogic is CoreContract {
     }
 
     function submitOrder(
-        OrderMirrorPosition calldata order,
+        RequestMirrorPosition calldata order,
         Subaccount subaccount,
+        MirrorPositionStore.RequestAdjustment memory request,
         GmxPositionUtils.OrderType orderType,
-        MirrorPositionStore.RequestAdjustment memory request
+        uint collateralDelta
     ) internal returns (bytes32 requestKey) {
         (bool orderSuccess, bytes memory orderReturnData) = subaccount.execute(
             address(config.gmxExchangeRouter),
@@ -78,8 +85,8 @@ contract RequestPositionLogic is CoreContract {
                         swapPath: new address[](0)
                     }),
                     numbers: GmxPositionUtils.CreateOrderParamsNumbers({
-                        sizeDeltaUsd: request.puppetSizeDelta,
-                        initialCollateralDeltaAmount: request.puppetCollateralDelta,
+                        sizeDeltaUsd: request.sizeDelta,
+                        initialCollateralDeltaAmount: collateralDelta,
                         triggerPrice: order.triggerPrice,
                         acceptablePrice: order.acceptablePrice,
                         executionFee: order.executionFee,
@@ -100,170 +107,140 @@ contract RequestPositionLogic is CoreContract {
         }
 
         requestKey = abi.decode(orderReturnData, (bytes32));
+
         request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + order.executionFee;
         positionStore.setRequestAdjustment(requestKey, request);
     }
 
     function adjust(
-        OrderMirrorPosition calldata order,
-        MirrorPositionStore.Position memory mirrorPosition,
-        MirrorPositionStore.RequestAdjustment memory request
+        RequestMirrorPosition calldata order,
+        MirrorPositionStore.RequestAdjustment memory request,
+        Subaccount subaccount
     ) internal returns (bytes32 requestKey) {
-        uint leverage = Precision.toBasisPoints(mirrorPosition.traderSize, mirrorPosition.traderCollateral);
+        uint traderSize = getDatstoreValue(request.traderPositionKey, GMX_DATASTORE_SIZE_IN_USD);
+        uint traderCollateral = getDatstoreValue(request.traderPositionKey, GMX_DATASTORE_COLLATERAL_AMOUNT);
+        uint leverage = Precision.toBasisPoints(traderSize, traderCollateral);
         uint targetLeverage = order.isIncrease
-            ? Precision.toBasisPoints(
-                mirrorPosition.traderSize + order.sizeDelta, mirrorPosition.traderCollateral + order.collateralDelta
-            )
-            : order.sizeDelta < mirrorPosition.traderSize
-                ? Precision.toBasisPoints(
-                    mirrorPosition.traderSize - order.sizeDelta, mirrorPosition.traderCollateral - order.collateralDelta
-                )
+            ? Precision.toBasisPoints(traderSize + order.sizeDeltaInUsd, traderCollateral + order.collateralDelta)
+            : order.sizeDeltaInUsd < traderSize
+                ? Precision.toBasisPoints(traderSize - order.sizeDeltaInUsd, traderCollateral - order.collateralDelta)
                 : 0;
 
         if (targetLeverage > leverage) {
             uint deltaLeverage = targetLeverage - leverage;
-            request.puppetSizeDelta = mirrorPosition.traderSize * deltaLeverage / targetLeverage;
+            request.sizeDelta = traderSize * deltaLeverage / targetLeverage;
 
-            requestKey = submitOrder(order, request.subaccount, GmxPositionUtils.OrderType.MarketIncrease, request);
+            requestKey = submitOrder(order, subaccount, request, GmxPositionUtils.OrderType.MarketIncrease, 0);
+
             logEvent(
-                "requestIncrease", abi.encode(order.trader, requestKey, request.positionKey, request.puppetSizeDelta)
+                "RequestIncrease",
+                abi.encode(
+                    order.originRequestKey,
+                    requestKey,
+                    request.traderPositionKey,
+                    request.positionKey,
+                    request.sizeDelta,
+                    request.transactionCost,
+                    deltaLeverage
+                )
             );
         } else {
             uint deltaLeverage = leverage - targetLeverage;
-            request.puppetSizeDelta = mirrorPosition.traderSize * deltaLeverage / leverage;
+            request.sizeDelta = traderSize * deltaLeverage / leverage;
 
-            requestKey = submitOrder(order, request.subaccount, GmxPositionUtils.OrderType.MarketDecrease, request);
+            requestKey = submitOrder(order, subaccount, request, GmxPositionUtils.OrderType.MarketDecrease, 0);
+
             logEvent(
-                "requestDecrease", abi.encode(order.trader, requestKey, request.positionKey, request.puppetSizeDelta)
+                "RequestDecrease",
+                abi.encode(
+                    order.originRequestKey,
+                    requestKey,
+                    request.traderPositionKey,
+                    request.positionKey,
+                    request.sizeDelta,
+                    request.transactionCost,
+                    deltaLeverage
+                )
             );
         }
     }
 
-    function matchUp(
-        OrderMirrorPosition calldata order,
-        MirrorPositionStore.AllocationMatch memory allocation,
-        MirrorPositionStore.RequestAdjustment memory request
-    ) internal returns (bytes32 requestKey) {
-        (
-            PuppetStore.AllocationRule[] memory ruleList,
-            uint[] memory activityList,
-            uint[] memory balanceToAllocationList
-        ) = puppetStore.getBalanceAndActivityList(order.collateralToken, order.trader, order.puppetList);
-
-        uint puppetListLength = order.puppetList.length;
-
-        if (puppetListLength > config.limitPuppetList) {
-            revert Error.RequestPositionLogic__PuppetListLimitExceeded();
-        }
-
-        for (uint i = 0; i < puppetListLength; i++) {
-            // validate that puppet list calldata is sorted and has no duplicates
-            if (i > 0) {
-                if (order.puppetList[i - 1] > order.puppetList[i]) {
-                    revert Error.RequestPositionLogic__UnsortedPuppetList();
-                }
-                if (order.puppetList[i - 1] == order.puppetList[i]) {
-                    revert Error.RequestPositionLogic__DuplicatesInPuppetList();
-                }
-            }
-
-            PuppetStore.AllocationRule memory rule = ruleList[i];
-
-            // puppet rule expired or not set
-            if (
-                rule.expiry > block.timestamp
-                // current time is greater than  throttle activity period
-                || activityList[i] + rule.throttleActivity < block.timestamp
-                // has enough allowance or token allowance cap exists
-                || balanceToAllocationList[i] > config.minimumMatchAmount
-            ) {
-                // the lowest of either the allowance or the trader's deposit
-                uint collateralDelta = Math.min(
-                    Precision.applyBasisPoints(rule.allowanceRate, balanceToAllocationList[i]),
-                    order.collateralDelta // trader own deposit
-                );
-                request.puppetCollateralDelta += collateralDelta;
-                request.puppetSizeDelta += collateralDelta * order.sizeDelta / order.collateralDelta;
-
-                balanceToAllocationList[i] = collateralDelta;
-            } else {
-                balanceToAllocationList[i] = 0;
-            }
-
-            activityList[i] = block.timestamp;
-        }
-
-        puppetStore.transferOutAndUpdateActivityList(
-            order.collateralToken,
-            config.gmxOrderVault,
-            order.trader,
-            block.timestamp,
-            order.puppetList,
-            balanceToAllocationList
-        );
-
-        allocation.positionKey = request.positionKey;
-        allocation.mirrorPositionKey = request.mirrorPositionKey;
-        allocation.collateralToken = order.collateralToken;
-        allocation.trader = order.trader;
-        allocation.puppetList = order.puppetList;
-        allocation.collateralList = balanceToAllocationList;
-
-        positionStore.setAllocationMatch(request.positionKey, allocation);
-
-        requestKey = submitOrder(order, request.subaccount, GmxPositionUtils.OrderType.MarketIncrease, request);
-
-        logEvent(
-            "requestMatch",
-            abi.encode(
-                allocation.collateralToken,
-                allocation.trader,
-                allocation.puppetList,
-                allocation.collateralList,
-                requestKey,
-                request.positionKey,
-                request.puppetCollateralDelta,
-                request.puppetSizeDelta
-            )
-        );
-    }
-
-    function orderMirrorPosition(OrderMirrorPosition calldata order) external payable auth returns (bytes32) {
+    function mirror(RequestMirrorPosition calldata order) external payable auth returns (bytes32 requestKey) {
         uint startGas = gasleft();
-        Subaccount subaccount = positionStore.getSubaccount(order.trader);
+
+        Subaccount subaccount = positionStore.getSubaccount(order.routeKey);
         address subaccountAddress = address(subaccount);
 
         if (subaccountAddress == address(0)) {
-            subaccount = positionStore.createSubaccount(order.trader);
+            subaccount = positionStore.createSubaccount(order.routeKey, order.trader);
         }
 
         MirrorPositionStore.RequestAdjustment memory request = MirrorPositionStore.RequestAdjustment({
-            subaccount: subaccount,
-            mirrorPositionKey: GmxPositionUtils.getPositionKey(subaccountAddress, order.market, order.collateralToken, order.isLong),
-            // allocationKey: PositionUtils.getAllocationKey(order.collateralToken, order.trader),
-            positionKey: GmxPositionUtils.getPositionKey(order.trader, order.market, order.collateralToken, order.isLong),
-            traderSizeDelta: order.sizeDelta,
-            traderCollateralDelta: order.collateralDelta,
-            puppetSizeDelta: 0,
-            puppetCollateralDelta: 0,
+            routeKey: order.routeKey,
+            positionKey: GmxPositionUtils.getPositionKey(
+                subaccountAddress, order.market, order.collateralToken, order.isLong
+                ),
+            traderPositionKey: GmxPositionUtils.getPositionKey(
+                order.trader, order.market, order.collateralToken, order.isLong
+                ),
+            sizeDelta: 0,
             transactionCost: startGas
         });
 
         MirrorPositionStore.Position memory mirrorPosition = positionStore.getPosition(request.positionKey);
 
-        if (mirrorPosition.puppetSize == 0) {
-            // TODO: large allocations might exceed blockspace, we possibly need to handle it in a separate process
-            MirrorPositionStore.AllocationMatch memory allocation =
-                positionStore.getAllocationMatch(request.positionKey);
+        if (mirrorPosition.size == 0) {
+            PuppetStore.AllocationMatch memory allocation = puppetStore.getAllocationMatch(order.routeKey);
 
-            if (allocation.trader != address(0)) {
-                revert Error.RequestPositionLogic__ExistingRequestPending();
+            if (allocation.amountOut > 0) {
+                revert Error.RequestPositionLogic__PendingAllocation();
             }
 
-            return matchUp(order, allocation, request);
+            puppetStore.transferOutAllocation(
+                order.collateralToken, order.routeKey, config.gmxOrderVault, allocation.totalAllocated
+            );
+            requestKey =
+                submitOrder(order, subaccount, request, GmxPositionUtils.OrderType.MarketIncrease, allocation.amountOut);
+
+            logEvent(
+                "RequestIncrease",
+                abi.encode(
+                    order.originRequestKey,
+                    requestKey,
+                    request.traderPositionKey,
+                    request.positionKey,
+                    request.sizeDelta,
+                    request.transactionCost,
+                    0
+                )
+            );
         } else {
-            return adjust(order, mirrorPosition, request);
+            requestKey = adjust(order, request, subaccount);
         }
+    }
+
+    function allocate(
+        IERC20 collateralToken,
+        bytes32 originRequestKey,
+        bytes32 routeKey,
+        uint fromIndex,
+        uint toIndex
+    ) external auth {
+        uint startGas = gasleft();
+        (uint totalAllocated, PuppetStore.RouteAllocation[] memory _matchedAllocations) =
+            puppetStore.allocateList(collateralToken, routeKey, fromIndex, toIndex);
+        uint transactionCost = (startGas - gasleft()) * tx.gasprice;
+
+        logEvent(
+            "AllocateMatch",
+            abi.encode(
+                collateralToken, originRequestKey, routeKey, transactionCost, totalAllocated, _matchedAllocations
+            )
+        );
+    }
+
+    function getDatstoreValue(bytes32 positionKey, bytes32 prop) internal view returns (uint) {
+        return config.gmxDatastore.getUint(keccak256(abi.encode(positionKey, prop)));
     }
 
     // governance
@@ -272,6 +249,6 @@ contract RequestPositionLogic is CoreContract {
     /// @param _config The new rate limit configuration.
     function setConfig(Config calldata _config) external auth {
         config = _config;
-        logEvent("setConfig", abi.encode(_config));
+        logEvent("SetConfig", abi.encode(_config));
     }
 }

@@ -11,32 +11,17 @@ import {GmxPositionUtils} from "./../utils/GmxPositionUtils.sol";
 
 contract MirrorPositionStore is BankStore {
     struct RequestAdjustment {
-        Subaccount subaccount;
-        // bytes32 allocationKey;
+        bytes32 traderPositionKey;
+        bytes32 routeKey;
         bytes32 positionKey;
-        bytes32 mirrorPositionKey;
-        uint traderSizeDelta;
-        uint traderCollateralDelta;
-        uint puppetSizeDelta;
-        uint puppetCollateralDelta;
+        uint sizeDelta;
         uint transactionCost;
     }
 
-    struct AllocationMatch {
-        bytes32 positionKey;
-        bytes32 mirrorPositionKey;
-        IERC20 collateralToken;
-        address trader;
-        address[] puppetList;
-        uint[] collateralList;
-    }
-
     struct Position {
-        bytes32 allocationKey;
-        uint traderSize;
-        uint traderCollateral;
-        uint puppetSize;
-        uint puppetCollateral;
+        bytes32 routeKey;
+        IERC20 collateralToken;
+        uint size;
         uint cumulativeTransactionCost;
     }
 
@@ -46,26 +31,13 @@ contract MirrorPositionStore is BankStore {
         bytes eventData;
     }
 
-    mapping(bytes32 allocationKey => AllocationMatch) public allocationMatchMap;
+    mapping(bytes32 routeKey => Subaccount) routeSubaccountMap;
+    mapping(bytes32 routeKey => IERC20) routeTokenMap;
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
     mapping(bytes32 positionKey => Position) public positionMap;
     mapping(bytes32 positionKey => UnhandledCallback) public unhandledCallbackMap;
 
-    mapping(address => Subaccount) public subaccountMap;
-
     constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
-
-    function getAllocationMatch(bytes32 _key) external view returns (AllocationMatch memory) {
-        return allocationMatchMap[_key];
-    }
-
-    function setAllocationMatch(bytes32 _key, AllocationMatch calldata _val) external auth {
-        allocationMatchMap[_key] = _val;
-    }
-
-    function removeAllocationMatch(bytes32 _key) external auth {
-        delete allocationMatchMap[_key];
-    }
 
     function getRequestAdjustment(bytes32 _key) external view returns (RequestAdjustment memory) {
         return requestAdjustmentMap[_key];
@@ -115,11 +87,11 @@ contract MirrorPositionStore is BankStore {
         delete unhandledCallbackMap[_key];
     }
 
-    function getSubaccount(address _user) external view returns (Subaccount) {
-        return subaccountMap[_user];
+    function getSubaccount(bytes32 _key) external view returns (Subaccount) {
+        return routeSubaccountMap[_key];
     }
 
-    function createSubaccount(address _user) external auth returns (Subaccount) {
-        return subaccountMap[_user] = new Subaccount(this, _user);
+    function createSubaccount(bytes32 _key, address _account) external auth returns (Subaccount) {
+        return routeSubaccountMap[_key] = new Subaccount(this, _account);
     }
 }
