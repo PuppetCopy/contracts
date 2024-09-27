@@ -9,6 +9,8 @@ import {ExecuteDecreasePositionLogic} from "src/position/ExecuteDecreasePosition
 import {ExecuteIncreasePositionLogic} from "src/position/ExecuteIncreasePositionLogic.sol";
 import {ExecuteRevertedAdjustmentLogic} from "src/position/ExecuteRevertedAdjustmentLogic.sol";
 import {RequestPositionLogic} from "src/position/RequestPositionLogic.sol";
+import {SettleLogic} from "src/position/SettleLogic.sol";
+import {IGmxDatastore} from "src/position/interface/IGmxDatastore.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {MirrorPositionStore} from "src/position/store/MirrorPositionStore.sol";
 import {MirrorPositionStore} from "src/position/store/MirrorPositionStore.sol";
@@ -105,10 +107,9 @@ contract DeployTrading is BaseScript {
         dictator.setAccess(eventEmitter, address(executeIncreaseLogic));
         dictator.setAccess(positionStore, address(executeIncreaseLogic));
         ExecuteDecreasePositionLogic executeDecreaseLogic =
-            new ExecuteDecreasePositionLogic(dictator, eventEmitter, contributeStore, puppetStore, positionStore);
+            new ExecuteDecreasePositionLogic(dictator, eventEmitter, puppetStore, positionStore);
         dictator.setAccess(eventEmitter, address(executeDecreaseLogic));
         dictator.setAccess(positionStore, address(executeDecreaseLogic));
-        dictator.setAccess(contributeStore, address(executeDecreaseLogic));
 
         ExecuteRevertedAdjustmentLogic executeRevertedAdjustment =
             new ExecuteRevertedAdjustmentLogic(dictator, eventEmitter);
@@ -117,36 +118,43 @@ contract DeployTrading is BaseScript {
         dictator.setPermission(positionRouter, positionRouter.afterOrderExecution.selector, Address.gmxOrderHandler);
         dictator.setPermission(positionRouter, positionRouter.afterOrderCancellation.selector, Address.gmxOrderHandler);
         dictator.setPermission(positionRouter, positionRouter.afterOrderFrozen.selector, Address.gmxOrderHandler);
-
         dictator.setPermission(requestIncreaseLogic, requestIncreaseLogic.setConfig.selector, Address.dao);
+
+        SettleLogic settleLogic = new SettleLogic(dictator, eventEmitter, contributeStore, puppetStore);
+        dictator.setAccess(eventEmitter, address(executeDecreaseLogic));
+        dictator.setAccess(contributeStore, address(executeDecreaseLogic));
+        dictator.setAccess(puppetStore, address(executeDecreaseLogic));
+        dictator.setPermission(settleLogic, settleLogic.setConfig.selector, Address.dao);
+        settleLogic.setConfig(
+            SettleLogic.Config({performanceContributionRate: 0.1e30, traderPerformanceContributionShare: 0})
+        );
+
+        // config
+
         requestIncreaseLogic.setConfig(
             RequestPositionLogic.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
+                gmxDatastore: IGmxDatastore(Address.gmxDatastore),
                 callbackHandler: Address.PositionRouter,
                 gmxFundsReciever: Address.PuppetStore,
                 gmxOrderVault: Address.gmxOrderVault,
                 referralCode: Address.referralCode,
                 callbackGasLimit: 2_000_000,
-                limitPuppetList: 60,
+                limitPuppetList: 100,
                 minimumMatchAmount: 100e30
             })
         );
-        dictator.setPermission(executeDecreaseLogic, executeDecreaseLogic.setConfig.selector, Address.dao);
-        executeDecreaseLogic.setConfig(
-            ExecuteDecreasePositionLogic.Config({
-                gmxOrderReciever: address(positionStore),
-                performanceFeeRate: 0.1e30, // 10%
-                traderPerformanceFeeShare: 0.5e30 // shared between trader and platform
-            })
-        );
+
         dictator.setPermission(positionRouter, positionRouter.setConfig.selector, Address.dao);
         positionRouter.setConfig(
             PositionRouter.Config({
+                settleLogic: settleLogic,
                 executeIncrease: executeIncreaseLogic,
                 executeDecrease: executeDecreaseLogic,
                 executeRevertedAdjustment: executeRevertedAdjustment
             })
         );
-        dictator.setPermission(requestIncreaseLogic, requestIncreaseLogic.orderMirrorPosition.selector, Address.dao);
+        dictator.setPermission(requestIncreaseLogic, requestIncreaseLogic.allocate.selector, Address.dao);
+        dictator.setPermission(requestIncreaseLogic, requestIncreaseLogic.mirror.selector, Address.dao);
     }
 }

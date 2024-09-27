@@ -11,10 +11,12 @@ import {ExecuteDecreasePositionLogic} from "src/position/ExecuteDecreasePosition
 import {ExecuteIncreasePositionLogic} from "src/position/ExecuteIncreasePositionLogic.sol";
 import {ExecuteRevertedAdjustmentLogic} from "src/position/ExecuteRevertedAdjustmentLogic.sol";
 import {RequestPositionLogic} from "src/position/RequestPositionLogic.sol";
-import {IGmxDatastore} from "src/position/interface/IGmxDataStore.sol";
+import {SettleLogic} from "src/position/SettleLogic.sol";
+import {IGmxDatastore} from "src/position/interface/IGmxDatastore.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxOracle} from "src/position/interface/IGmxOracle.sol";
 import {MirrorPositionStore} from "src/position/store/MirrorPositionStore.sol";
+import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {PuppetLogic} from "src/puppet/PuppetLogic.sol";
 import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
@@ -74,10 +76,9 @@ contract TradingTest is BasicSetup {
         dictator.setAccess(eventEmitter, address(executeIncreaseLogic));
         dictator.setAccess(positionStore, address(executeIncreaseLogic));
         ExecuteDecreasePositionLogic executeDecreaseLogic =
-            new ExecuteDecreasePositionLogic(dictator, eventEmitter, contributeStore, puppetStore, positionStore);
+            new ExecuteDecreasePositionLogic(dictator, eventEmitter, puppetStore, positionStore);
         dictator.setAccess(eventEmitter, address(executeDecreaseLogic));
         dictator.setAccess(positionStore, address(executeDecreaseLogic));
-        dictator.setAccess(contributeStore, address(executeDecreaseLogic));
 
         ExecuteRevertedAdjustmentLogic executeRevertedAdjustment =
             new ExecuteRevertedAdjustmentLogic(dictator, eventEmitter);
@@ -106,23 +107,24 @@ contract TradingTest is BasicSetup {
         requestLogic.setConfig(
             RequestPositionLogic.Config({
                 gmxExchangeRouter: mockGmxExchangeRouter,
+                gmxDatastore: IGmxDatastore(Address.gmxDatastore),
                 callbackHandler: address(positionRouter),
-                gmxFundsReciever: address(puppetStore),
+                gmxFundsReciever: address(positionStore),
                 gmxOrderVault: Address.gmxOrderVault,
                 referralCode: Address.referralCode,
                 callbackGasLimit: 2_000_000,
-                limitPuppetList: 60,
+                limitPuppetList: 100,
                 minimumMatchAmount: 100e30
             })
         );
 
-        dictator.setPermission(executeDecreaseLogic, executeDecreaseLogic.setConfig.selector, users.owner);
-        executeDecreaseLogic.setConfig(
-            ExecuteDecreasePositionLogic.Config({
-                gmxOrderReciever: address(positionStore),
-                performanceFeeRate: 0.1e30, // 10%
-                traderPerformanceFeeShare: 0.5e30 // shared between trader and platform
-            })
+        SettleLogic settleLogic = new SettleLogic(dictator, eventEmitter, contributeStore, puppetStore);
+        dictator.setAccess(eventEmitter, address(executeDecreaseLogic));
+        dictator.setAccess(contributeStore, address(executeDecreaseLogic));
+        dictator.setAccess(puppetStore, address(executeDecreaseLogic));
+        dictator.setPermission(settleLogic, settleLogic.setConfig.selector, Address.dao);
+        settleLogic.setConfig(
+            SettleLogic.Config({performanceContributionRate: 0.1e30, traderPerformanceContributionShare: 0})
         );
 
         dictator.setPermission(puppetRouter, puppetRouter.setConfig.selector, users.owner);
@@ -131,6 +133,7 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(positionRouter, positionRouter.setConfig.selector, users.owner);
         positionRouter.setConfig(
             PositionRouter.Config({
+                settleLogic: settleLogic,
                 executeIncrease: executeIncreaseLogic,
                 executeDecrease: executeDecreaseLogic,
                 executeRevertedAdjustment: executeRevertedAdjustment
@@ -140,7 +143,8 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(positionRouter, positionRouter.afterOrderExecution.selector, Address.gmxOrderHandler);
         dictator.setPermission(positionRouter, positionRouter.afterOrderCancellation.selector, Address.gmxOrderHandler);
         dictator.setPermission(positionRouter, positionRouter.afterOrderFrozen.selector, Address.gmxOrderHandler);
-        dictator.setPermission(requestLogic, requestLogic.orderMirrorPosition.selector, users.owner);
+        dictator.setPermission(requestLogic, requestLogic.allocate.selector, users.owner);
+        dictator.setPermission(requestLogic, requestLogic.mirror.selector, users.owner);
     }
 
     function testIncreaseRequestInUsdc() public {
@@ -149,24 +153,30 @@ contract TradingTest is BasicSetup {
         uint estimatedGasLimit = 5_000_000;
         uint executionFee = tx.gasprice * estimatedGasLimit;
 
-        address[] memory puppetList = getGeneratePuppetList(usdc, trader, 10);
+        address[] memory puppetList = getGeneratePuppetList(usdc, trader, 15);
 
         // vm.startPrank(trader);
         vm.startPrank(users.owner);
 
-        requestLogic.orderMirrorPosition{value: executionFee}(
-            RequestPositionLogic.OrderMirrorPosition({
+        bytes32 routeKey = PositionUtils.getRouteKey(usdc, trader);
+        bytes32 mockOriginRequestKey = keccak256(abi.encodePacked(routeKey, uint(0)));
+
+        requestLogic.allocate(usdc, mockOriginRequestKey, PositionUtils.getRouteKey(usdc, trader), 0, 1000);
+        requestLogic.mirror{value: executionFee}(
+            RequestPositionLogic.RequestMirrorPosition({
                 trader: trader,
+                originRequestKey: mockOriginRequestKey,
+                routeKey: routeKey,
                 market: Address.gmxEthUsdcMarket,
                 collateralToken: usdc,
                 isIncrease: true,
                 isLong: true,
                 executionFee: executionFee,
-                collateralDelta: 100e6,
-                sizeDelta: 1000e30,
-                acceptablePrice: 3320e12,
-                triggerPrice: 3420e6,
-                puppetList: puppetList
+                orderType: GmxPositionUtils.OrderType.MarketIncrease,
+                collateralDelta: 1e18,
+                sizeDeltaInUsd: 30e30,
+                acceptablePrice: 1000e12,
+                triggerPrice: 1000e12
             })
         );
     }
@@ -197,11 +207,14 @@ contract TradingTest is BasicSetup {
         IERC20(collateralToken).approve(address(router), fundValue);
 
         puppetRouter.deposit(collateralToken, fundValue);
-
         puppetRouter.setAllocationRule(
             collateralToken, //
             trader,
-            PuppetStore.AllocationRule({throttleActivity: 0, allowanceRate: 1000, expiry: block.timestamp + 28 days})
+            PuppetStore.RouteAllocationRule({
+                throttleActivity: 0,
+                allowanceRate: 1000,
+                expiry: block.timestamp + 28 days
+            })
         );
 
         return user;

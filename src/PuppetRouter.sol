@@ -16,7 +16,7 @@ contract PuppetRouter is CoreContract, ReentrancyGuardTransient {
         PuppetLogic logic;
     }
 
-    Config config;
+    Config public config;
 
     constructor(
         IAuthority _authority,
@@ -34,13 +34,13 @@ contract PuppetRouter is CoreContract, ReentrancyGuardTransient {
     function setAllocationRule(
         IERC20 collateralToken,
         address trader,
-        PuppetStore.AllocationRule calldata ruleParams //
+        PuppetStore.RouteAllocationRule calldata ruleParams //
     ) external nonReentrant {
         config.logic.setAllocationRule(collateralToken, msg.sender, trader, ruleParams);
     }
 
     function setAllocationRuleList(
-        PuppetStore.AllocationRule[] calldata ruleParams, //
+        PuppetStore.RouteAllocationRule[] calldata ruleParams, //
         address[] calldata traderList,
         IERC20[] calldata collateralTokenList
     ) external nonReentrant {
@@ -53,6 +53,6 @@ contract PuppetRouter is CoreContract, ReentrancyGuardTransient {
     /// @param _config The new rate limit configuration.
     function setConfig(Config calldata _config) external auth {
         config = _config;
-        logEvent("setConfig", abi.encode(_config));
+        logEvent("SetConfig", abi.encode(_config));
     }
 }

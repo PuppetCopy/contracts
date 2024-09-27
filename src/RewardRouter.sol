@@ -20,7 +20,7 @@ contract RewardRouter is CoreContract, ReentrancyGuardTransient, Multicall {
         ContributeLogic contributeLogic;
     }
 
-    Config config;
+    Config public config;
 
     constructor(
         IAuthority _authority,
@@ -93,6 +93,6 @@ contract RewardRouter is CoreContract, ReentrancyGuardTransient, Multicall {
     /// @param _config The configuration to set.
     function _setConfig(Config memory _config) internal {
         config = _config;
-        logEvent("setConfig", abi.encode(_config));
+        logEvent("SetConfig", abi.encode(_config));
     }
 }

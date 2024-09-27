@@ -19,7 +19,7 @@ contract PuppetLogic is CoreContract {
         uint[] tokenAllowanceAmountList;
     }
 
-    Config config;
+    Config public config;
     PuppetStore store;
 
     constructor(
@@ -35,51 +35,51 @@ contract PuppetLogic is CoreContract {
 
         uint balance = store.increaseBalance(token, user, amount);
 
-        logEvent("deposit", abi.encode(token, user, balance));
+        logEvent("Deposit", abi.encode(token, user, balance));
     }
 
     function withdraw(IERC20 token, address user, address receiver, uint amount) external auth {
         if (amount == 0) revert Error.PuppetLogic__InvalidAmount();
 
-        if (amount > store.getBalance(token, user)) revert Error.PuppetLogic__InsufficientBalance();
+        if (amount > store.getUserBalance(token, user)) revert Error.PuppetLogic__InsufficientBalance();
 
         uint balance = store.decreaseBalance(token, user, receiver, amount);
 
-        logEvent("withdraw", abi.encode(token, user, balance));
+        logEvent("Withdraw", abi.encode(token, user, balance));
     }
 
     function setAllocationRule(
         IERC20 collateralToken,
         address puppet,
         address trader,
-        PuppetStore.AllocationRule calldata ruleParams
+        PuppetStore.RouteAllocationRule calldata ruleParams
     ) external auth {
-        bytes32 key = PositionUtils.getRuleKey(collateralToken, puppet, trader);
+        bytes32 routeKey = PositionUtils.getRouteKey(collateralToken, trader);
         _validatePuppetTokenAllowance(collateralToken, puppet);
 
-        PuppetStore.AllocationRule memory storedRule = store.getAllocationRule(key);
-        PuppetStore.AllocationRule memory rule = _setRule(storedRule, ruleParams);
+        PuppetStore.RouteAllocationRule memory storedRule = store.getAllocationRule(routeKey, puppet);
+        PuppetStore.RouteAllocationRule memory rule = _setRule(storedRule, ruleParams);
 
-        store.setAllocationRule(key, rule);
+        store.setRouteAllocationRule(routeKey, puppet, rule);
 
-        logEvent("setRule", abi.encode(key, collateralToken, puppet, trader, rule));
+        logEvent("SetRule", abi.encode(routeKey, collateralToken, puppet, trader, rule));
     }
 
     function setAllocationRuleList(
         IERC20[] calldata collateralTokenList,
         address puppet,
         address[] calldata traderList,
-        PuppetStore.AllocationRule[] calldata ruleParams
+        PuppetStore.RouteAllocationRule[] calldata ruleParams
     ) external auth {
         IERC20[] memory verifyAllowanceTokenList = new IERC20[](0);
         uint length = traderList.length;
         bytes32[] memory keyList = new bytes32[](length);
 
         for (uint i = 0; i < length; i++) {
-            keyList[i] = PositionUtils.getRuleKey(collateralTokenList[i], puppet, traderList[i]);
+            keyList[i] = PositionUtils.getRouteKey(collateralTokenList[i], traderList[i]);
         }
 
-        PuppetStore.AllocationRule[] memory storedRuleList = store.getRuleList(keyList);
+        PuppetStore.RouteAllocationRule[] memory storedRuleList = store.getPuppetAllocationRuleList(puppet, keyList);
 
         for (uint i = 0; i < length; i++) {
             storedRuleList[i] = _setRule(storedRuleList[i], ruleParams[i]);
@@ -90,18 +90,18 @@ contract PuppetLogic is CoreContract {
                 verifyAllowanceTokenList[verifyAllowanceTokenList.length] = collateralToken;
             }
 
-            logEvent("setRuleList", abi.encode(keyList[i], collateralToken, puppet, traderList, storedRuleList[i]));
+            logEvent("SetRuleList", abi.encode(keyList[i], collateralToken, puppet, traderList, storedRuleList[i]));
         }
 
-        store.setRuleList(keyList, storedRuleList);
-
         _validatePuppetTokenAllowanceList(verifyAllowanceTokenList, puppet);
+
+        store.setRouteAllocationRuleList(puppet, keyList, storedRuleList);
     }
 
     function _setRule(
-        PuppetStore.AllocationRule memory storedRule,
-        PuppetStore.AllocationRule calldata ruleParams
-    ) internal view returns (PuppetStore.AllocationRule memory) {
+        PuppetStore.RouteAllocationRule memory storedRule,
+        PuppetStore.RouteAllocationRule calldata ruleParams
+    ) internal view returns (PuppetStore.RouteAllocationRule memory) {
         if (ruleParams.expiry == 0) {
             if (storedRule.expiry == 0) revert Error.PuppetLogic__NotFound();
 
@@ -144,7 +144,7 @@ contract PuppetLogic is CoreContract {
     }
 
     function _validatePuppetTokenAllowance(IERC20 token, address puppet) internal view returns (uint) {
-        uint tokenAllowance = store.getBalance(token, puppet);
+        uint tokenAllowance = store.getUserBalance(token, puppet);
         uint allowanceCap = store.getTokenAllowanceCap(token);
 
         if (allowanceCap == 0) revert Error.PuppetLogic__TokenNotAllowed();
@@ -167,6 +167,6 @@ contract PuppetLogic is CoreContract {
         }
 
         config = _config;
-        logEvent("setConfig", abi.encode(_config));
+        logEvent("SetConfig", abi.encode(_config));
     }
 }
