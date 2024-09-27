@@ -37,7 +37,7 @@ abstract contract Permission {
     }
 
     function removePermission(bytes4 functionSig, address user) external checkAuthority {
-        delete permissionMap[functionSig][user];
+        permissionMap[functionSig][user] = false;
     }
 
     error Auth_Unauthorized();

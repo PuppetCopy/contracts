@@ -37,7 +37,7 @@ abstract contract Auth {
     }
 
     function removeAuth(address user) external checkAuthority {
-        delete authMap[user];
+        authMap[user] = false;
     }
 
     error Auth_Unauthorized();
