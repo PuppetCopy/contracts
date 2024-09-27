@@ -86,7 +86,7 @@ contract RewardLogic is CoreContract {
         store.setUserRewardCursor(user, cursor);
         store.transferOut(rewardToken, receiver, amount);
 
-        logEvent("claim()", abi.encode(user, receiver, amount));
+        logEvent("Claim", abi.encode(user, receiver, amount));
     }
 
     /// @notice Distributes the rewards to the users based on the current token emission rate and the time elapsed
@@ -116,7 +116,7 @@ contract RewardLogic is CoreContract {
 
         uint rewardPerToken = store.incrementCumulativePerContribution(Precision.toFactor(emission, supply));
 
-        logEvent("distribute()", abi.encode(rewardPerToken, supply, emission));
+        logEvent("Distribute", abi.encode(rewardPerToken, supply, emission));
 
         return rewardPerToken;
     }
@@ -152,7 +152,7 @@ contract RewardLogic is CoreContract {
     /// @param _config The configuration to set.
     function _setConfig(Config memory _config) internal {
         config = _config;
-        logEvent("setConfig", abi.encode(_config));
+        logEvent("SetConfig", abi.encode(_config));
     }
 
     /// @notice Error emitted when there is no claimable amount for a user

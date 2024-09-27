@@ -125,7 +125,7 @@ contract VotingEscrowLogic is CoreContract {
         store.setLockDuration(user, nextDuration);
         vToken.mint(user, amount);
 
-        logEvent("lock()", abi.encode(depositor, user, nextAmount, nextDuration, bonusAmount));
+        logEvent("Lock", abi.encode(depositor, user, nextAmount, nextDuration, bonusAmount));
     }
 
     /// @notice Initiates the vesting process for a user's locked tokens.
@@ -156,7 +156,7 @@ contract VotingEscrowLogic is CoreContract {
         store.setVested(user, vested);
         store.transferOut(token, receiver, amount);
 
-        logEvent("claim()", abi.encode(user, receiver, amount));
+        logEvent("Claim", abi.encode(user, receiver, amount));
     }
 
     // governance
@@ -172,7 +172,7 @@ contract VotingEscrowLogic is CoreContract {
     /// @param _config The new configuration parameters.
     function _setConfig(Config memory _config) internal {
         config = _config;
-        logEvent("setConfig", abi.encode(_config));
+        logEvent("SetConfig", abi.encode(_config));
     }
 
     // internal
@@ -188,7 +188,7 @@ contract VotingEscrowLogic is CoreContract {
 
         store.setVested(user, vested);
 
-        logEvent("vest()", abi.encode(user, receiver, vested));
+        logEvent("Vest", abi.encode(user, receiver, vested));
     }
 
     error VotingEscrowLogic__ZeroAmount();

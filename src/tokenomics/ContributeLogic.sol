@@ -82,7 +82,7 @@ contract ContributeLogic is CoreContract {
         store.setCursor(token, cursor + 1);
         store.setCursorBalance(token, 0);
 
-        logEvent("buyback()", abi.encode(token, depositor, receiver, cursor, revenueAmount, quoteAmount));
+        logEvent("Buyback", abi.encode(token, depositor, receiver, cursor, revenueAmount, quoteAmount));
     }
 
     /// @notice Claims the rewards for a specific token contribution.
@@ -110,7 +110,7 @@ contract ContributeLogic is CoreContract {
         store.setUserAccruedReward(user, accruedReward);
         rewardToken.mint(receiver, reward);
 
-        logEvent("claim()", abi.encode(user, accruedReward, reward));
+        logEvent("Claim", abi.encode(user, accruedReward, reward));
 
         return reward;
     }
@@ -134,7 +134,7 @@ contract ContributeLogic is CoreContract {
     /// @param _config The configuration to set.
     function _setConfig(Config memory _config) internal {
         config = _config;
-        logEvent("setConfig", abi.encode(_config));
+        logEvent("SetConfig", abi.encode(_config));
     }
 
     /// @notice Error emitted when the claim token is invalid
