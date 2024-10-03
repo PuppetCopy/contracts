@@ -4,6 +4,8 @@ pragma solidity 0.8.24;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 // import {PuppetStore} from "../puppet/store/PuppetStore.sol";
+
+import {PuppetStore} from "../puppet/store/PuppetStore.sol";
 import {Error} from "../shared/Error.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
@@ -12,16 +14,16 @@ import {MirrorPositionStore} from "./store/MirrorPositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
 contract ExecuteIncreasePositionLogic is CoreContract {
-    MirrorPositionStore positionStore;
-    // PuppetStore puppetStore;
+    MirrorPositionStore immutable positionStore;
+    PuppetStore immutable puppetStore;
 
     constructor(
         IAuthority _authority,
         EventEmitter _eventEmitter,
-        // PuppetStore _puppetStore,
+        PuppetStore _puppetStore,
         MirrorPositionStore _positionStore
     ) CoreContract("ExecuteIncreasePositionLogic", "1", _authority, _eventEmitter) {
-        // puppetStore = _puppetStore;
+        puppetStore = _puppetStore;
         positionStore = _positionStore;
     }
 
@@ -36,18 +38,21 @@ contract ExecuteIncreasePositionLogic is CoreContract {
             revert Error.ExecuteIncreasePositionLogic__RequestDoesNotExist();
         }
 
-        // PuppetStore.AllocationMatch memory allocation = puppetStore.getAllocationMatch(request.positionKey);
+        PuppetStore.Allocation memory allocation = puppetStore.getAllocation(request.matchKey);
 
-        MirrorPositionStore.Position memory position = positionStore.getPosition(request.positionKey);
-
-        position.size += request.sizeDelta;
-        position.cumulativeTransactionCost += request.transactionCost;
-
+        allocation.size += request.sizeDelta;
         positionStore.removeRequestAdjustment(requestKey);
-        positionStore.setPosition(requestKey, position);
 
         logEvent(
-            "Execute", abi.encode(requestKey, request.positionKey, position.size, position.cumulativeTransactionCost)
+            "Execute",
+            abi.encode(
+                requestKey,
+                request.traderPositionKey,
+                request.matchKey,
+                request.positionKey,
+                request.sizeDelta,
+                request.transactionCost
+            )
         );
     }
 }

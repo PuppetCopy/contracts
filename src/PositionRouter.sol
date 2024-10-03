@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {AllocationLogic} from "./position/AllocationLogic.sol";
 import {ExecuteDecreasePositionLogic} from "./position/ExecuteDecreasePositionLogic.sol";
 import {ExecuteIncreasePositionLogic} from "./position/ExecuteIncreasePositionLogic.sol";
 import {ExecuteRevertedAdjustmentLogic} from "./position/ExecuteRevertedAdjustmentLogic.sol";
-import {SettleLogic} from "./position/SettleLogic.sol";
 import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
 import {MirrorPositionStore} from "./position/store/MirrorPositionStore.sol";
 import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
@@ -16,14 +16,15 @@ import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
 contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallbackReceiver {
     struct Config {
-        SettleLogic settleLogic;
+        AllocationLogic settleLogic;
         ExecuteIncreasePositionLogic executeIncrease;
         ExecuteDecreasePositionLogic executeDecrease;
         ExecuteRevertedAdjustmentLogic executeRevertedAdjustment;
     }
 
+    MirrorPositionStore immutable positionStore;
+
     Config public config;
-    MirrorPositionStore positionStore;
 
     constructor(
         IAuthority _authority,

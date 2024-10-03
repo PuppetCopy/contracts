@@ -14,8 +14,14 @@ import {MirrorPositionStore} from "./store/MirrorPositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
 contract ExecuteDecreasePositionLogic is CoreContract {
-    MirrorPositionStore positionStore;
-    PuppetStore puppetStore;
+    struct Config {
+        uint _dummy;
+    }
+
+    PuppetStore immutable puppetStore;
+    MirrorPositionStore immutable positionStore;
+
+    Config public config;
 
     constructor(
         IAuthority _authority,
@@ -38,33 +44,50 @@ contract ExecuteDecreasePositionLogic is CoreContract {
             revert Error.ExecuteDecreasePositionLogic__RequestDoesNotExist();
         }
 
-        MirrorPositionStore.Position memory position = positionStore.getPosition(request.positionKey);
+        PuppetStore.Allocation memory allocation = puppetStore.getAllocation(request.matchKey);
 
-        if (position.size == 0) {
+        if (allocation.size == 0) {
             revert Error.ExecuteDecreasePositionLogic__PositionDoesNotExist();
         }
 
-        PuppetStore.AllocationMatch memory allocation = puppetStore.getAllocationMatch(request.routeKey);
-
-        uint recordedAmountIn = puppetStore.recordedTransferIn(position.collateralToken);
-        uint adjustedAmountOut = allocation.amountOut * request.sizeDelta / position.size;
-        uint profit = recordedAmountIn > adjustedAmountOut ? recordedAmountIn - adjustedAmountOut : 0;
-
-        puppetStore.setSettlement(request.routeKey, recordedAmountIn, profit);
-
-        position.size -= request.sizeDelta;
-        position.cumulativeTransactionCost += request.transactionCost;
-
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
-        if (request.sizeDelta < position.size) {
-            positionStore.setPosition(request.positionKey, position);
+        if (allocation.size > request.sizeDelta) {
+            puppetStore.removeAllocation(request.matchKey);
         } else {
-            positionStore.removePosition(request.positionKey);
-            puppetStore.removeAllocationMatch(request.positionKey);
+            allocation.size -= request.sizeDelta;
+            // allocation.cumulativeTransactionCost += request.transactionCost;
+
+            // positionStore.setPosition(request.positionKey, position);
+            puppetStore.setAllocation(request.matchKey, allocation);
         }
 
+        PuppetStore.Settlement memory settlement = PuppetStore.Settlement({
+            matchKey: request.matchKey,
+            settled: positionStore.recordTransferIn(allocation.token)
+        });
+
+        puppetStore.setSettlement(request.matchKey, settlement);
         positionStore.removeRequestDecrease(requestKey);
 
-        logEvent("Execute", abi.encode(requestKey, request.positionKey, position.size, recordedAmountIn, profit));
+        logEvent(
+            "Execute",
+            abi.encode(
+                requestKey,
+                request.traderPositionKey,
+                request.matchKey,
+                request.positionKey,
+                request.sizeDelta,
+                request.transactionCost,
+                settlement.settled
+            )
+        );
+    }
+
+    // governance
+
+    function setConfig(Config memory _config) external auth {
+        config = _config;
+
+        logEvent("SetConfig", abi.encode(_config));
     }
 }

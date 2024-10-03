@@ -8,7 +8,7 @@ import {PuppetStore} from "./puppet/store/PuppetStore.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
 import {EventEmitter} from "./utils/EventEmitter.sol";
 import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
-import {Auth} from "./utils/access/Auth.sol";
+import {Access} from "./utils/auth/Access.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
 contract PuppetRouter is CoreContract, ReentrancyGuardTransient {
@@ -31,20 +31,20 @@ contract PuppetRouter is CoreContract, ReentrancyGuardTransient {
         config.logic.withdraw(token, msg.sender, receiver, amount);
     }
 
-    function setAllocationRule(
+    function setMatchRule(
         IERC20 collateralToken,
         address trader,
-        PuppetStore.RouteAllocationRule calldata ruleParams //
+        PuppetStore.MatchRule calldata ruleParams //
     ) external nonReentrant {
-        config.logic.setAllocationRule(collateralToken, msg.sender, trader, ruleParams);
+        config.logic.setMatchRule(collateralToken, msg.sender, trader, ruleParams);
     }
 
-    function setAllocationRuleList(
-        PuppetStore.RouteAllocationRule[] calldata ruleParams, //
+    function setMatchRuleList(
+        PuppetStore.MatchRule[] calldata ruleParams, //
         address[] calldata traderList,
         IERC20[] calldata collateralTokenList
     ) external nonReentrant {
-        config.logic.setAllocationRuleList(collateralTokenList, msg.sender, traderList, ruleParams);
+        config.logic.setMatchRuleList(collateralTokenList, msg.sender, traderList, ruleParams);
     }
 
     // governance

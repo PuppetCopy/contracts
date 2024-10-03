@@ -30,14 +30,11 @@ contract RequestPositionLogic is CoreContract {
         address gmxOrderVault;
         bytes32 referralCode;
         uint callbackGasLimit;
-        uint limitPuppetList;
-        uint minimumMatchAmount;
     }
 
     struct RequestMirrorPosition {
         IERC20 collateralToken;
         bytes32 originRequestKey;
-        bytes32 routeKey;
         address trader;
         address market;
         bool isIncrease;
@@ -50,8 +47,9 @@ contract RequestPositionLogic is CoreContract {
         uint triggerPrice;
     }
 
-    PuppetStore puppetStore;
-    MirrorPositionStore positionStore;
+    PuppetStore immutable puppetStore;
+    MirrorPositionStore immutable positionStore;
+
     Config public config;
 
     constructor(
@@ -129,7 +127,6 @@ contract RequestPositionLogic is CoreContract {
         if (targetLeverage > leverage) {
             uint deltaLeverage = targetLeverage - leverage;
             request.sizeDelta = traderSize * deltaLeverage / targetLeverage;
-
             requestKey = submitOrder(order, subaccount, request, GmxPositionUtils.OrderType.MarketIncrease, 0);
 
             logEvent(
@@ -167,16 +164,16 @@ contract RequestPositionLogic is CoreContract {
 
     function mirror(RequestMirrorPosition calldata order) external payable auth returns (bytes32 requestKey) {
         uint startGas = gasleft();
-
-        Subaccount subaccount = positionStore.getSubaccount(order.routeKey);
+        bytes32 matchKey = PositionUtils.getMatchKey(order.collateralToken, order.trader);
+        Subaccount subaccount = positionStore.getSubaccount(matchKey);
         address subaccountAddress = address(subaccount);
 
         if (subaccountAddress == address(0)) {
-            subaccount = positionStore.createSubaccount(order.routeKey, order.trader);
+            subaccount = positionStore.createSubaccount(matchKey, order.trader);
         }
 
         MirrorPositionStore.RequestAdjustment memory request = MirrorPositionStore.RequestAdjustment({
-            routeKey: order.routeKey,
+            matchKey: matchKey,
             positionKey: GmxPositionUtils.getPositionKey(
                 subaccountAddress, order.market, order.collateralToken, order.isLong
                 ),
@@ -187,20 +184,26 @@ contract RequestPositionLogic is CoreContract {
             transactionCost: startGas
         });
 
-        MirrorPositionStore.Position memory mirrorPosition = positionStore.getPosition(request.positionKey);
+        // MirrorPositionStore.Position memory mirrorPosition = positionStore.getPosition(request.positionKey);
+        PuppetStore.Allocation memory allocation = puppetStore.getAllocation(matchKey);
 
-        if (mirrorPosition.size == 0) {
-            PuppetStore.AllocationMatch memory allocation = puppetStore.getAllocationMatch(order.routeKey);
-
-            if (allocation.amountOut > 0) {
-                revert Error.RequestPositionLogic__PendingAllocation();
+        if (allocation.size == 0) {
+            if (allocation.allocated == 0) {
+                revert Error.RequestPositionLogic__NoAllocation();
             }
 
+            if (allocation.amountOut > 0) revert Error.RequestPositionLogic__PendingSettlement();
+
             puppetStore.transferOutAllocation(
-                order.collateralToken, order.routeKey, config.gmxOrderVault, allocation.totalAllocated
+                order.collateralToken, matchKey, config.gmxOrderVault, allocation.allocated
             );
-            requestKey =
-                submitOrder(order, subaccount, request, GmxPositionUtils.OrderType.MarketIncrease, allocation.amountOut);
+            requestKey = submitOrder(
+                order, //
+                subaccount,
+                request,
+                GmxPositionUtils.OrderType.MarketIncrease,
+                allocation.allocated
+            );
 
             logEvent(
                 "RequestIncrease",
@@ -217,26 +220,6 @@ contract RequestPositionLogic is CoreContract {
         } else {
             requestKey = adjust(order, request, subaccount);
         }
-    }
-
-    function allocate(
-        IERC20 collateralToken,
-        bytes32 originRequestKey,
-        bytes32 routeKey,
-        uint fromIndex,
-        uint toIndex
-    ) external auth {
-        uint startGas = gasleft();
-        (uint totalAllocated, PuppetStore.RouteAllocation[] memory _matchedAllocations) =
-            puppetStore.allocateList(collateralToken, routeKey, fromIndex, toIndex);
-        uint transactionCost = (startGas - gasleft()) * tx.gasprice;
-
-        logEvent(
-            "AllocateMatch",
-            abi.encode(
-                collateralToken, originRequestKey, routeKey, transactionCost, totalAllocated, _matchedAllocations
-            )
-        );
     }
 
     function getDatstoreValue(bytes32 positionKey, bytes32 prop) internal view returns (uint) {

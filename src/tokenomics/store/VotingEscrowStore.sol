@@ -5,7 +5,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {BankStore} from "../../shared/store/BankStore.sol";
 import {Router} from "./../../shared/Router.sol";
-import {Auth} from "./../../utils/access/Auth.sol";
+import {Access} from "./../../utils/auth/Access.sol";
 import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 
 contract VotingEscrowStore is BankStore {

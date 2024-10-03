@@ -7,7 +7,7 @@ import {PuppetToken} from "../tokenomics/PuppetToken.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
 import {Precision} from "../utils/Precision.sol";
-import {Permission} from "../utils/access/Permission.sol";
+import {Permission} from "../utils/auth/Permission.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {PuppetVoteToken} from "./PuppetVoteToken.sol";
 import {VotingEscrowStore} from "./store/VotingEscrowStore.sol";
@@ -25,12 +25,13 @@ contract VotingEscrowLogic is CoreContract {
         uint baseMultiplier;
     }
 
-    /// @notice The configuration parameters for the RewardLogic
-    Config public config;
+    VotingEscrowStore immutable store;
 
     PuppetToken public immutable token;
     PuppetVoteToken public immutable vToken;
-    VotingEscrowStore public immutable store;
+
+    /// @notice The configuration parameters for the RewardLogic
+    Config public config;
 
     /// @notice Computes the current vesting state for a user, updating the amount and remaining duration.
     /// @dev Returns a Vested struct reflecting the state after accounting for the time elapsed since the last accrual.

@@ -2,8 +2,9 @@
 pragma solidity >=0.8.0;
 
 import {IAuthority} from "./../interfaces/IAuthority.sol";
+import {IPermission} from "./../interfaces/IPermission.sol";
 
-abstract contract Permission {
+abstract contract Permission is IPermission {
     IAuthority public immutable authority;
 
     mapping(bytes4 signatureHash => mapping(address => bool)) internal permissionMap;
@@ -32,11 +33,11 @@ abstract contract Permission {
         }
     }
 
-    function setPermission(bytes4 functionSig, address user) external checkAuthority {
+    function set(bytes4 functionSig, address user) external checkAuthority {
         permissionMap[functionSig][user] = true;
     }
 
-    function removePermission(bytes4 functionSig, address user) external checkAuthority {
+    function remove(bytes4 functionSig, address user) external checkAuthority {
         permissionMap[functionSig][user] = false;
     }
 

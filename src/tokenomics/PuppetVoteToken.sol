@@ -6,7 +6,7 @@ import {ERC20Votes} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Vo
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Permission} from "src/utils/access/Permission.sol";
+import {Permission} from "src/utils/auth/Permission.sol";
 import {IAuthority} from "src/utils/interfaces/IAuthority.sol";
 
 /// @title PuppetVoteToken

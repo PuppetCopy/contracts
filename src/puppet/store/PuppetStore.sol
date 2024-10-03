@@ -8,52 +8,67 @@ import {Error} from "../../shared/Error.sol";
 import {Router} from "./../../shared/Router.sol";
 import {BankStore} from "./../../shared/store/BankStore.sol";
 import {Precision} from "./../../utils/Precision.sol";
-import {Auth} from "./../../utils/access/Auth.sol";
 import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 
 contract PuppetStore is BankStore {
-    struct RouteAllocationRule {
-        uint throttleActivity;
+    struct MatchRule {
         uint allowanceRate;
-        uint expiry;
     }
 
-    struct RouteAllocation {
-        address puppet;
-        uint amount;
+    struct TradeRoute {
+        uint allowanceRate;
+        uint balance;
     }
 
-    struct IndexedMatchedAllocationList {
-        RouteAllocation[] list;
-        mapping(address value => uint) indexMap;
+    struct AllocationRule {
+        uint throttleActivity;
+        uint concurrentPositionLimit;
     }
 
-    struct AllocationMatch {
+    struct Allocation {
         IERC20 token;
-        uint allocatedCount;
-        uint totalAllocated;
+        uint allocated;
         uint amountOut;
-        uint atIndex;
+        uint size;
+        bytes32[] matchHashList;
     }
 
     struct Settlement {
-        uint amountIn;
-        uint profit;
-        uint atIndex;
-        bytes32 routeKey;
+        bytes32 matchKey;
+        uint settled;
     }
 
+    uint requestId = 0;
     mapping(IERC20 token => uint) tokenAllowanceCapMap;
-
-    mapping(bytes32 => mapping(address => RouteAllocationRule)) routeAllocationRuleMap;
-    mapping(bytes32 => IndexedMatchedAllocationList) routeIndexedMatchedAllocationListMap;
-    mapping(bytes32 => AllocationMatch) allocationMatchMap;
-    mapping(bytes32 => Settlement) settlementMap;
-
     mapping(IERC20 token => mapping(address user => uint)) userBalanceMap;
-    mapping(bytes32 routeKey => mapping(address puppet => uint)) allocationActivityMap;
+
+    mapping(address puppet => uint) activityThrottleMap;
+    mapping(address puppet => AllocationRule) allocationRuleMap;
+
+    mapping(bytes32 matchKey => mapping(address puppet => MatchRule)) matchRuleMap;
+    mapping(bytes32 matchKey => mapping(address puppet => uint amount)) userAllocationMap;
+    mapping(bytes32 matchKey => Allocation) slotAllocationMap;
+    mapping(bytes32 settlementKey => Settlement) settlementMap;
 
     constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
+
+    function getAllocationRule(address _puppet) external view returns (AllocationRule memory) {
+        return allocationRuleMap[_puppet];
+    }
+
+    function setAllocationRule(address _puppet, AllocationRule calldata _rule) external auth {
+        if (activityThrottleMap[_puppet] == 0) activityThrottleMap[_puppet] = 1;
+
+        allocationRuleMap[_puppet] = _rule;
+    }
+
+    function getRequestId() external view returns (uint) {
+        return requestId;
+    }
+
+    function incrementRequestId() external auth returns (uint) {
+        return requestId += 1;
+    }
 
     function getTokenAllowanceCap(IERC20 _token) external view returns (uint) {
         return tokenAllowanceCapMap[_token];
@@ -63,108 +78,15 @@ contract PuppetStore is BankStore {
         tokenAllowanceCapMap[_token] = _value;
     }
 
-    function allocateList(
-        IERC20 _token,
-        bytes32 _routeKey,
-        uint _fromIndex,
-        uint _toIndex
-    ) external auth returns (uint totalAllocated, RouteAllocation[] memory _matchedAllocations) {
-        AllocationMatch storage allocationMatch = allocationMatchMap[_routeKey];
-        uint setLength = routeIndexedMatchedAllocationListMap[_routeKey].list.length;
+    // function getUserBalance(IERC20 _token, address _account) external view returns (uint) {
+    //     return userBalanceMap[_token][_account];
+    // }
 
-        allocationMatch.token = _token;
-        (totalAllocated, _matchedAllocations) =
-            _processAllocations(_token, _routeKey, _fromIndex, Math.min(_toIndex, setLength));
-        allocationMatch.atIndex = _matchedAllocations.length;
-        allocationMatch.totalAllocated = totalAllocated;
-    }
+    // function increaseBalance(IERC20 _token, address _depositor, uint _value) external auth returns (uint) {
+    //     transferIn(_token, _depositor, _value);
 
-    function _processAllocations(
-        IERC20 _token,
-        bytes32 _routeKey,
-        uint _fromIndex,
-        uint _toIndex
-    ) internal returns (uint totalAllocated, RouteAllocation[] memory _matchedAllocations) {
-        IndexedMatchedAllocationList storage indexedList = routeIndexedMatchedAllocationListMap[_routeKey];
-
-        _matchedAllocations = new RouteAllocation[](_toIndex - _fromIndex);
-
-        for (uint i = _fromIndex; i < _toIndex; i++) {
-            RouteAllocation storage allocation = indexedList.list[i];
-            address puppet = allocation.puppet;
-            RouteAllocationRule storage rule = routeAllocationRuleMap[_routeKey][puppet];
-
-            if (rule.expiry < block.timestamp) {
-                // delete an element by swapping the last element with the current element
-                RouteAllocation memory lastValue = indexedList.list[indexedList.list.length - 1];
-
-                indexedList.list[i] = lastValue;
-                indexedList.indexMap[lastValue.puppet] = i + 1;
-
-                indexedList.list.pop();
-                delete indexedList.indexMap[puppet];
-                delete routeAllocationRuleMap[_routeKey][puppet];
-
-                // decrement the index to avoid skipping swapped element
-                i--;
-                continue;
-            }
-
-            if (allocationActivityMap[_routeKey][puppet] + rule.throttleActivity > block.timestamp) {
-                allocation.amount = 0;
-                continue;
-            }
-
-            allocationActivityMap[_routeKey][puppet] = block.timestamp;
-            allocation.amount = Precision.applyBasisPoints(rule.allowanceRate, userBalanceMap[_token][puppet]);
-            totalAllocated += allocation.amount;
-            _matchedAllocations[i] = allocation;
-        }
-    }
-
-    function transferOutAllocation(
-        IERC20 _token,
-        bytes32 _routeKey,
-        address _receiver,
-        uint _amountOut
-    ) external auth {
-        AllocationMatch storage allocationMatch = allocationMatchMap[_routeKey];
-        if (allocationMatch.amountOut > 0) revert Error.PuppetStore__TransferredOutAlready();
-        if (allocationMatch.totalAllocated == 0) revert Error.PuppetStore__ZeroAllocation();
-
-        allocationMatch.amountOut = _amountOut;
-        transferOut(_token, _receiver, _amountOut);
-    }
-
-    function getAllocationMatch(bytes32 _routeKey) external view returns (AllocationMatch memory) {
-        return allocationMatchMap[_routeKey];
-    }
-
-    function removeAllocationMatch(bytes32 _routeKey) external auth {
-        delete allocationMatchMap[_routeKey];
-    }
-
-    function settleRound(
-        IERC20 _token,
-        bytes32 _routeKey,
-        address[] calldata _puppetList,
-        uint[] calldata _amountList
-    ) external auth {
-        uint _puppetListLength = _puppetList.length;
-
-        if (_puppetListLength != _amountList.length) revert Error.PuppetStore__InvalidLength();
-
-        for (uint i = 0; i < _puppetListLength; i++) {
-            address _puppet = _puppetList[i];
-            uint _amount = _amountList[i];
-            userBalanceMap[_token][_puppet] += _amount;
-            allocationActivityMap[_routeKey][_puppet] = block.timestamp;
-        }
-    }
-
-    function getUserBalance(IERC20 _token, address _account) external view returns (uint) {
-        return userBalanceMap[_token][_account];
-    }
+    //     return userBalanceMap[_token][_depositor] += _value;
+    // }
 
     function getBalanceList(IERC20 _token, address[] calldata _accountList) external view returns (uint[] memory) {
         uint _accountListLength = _accountList.length;
@@ -175,10 +97,86 @@ contract PuppetStore is BankStore {
         return _balanceList;
     }
 
-    function increaseBalance(IERC20 _token, address _depositor, uint _value) external auth returns (uint) {
-        transferIn(_token, _depositor, _value);
+    function getUserAllocation(address _puppet, bytes32 _key) external view returns (uint) {
+        return userAllocationMap[_key][_puppet];
+    }
 
-        return userBalanceMap[_token][_depositor] += _value;
+    function setUserAllocation(bytes32 _key, address _puppet, uint _value) external auth {
+        userAllocationMap[_key][_puppet] = _value;
+    }
+
+    function getAllocationList(
+        bytes32 _key,
+        address[] calldata _puppetList
+    ) external view returns (uint[] memory _allocationList) {
+        uint _puppetListLength = _puppetList.length;
+        _allocationList = new uint[](_puppetListLength);
+
+        for (uint i = 0; i < _puppetListLength; i++) {
+            _allocationList[i] = userAllocationMap[_key][_puppetList[i]];
+        }
+
+        return _allocationList;
+    }
+
+    function allocate(
+        IERC20 _token,
+        bytes32 _matchKey,
+        address _puppet,
+        uint _allocationAmount
+    ) external auth returns (uint) {
+        userBalanceMap[_token][_puppet] -= _allocationAmount;
+        userAllocationMap[_matchKey][_puppet] = _allocationAmount;
+        slotAllocationMap[_matchKey].allocated += _allocationAmount;
+        activityThrottleMap[_puppet] = block.timestamp + allocationRuleMap[_puppet].throttleActivity;
+
+        return _allocationAmount;
+    }
+
+    function getAllocation(bytes32 _matchKey, address _puppet) public view auth returns (uint) {
+        return userAllocationMap[_matchKey][_puppet];
+    }
+
+    function allocatePuppetList(
+        IERC20 _token,
+        bytes32 _matchKey,
+        address[] calldata _puppetList,
+        uint[] calldata _amountList
+    ) external auth returns (uint) {
+        mapping(address => uint) storage balance = userBalanceMap[_token];
+        mapping(address => uint) storage allocationAmount = userAllocationMap[_matchKey];
+        uint listLength = _puppetList.length;
+        uint totalAllocated;
+
+        for (uint i = 0; i < listLength; i++) {
+            uint _allocation = _amountList[i];
+
+            if (_allocation <= 1) continue;
+
+            address _puppet = _puppetList[i];
+
+            balance[_puppet] -= _allocation;
+            allocationAmount[_puppet] += _allocation;
+            activityThrottleMap[_puppet] = block.timestamp + allocationRuleMap[_puppet].throttleActivity;
+            totalAllocated += _allocation;
+        }
+
+        slotAllocationMap[_matchKey].allocated += totalAllocated;
+        slotAllocationMap[_matchKey].matchHashList.push(keccak256(abi.encode(_puppetList)));
+
+        return totalAllocated;
+    }
+
+    function transferOutAllocation(
+        IERC20 _token,
+        bytes32 _allocationKey,
+        address _receiver,
+        uint _amountOut
+    ) external auth {
+        Allocation storage allocation = slotAllocationMap[_allocationKey];
+
+        transferOut(_token, _receiver, _amountOut);
+        allocation.amountOut = _amountOut;
     }
 
     function increaseBalanceList(
@@ -189,7 +187,7 @@ contract PuppetStore is BankStore {
         uint _accountListLength = _accountList.length;
         uint totalAmountIn;
 
-        if (_accountListLength != _valueList.length) revert Error.PuppetStore__InvalidLength();
+        if (_accountListLength != _valueList.length) revert Error.Store__InvalidLength();
 
         for (uint i = 0; i < _accountListLength; i++) {
             userBalanceMap[_token][_accountList[i]] += _valueList[i];
@@ -205,160 +203,158 @@ contract PuppetStore is BankStore {
         return userBalanceMap[_token][_user] -= _value;
     }
 
-    function getAllocationRule(bytes32 _routeKey, address puppet) external view returns (RouteAllocationRule memory) {
-        return routeAllocationRuleMap[_routeKey][puppet];
-    }
-
-    function getRouteAllocationRuleList(
+    function getMatchRuleList(
         address _puppet,
-        bytes32[] calldata _routeKeyList
-    ) external view returns (RouteAllocationRule[] memory) {
-        uint _keyListLength = _routeKeyList.length;
-        RouteAllocationRule[] memory _ruleList = new RouteAllocationRule[](_keyListLength);
+        bytes32[] calldata _matchKeyList
+    ) external view returns (MatchRule[] memory) {
+        uint _keyListLength = _matchKeyList.length;
+        MatchRule[] memory _ruleList = new MatchRule[](_keyListLength);
 
         for (uint i = 0; i < _keyListLength; i++) {
-            _ruleList[i] = routeAllocationRuleMap[_routeKeyList[i]][_puppet];
+            _ruleList[i] = matchRuleMap[_matchKeyList[i]][_puppet];
         }
 
         return _ruleList;
     }
 
-    function setRouteAllocationRule(
-        bytes32 _routeKey,
-        address puppet,
-        RouteAllocationRule calldata _rule
-    ) public auth returns (uint index) {
-        IndexedMatchedAllocationList storage indexedList = routeIndexedMatchedAllocationListMap[_routeKey];
+    function getMatchRule(bytes32 _matchKey, address _puppet) external view returns (MatchRule memory) {
+        return matchRuleMap[_matchKey][_puppet];
+    }
 
-        index = indexedList.indexMap[puppet];
+    function setMatchRule(bytes32 _matchKey, address _puppet, MatchRule calldata _rule) external auth {
+        mapping(address => uint) storage amountMap = userAllocationMap[_matchKey];
 
-        if (index == 0) {
-            indexedList.list.push(RouteAllocation(puppet, 0));
-            indexedList.indexMap[puppet] = routeIndexedMatchedAllocationListMap[_routeKey].list.length;
+        // Initialize allocation amount to 1 to pre-allocate storage slot
+        if (amountMap[_puppet] == 0) {
+            amountMap[_puppet] = 1;
         }
 
-        routeAllocationRuleMap[_routeKey][puppet] = _rule;
+        matchRuleMap[_matchKey][_puppet] = _rule;
     }
 
-    function getRouteAllocationList(bytes32 _routeKey) external view returns (RouteAllocation[] memory) {
-        return routeIndexedMatchedAllocationListMap[_routeKey].list;
-    }
-
-    function setRouteAllocationRuleList(
+    function setRouteRuleList(
         address _puppet,
-        bytes32[] calldata _routeKeyList,
-        RouteAllocationRule[] calldata _rules
-    ) external auth returns (uint[] memory _indexList) {
-        uint _keyListLength = _routeKeyList.length;
-        _indexList = new uint[](_keyListLength);
+        bytes32[] calldata _matchKeyList,
+        MatchRule[] calldata _rules
+    ) external auth {
+        uint _keyListLength = _matchKeyList.length;
+        if (_keyListLength != _rules.length) revert Error.Store__InvalidLength();
 
         for (uint i = 0; i < _keyListLength; i++) {
-            _indexList[i] = setRouteAllocationRule(_routeKeyList[i], _puppet, _rules[i]);
+            bytes32 _key = _matchKeyList[i];
+
+            mapping(address => uint) storage amountMap = userAllocationMap[_key];
+
+            // Initialize allocation amount to 1 to pre-allocate storage slot
+            if (amountMap[_puppet] == 0) {
+                amountMap[_puppet] = 1;
+            }
+
+            matchRuleMap[_key][_puppet] = _rules[i];
         }
     }
 
-    function getPuppetAllocationRuleList(
+    function getPuppetRouteRuleList(
         address _puppet,
-        bytes32[] calldata _routeKeyList
-    ) external view returns (RouteAllocationRule[] memory) {
-        uint _keyListLength = _routeKeyList.length;
-        RouteAllocationRule[] memory _ruleList = new RouteAllocationRule[](_keyListLength);
+        bytes32[] calldata _matchKeyList
+    ) external view returns (MatchRule[] memory) {
+        uint _keyListLength = _matchKeyList.length;
+        MatchRule[] memory _ruleList = new MatchRule[](_keyListLength);
 
         for (uint i = 0; i < _keyListLength; i++) {
-            _ruleList[i] = routeAllocationRuleMap[_routeKeyList[i]][_puppet];
+            _ruleList[i] = matchRuleMap[_matchKeyList[i]][_puppet];
         }
 
         return _ruleList;
     }
 
-    function getAllocationActivityList(
-        bytes32 _routeKey,
-        address[] calldata puppetList
-    ) external view returns (uint[] memory) {
+    function getActivityThrottleList(address[] calldata puppetList) external view returns (uint[] memory) {
         uint _puppetListLength = puppetList.length;
         uint[] memory _activityList = new uint[](_puppetListLength);
 
         for (uint i = 0; i < _puppetListLength; i++) {
-            _activityList[i] = allocationActivityMap[_routeKey][puppetList[i]];
+            _activityList[i] = activityThrottleMap[puppetList[i]];
         }
 
         return _activityList;
     }
 
-    function setAllocationActivity(bytes32 _routeKey, address puppet, uint _time) external auth {
-        allocationActivityMap[_routeKey][puppet] = _time;
+    function setActivityThrottle(address puppet, uint _time) external auth {
+        activityThrottleMap[puppet] = _time;
     }
 
-    function getAllocationActivity(bytes32 _routeKey, address puppet) external view returns (uint) {
-        return allocationActivityMap[_routeKey][puppet];
+    function getActivityThrottle(address puppet) external view returns (uint) {
+        return activityThrottleMap[puppet];
     }
 
-    function getBalanceAndActivityList(
+    function getBalanceAndActivityThrottle(
         IERC20 _token,
-        bytes32 _routeKey,
+        bytes32 _matchKey,
+        address _puppet
+    ) external view returns (MatchRule memory _rule, uint _allocationActivity, uint _balance) {
+        return (matchRuleMap[_matchKey][_puppet], activityThrottleMap[_puppet], userBalanceMap[_token][_puppet]);
+    }
+
+    function getBalanceAndActivityThrottleList(
+        IERC20 _token,
+        bytes32 _matchKey,
         address[] calldata _puppetList
-    )
-        external
-        view
-        returns (
-            RouteAllocationRule[] memory _ruleList,
-            uint[] memory _allocationActivityList,
-            uint[] memory _valueList
-        )
-    {
+    ) external view returns (MatchRule[] memory _ruleList, uint[] memory _activityList, uint[] memory _balanceList) {
         uint _puppetListLength = _puppetList.length;
 
-        _ruleList = new RouteAllocationRule[](_puppetListLength);
-        _allocationActivityList = new uint[](_puppetListLength);
-        _valueList = new uint[](_puppetListLength);
+        _ruleList = new MatchRule[](_puppetListLength);
+        _activityList = new uint[](_puppetListLength);
+        _balanceList = new uint[](_puppetListLength);
+
+        mapping(address => MatchRule) storage matchRule = matchRuleMap[_matchKey];
 
         for (uint i = 0; i < _puppetListLength; i++) {
             address _puppet = _puppetList[i];
-            _ruleList[i] = routeAllocationRuleMap[_routeKey][_puppet];
-            _allocationActivityList[i] = allocationActivityMap[_routeKey][_puppet];
-            _valueList[i] = userBalanceMap[_token][_puppet];
+            _ruleList[i] = matchRule[_puppet];
+            _activityList[i] = activityThrottleMap[_puppet];
+            _balanceList[i] = userBalanceMap[_token][_puppet];
         }
-        return (_ruleList, _allocationActivityList, _valueList);
+        return (_ruleList, _activityList, _balanceList);
     }
 
-    function getAllocationMatchList(bytes32 _routeKey) external view returns (AllocationMatch memory) {
-        return allocationMatchMap[_routeKey];
+    function getAllocation(bytes32 _matchKey) external view returns (Allocation memory) {
+        return slotAllocationMap[_matchKey];
     }
 
-    function setAllocationMatch(bytes32 _routeKey, AllocationMatch calldata _allocationMatch) external auth {
-        allocationMatchMap[_routeKey] = _allocationMatch;
+    function setAllocation(bytes32 _matchKey, Allocation calldata _settlement) external auth {
+        slotAllocationMap[_matchKey] = _settlement;
     }
 
-    function setSettlement(bytes32 _routeKey, uint _amountIn, uint _profit) external auth {
-        settlementMap[_routeKey] = Settlement({amountIn: _amountIn, atIndex: 0, profit: _profit, routeKey: _routeKey});
+    function removeAllocation(bytes32 _matchKey) external auth {
+        delete slotAllocationMap[_matchKey];
     }
 
-    function getSettlement(bytes32 _routeKey) external view returns (Settlement memory) {
-        return settlementMap[_routeKey];
+    function getSettlement(bytes32 _settlementKey) external view returns (Settlement memory) {
+        return settlementMap[_settlementKey];
+    }
+
+    function setSettlement(bytes32 _settlementKey, Settlement calldata _settlement) external auth {
+        settlementMap[_settlementKey] = _settlement;
+    }
+
+    function settle(IERC20 _token, address _puppet, uint _settleAmount) external auth {
+        userBalanceMap[_token][_puppet] += _settleAmount;
     }
 
     function settleList(
         IERC20 _token,
-        bytes32 _routeKey,
-        uint _fromIndex,
-        uint _toIndex,
-        uint _settlementAmountInAfterFee
-    ) external auth returns (address[] memory _puppetContributionList, uint[] memory _puppetContributionAmountList) {
-        Settlement storage settlement = settlementMap[_routeKey];
-        IndexedMatchedAllocationList storage indexedList = routeIndexedMatchedAllocationListMap[_routeKey];
+        address[] calldata _puppetList,
+        uint[] calldata _settleAmountList
+    ) external auth {
+        mapping(address => uint) storage tokenBalanceMap = userBalanceMap[_token];
 
-        _puppetContributionList = new address[](_toIndex - _fromIndex);
-        _puppetContributionAmountList = new uint[](_toIndex - _fromIndex);
-
-        for (uint i = _fromIndex; i < _toIndex; i++) {
-            RouteAllocation memory allocation = indexedList.list[i];
-            uint amountIn = allocation.amount * _settlementAmountInAfterFee / settlement.amountIn;
-            userBalanceMap[_token][allocation.puppet] += amountIn;
-            _puppetContributionList[i] = allocation.puppet;
-            _puppetContributionAmountList[i] = amountIn;
+        uint _puppetListLength = _puppetList.length;
+        for (uint i = 0; i < _puppetListLength; i++) {
+            tokenBalanceMap[_puppetList[i]] += _settleAmountList[i];
         }
+    }
 
-        settlement.atIndex = _puppetContributionList.length;
-        delete allocationMatchMap[_routeKey];
+    function removeSettlement(bytes32 _matchKey) external auth {
+        delete settlementMap[_matchKey];
     }
 }

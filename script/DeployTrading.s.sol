@@ -5,11 +5,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {PositionRouter} from "src/PositionRouter.sol";
 import {PuppetRouter} from "src/PuppetRouter.sol";
+
+import {AllocationLogic} from "src/position/AllocationLogic.sol";
 import {ExecuteDecreasePositionLogic} from "src/position/ExecuteDecreasePositionLogic.sol";
 import {ExecuteIncreasePositionLogic} from "src/position/ExecuteIncreasePositionLogic.sol";
 import {ExecuteRevertedAdjustmentLogic} from "src/position/ExecuteRevertedAdjustmentLogic.sol";
 import {RequestPositionLogic} from "src/position/RequestPositionLogic.sol";
-import {SettleLogic} from "src/position/SettleLogic.sol";
 import {IGmxDatastore} from "src/position/interface/IGmxDatastore.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {MirrorPositionStore} from "src/position/store/MirrorPositionStore.sol";
@@ -75,16 +76,19 @@ contract DeployTrading is BaseScript {
         puppetLogic.setConfig(
             PuppetLogic.Config({
                 minExpiryDuration: 1 days,
-                minAllowanceRate: 1000,
-                maxAllowanceRate: 10000,
+                minRouteRate: 100, // 10 basis points
+                maxRouteRate: 10000,
+                minAllocationActivity: 3600,
+                maxAllocationActivity: 604800,
+                concurrentPositionLimit: 10,
                 tokenAllowanceList: tokenAllowanceCapList,
                 tokenAllowanceAmountList: tokenAllowanceCapAmountList
             })
         );
 
         dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
-        dictator.setPermission(puppetLogic, puppetLogic.setAllocationRule.selector, address(puppetRouter));
-        dictator.setPermission(puppetLogic, puppetLogic.setAllocationRuleList.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.setMatchRule.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.setMatchRuleList.selector, address(puppetRouter));
 
         dictator.setPermission(puppetRouter, puppetRouter.setConfig.selector, Address.dao);
         puppetRouter.setConfig(PuppetRouter.Config({logic: puppetLogic}));
@@ -103,7 +107,7 @@ contract DeployTrading is BaseScript {
         dictator.setAccess(positionStore, address(requestIncreaseLogic));
 
         ExecuteIncreasePositionLogic executeIncreaseLogic =
-            new ExecuteIncreasePositionLogic(dictator, eventEmitter, positionStore);
+            new ExecuteIncreasePositionLogic(dictator, eventEmitter, puppetStore, positionStore);
         dictator.setAccess(eventEmitter, address(executeIncreaseLogic));
         dictator.setAccess(positionStore, address(executeIncreaseLogic));
         ExecuteDecreasePositionLogic executeDecreaseLogic =
@@ -120,13 +124,18 @@ contract DeployTrading is BaseScript {
         dictator.setPermission(positionRouter, positionRouter.afterOrderFrozen.selector, Address.gmxOrderHandler);
         dictator.setPermission(requestIncreaseLogic, requestIncreaseLogic.setConfig.selector, Address.dao);
 
-        SettleLogic settleLogic = new SettleLogic(dictator, eventEmitter, contributeStore, puppetStore);
+        AllocationLogic settleLogic =
+            new AllocationLogic(dictator, eventEmitter, contributeStore, puppetStore, positionStore);
         dictator.setAccess(eventEmitter, address(executeDecreaseLogic));
         dictator.setAccess(contributeStore, address(executeDecreaseLogic));
         dictator.setAccess(puppetStore, address(executeDecreaseLogic));
         dictator.setPermission(settleLogic, settleLogic.setConfig.selector, Address.dao);
         settleLogic.setConfig(
-            SettleLogic.Config({performanceContributionRate: 0.1e30, traderPerformanceContributionShare: 0})
+            AllocationLogic.Config({
+                limitAllocationListLength: 100,
+                performanceContributionRate: 0.1e30,
+                traderPerformanceContributionShare: 0
+            })
         );
 
         // config
@@ -139,9 +148,7 @@ contract DeployTrading is BaseScript {
                 gmxFundsReciever: Address.PuppetStore,
                 gmxOrderVault: Address.gmxOrderVault,
                 referralCode: Address.referralCode,
-                callbackGasLimit: 2_000_000,
-                limitPuppetList: 100,
-                minimumMatchAmount: 100e30
+                callbackGasLimit: 2_000_000
             })
         );
 
@@ -154,7 +161,9 @@ contract DeployTrading is BaseScript {
                 executeRevertedAdjustment: executeRevertedAdjustment
             })
         );
-        dictator.setPermission(requestIncreaseLogic, requestIncreaseLogic.allocate.selector, Address.dao);
+
+        // Allocator
+        dictator.setPermission(requestIncreaseLogic, settleLogic.allocate.selector, Address.dao);
         dictator.setPermission(requestIncreaseLogic, requestIncreaseLogic.mirror.selector, Address.dao);
     }
 }

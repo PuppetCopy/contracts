@@ -23,17 +23,17 @@ contract RewardLogic is CoreContract {
         BankStore distributionStore;
     }
 
-    /// @notice The configuration parameters for the RewardLogic
-    Config public config;
-
     /// @notice The contract used for minting rewards.
     IERC20 public immutable rewardToken;
 
-    /// @notice The RewardStore contract used for tracking reward accruals
-    RewardStore public immutable store;
-
     /// @notice The token contract used for voting power
     IERC20 public immutable vToken;
+
+    /// @notice The RewardStore contract used for tracking reward accruals
+    RewardStore immutable store;
+
+    /// @notice The configuration parameters for the RewardLogic
+    Config public config;
 
     function getPendingEmission() public view returns (uint reward) {
         uint timeElapsed = block.timestamp - store.lastDistributionTimestamp();
@@ -112,7 +112,7 @@ contract RewardLogic is CoreContract {
 
         if (emission == 0 || supply == 0) return store.cumulativeRewardPerToken();
 
-        store.interIn(rewardToken, config.distributionStore, emission);
+        store.interTransferIn(rewardToken, config.distributionStore, emission);
 
         uint rewardPerToken = store.incrementCumulativePerContribution(Precision.toFactor(emission, supply));
 

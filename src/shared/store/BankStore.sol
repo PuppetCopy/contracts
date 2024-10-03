@@ -4,17 +4,17 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Router} from "../Router.sol";
-import {Auth} from "./../../utils/access/Auth.sol";
+import {Access} from "./../../utils/auth/Access.sol";
 import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 
 // @title Bank
 // @dev Contract to handle storing and transferring of tokens
-abstract contract BankStore is Auth {
+abstract contract BankStore is Access {
     mapping(IERC20 => uint) public tokenBalanceMap;
 
-    Router router;
+    Router immutable router;
 
-    constructor(IAuthority _authority, Router _router) Auth(_authority) {
+    constructor(IAuthority _authority, Router _router) Access(_authority) {
         router = _router;
     }
 
@@ -22,14 +22,14 @@ abstract contract BankStore is Auth {
         return tokenBalanceMap[_token];
     }
 
-    function recordedTransferIn(IERC20 _token) public auth returns (uint) {
+    function recordTransferIn(IERC20 _token) public auth returns (uint) {
         uint prevBalance = tokenBalanceMap[_token];
         uint currentBalance = _syncTokenBalance(_token);
 
         return currentBalance - prevBalance;
     }
 
-    function interIn(IERC20 _token, BankStore _bank, uint _value) public auth {
+    function interTransferIn(IERC20 _token, BankStore _bank, uint _value) public auth {
         _bank.transferOut(_token, address(this), _value);
         tokenBalanceMap[_token] += _value;
     }

@@ -10,7 +10,7 @@ import {VotingEscrowLogic} from "./tokenomics/VotingEscrowLogic.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
 import {EventEmitter} from "./utils/EventEmitter.sol";
 import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
-import {Auth} from "./utils/access/Auth.sol";
+import {Access} from "./utils/auth/Access.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
 contract RewardRouter is CoreContract, ReentrancyGuardTransient, Multicall {

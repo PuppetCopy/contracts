@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {Auth} from "./../utils/access/Auth.sol";
+import {Access} from "./../utils/auth/Access.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 
 // @title EventEmitter
@@ -10,10 +10,10 @@ import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 // Logic contracts can be updated while re-using the same eventEmitter contract
 // Peripheral services like monitoring or analytics would be able to continue
 // to work without an update and without segregating historical data
-contract EventEmitter is Auth {
+contract EventEmitter is Access {
     event LogEvent(address operator, string name, string version, string method, bytes data);
 
-    constructor(IAuthority _authority) Auth(_authority) {
+    constructor(IAuthority _authority) Access(_authority) {
         authority = _authority;
     }
 

@@ -23,14 +23,14 @@ contract ContributeLogic is CoreContract {
         uint baselineEmissionRate;
     }
 
-    /// @notice The configuration parameters for the ContributeLogic
-    Config public config;
+    /// @notice The RewardStore contract used for tracking reward accruals
+    ContributeStore immutable store;
 
     /// @notice The contract used for minting rewards.
     IERC20Mintable public immutable rewardToken;
 
-    /// @notice The RewardStore contract used for tracking reward accruals
-    ContributeStore public immutable store;
+    /// @notice The configuration parameters for the ContributeLogic
+    Config public config;
 
     function getCursorRewardList(IERC20[] calldata tokenList, address user) external view returns (uint[] memory) {
         return store.getPendingCursorRewardList(tokenList, user);

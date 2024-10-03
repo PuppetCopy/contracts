@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import {EventEmitter} from "./EventEmitter.sol";
-import {Permission} from "./access/Permission.sol";
+import {Permission} from "./auth/Permission.sol";
 import {IAuthority} from "./interfaces/IAuthority.sol";
 
 abstract contract CoreContract is Permission, EIP712 {

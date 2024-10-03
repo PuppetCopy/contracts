@@ -81,7 +81,7 @@ contract ContributeStore is BankStore {
         userContributionBalanceMap[_token][_user] += _amount;
         cursorBalanceMap[_token] += _amount;
 
-        interIn(_token, _bank, _amount);
+        interTransferIn(_token, _bank, _amount);
     }
 
     function contributeMany(
@@ -105,7 +105,7 @@ contract ContributeStore is BankStore {
             _totalAmount += value;
         }
 
-        interIn(_token, _bank, _totalAmount);
+        interTransferIn(_token, _bank, _totalAmount);
     }
 
     function getUserAccruedReward(address _user) external view returns (uint) {

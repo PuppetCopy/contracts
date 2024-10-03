@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {Auth} from "../utils/access/Auth.sol";
+import {IAccess} from "../utils/interfaces/IAccess.sol";
 
 contract Subaccount {
-    Auth store;
+    IAccess store;
     address public account;
 
-    constructor(Auth _store, address _account) {
+    constructor(IAccess _store, address _account) {
         store = _store;
         account = _account;
     }

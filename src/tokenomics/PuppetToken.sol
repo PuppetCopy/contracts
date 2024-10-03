@@ -7,7 +7,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
 import {Precision} from "../utils/Precision.sol";
-import {Permission} from "../utils/access/Permission.sol";
+import {Permission} from "../utils/auth/Permission.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {IERC20Mintable} from "../utils/interfaces/IERC20Mintable.sol";
 
@@ -39,20 +39,20 @@ contract PuppetToken is CoreContract, ERC20, IERC20Mintable {
         uint durationWindow;
     }
 
-    /// @notice The current configuration.
-    Config public config;
-
     /// @dev The timestamp of the last mint operation.
     uint lastMintTime = block.timestamp;
 
     /// @dev The current mint capacity.
     uint emissionRate;
 
+    /// @notice The amount of tokens minted to the core.
+    uint public mintedCoreAmount = 0;
+
     /// @notice The timestamp when the contract was deployed.
     uint public immutable deployTimestamp = block.timestamp;
 
-    /// @notice The amount of tokens minted to the core.
-    uint public mintedCoreAmount = 0;
+    /// @notice The current configuration.
+    Config public config;
 
     /// @notice Initializes the contract with authority, configuration, and initial receiver of
     /// genesis mint.

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity >=0.8.0;
 
+import {IAccess} from "./../interfaces/IAccess.sol";
 import {IAuthority} from "./../interfaces/IAuthority.sol";
 
-abstract contract Auth {
+abstract contract Access is IAccess {
     IAuthority public immutable authority;
 
     mapping(address => bool) internal authMap;
@@ -32,11 +33,11 @@ abstract contract Auth {
         }
     }
 
-    function setAuth(address user) external checkAuthority {
+    function set(address user) external checkAuthority {
         authMap[user] = true;
     }
 
-    function removeAuth(address user) external checkAuthority {
+    function remove(address user) external checkAuthority {
         authMap[user] = false;
     }
 

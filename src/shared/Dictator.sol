@@ -3,15 +3,15 @@ pragma solidity 0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-import {Auth} from "./../utils/access/Auth.sol";
-import {Permission} from "./../utils/access/Permission.sol";
+import {Access} from "./../utils/auth/Access.sol";
+import {Permission} from "./../utils/auth/Permission.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 
 contract Dictator is Ownable, IAuthority {
     event UpdateAccess(address target, bool enabled);
     event UpdatePermission(address target, bytes4 functionSig, bool enabled);
 
-    function hasAccess(Auth target, address user) external view returns (bool) {
+    function hasAccess(Access target, address user) external view returns (bool) {
         return target.canCall(user);
     }
 
@@ -21,26 +21,26 @@ contract Dictator is Ownable, IAuthority {
 
     constructor(address _owner) Ownable(_owner) {}
 
-    function setAccess(Auth target, address user) public virtual onlyOwner {
-        target.setAuth(user);
+    function setAccess(Access target, address user) public virtual onlyOwner {
+        target.set(user);
 
         emit UpdateAccess(user, true);
     }
 
-    function removeAccess(Auth target, address user) public virtual onlyOwner {
-        target.removeAuth(user);
+    function removeAccess(Access target, address user) public virtual onlyOwner {
+        target.remove(user);
 
         emit UpdateAccess(user, false);
     }
 
     function setPermission(Permission target, bytes4 functionSig, address user) public virtual onlyOwner {
-        target.setPermission(functionSig, user);
+        target.set(functionSig, user);
 
         emit UpdatePermission(user, functionSig, true);
     }
 
     function removePermission(Permission target, bytes4 functionSig, address user) public virtual onlyOwner {
-        target.removePermission(functionSig, user);
+        target.remove(functionSig, user);
 
         emit UpdatePermission(user, functionSig, false);
     }
