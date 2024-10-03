@@ -63,7 +63,7 @@ contract ExecuteDecreasePositionLogic is CoreContract {
 
         PuppetStore.Settlement memory settlement = PuppetStore.Settlement({
             matchKey: request.matchKey,
-            settled: positionStore.recordTransferIn(allocation.token)
+            settled: positionStore.recordTransferIn(allocation.collateralToken)
         });
 
         puppetStore.setSettlement(request.matchKey, settlement);

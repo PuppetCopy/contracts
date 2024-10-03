@@ -164,7 +164,7 @@ contract RequestPositionLogic is CoreContract {
 
     function mirror(RequestMirrorPosition calldata order) external payable auth returns (bytes32 requestKey) {
         uint startGas = gasleft();
-        bytes32 matchKey = PositionUtils.getMatchKey(order.collateralToken, order.trader);
+        bytes32 matchKey = PositionUtils.getMatchKey(order.collateralToken, order.market, order.trader);
         Subaccount subaccount = positionStore.getSubaccount(matchKey);
         address subaccountAddress = address(subaccount);
 

@@ -64,6 +64,8 @@ contract TradingTest is BasicSetup {
         dictator.setAccess(eventEmitter, address(puppetRouter));
 
         dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.withdraw.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.setAllocationRule.selector, address(puppetRouter));
         dictator.setPermission(puppetLogic, puppetLogic.setMatchRule.selector, address(puppetRouter));
         dictator.setPermission(puppetLogic, puppetLogic.setMatchRuleList.selector, address(puppetRouter));
 
@@ -154,12 +156,13 @@ contract TradingTest is BasicSetup {
     }
 
     function testIncreaseRequestInUsdc() public {
+        skip(100);
         address trader = users.bob;
 
         uint estimatedGasLimit = 5_000_000;
         uint executionFee = tx.gasprice * estimatedGasLimit;
 
-        address[] memory puppetList = getGeneratePuppetList(usdc, trader, 100);
+        address[] memory puppetList = getGeneratePuppetList(usdc, Address.gmxEthUsdcMarket, trader, 100);
 
         // vm.startPrank(trader);
         vm.startPrank(users.owner);
@@ -167,7 +170,12 @@ contract TradingTest is BasicSetup {
         bytes32 mockOriginRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
 
         settleLogic.allocate(
-            AllocationLogic.AllocateParams({collateralToken: usdc, trader: trader, puppetList: puppetList})
+            AllocationLogic.AllocateParams({
+                collateralToken: usdc,
+                market: Address.gmxEthUsdcMarket,
+                trader: trader,
+                puppetList: puppetList
+            })
         );
         // requestLogic.mirror{value: executionFee}(
         //     RequestPositionLogic.RequestMirrorPosition({
@@ -189,19 +197,22 @@ contract TradingTest is BasicSetup {
 
     function getGeneratePuppetList(
         IERC20 collateralToken,
+        address market,
         address trader,
         uint _length
     ) internal returns (address[] memory) {
         address[] memory puppetList = new address[](_length);
         for (uint i; i < _length; i++) {
-            puppetList[i] =
-                createPuppet(collateralToken, trader, string(abi.encodePacked("puppet:", Strings.toString(i))), 100e6);
+            puppetList[i] = createPuppet(
+                collateralToken, market, trader, string(abi.encodePacked("puppet:", Strings.toString(i))), 100e6
+            );
         }
         return sortAddresses(puppetList);
     }
 
     function createPuppet(
         IERC20 collateralToken,
+        address market,
         address trader,
         string memory name,
         uint fundValue
@@ -213,10 +224,11 @@ contract TradingTest is BasicSetup {
         IERC20(collateralToken).approve(address(router), fundValue);
 
         puppetRouter.deposit(collateralToken, fundValue);
+        puppetRouter.setAllocationRule(
+            collateralToken, user, PuppetStore.AllocationRule({throttleActivity: 3600, concurrentPositionLimit: 5})
+        );
         puppetRouter.setMatchRule(
-            collateralToken, //
-            trader,
-            PuppetStore.MatchRule({allowanceRate: 1000})
+            trader, PuppetStore.MatchRule({collateralToken: collateralToken, market: market, allowanceRate: 1000})
         );
 
         return user;

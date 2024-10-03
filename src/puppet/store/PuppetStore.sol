@@ -12,6 +12,8 @@ import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 
 contract PuppetStore is BankStore {
     struct MatchRule {
+        IERC20 collateralToken;
+        address market;
         uint allowanceRate;
     }
 
@@ -26,7 +28,7 @@ contract PuppetStore is BankStore {
     }
 
     struct Allocation {
-        IERC20 token;
+        IERC20 collateralToken;
         uint allocated;
         uint amountOut;
         uint size;
@@ -78,15 +80,15 @@ contract PuppetStore is BankStore {
         tokenAllowanceCapMap[_token] = _value;
     }
 
-    // function getUserBalance(IERC20 _token, address _account) external view returns (uint) {
-    //     return userBalanceMap[_token][_account];
-    // }
+    function getUserBalance(IERC20 _token, address _account) external view returns (uint) {
+        return userBalanceMap[_token][_account];
+    }
 
-    // function increaseBalance(IERC20 _token, address _depositor, uint _value) external auth returns (uint) {
-    //     transferIn(_token, _depositor, _value);
+    function increaseBalance(IERC20 _token, address _depositor, uint _value) external auth returns (uint) {
+        transferIn(_token, _depositor, _value);
 
-    //     return userBalanceMap[_token][_depositor] += _value;
-    // }
+        return userBalanceMap[_token][_depositor] += _value;
+    }
 
     function getBalanceList(IERC20 _token, address[] calldata _accountList) external view returns (uint[] memory) {
         uint _accountListLength = _accountList.length;
@@ -141,7 +143,7 @@ contract PuppetStore is BankStore {
         IERC20 _token,
         bytes32 _matchKey,
         address[] calldata _puppetList,
-        uint[] calldata _amountList
+        uint[] calldata _allocationList
     ) external auth returns (uint) {
         mapping(address => uint) storage balance = userBalanceMap[_token];
         mapping(address => uint) storage allocationAmount = userAllocationMap[_matchKey];
@@ -149,7 +151,7 @@ contract PuppetStore is BankStore {
         uint totalAllocated;
 
         for (uint i = 0; i < listLength; i++) {
-            uint _allocation = _amountList[i];
+            uint _allocation = _allocationList[i];
 
             if (_allocation <= 1) continue;
 
@@ -232,13 +234,15 @@ contract PuppetStore is BankStore {
         matchRuleMap[_matchKey][_puppet] = _rule;
     }
 
-    function setRouteRuleList(
+    function setMatchRuleList(
         address _puppet,
         bytes32[] calldata _matchKeyList,
         MatchRule[] calldata _rules
     ) external auth {
         uint _keyListLength = _matchKeyList.length;
         if (_keyListLength != _rules.length) revert Error.Store__InvalidLength();
+
+        mapping(address => MatchRule) storage matchRule = matchRuleMap[_matchKeyList[0]];
 
         for (uint i = 0; i < _keyListLength; i++) {
             bytes32 _key = _matchKeyList[i];
@@ -250,7 +254,7 @@ contract PuppetStore is BankStore {
                 amountMap[_puppet] = 1;
             }
 
-            matchRuleMap[_key][_puppet] = _rules[i];
+            matchRule[_puppet] = _rules[i];
         }
     }
 
@@ -291,18 +295,22 @@ contract PuppetStore is BankStore {
         IERC20 _token,
         bytes32 _matchKey,
         address _puppet
-    ) external view returns (MatchRule memory _rule, uint _allocationActivity, uint _balance) {
-        return (matchRuleMap[_matchKey][_puppet], activityThrottleMap[_puppet], userBalanceMap[_token][_puppet]);
+    ) external view returns (uint _rate, uint _allocationActivity, uint _balance) {
+        return (
+            matchRuleMap[_matchKey][_puppet].allowanceRate,
+            activityThrottleMap[_puppet],
+            userBalanceMap[_token][_puppet]
+        );
     }
 
     function getBalanceAndActivityThrottleList(
         IERC20 _token,
         bytes32 _matchKey,
         address[] calldata _puppetList
-    ) external view returns (MatchRule[] memory _ruleList, uint[] memory _activityList, uint[] memory _balanceList) {
+    ) external view returns (uint[] memory _rateList, uint[] memory _activityList, uint[] memory _balanceList) {
         uint _puppetListLength = _puppetList.length;
 
-        _ruleList = new MatchRule[](_puppetListLength);
+        _rateList = new uint[](_puppetListLength);
         _activityList = new uint[](_puppetListLength);
         _balanceList = new uint[](_puppetListLength);
 
@@ -310,11 +318,11 @@ contract PuppetStore is BankStore {
 
         for (uint i = 0; i < _puppetListLength; i++) {
             address _puppet = _puppetList[i];
-            _ruleList[i] = matchRule[_puppet];
+            _rateList[i] = matchRule[_puppet].allowanceRate;
             _activityList[i] = activityThrottleMap[_puppet];
             _balanceList[i] = userBalanceMap[_token][_puppet];
         }
-        return (_ruleList, _activityList, _balanceList);
+        return (_rateList, _activityList, _balanceList);
     }
 
     function getAllocation(bytes32 _matchKey) external view returns (Allocation memory) {

@@ -64,88 +64,57 @@ contract PuppetLogic is CoreContract {
         logEvent("SetAllocationRule", abi.encode(collateralToken, puppet, rule));
     }
 
-    function setMatchRule(
-        IERC20 collateralToken,
-        address puppet,
-        address trader,
-        PuppetStore.MatchRule calldata ruleParams
-    ) external auth {
-        bytes32 matchKey = PositionUtils.getMatchKey(collateralToken, trader);
-        _validatePuppetTokenAllowance(collateralToken, puppet);
+    function setMatchRule(address puppet, address trader, PuppetStore.MatchRule calldata ruleParams) external auth {
+        bytes32 key = PositionUtils.getMatchKey(ruleParams.collateralToken, ruleParams.market, trader);
 
-        PuppetStore.MatchRule memory storedRule = store.getMatchRule(matchKey, puppet);
-        PuppetStore.MatchRule memory rule = _setRouteRule(storedRule, ruleParams);
+        validatePuppetTokenAllowance(ruleParams.collateralToken, puppet);
+        _validateRuleParams(ruleParams);
 
-        store.setMatchRule(matchKey, puppet, rule);
+        store.setMatchRule(key, puppet, ruleParams);
 
-        logEvent("SetMatchRule", abi.encode(matchKey, collateralToken, puppet, trader, rule));
+        logEvent("SetMatchRule", abi.encode(puppet, trader, key, ruleParams));
     }
 
     function setMatchRuleList(
-        IERC20[] calldata collateralTokenList,
         address puppet,
         address[] calldata traderList,
-        PuppetStore.MatchRule[] calldata ruleParams
+        PuppetStore.MatchRule[] calldata ruleParamList
     ) external auth {
-        IERC20[] memory verifyAllowanceTokenList = new IERC20[](0);
         uint length = traderList.length;
+        if (length != ruleParamList.length) revert Error.PuppetLogic__InvalidLength();
+
+        IERC20[] memory verifyAllowanceTokenList = new IERC20[](0);
         bytes32[] memory matchKeyList = new bytes32[](length);
-        for (uint i = 0; i < length; i++) {
-            matchKeyList[i] = PositionUtils.getMatchKey(collateralTokenList[i], traderList[i]);
-        }
-
-        PuppetStore.MatchRule[] memory storedRuleList = store.getPuppetRouteRuleList(puppet, matchKeyList);
 
         for (uint i = 0; i < length; i++) {
-            storedRuleList[i] = _setRouteRule(storedRuleList[i], ruleParams[i]);
+            PuppetStore.MatchRule memory rule = ruleParamList[i];
 
-            IERC20 collateralToken = collateralTokenList[i];
+            _validateRuleParams(rule);
 
-            if (isArrayContains(verifyAllowanceTokenList, collateralToken)) {
-                verifyAllowanceTokenList[verifyAllowanceTokenList.length] = collateralToken;
+            bytes32 key = PositionUtils.getMatchKey(rule.collateralToken, rule.market, traderList[i]);
+
+            matchKeyList[i] = key;
+
+            if (_isArrayContains(verifyAllowanceTokenList, rule.collateralToken)) {
+                verifyAllowanceTokenList[verifyAllowanceTokenList.length] = rule.collateralToken;
             }
-
-            logEvent("SetMatchRuleList", abi.encode(matchKeyList[i], collateralToken, puppet, traderList, storedRuleList[i]));
         }
 
-        _validatePuppetTokenAllowanceList(verifyAllowanceTokenList, puppet);
+        validatePuppetTokenAllowanceList(verifyAllowanceTokenList, puppet);
+        store.setMatchRuleList(puppet, matchKeyList, ruleParamList);
 
-        store.setRouteRuleList(puppet, matchKeyList, storedRuleList);
-    }
-
-    function _setRouteRule(
-        PuppetStore.MatchRule memory storedRule,
-        PuppetStore.MatchRule calldata ruleParams
-    ) internal view returns (PuppetStore.MatchRule memory) {
-        if (ruleParams.allowanceRate < config.minRouteRate || ruleParams.allowanceRate > config.maxRouteRate) {
-            revert Error.PuppetLogic__InvalidAllowanceRate(config.minRouteRate, config.maxRouteRate);
-        }
-
-        // storedRule.throttleActivity = ruleParams.throttleActivity;
-        storedRule.allowanceRate = ruleParams.allowanceRate;
-
-        return storedRule;
+        logEvent("SetMatchRuleList", abi.encode(puppet, traderList, matchKeyList, ruleParamList));
     }
 
     // internal
 
-    function isArrayContains(IERC20[] memory array, IERC20 value) internal pure returns (bool) {
-        for (uint i = 0; i < array.length; i++) {
-            if (array[i] == value) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    function _validatePuppetTokenAllowanceList(IERC20[] memory tokenList, address puppet) internal view {
+    function validatePuppetTokenAllowanceList(IERC20[] memory tokenList, address puppet) internal view {
         for (uint i = 0; i < tokenList.length; i++) {
-            _validatePuppetTokenAllowance(tokenList[i], puppet);
+            validatePuppetTokenAllowance(tokenList[i], puppet);
         }
     }
 
-    function _validatePuppetTokenAllowance(IERC20 token, address puppet) internal view returns (uint) {
+    function validatePuppetTokenAllowance(IERC20 token, address puppet) internal view returns (uint) {
         uint tokenAllowance = store.getUserBalance(token, puppet);
         uint allowanceCap = store.getTokenAllowanceCap(token);
 
@@ -153,6 +122,22 @@ contract PuppetLogic is CoreContract {
         if (tokenAllowance > allowanceCap) revert Error.PuppetLogic__AllowanceAboveLimit(allowanceCap);
 
         return tokenAllowance;
+    }
+
+    function _validateRuleParams(PuppetStore.MatchRule memory ruleParams) internal view {
+        if (ruleParams.allowanceRate < config.minRouteRate || ruleParams.allowanceRate > config.maxRouteRate) {
+            revert Error.PuppetLogic__InvalidAllowanceRate(config.minRouteRate, config.maxRouteRate);
+        }
+    }
+
+    function _isArrayContains(IERC20[] memory array, IERC20 value) internal pure returns (bool) {
+        for (uint i = 0; i < array.length; i++) {
+            if (array[i] == value) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // governance

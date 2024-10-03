@@ -24,6 +24,7 @@ contract AllocationLogic is CoreContract {
 
     struct AllocateParams {
         IERC20 collateralToken;
+        address market;
         address trader;
         address[] puppetList;
     }
@@ -73,25 +74,21 @@ contract AllocationLogic is CoreContract {
             revert Error.AllocationLogic__PuppetListLimit();
         }
 
-        bytes32 matchKey = PositionUtils.getMatchKey(params.collateralToken, params.trader);
+        bytes32 matchKey = PositionUtils.getMatchKey(params.collateralToken, params.market, params.trader);
 
         PuppetStore.Allocation memory allocation = puppetStore.getAllocation(matchKey);
 
         if (allocation.allocated == 0) {
-            allocation.token = params.collateralToken;
+            allocation.collateralToken = params.collateralToken;
         }
 
-        (
-            PuppetStore.MatchRule[] memory ruleList,
-            uint[] memory activityThrottleList,
-            uint[] memory balanceToAllocationList
-        ) = puppetStore.getBalanceAndActivityThrottleList(params.collateralToken, matchKey, params.puppetList);
+        (uint[] memory rateList, uint[] memory activityThrottleList, uint[] memory balanceToAllocationList) =
+            puppetStore.getBalanceAndActivityThrottleList(params.collateralToken, matchKey, params.puppetList);
 
         for (uint i = 0; i < puppetListLength; i++) {
             // Thorttle user allocation if the activityThrottle is within range
             if (block.timestamp > activityThrottleList[i]) {
-                balanceToAllocationList[i] =
-                    Precision.applyBasisPoints(ruleList[i].allowanceRate, balanceToAllocationList[i]);
+                balanceToAllocationList[i] = Precision.applyBasisPoints(rateList[i], balanceToAllocationList[i]);
             } else {
                 balanceToAllocationList[i] = 0;
             }
@@ -150,12 +147,12 @@ contract AllocationLogic is CoreContract {
             allocationToSettledAmountList[i] = puppetAllocation - contributionAmount;
         }
 
-        puppetStore.settleList(allocation.token, puppetList, allocationToSettledAmountList);
-        contributeStore.contributeMany(allocation.token, puppetStore, puppetList, contributionAmountList);
+        puppetStore.settleList(allocation.collateralToken, puppetList, allocationToSettledAmountList);
+        contributeStore.contributeMany(allocation.collateralToken, puppetStore, puppetList, contributionAmountList);
 
         if (traderPerformanceContribution > 0) {
             contributeStore.contribute(
-                allocation.token,
+                allocation.collateralToken,
                 positionStore,
                 positionStore.getSubaccount(settlement.matchKey).account(),
                 traderPerformanceContribution

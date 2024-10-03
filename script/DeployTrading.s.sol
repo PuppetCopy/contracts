@@ -87,6 +87,8 @@ contract DeployTrading is BaseScript {
         );
 
         dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.withdraw.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.setAllocationRule.selector, address(puppetRouter));
         dictator.setPermission(puppetLogic, puppetLogic.setMatchRule.selector, address(puppetRouter));
         dictator.setPermission(puppetLogic, puppetLogic.setMatchRuleList.selector, address(puppetRouter));
 
