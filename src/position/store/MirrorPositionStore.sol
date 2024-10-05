@@ -12,19 +12,12 @@ import {GmxPositionUtils} from "./../utils/GmxPositionUtils.sol";
 contract MirrorPositionStore is BankStore {
     struct RequestAdjustment {
         bytes32 traderPositionKey;
+        bytes32 traderRequestKey;
         bytes32 matchKey;
         bytes32 positionKey;
         uint sizeDelta;
         uint transactionCost;
     }
-
-    // struct Position {
-    //     bytes32 matchKey;
-    //     IERC20 collateralToken;
-    //     uint size;
-    //     uint collateral;
-    //     uint cumulativeTransactionCost;
-    // }
 
     struct UnhandledCallback {
         GmxPositionUtils.OrderExecutionStatus status;
@@ -35,7 +28,6 @@ contract MirrorPositionStore is BankStore {
     mapping(bytes32 matchKey => Subaccount) routeSubaccountMap;
     mapping(bytes32 matchKey => IERC20) routeTokenMap;
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
-    // mapping(bytes32 positionKey => Position) public positionMap;
     mapping(bytes32 positionKey => UnhandledCallback) public unhandledCallbackMap;
 
     constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
@@ -55,18 +47,6 @@ contract MirrorPositionStore is BankStore {
     function removeRequestDecrease(bytes32 _key) external auth {
         delete requestAdjustmentMap[_key];
     }
-
-    // function getPosition(bytes32 _key) external view returns (Position memory) {
-    //     return positionMap[_key];
-    // }
-
-    // function setPosition(bytes32 _key, Position calldata _mp) external auth {
-    //     positionMap[_key] = _mp;
-    // }
-
-    // function removePosition(bytes32 _key) external auth {
-    //     delete positionMap[_key];
-    // }
 
     function setUnhandledCallback(
         GmxPositionUtils.OrderExecutionStatus _status,

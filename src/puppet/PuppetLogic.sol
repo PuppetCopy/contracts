@@ -13,11 +13,10 @@ import {PuppetStore} from "./store/PuppetStore.sol";
 contract PuppetLogic is CoreContract {
     struct Config {
         uint minExpiryDuration;
-        uint minRouteRate;
-        uint maxRouteRate;
+        uint minAllowanceRate;
+        uint maxAllowanceRate;
         uint minAllocationActivity;
         uint maxAllocationActivity;
-        uint concurrentPositionLimit;
         IERC20[] tokenAllowanceList;
         uint[] tokenAllowanceAmountList;
     }
@@ -57,17 +56,39 @@ contract PuppetLogic is CoreContract {
         address puppet,
         PuppetStore.AllocationRule calldata ruleParams
     ) external auth {
-        PuppetStore.AllocationRule memory rule = store.getAllocationRule(puppet);
+        uint throttleTime = store.getActivityThrottle(puppet);
+
+        if (
+            ruleParams.throttleActivity < config.minAllocationActivity
+                || ruleParams.throttleActivity > config.maxAllocationActivity
+        ) {
+            revert Error.PuppetLogic__InvalidActivityThrottle(
+                config.minAllocationActivity, config.maxAllocationActivity
+            );
+        }
+
+        if (throttleTime == 0) {
+            store.setActivityThrottle(puppet, 1);
+        }
+
+        uint nextThrottleTime = block.timestamp + ruleParams.throttleActivity;
+        if (throttleTime > nextThrottleTime) {
+            store.setActivityThrottle(puppet, nextThrottleTime);
+        }
 
         store.setAllocationRule(puppet, ruleParams);
 
-        logEvent("SetAllocationRule", abi.encode(collateralToken, puppet, rule));
+        logEvent("SetAllocationRule", abi.encode(collateralToken, puppet, ruleParams));
     }
 
-    function setMatchRule(address puppet, address trader, PuppetStore.MatchRule calldata ruleParams) external auth {
-        bytes32 key = PositionUtils.getMatchKey(ruleParams.collateralToken, ruleParams.market, trader);
-
-        validatePuppetTokenAllowance(ruleParams.collateralToken, puppet);
+    function setMatchRule(
+        IERC20 collateralToken,
+        PuppetStore.MatchRule calldata ruleParams,
+        address puppet,
+        address trader
+    ) external auth {
+        bytes32 key = PositionUtils.getMatchKey(collateralToken, trader);
+        validatePuppetTokenAllowance(collateralToken, puppet);
         _validateRuleParams(ruleParams);
 
         store.setMatchRule(key, puppet, ruleParams);
@@ -76,9 +97,10 @@ contract PuppetLogic is CoreContract {
     }
 
     function setMatchRuleList(
-        address puppet,
+        IERC20[] calldata collateralTokenList,
         address[] calldata traderList,
-        PuppetStore.MatchRule[] calldata ruleParamList
+        PuppetStore.MatchRule[] calldata ruleParamList,
+        address puppet
     ) external auth {
         uint length = traderList.length;
         if (length != ruleParamList.length) revert Error.PuppetLogic__InvalidLength();
@@ -88,31 +110,27 @@ contract PuppetLogic is CoreContract {
 
         for (uint i = 0; i < length; i++) {
             PuppetStore.MatchRule memory rule = ruleParamList[i];
+            IERC20 collateralToken = collateralTokenList[i];
 
             _validateRuleParams(rule);
 
-            bytes32 key = PositionUtils.getMatchKey(rule.collateralToken, rule.market, traderList[i]);
+            bytes32 key = PositionUtils.getMatchKey(collateralToken, traderList[i]);
 
             matchKeyList[i] = key;
 
-            if (_isArrayContains(verifyAllowanceTokenList, rule.collateralToken)) {
-                verifyAllowanceTokenList[verifyAllowanceTokenList.length] = rule.collateralToken;
+            if (!_isArrayContains(verifyAllowanceTokenList, collateralToken)) {
+                verifyAllowanceTokenList[verifyAllowanceTokenList.length] = collateralToken;
+
+                validatePuppetTokenAllowance(collateralToken, puppet);
             }
         }
 
-        validatePuppetTokenAllowanceList(verifyAllowanceTokenList, puppet);
         store.setMatchRuleList(puppet, matchKeyList, ruleParamList);
 
         logEvent("SetMatchRuleList", abi.encode(puppet, traderList, matchKeyList, ruleParamList));
     }
 
     // internal
-
-    function validatePuppetTokenAllowanceList(IERC20[] memory tokenList, address puppet) internal view {
-        for (uint i = 0; i < tokenList.length; i++) {
-            validatePuppetTokenAllowance(tokenList[i], puppet);
-        }
-    }
 
     function validatePuppetTokenAllowance(IERC20 token, address puppet) internal view returns (uint) {
         uint tokenAllowance = store.getUserBalance(token, puppet);
@@ -125,8 +143,8 @@ contract PuppetLogic is CoreContract {
     }
 
     function _validateRuleParams(PuppetStore.MatchRule memory ruleParams) internal view {
-        if (ruleParams.allowanceRate < config.minRouteRate || ruleParams.allowanceRate > config.maxRouteRate) {
-            revert Error.PuppetLogic__InvalidAllowanceRate(config.minRouteRate, config.maxRouteRate);
+        if (ruleParams.allowanceRate < config.minAllowanceRate || ruleParams.allowanceRate > config.maxAllowanceRate) {
+            revert Error.PuppetLogic__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate);
         }
     }
 

@@ -47,8 +47,9 @@ contract ExecuteIncreasePositionLogic is CoreContract {
             "Execute",
             abi.encode(
                 requestKey,
+                request.traderRequestKey,
                 request.traderPositionKey,
-                request.matchKey,
+                allocation.matchKey,
                 request.positionKey,
                 request.sizeDelta,
                 request.transactionCost

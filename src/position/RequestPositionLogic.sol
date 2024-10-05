@@ -19,8 +19,8 @@ import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
 contract RequestPositionLogic is CoreContract {
-    bytes32 constant GMX_DATASTORE_SIZE_IN_USD = keccak256(abi.encode("SIZE_IN_USD"));
-    bytes32 constant GMX_DATASTORE_COLLATERAL_AMOUNT = keccak256(abi.encode("COLLATERAL_AMOUNT"));
+    // bytes32 constant GMX_DATASTORE_SIZE_IN_USD = keccak256(abi.encode("SIZE_IN_USD"));
+    // bytes32 constant GMX_DATASTORE_COLLATERAL_AMOUNT = keccak256(abi.encode("COLLATERAL_AMOUNT"));
 
     struct Config {
         IGmxExchangeRouter gmxExchangeRouter;
@@ -35,6 +35,8 @@ contract RequestPositionLogic is CoreContract {
     struct RequestMirrorPosition {
         IERC20 collateralToken;
         bytes32 originRequestKey;
+        bytes32 matchKey;
+        bytes32 allocationKey;
         address trader;
         address market;
         bool isIncrease;
@@ -105,29 +107,30 @@ contract RequestPositionLogic is CoreContract {
         }
 
         requestKey = abi.decode(orderReturnData, (bytes32));
-
-        request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + order.executionFee;
-        positionStore.setRequestAdjustment(requestKey, request);
     }
 
     function adjust(
         RequestMirrorPosition calldata order,
         MirrorPositionStore.RequestAdjustment memory request,
+        PuppetStore.Allocation memory allocation,
         Subaccount subaccount
     ) internal returns (bytes32 requestKey) {
-        uint traderSize = getDatstoreValue(request.traderPositionKey, GMX_DATASTORE_SIZE_IN_USD);
-        uint traderCollateral = getDatstoreValue(request.traderPositionKey, GMX_DATASTORE_COLLATERAL_AMOUNT);
-        uint leverage = Precision.toBasisPoints(traderSize, traderCollateral);
+        // uint traderSize = getDatstoreValue(request.traderPositionKey, GMX_DATASTORE_SIZE_IN_USD);
+        // uint traderCollateral = getDatstoreValue(request.traderPositionKey, GMX_DATASTORE_COLLATERAL_AMOUNT);
+        uint leverage = Precision.toBasisPoints(allocation.size, allocation.collateral);
         uint targetLeverage = order.isIncrease
-            ? Precision.toBasisPoints(traderSize + order.sizeDeltaInUsd, traderCollateral + order.collateralDelta)
-            : order.sizeDeltaInUsd < traderSize
-                ? Precision.toBasisPoints(traderSize - order.sizeDeltaInUsd, traderCollateral - order.collateralDelta)
+            ? Precision.toBasisPoints(allocation.size + order.sizeDeltaInUsd, allocation.collateral + order.collateralDelta)
+            : order.sizeDeltaInUsd < allocation.size
+                ? Precision.toBasisPoints(allocation.size - order.sizeDeltaInUsd, allocation.collateral - order.collateralDelta)
                 : 0;
 
         if (targetLeverage > leverage) {
             uint deltaLeverage = targetLeverage - leverage;
-            request.sizeDelta = traderSize * deltaLeverage / targetLeverage;
+            request.sizeDelta = allocation.size * deltaLeverage / targetLeverage;
             requestKey = submitOrder(order, subaccount, request, GmxPositionUtils.OrderType.MarketIncrease, 0);
+
+            request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + order.executionFee;
+            positionStore.setRequestAdjustment(requestKey, request);
 
             logEvent(
                 "RequestIncrease",
@@ -143,9 +146,12 @@ contract RequestPositionLogic is CoreContract {
             );
         } else {
             uint deltaLeverage = leverage - targetLeverage;
-            request.sizeDelta = traderSize * deltaLeverage / leverage;
+            request.sizeDelta = allocation.size * deltaLeverage / leverage;
 
             requestKey = submitOrder(order, subaccount, request, GmxPositionUtils.OrderType.MarketDecrease, 0);
+
+            request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + order.executionFee;
+            positionStore.setRequestAdjustment(requestKey, request);
 
             logEvent(
                 "RequestDecrease",
@@ -164,19 +170,19 @@ contract RequestPositionLogic is CoreContract {
 
     function mirror(RequestMirrorPosition calldata order) external payable auth returns (bytes32 requestKey) {
         uint startGas = gasleft();
-        bytes32 matchKey = PositionUtils.getMatchKey(order.collateralToken, order.market, order.trader);
-        Subaccount subaccount = positionStore.getSubaccount(matchKey);
+        Subaccount subaccount = positionStore.getSubaccount(order.matchKey);
         address subaccountAddress = address(subaccount);
 
         if (subaccountAddress == address(0)) {
-            subaccount = positionStore.createSubaccount(matchKey, order.trader);
+            subaccount = positionStore.createSubaccount(order.matchKey, order.trader);
         }
 
         MirrorPositionStore.RequestAdjustment memory request = MirrorPositionStore.RequestAdjustment({
-            matchKey: matchKey,
+            matchKey: order.matchKey,
             positionKey: GmxPositionUtils.getPositionKey(
                 subaccountAddress, order.market, order.collateralToken, order.isLong
                 ),
+            traderRequestKey: order.originRequestKey,
             traderPositionKey: GmxPositionUtils.getPositionKey(
                 order.trader, order.market, order.collateralToken, order.isLong
                 ),
@@ -184,26 +190,29 @@ contract RequestPositionLogic is CoreContract {
             transactionCost: startGas
         });
 
-        // MirrorPositionStore.Position memory mirrorPosition = positionStore.getPosition(request.positionKey);
-        PuppetStore.Allocation memory allocation = puppetStore.getAllocation(matchKey);
+        PuppetStore.Allocation memory allocation = puppetStore.getAllocation(order.allocationKey);
+
+        if (allocation.matchKey != order.matchKey) {
+            revert Error.RequestPositionLogic__InvalidAllocationMatchKey();
+        }
 
         if (allocation.size == 0) {
             if (allocation.allocated == 0) {
                 revert Error.RequestPositionLogic__NoAllocation();
             }
 
-            if (allocation.amountOut > 0) revert Error.RequestPositionLogic__PendingSettlement();
+            if (allocation.collateral > 0) revert Error.RequestPositionLogic__PendingExecution();
 
-            puppetStore.transferOutAllocation(
-                order.collateralToken, matchKey, config.gmxOrderVault, allocation.allocated
-            );
-            requestKey = submitOrder(
-                order, //
-                subaccount,
-                request,
-                GmxPositionUtils.OrderType.MarketIncrease,
-                allocation.allocated
-            );
+            allocation.collateral = allocation.allocated;
+
+            puppetStore.transferOut(order.collateralToken, config.gmxOrderVault, allocation.allocated);
+            puppetStore.setAllocation(order.allocationKey, allocation);
+
+            requestKey =
+                submitOrder(order, subaccount, request, GmxPositionUtils.OrderType.MarketIncrease, allocation.allocated);
+
+            request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + order.executionFee;
+            positionStore.setRequestAdjustment(requestKey, request);
 
             logEvent(
                 "RequestIncrease",
@@ -218,13 +227,13 @@ contract RequestPositionLogic is CoreContract {
                 )
             );
         } else {
-            requestKey = adjust(order, request, subaccount);
+            requestKey = adjust(order, request, allocation, subaccount);
         }
     }
 
-    function getDatstoreValue(bytes32 positionKey, bytes32 prop) internal view returns (uint) {
-        return config.gmxDatastore.getUint(keccak256(abi.encode(positionKey, prop)));
-    }
+    // function getDatstoreValue(bytes32 positionKey, bytes32 prop) internal view returns (uint) {
+    //     return config.gmxDatastore.getUint(keccak256(abi.encode(positionKey, prop)));
+    // }
 
     // governance
 

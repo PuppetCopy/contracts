@@ -50,35 +50,31 @@ contract ExecuteDecreasePositionLogic is CoreContract {
             revert Error.ExecuteDecreasePositionLogic__PositionDoesNotExist();
         }
 
+        allocation.settled += positionStore.recordTransferIn(allocation.collateralToken);
+
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
-        if (allocation.size > request.sizeDelta) {
-            puppetStore.removeAllocation(request.matchKey);
-        } else {
+        if (allocation.size > request.sizeDelta) {} else {
             allocation.size -= request.sizeDelta;
             // allocation.cumulativeTransactionCost += request.transactionCost;
 
             // positionStore.setPosition(request.positionKey, position);
-            puppetStore.setAllocation(request.matchKey, allocation);
         }
 
-        PuppetStore.Settlement memory settlement = PuppetStore.Settlement({
-            matchKey: request.matchKey,
-            settled: positionStore.recordTransferIn(allocation.collateralToken)
-        });
+        puppetStore.setAllocation(request.matchKey, allocation);
 
-        puppetStore.setSettlement(request.matchKey, settlement);
         positionStore.removeRequestDecrease(requestKey);
 
         logEvent(
             "Execute",
             abi.encode(
                 requestKey,
+                request.traderRequestKey,
                 request.traderPositionKey,
                 request.matchKey,
                 request.positionKey,
                 request.sizeDelta,
                 request.transactionCost,
-                settlement.settled
+                allocation.settled
             )
         );
     }

@@ -76,11 +76,10 @@ contract DeployTrading is BaseScript {
         puppetLogic.setConfig(
             PuppetLogic.Config({
                 minExpiryDuration: 1 days,
-                minRouteRate: 100, // 10 basis points
-                maxRouteRate: 10000,
+                minAllowanceRate: 100, // 10 basis points
+                maxAllowanceRate: 10000,
                 minAllocationActivity: 3600,
                 maxAllocationActivity: 604800,
-                concurrentPositionLimit: 10,
                 tokenAllowanceList: tokenAllowanceCapList,
                 tokenAllowanceAmountList: tokenAllowanceCapAmountList
             })
@@ -126,13 +125,13 @@ contract DeployTrading is BaseScript {
         dictator.setPermission(positionRouter, positionRouter.afterOrderFrozen.selector, Address.gmxOrderHandler);
         dictator.setPermission(requestIncreaseLogic, requestIncreaseLogic.setConfig.selector, Address.dao);
 
-        AllocationLogic settleLogic =
+        AllocationLogic allocationLogic =
             new AllocationLogic(dictator, eventEmitter, contributeStore, puppetStore, positionStore);
         dictator.setAccess(eventEmitter, address(executeDecreaseLogic));
         dictator.setAccess(contributeStore, address(executeDecreaseLogic));
         dictator.setAccess(puppetStore, address(executeDecreaseLogic));
-        dictator.setPermission(settleLogic, settleLogic.setConfig.selector, Address.dao);
-        settleLogic.setConfig(
+        dictator.setPermission(allocationLogic, allocationLogic.setConfig.selector, Address.dao);
+        allocationLogic.setConfig(
             AllocationLogic.Config({
                 limitAllocationListLength: 100,
                 performanceContributionRate: 0.1e30,
@@ -157,7 +156,7 @@ contract DeployTrading is BaseScript {
         dictator.setPermission(positionRouter, positionRouter.setConfig.selector, Address.dao);
         positionRouter.setConfig(
             PositionRouter.Config({
-                settleLogic: settleLogic,
+                settleLogic: allocationLogic,
                 executeIncrease: executeIncreaseLogic,
                 executeDecrease: executeDecreaseLogic,
                 executeRevertedAdjustment: executeRevertedAdjustment
@@ -165,7 +164,8 @@ contract DeployTrading is BaseScript {
         );
 
         // Allocator
-        dictator.setPermission(requestIncreaseLogic, settleLogic.allocate.selector, Address.dao);
+        dictator.setPermission(requestIncreaseLogic, allocationLogic.allocate.selector, Address.dao);
+        dictator.setPermission(requestIncreaseLogic, allocationLogic.settle.selector, Address.dao);
         dictator.setPermission(requestIncreaseLogic, requestIncreaseLogic.mirror.selector, Address.dao);
     }
 }
