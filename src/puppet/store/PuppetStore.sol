@@ -149,10 +149,8 @@ contract PuppetStore is BankStore {
             uint _allocation = _allocationList[i];
             address _puppet = _puppetList[i];
 
+            if (allocationAmount[_puppet] > 0) revert Error.PuppetStore__OverwriteAllocation();
             if (_allocation == 0) continue;
-            if (allocationAmount[_puppet] > 0) {
-                revert Error.PuppetStore__OverwriteAllocation();
-            }
 
             balance[_puppet] -= _allocation;
             allocationAmount[_puppet] = _allocation;

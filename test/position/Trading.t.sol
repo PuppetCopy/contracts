@@ -180,13 +180,12 @@ contract TradingTest is BasicSetup {
                 puppetList: puppetList
             })
         );
-        // allocationLogic.settle(AllocationLogic.CallSettleParams({allocationKey: allocationKey, puppetList:
-        // puppetList}));
+
+        // allocationLogic.settle(AllocationLogic.CallSettleParams({allocationKey: allocationKey, puppetList: puppetList}));
 
         requestLogic.mirror{value: executionFee}(
             RequestPositionLogic.RequestMirrorPosition({
                 trader: trader,
-                matchKey: PositionUtils.getMatchKey(usdc, trader),
                 allocationKey: allocationKey,
                 originRequestKey: mockOriginRequestKey,
                 market: Address.gmxEthUsdcMarket,
