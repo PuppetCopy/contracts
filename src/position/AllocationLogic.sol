@@ -36,11 +36,10 @@ contract AllocationLogic is CoreContract {
         address[] puppetList;
     }
 
-    struct AllocationData {
-        uint[] rateList;
-        uint[] activityThrottleList;
-        uint[] balanceToAllocationList;
+    struct ProcessAllocationData {
+        uint[] allocationList;
         bytes32 puppetListHash;
+        uint puppetListLength;
     }
 
     MirrorPositionStore immutable positionStore;
@@ -61,13 +60,34 @@ contract AllocationLogic is CoreContract {
         contributeStore = _contributeStore;
     }
 
-    function allocate(CallAllocateParams calldata params) external auth returns (bytes32 allocationKey) {
-        uint startGas = gasleft();
-        uint puppetListLength = params.puppetList.length;
+    function processAllocationData(
+        CallAllocateParams calldata params //
+    ) internal view returns (ProcessAllocationData memory data) {
+        data.puppetListLength = params.puppetList.length;
 
-        if (puppetListLength > config.limitAllocationListLength) {
+        if (data.puppetListLength > config.limitAllocationListLength) {
             revert Error.AllocationLogic__PuppetListLimit();
         }
+
+        data.puppetListHash = keccak256(abi.encode(params.puppetList));
+
+        (uint[] memory rateList, uint[] memory activityThrottleList, uint[] memory balanceToAllocationList) =
+            puppetStore.getBalanceAndActivityThrottleList(params.collateralToken, params.matchKey, params.puppetList);
+
+        for (uint i = 0; i < data.puppetListLength; i++) {
+            // Thorttle user allocation if the activityThrottle is within range
+            if (block.timestamp > activityThrottleList[i]) {
+                balanceToAllocationList[i] = Precision.applyBasisPoints(rateList[i], balanceToAllocationList[i]);
+            } else {
+                balanceToAllocationList[i] = 0;
+            }
+        }
+
+        data.allocationList = balanceToAllocationList;
+    }
+
+    function allocate(CallAllocateParams calldata params) external auth returns (bytes32 allocationKey) {
+        uint startGas = gasleft();
 
         allocationKey = PositionUtils.getAllocationKey(params.matchKey, puppetStore.getRequestId());
 
@@ -79,22 +99,12 @@ contract AllocationLogic is CoreContract {
             allocationKey = PositionUtils.getAllocationKey(params.matchKey, puppetStore.incrementRequestId());
         }
 
-        AllocationData memory allocationData = getAllocationData(params);
-
-        for (uint i = 0; i < puppetListLength; i++) {
-            // Thorttle user allocation if the activityThrottle is within range
-            if (block.timestamp > allocationData.activityThrottleList[i]) {
-                allocationData.balanceToAllocationList[i] =
-                    Precision.applyBasisPoints(allocationData.rateList[i], allocationData.balanceToAllocationList[i]);
-            } else {
-                allocationData.balanceToAllocationList[i] = 0;
-            }
-        }
+        ProcessAllocationData memory allocationData = processAllocationData(params);
 
         puppetStore.setSettledAllocationHash(allocationData.puppetListHash, allocationKey);
 
         allocation.allocated += puppetStore.allocatePuppetList(
-            params.collateralToken, allocationKey, params.puppetList, allocationData.balanceToAllocationList
+            params.collateralToken, allocationKey, params.puppetList, allocationData.allocationList
         );
         puppetStore.setAllocation(allocationKey, allocation);
 
@@ -107,27 +117,13 @@ contract AllocationLogic is CoreContract {
                 params.originRequestKey,
                 params.matchKey,
                 allocationKey,
-                allocationData.puppetListHash,
                 params.puppetList,
-                allocationData.balanceToAllocationList,
+                allocationData.puppetListHash,
+                allocationData.allocationList,
                 allocation.allocated,
                 transactionCost
             )
         );
-    }
-
-    function getAllocationData(CallAllocateParams calldata params) internal view returns (AllocationData memory data) {
-        uint puppetListLength = params.puppetList.length;
-
-        data.rateList = new uint[](puppetListLength);
-        data.activityThrottleList = new uint[](puppetListLength);
-        data.balanceToAllocationList = new uint[](puppetListLength);
-        data.puppetListHash = keccak256(abi.encode(params.puppetList));
-
-        for (uint i = 0; i < puppetListLength; i++) {
-            (data.rateList[i], data.activityThrottleList[i], data.balanceToAllocationList[i]) =
-                puppetStore.getBalanceAndActivityThrottle(params.collateralToken, params.matchKey, params.puppetList[i]);
-        }
     }
 
     function settle(CallSettleParams calldata params) external auth {

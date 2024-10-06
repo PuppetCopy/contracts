@@ -35,7 +35,6 @@ contract RequestPositionLogic is CoreContract {
     struct RequestMirrorPosition {
         IERC20 collateralToken;
         bytes32 originRequestKey;
-        bytes32 matchKey;
         bytes32 allocationKey;
         address trader;
         address market;
@@ -170,15 +169,18 @@ contract RequestPositionLogic is CoreContract {
 
     function mirror(RequestMirrorPosition calldata order) external payable auth returns (bytes32 requestKey) {
         uint startGas = gasleft();
-        Subaccount subaccount = positionStore.getSubaccount(order.matchKey);
+
+        PuppetStore.Allocation memory allocation = puppetStore.getAllocation(order.allocationKey);
+
+        Subaccount subaccount = positionStore.getSubaccount(allocation.matchKey);
         address subaccountAddress = address(subaccount);
 
         if (subaccountAddress == address(0)) {
-            subaccount = positionStore.createSubaccount(order.matchKey, order.trader);
+            subaccount = positionStore.createSubaccount(allocation.matchKey, order.trader);
         }
 
         MirrorPositionStore.RequestAdjustment memory request = MirrorPositionStore.RequestAdjustment({
-            matchKey: order.matchKey,
+            matchKey: allocation.matchKey,
             positionKey: GmxPositionUtils.getPositionKey(
                 subaccountAddress, order.market, order.collateralToken, order.isLong
                 ),
@@ -189,12 +191,6 @@ contract RequestPositionLogic is CoreContract {
             sizeDelta: 0,
             transactionCost: startGas
         });
-
-        PuppetStore.Allocation memory allocation = puppetStore.getAllocation(order.allocationKey);
-
-        if (allocation.matchKey != order.matchKey) {
-            revert Error.RequestPositionLogic__InvalidAllocationMatchKey();
-        }
 
         if (allocation.size == 0) {
             if (allocation.allocated == 0) {
