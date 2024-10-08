@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.24;
+pragma solidity 0.8.27;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -22,26 +22,6 @@ contract AllocationLogic is CoreContract {
         uint traderPerformanceContributionShare;
     }
 
-    struct CallAllocateParams {
-        IERC20 collateralToken;
-        bytes32 originRequestKey;
-        bytes32 matchKey;
-        address market;
-        address trader;
-        address[] puppetList;
-    }
-
-    struct CallSettleParams {
-        bytes32 allocationKey;
-        address[] puppetList;
-    }
-
-    struct ProcessAllocationData {
-        uint[] allocationList;
-        bytes32 puppetListHash;
-        uint puppetListLength;
-    }
-
     MirrorPositionStore immutable positionStore;
     PuppetStore immutable puppetStore;
     ContributeStore immutable contributeStore;
@@ -60,52 +40,52 @@ contract AllocationLogic is CoreContract {
         contributeStore = _contributeStore;
     }
 
-    function processAllocationData(
-        CallAllocateParams calldata params //
-    ) internal view returns (ProcessAllocationData memory data) {
-        data.puppetListLength = params.puppetList.length;
+    function allocate(
+        IERC20 collateralToken,
+        bytes32 originRequestKey,
+        bytes32 matchKey,
+        address[] calldata puppetList
+    ) external auth returns (bytes32 allocationKey) {
+        uint startGas = gasleft();
 
-        if (data.puppetListLength > config.limitAllocationListLength) {
+        allocationKey = PositionUtils.getAllocationKey(matchKey, puppetStore.getRequestId());
+
+        PuppetStore.Allocation memory allocation = puppetStore.getAllocation(allocationKey);
+
+        if (allocation.matchKey == bytes32(0)) {
+            allocation.matchKey = matchKey;
+            allocation.collateralToken = collateralToken;
+            allocationKey = PositionUtils.getAllocationKey(matchKey, puppetStore.incrementRequestId());
+        }
+
+        uint puppetListLength = puppetList.length;
+
+        if (puppetListLength > config.limitAllocationListLength) {
             revert Error.AllocationLogic__PuppetListLimit();
         }
 
-        data.puppetListHash = keccak256(abi.encode(params.puppetList));
+        bytes32 puppetListHash = keccak256(abi.encode(puppetList));
 
-        (uint[] memory rateList, uint[] memory activityThrottleList, uint[] memory balanceToAllocationList) =
-            puppetStore.getBalanceAndActivityThrottleList(params.collateralToken, params.matchKey, params.puppetList);
+        (
+            PuppetStore.MatchRule[] memory ruleList,
+            uint[] memory activityThrottleList,
+            uint[] memory balanceToAllocationList
+        ) = puppetStore.getBalanceAndActivityThrottleList(collateralToken, matchKey, puppetList);
 
-        for (uint i = 0; i < data.puppetListLength; i++) {
+        for (uint i = 0; i < puppetListLength; i++) {
+            PuppetStore.MatchRule memory rule = ruleList[i];
             // Thorttle user allocation if the activityThrottle is within range
-            if (block.timestamp > activityThrottleList[i]) {
-                balanceToAllocationList[i] = Precision.applyBasisPoints(rateList[i], balanceToAllocationList[i]);
+            if (rule.expiry > block.timestamp && block.timestamp > activityThrottleList[i]) {
+                balanceToAllocationList[i] = Precision.applyBasisPoints(rule.allowanceRate, balanceToAllocationList[i]);
             } else {
                 balanceToAllocationList[i] = 0;
             }
         }
 
-        data.allocationList = balanceToAllocationList;
-    }
+        puppetStore.setSettledAllocationHash(puppetListHash, allocationKey);
 
-    function allocate(CallAllocateParams calldata params) external auth returns (bytes32 allocationKey) {
-        uint startGas = gasleft();
-
-        allocationKey = PositionUtils.getAllocationKey(params.matchKey, puppetStore.getRequestId());
-
-        PuppetStore.Allocation memory allocation = puppetStore.getAllocation(allocationKey);
-
-        if (allocation.matchKey == bytes32(0)) {
-            allocation.matchKey = params.matchKey;
-            allocation.collateralToken = params.collateralToken;
-            allocationKey = PositionUtils.getAllocationKey(params.matchKey, puppetStore.incrementRequestId());
-        }
-
-        ProcessAllocationData memory allocationData = processAllocationData(params);
-
-        puppetStore.setSettledAllocationHash(allocationData.puppetListHash, allocationKey);
-
-        allocation.allocated += puppetStore.allocatePuppetList(
-            params.collateralToken, allocationKey, params.puppetList, allocationData.allocationList
-        );
+        allocation.allocated +=
+            puppetStore.allocatePuppetList(collateralToken, allocationKey, puppetList, balanceToAllocationList);
         puppetStore.setAllocation(allocationKey, allocation);
 
         uint transactionCost = (startGas - gasleft()) * tx.gasprice;
@@ -113,96 +93,99 @@ contract AllocationLogic is CoreContract {
         logEvent(
             "Allocate",
             abi.encode(
-                params.collateralToken,
-                params.originRequestKey,
-                params.matchKey,
+                collateralToken,
+                originRequestKey,
+                matchKey,
                 allocationKey,
-                params.puppetList,
-                allocationData.puppetListHash,
-                allocationData.allocationList,
+                puppetListHash,
+                puppetList,
+                balanceToAllocationList,
                 allocation.allocated,
                 transactionCost
             )
         );
     }
 
-    function settle(CallSettleParams calldata params) external auth {
+    function settle(bytes32 allocationKey, address[] calldata puppetList) external auth {
         uint startGas = gasleft();
 
-        PuppetStore.Allocation memory allocation = puppetStore.getAllocation(params.allocationKey);
-
+        PuppetStore.Allocation memory allocation = puppetStore.getAllocation(allocationKey);
         if (allocation.matchKey == bytes32(0)) {
             revert Error.AllocationLogic__AllocationDoesNotExist();
         }
-
         if (allocation.collateral > 0) {
             revert Error.AllocationLogic__AllocationStillUtilized();
         }
 
-        bytes32 listHash = keccak256(abi.encode(params.puppetList));
-
-        if (puppetStore.getSettledAllocationHash(listHash) != params.allocationKey) {
+        bytes32 listHash = keccak256(abi.encode(puppetList));
+        if (puppetStore.getSettledAllocationHash(listHash) != allocationKey) {
             revert Error.AllocationLogic__InvalidPuppetListIntegrity();
-        } else {
-            puppetStore.setSettledAllocationHash(listHash, params.allocationKey);
+        }
+        puppetStore.setSettledAllocationHash(listHash, allocationKey);
+
+        uint[] memory allocationToSettledAmountList = puppetStore.getUserAllocationList(allocationKey, puppetList);
+        uint[] memory contributionAmountList = new uint[](puppetList.length);
+        uint totalContribution;
+        int profit = int(allocation.settled) - int(allocation.allocated);
+
+        if (profit > 0) {
+            totalContribution = Precision.applyFactor(config.performanceContributionRate, uint(profit));
+            uint traderContribution = Precision.applyFactor(config.traderPerformanceContributionShare, uint(profit));
+
+            for (uint i = 0; i < allocationToSettledAmountList.length; i++) {
+                uint puppetAllocation = allocationToSettledAmountList[i];
+                if (puppetAllocation > 0) {
+                    contributionAmountList[i] = puppetAllocation * totalContribution / allocation.allocated;
+                    allocationToSettledAmountList[i] -= contributionAmountList[i];
+                }
+            }
+
+            if (traderContribution > 0) {
+                contributeStore.contribute(
+                    allocation.collateralToken,
+                    positionStore,
+                    positionStore.getSubaccount(allocation.matchKey).account(),
+                    traderContribution
+                );
+            }
+        } else if (allocation.settled > 0) {
+            for (uint i = 0; i < allocationToSettledAmountList.length; i++) {
+                uint puppetAllocation = allocationToSettledAmountList[i];
+                if (puppetAllocation > 0) {
+                    contributionAmountList[i] = puppetAllocation * allocation.settled / allocation.allocated;
+                    allocationToSettledAmountList[i] -= contributionAmountList[i];
+                }
+            }
         }
 
-        uint profit = allocation.settled > allocation.allocated ? allocation.settled - allocation.allocated : 0;
-        uint puppetContribution = Precision.applyFactor(config.performanceContributionRate, profit);
-        uint traderPerformanceContribution = Precision.applyFactor(config.traderPerformanceContributionShare, profit);
-
-        uint[] memory allocationToSettledAmountList =
-            puppetStore.getUserAllocationList(params.allocationKey, params.puppetList);
-        uint[] memory contributionAmountList = new uint[](params.puppetList.length);
-
-        for (uint i = 0; i < allocationToSettledAmountList.length; i++) {
-            uint puppetAllocation = allocationToSettledAmountList[i];
-
-            if (puppetAllocation == 0) continue;
-
-            uint contributionAmount = puppetAllocation * puppetContribution / allocation.allocated;
-            contributionAmountList[i] = contributionAmount;
-            allocationToSettledAmountList[i] = puppetAllocation - contributionAmount;
+        puppetStore.settleList(allocation.collateralToken, puppetList, allocationToSettledAmountList);
+        if (totalContribution > 0) {
+            contributeStore.contributeMany(allocation.collateralToken, puppetStore, puppetList, contributionAmountList);
         }
-
-        puppetStore.settleList(allocation.collateralToken, params.puppetList, allocationToSettledAmountList);
-        contributeStore.contributeMany(
-            allocation.collateralToken, puppetStore, params.puppetList, contributionAmountList
-        );
-
-        if (traderPerformanceContribution > 0) {
-            contributeStore.contribute(
-                allocation.collateralToken,
-                positionStore,
-                positionStore.getSubaccount(allocation.matchKey).account(),
-                traderPerformanceContribution
-            );
-        }
-
-        puppetStore.removeAllocation(params.allocationKey);
-
-        uint transactionCost = (startGas - gasleft()) * tx.gasprice;
+        puppetStore.removeAllocation(allocationKey);
 
         logEvent(
             "Settle",
             abi.encode(
+                allocation.collateralToken,
                 allocation.matchKey,
-                params.allocationKey,
+                allocationKey,
                 listHash,
-                params.puppetList,
+                puppetList,
                 allocationToSettledAmountList,
-                profit,
-                puppetContribution,
-                traderPerformanceContribution,
                 contributionAmountList,
-                transactionCost
+                profit, // Now a single value for both profit and loss
+                allocation.settled,
+                totalContribution,
+                (startGas - gasleft()) * tx.gasprice
             )
         );
     }
 
     // governance
-
-    function setConfig(Config memory _config) external auth {
+    function setConfig(
+        Config memory _config
+    ) external auth {
         config = _config;
 
         logEvent("SetConfig", abi.encode(_config));
