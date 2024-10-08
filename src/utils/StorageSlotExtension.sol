@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.27;
 
 /**
  * @dev Library for reading and writing primitive types to specific storage slots. Based on OpenZeppelin; just adding support for int256.

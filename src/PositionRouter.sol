@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.24;
+pragma solidity 0.8.27;
 
 import {AllocationLogic} from "./position/AllocationLogic.sol";
 import {ExecuteDecreasePositionLogic} from "./position/ExecuteDecreasePositionLogic.sol";

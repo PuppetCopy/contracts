@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.24;
+pragma solidity 0.8.27;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
@@ -170,18 +170,11 @@ contract TradingTest is BasicSetup {
 
         bytes32 mockOriginRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
 
-        bytes32 allocationKey = allocationLogic.allocate(
-            AllocationLogic.CallAllocateParams({
-                originRequestKey: mockOriginRequestKey,
-                matchKey: PositionUtils.getMatchKey(usdc, trader),
-                collateralToken: usdc,
-                market: Address.gmxEthUsdcMarket,
-                trader: trader,
-                puppetList: puppetList
-            })
-        );
+        bytes32 allocationKey =
+            allocationLogic.allocate(usdc, mockOriginRequestKey, PositionUtils.getMatchKey(usdc, trader), puppetList);
 
-        // allocationLogic.settle(AllocationLogic.CallSettleParams({allocationKey: allocationKey, puppetList: puppetList}));
+        // allocationLogic.settle(AllocationLogic.CallSettleParams({allocationKey: allocationKey, puppetList:
+        // puppetList}));
 
         requestLogic.mirror{value: executionFee}(
             RequestPositionLogic.RequestMirrorPosition({
@@ -193,7 +186,6 @@ contract TradingTest is BasicSetup {
                 isIncrease: true,
                 isLong: true,
                 executionFee: executionFee,
-                orderType: GmxPositionUtils.OrderType.MarketIncrease,
                 collateralDelta: 1e18,
                 sizeDeltaInUsd: 30e30,
                 acceptablePrice: 1000e12,
@@ -232,12 +224,16 @@ contract TradingTest is BasicSetup {
 
         puppetRouter.deposit(collateralToken, fundValue);
         puppetRouter.setAllocationRule(collateralToken, PuppetStore.AllocationRule({throttleActivity: 3600}), user);
-        puppetRouter.setMatchRule(collateralToken, PuppetStore.MatchRule({allowanceRate: 1000}), trader);
+        puppetRouter.setMatchRule(
+            collateralToken, PuppetStore.MatchRule({allowanceRate: 1000, expiry: block.timestamp + 100000}), trader
+        );
 
         return user;
     }
 
-    function sortAddresses(address[] memory addresses) public pure returns (address[] memory) {
+    function sortAddresses(
+        address[] memory addresses
+    ) public pure returns (address[] memory) {
         uint length = addresses.length;
         for (uint i = 0; i < length; i++) {
             for (uint j = 0; j < length - i - 1; j++) {
