@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.24;
+pragma solidity 0.8.27;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -56,7 +56,6 @@ contract ExecuteDecreasePositionLogic is CoreContract {
         if (allocation.size > request.sizeDelta) {} else {
             allocation.size -= request.sizeDelta;
             // allocation.cumulativeTransactionCost += request.transactionCost;
-
             // positionStore.setPosition(request.positionKey, position);
         }
 

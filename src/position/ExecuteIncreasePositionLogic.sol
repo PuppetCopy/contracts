@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.24;
+pragma solidity 0.8.27;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-
-// import {PuppetStore} from "../puppet/store/PuppetStore.sol";
 
 import {PuppetStore} from "../puppet/store/PuppetStore.sol";
 import {Error} from "../shared/Error.sol";
