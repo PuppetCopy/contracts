@@ -26,11 +26,12 @@ library Address {
     address constant MirrorPositionStore = 0x5F5C9d9272b4Bae556e0F83BE2c488B6E77F03EC;
     address constant PuppetRouter = 0x8F7d6b64264968D7b61DebbEAE6331af230fa860;
     address constant PositionRouter = 0xe24B30FB459656425c8215eDf555585fc6b1F711;
+
     address constant PuppetLogic = 0x3E0894BE6984Ff281e0dd142F3606734F7A9CE94;
-    address constant RequestPositionLogic = 0x4b2BBd178167D75d25807911ce5d8F9690a8DF5C;
-    address constant ExecuteIncreasePositionLogic = 0x0900bcaAA6573a3905406bd20214388b71594D55;
-    address constant ExecuteDecreasePositionLogic = 0x4BCFCBE765Dd1836a4B6F402fB16724bEcECbC6a;
-    address constant ExecuteRevertedAdjustmentLogic = 0xB5546C0292f6570981630CF758B5bc3846DeB996;
+    address constant AllocationLogic = 0x3E0894BE6984Ff281e0dd142F3606734F7A9CE94;
+    address constant RequestLogic = 0x4b2BBd178167D75d25807911ce5d8F9690a8DF5C;
+    address constant ExecutionLogic = 0x4BCFCBE765Dd1836a4B6F402fB16724bEcECbC6a;
+    address constant UnhandledCallbackLogic = 0xB5546C0292f6570981630CF758B5bc3846DeB996;
 
     // Liquidity Pools
     address constant BasePool = 0x19da41A2ccd0792b9b674777E72447903FE29074;

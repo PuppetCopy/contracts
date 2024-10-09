@@ -7,10 +7,10 @@ import {PositionRouter} from "src/PositionRouter.sol";
 import {PuppetRouter} from "src/PuppetRouter.sol";
 
 import {AllocationLogic} from "src/position/AllocationLogic.sol";
-import {ExecuteDecreasePositionLogic} from "src/position/ExecuteDecreasePositionLogic.sol";
-import {ExecuteIncreasePositionLogic} from "src/position/ExecuteIncreasePositionLogic.sol";
-import {ExecuteRevertedAdjustmentLogic} from "src/position/ExecuteRevertedAdjustmentLogic.sol";
-import {RequestPositionLogic} from "src/position/RequestPositionLogic.sol";
+import {ExecutionLogic} from "src/position/ExecutionLogic.sol";
+
+import {RequestLogic} from "src/position/RequestLogic.sol";
+import {UnhandledCallbackLogic} from "src/position/UnhandledCallbackLogic.sol";
 import {IGmxDatastore} from "src/position/interface/IGmxDatastore.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {MirrorPositionStore} from "src/position/store/MirrorPositionStore.sol";
@@ -101,35 +101,25 @@ contract DeployTrading is BaseScript {
         ContributeStore contributeStore = ContributeStore(Address.ContributeStore);
         PositionRouter positionRouter = PositionRouter(Address.PositionRouter);
 
-        RequestPositionLogic requestIncreaseLogic =
-            new RequestPositionLogic(dictator, eventEmitter, puppetStore, positionStore);
-        dictator.setAccess(eventEmitter, address(requestIncreaseLogic));
-        dictator.setAccess(puppetStore, address(requestIncreaseLogic));
-        dictator.setAccess(positionStore, address(requestIncreaseLogic));
+        RequestLogic requestLogic = new RequestLogic(dictator, eventEmitter, puppetStore, positionStore);
+        dictator.setAccess(eventEmitter, address(requestLogic));
+        dictator.setAccess(puppetStore, address(requestLogic));
+        dictator.setAccess(positionStore, address(requestLogic));
 
-        ExecuteIncreasePositionLogic executeIncreaseLogic =
-            new ExecuteIncreasePositionLogic(dictator, eventEmitter, puppetStore, positionStore);
-        dictator.setAccess(eventEmitter, address(executeIncreaseLogic));
-        dictator.setAccess(positionStore, address(executeIncreaseLogic));
-        ExecuteDecreasePositionLogic executeDecreaseLogic =
-            new ExecuteDecreasePositionLogic(dictator, eventEmitter, puppetStore, positionStore);
-        dictator.setAccess(eventEmitter, address(executeDecreaseLogic));
-        dictator.setAccess(positionStore, address(executeDecreaseLogic));
+        ExecutionLogic executionLogic = new ExecutionLogic(dictator, eventEmitter, puppetStore, positionStore);
+        dictator.setAccess(eventEmitter, address(executionLogic));
+        dictator.setAccess(positionStore, address(executionLogic));
 
-        ExecuteRevertedAdjustmentLogic executeRevertedAdjustment =
-            new ExecuteRevertedAdjustmentLogic(dictator, eventEmitter);
-        dictator.setAccess(eventEmitter, address(executeRevertedAdjustment));
-
-        dictator.setPermission(positionRouter, positionRouter.afterOrderExecution.selector, Address.gmxOrderHandler);
-        dictator.setPermission(positionRouter, positionRouter.afterOrderCancellation.selector, Address.gmxOrderHandler);
-        dictator.setPermission(positionRouter, positionRouter.afterOrderFrozen.selector, Address.gmxOrderHandler);
-        dictator.setPermission(requestIncreaseLogic, requestIncreaseLogic.setConfig.selector, Address.dao);
+        UnhandledCallbackLogic unhandledCallbackLogic =
+            new UnhandledCallbackLogic(dictator, eventEmitter, positionStore);
+        dictator.setAccess(eventEmitter, address(unhandledCallbackLogic));
+        dictator.setPermission(requestLogic, requestLogic.setConfig.selector, Address.dao);
 
         AllocationLogic allocationLogic =
             new AllocationLogic(dictator, eventEmitter, contributeStore, puppetStore, positionStore);
-        dictator.setAccess(eventEmitter, address(executeDecreaseLogic));
-        dictator.setAccess(contributeStore, address(executeDecreaseLogic));
-        dictator.setAccess(puppetStore, address(executeDecreaseLogic));
+        dictator.setAccess(eventEmitter, address(executionLogic));
+        dictator.setAccess(contributeStore, address(executionLogic));
+        dictator.setAccess(puppetStore, address(executionLogic));
         dictator.setPermission(allocationLogic, allocationLogic.setConfig.selector, Address.dao);
         allocationLogic.setConfig(
             AllocationLogic.Config({
@@ -141,8 +131,8 @@ contract DeployTrading is BaseScript {
 
         // config
 
-        requestIncreaseLogic.setConfig(
-            RequestPositionLogic.Config({
+        requestLogic.setConfig(
+            RequestLogic.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
                 gmxDatastore: IGmxDatastore(Address.gmxDatastore),
                 callbackHandler: Address.PositionRouter,
@@ -156,16 +146,24 @@ contract DeployTrading is BaseScript {
         dictator.setPermission(positionRouter, positionRouter.setConfig.selector, Address.dao);
         positionRouter.setConfig(
             PositionRouter.Config({
-                settleLogic: allocationLogic,
-                executeIncrease: executeIncreaseLogic,
-                executeDecrease: executeDecreaseLogic,
-                executeRevertedAdjustment: executeRevertedAdjustment
+                requestLogic: requestLogic,
+                allocationLogic: allocationLogic,
+                executionLogic: executionLogic,
+                unhandledCallbackLogic: unhandledCallbackLogic
             })
         );
 
-        // Allocator
-        dictator.setPermission(requestIncreaseLogic, allocationLogic.allocate.selector, Address.dao);
-        dictator.setPermission(requestIncreaseLogic, allocationLogic.settle.selector, Address.dao);
-        dictator.setPermission(requestIncreaseLogic, requestIncreaseLogic.mirror.selector, Address.dao);
+        // Operation
+
+        dictator.setPermission(requestLogic, requestLogic.mirror.selector, address(positionRouter));
+        dictator.setPermission(allocationLogic, allocationLogic.allocate.selector, address(positionRouter));
+        dictator.setPermission(allocationLogic, allocationLogic.settle.selector, address(positionRouter));
+
+        dictator.setPermission(positionRouter, positionRouter.afterOrderExecution.selector, Address.gmxOrderHandler);
+        dictator.setPermission(positionRouter, positionRouter.afterOrderCancellation.selector, Address.gmxOrderHandler);
+        dictator.setPermission(positionRouter, positionRouter.afterOrderFrozen.selector, Address.gmxOrderHandler);
+        dictator.setPermission(positionRouter, positionRouter.mirror.selector, Address.dao);
+        dictator.setPermission(positionRouter, positionRouter.allocate.selector, Address.dao);
+        dictator.setPermission(positionRouter, positionRouter.settle.selector, Address.dao);
     }
 }
