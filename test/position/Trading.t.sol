@@ -8,10 +8,10 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {PositionRouter} from "src/PositionRouter.sol";
 import {PuppetRouter} from "src/PuppetRouter.sol";
 import {AllocationLogic} from "src/position/AllocationLogic.sol";
-import {ExecuteDecreasePositionLogic} from "src/position/ExecuteDecreasePositionLogic.sol";
-import {ExecuteIncreasePositionLogic} from "src/position/ExecuteIncreasePositionLogic.sol";
-import {ExecuteRevertedAdjustmentLogic} from "src/position/ExecuteRevertedAdjustmentLogic.sol";
-import {RequestPositionLogic} from "src/position/RequestPositionLogic.sol";
+import {ExecutionLogic} from "src/position/ExecutionLogic.sol";
+
+import {RequestLogic} from "src/position/RequestLogic.sol";
+import {UnhandledCallbackLogic} from "src/position/UnhandledCallbackLogic.sol";
 import {IGmxDatastore} from "src/position/interface/IGmxDatastore.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxOracle} from "src/position/interface/IGmxOracle.sol";
@@ -37,7 +37,7 @@ contract TradingTest is BasicSetup {
     IGmxExchangeRouter gmxExchangeRouter;
     MockGmxExchangeRouter mockGmxExchangeRouter;
 
-    RequestPositionLogic requestLogic;
+    RequestLogic requestLogic;
     AllocationLogic allocationLogic;
 
     IGmxOracle gmxOracle = IGmxOracle(Address.gmxOracle);
@@ -70,23 +70,23 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(puppetLogic, puppetLogic.setMatchRule.selector, address(puppetRouter));
         dictator.setPermission(puppetLogic, puppetLogic.setMatchRuleList.selector, address(puppetRouter));
 
-        requestLogic = new RequestPositionLogic(dictator, eventEmitter, puppetStore, positionStore);
+        allocationLogic = new AllocationLogic(dictator, eventEmitter, contributeStore, puppetStore, positionStore);
+        dictator.setAccess(eventEmitter, address(allocationLogic));
+        dictator.setAccess(contributeStore, address(allocationLogic));
+        dictator.setAccess(puppetStore, address(allocationLogic));
+
+        requestLogic = new RequestLogic(dictator, eventEmitter, puppetStore, positionStore);
         dictator.setAccess(eventEmitter, address(requestLogic));
         dictator.setAccess(puppetStore, address(requestLogic));
         dictator.setAccess(positionStore, address(requestLogic));
 
-        ExecuteIncreasePositionLogic executeIncreaseLogic =
-            new ExecuteIncreasePositionLogic(dictator, eventEmitter, puppetStore, positionStore);
-        dictator.setAccess(eventEmitter, address(executeIncreaseLogic));
-        dictator.setAccess(positionStore, address(executeIncreaseLogic));
-        ExecuteDecreasePositionLogic executeDecreaseLogic =
-            new ExecuteDecreasePositionLogic(dictator, eventEmitter, puppetStore, positionStore);
-        dictator.setAccess(eventEmitter, address(executeDecreaseLogic));
-        dictator.setAccess(positionStore, address(executeDecreaseLogic));
+        ExecutionLogic executionLogic = new ExecutionLogic(dictator, eventEmitter, puppetStore, positionStore);
+        dictator.setAccess(eventEmitter, address(executionLogic));
+        dictator.setAccess(positionStore, address(executionLogic));
 
-        ExecuteRevertedAdjustmentLogic executeRevertedAdjustment =
-            new ExecuteRevertedAdjustmentLogic(dictator, eventEmitter);
-        dictator.setAccess(eventEmitter, address(executeRevertedAdjustment));
+        UnhandledCallbackLogic unhandledCallbackLogic =
+            new UnhandledCallbackLogic(dictator, eventEmitter, positionStore);
+        dictator.setAccess(eventEmitter, address(unhandledCallbackLogic));
 
         // config
 
@@ -111,7 +111,7 @@ contract TradingTest is BasicSetup {
 
         dictator.setPermission(requestLogic, requestLogic.setConfig.selector, users.owner);
         requestLogic.setConfig(
-            RequestPositionLogic.Config({
+            RequestLogic.Config({
                 gmxExchangeRouter: mockGmxExchangeRouter,
                 gmxDatastore: IGmxDatastore(Address.gmxDatastore),
                 callbackHandler: address(positionRouter),
@@ -122,10 +122,6 @@ contract TradingTest is BasicSetup {
             })
         );
 
-        allocationLogic = new AllocationLogic(dictator, eventEmitter, contributeStore, puppetStore, positionStore);
-        dictator.setAccess(eventEmitter, address(allocationLogic));
-        dictator.setAccess(contributeStore, address(allocationLogic));
-        dictator.setAccess(puppetStore, address(allocationLogic));
         dictator.setPermission(allocationLogic, allocationLogic.setConfig.selector, users.owner);
         allocationLogic.setConfig(
             AllocationLogic.Config({
@@ -143,17 +139,25 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(positionRouter, positionRouter.setConfig.selector, users.owner);
         positionRouter.setConfig(
             PositionRouter.Config({
-                settleLogic: allocationLogic,
-                executeIncrease: executeIncreaseLogic,
-                executeDecrease: executeDecreaseLogic,
-                executeRevertedAdjustment: executeRevertedAdjustment
+                requestLogic: requestLogic,
+                allocationLogic: allocationLogic,
+                executionLogic: executionLogic,
+                unhandledCallbackLogic: unhandledCallbackLogic
             })
         );
+
+        // test setup
+
+        dictator.setPermission(requestLogic, requestLogic.mirror.selector, address(positionRouter));
+        dictator.setPermission(allocationLogic, allocationLogic.allocate.selector, address(positionRouter));
+        dictator.setPermission(allocationLogic, allocationLogic.settle.selector, address(positionRouter));
 
         dictator.setPermission(positionRouter, positionRouter.afterOrderExecution.selector, Address.gmxOrderHandler);
         dictator.setPermission(positionRouter, positionRouter.afterOrderCancellation.selector, Address.gmxOrderHandler);
         dictator.setPermission(positionRouter, positionRouter.afterOrderFrozen.selector, Address.gmxOrderHandler);
-        dictator.setPermission(requestLogic, requestLogic.mirror.selector, users.owner);
+        dictator.setPermission(positionRouter, positionRouter.mirror.selector, users.owner);
+        dictator.setPermission(positionRouter, positionRouter.allocate.selector, users.owner);
+        dictator.setPermission(positionRouter, positionRouter.settle.selector, users.owner);
     }
 
     function testIncreaseRequestInUsdc() public {
@@ -163,7 +167,7 @@ contract TradingTest is BasicSetup {
         uint estimatedGasLimit = 5_000_000;
         uint executionFee = tx.gasprice * estimatedGasLimit;
 
-        address[] memory puppetList = getGeneratePuppetList(usdc, Address.gmxEthUsdcMarket, trader, 10);
+        address[] memory puppetList = getGeneratePuppetList(usdc, trader, 10);
 
         // vm.startPrank(trader);
         vm.startPrank(users.owner);
@@ -173,11 +177,10 @@ contract TradingTest is BasicSetup {
         bytes32 allocationKey =
             allocationLogic.allocate(usdc, mockOriginRequestKey, PositionUtils.getMatchKey(usdc, trader), puppetList);
 
-        // allocationLogic.settle(AllocationLogic.CallSettleParams({allocationKey: allocationKey, puppetList:
-        // puppetList}));
+        // allocationLogic.settle(allocationKey, puppetList);
 
-        requestLogic.mirror{value: executionFee}(
-            RequestPositionLogic.RequestMirrorPosition({
+        positionRouter.mirror{value: executionFee}(
+            RequestLogic.MirrorPositionParams({
                 trader: trader,
                 allocationKey: allocationKey,
                 originRequestKey: mockOriginRequestKey,
@@ -196,22 +199,19 @@ contract TradingTest is BasicSetup {
 
     function getGeneratePuppetList(
         IERC20 collateralToken,
-        address market,
         address trader,
         uint _length
     ) internal returns (address[] memory) {
         address[] memory puppetList = new address[](_length);
         for (uint i; i < _length; i++) {
-            puppetList[i] = createPuppet(
-                collateralToken, market, trader, string(abi.encodePacked("puppet:", Strings.toString(i))), 100e6
-            );
+            puppetList[i] =
+                createPuppet(collateralToken, trader, string(abi.encodePacked("puppet:", Strings.toString(i))), 100e6);
         }
         return sortAddresses(puppetList);
     }
 
     function createPuppet(
         IERC20 collateralToken,
-        address market,
         address trader,
         string memory name,
         uint fundValue

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.27;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IGmxDatastore} from "../interface/IGmxDatastore.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 library GmxPositionUtils {
     enum OrderType {
@@ -14,6 +14,7 @@ library GmxPositionUtils {
         LimitDecrease, // 5
         StopLossDecrease, // 6
         Liquidation // 7
+
     }
 
     enum OrderExecutionStatus {
@@ -95,15 +96,21 @@ library GmxPositionUtils {
         uint minOutputAmount;
     }
 
-    function isIncreaseOrder(OrderType orderType) internal pure returns (bool) {
+    function isIncreaseOrder(
+        OrderType orderType
+    ) internal pure returns (bool) {
         return orderType == OrderType.MarketIncrease || orderType == OrderType.LimitIncrease;
     }
 
-    function isDecreaseOrder(OrderType orderType) internal pure returns (bool) {
+    function isDecreaseOrder(
+        OrderType orderType
+    ) internal pure returns (bool) {
         return orderType == OrderType.MarketDecrease || orderType == OrderType.Liquidation;
     }
 
-    function isLiquidateOrder(OrderType orderType) internal pure returns (bool) {
+    function isLiquidateOrder(
+        OrderType orderType
+    ) internal pure returns (bool) {
         return orderType == OrderType.Liquidation;
     }
 
@@ -116,7 +123,9 @@ library GmxPositionUtils {
         return keccak256(abi.encode(account, market, collateralToken, isLong));
     }
 
-    function getCurrentNonce(IGmxDatastore dataStore) internal view returns (uint) {
+    function getCurrentNonce(
+        IGmxDatastore dataStore
+    ) internal view returns (uint) {
         return dataStore.getUint(keccak256(abi.encode("NONCE")));
     }
 
@@ -124,11 +133,15 @@ library GmxPositionUtils {
         return keccak256(abi.encode(address(dataStore), nonce));
     }
 
-    function getNextRequestKey(IGmxDatastore dataStore) internal view returns (bytes32) {
+    function getNextRequestKey(
+        IGmxDatastore dataStore
+    ) internal view returns (bytes32) {
         return getRequestKey(dataStore, getCurrentNonce(dataStore) + 1);
     }
 
-    function getCurrentRequestKey(IGmxDatastore dataStore) internal view returns (bytes32) {
+    function getCurrentRequestKey(
+        IGmxDatastore dataStore
+    ) internal view returns (bytes32) {
         return getRequestKey(dataStore, getCurrentNonce(dataStore));
     }
 }

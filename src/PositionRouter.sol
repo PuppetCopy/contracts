@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.27;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import {AllocationLogic} from "./position/AllocationLogic.sol";
-import {ExecuteDecreasePositionLogic} from "./position/ExecuteDecreasePositionLogic.sol";
-import {ExecuteIncreasePositionLogic} from "./position/ExecuteIncreasePositionLogic.sol";
-import {ExecuteRevertedAdjustmentLogic} from "./position/ExecuteRevertedAdjustmentLogic.sol";
+import {ExecutionLogic} from "./position/ExecutionLogic.sol";
+import {RequestLogic} from "./position/RequestLogic.sol";
+import {UnhandledCallbackLogic} from "./position/UnhandledCallbackLogic.sol";
 import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
 import {MirrorPositionStore} from "./position/store/MirrorPositionStore.sol";
 import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
@@ -16,10 +18,10 @@ import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
 contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallbackReceiver {
     struct Config {
-        AllocationLogic settleLogic;
-        ExecuteIncreasePositionLogic executeIncrease;
-        ExecuteDecreasePositionLogic executeDecrease;
-        ExecuteRevertedAdjustmentLogic executeRevertedAdjustment;
+        RequestLogic requestLogic;
+        AllocationLogic allocationLogic;
+        ExecutionLogic executionLogic;
+        UnhandledCallbackLogic unhandledCallbackLogic;
     }
 
     MirrorPositionStore immutable positionStore;
@@ -39,18 +41,9 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         GmxPositionUtils.Props calldata order,
         bytes calldata eventData
     ) external nonReentrant auth {
-        if (GmxPositionUtils.isIncreaseOrder(order.numbers.orderType)) {
-            try config.executeIncrease.execute(key, order, eventData) {}
-            catch {
-                storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.ExecutedIncrease, order, key, eventData);
-            }
-        } else if (GmxPositionUtils.isDecreaseOrder(order.numbers.orderType)) {
-            try config.executeDecrease.execute(key, order, eventData) {}
-            catch {
-                storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.ExecutedDecrease, order, key, eventData);
-            }
-        } else {
-            revert Error.PositionRouter__InvalidOrderType(order.numbers.orderType);
+        try config.executionLogic.handleExecution(key, order, eventData) {}
+        catch {
+            config.unhandledCallbackLogic.storeUnhandledCallback(order, key, eventData);
         }
     }
 
@@ -59,9 +52,9 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         GmxPositionUtils.Props calldata order,
         bytes calldata eventData
     ) external nonReentrant auth {
-        try config.executeRevertedAdjustment.handleCancelled(key, order) {}
+        try config.executionLogic.handleCancelled(key, order, eventData) {}
         catch {
-            storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.Cancelled, order, key, eventData);
+            config.unhandledCallbackLogic.storeUnhandledCallback(order, key, eventData);
         }
     }
 
@@ -70,44 +63,39 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         GmxPositionUtils.Props calldata order,
         bytes calldata eventData
     ) external nonReentrant auth {
-        try config.executeRevertedAdjustment.handleFrozen(key, order) {}
+        try config.executionLogic.handleFrozen(key, order, eventData) {}
         catch {
-            storeUnhandledCallback(GmxPositionUtils.OrderExecutionStatus.Frozen, order, key, eventData);
+            config.unhandledCallbackLogic.storeUnhandledCallback(order, key, eventData);
         }
     }
 
-    function executeUnhandledExecutionCallback(bytes32 key) external nonReentrant auth {
-        MirrorPositionStore.UnhandledCallback memory callbackData = positionStore.getUnhandledCallback(key);
+    function allocate(
+        IERC20 collateralToken,
+        bytes32 originRequestKey,
+        bytes32 matchKey,
+        address[] calldata puppetList
+    ) external nonReentrant auth returns (bytes32 allocationKey) {
+        return config.allocationLogic.allocate(collateralToken, originRequestKey, matchKey, puppetList);
+    }
 
-        if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.ExecutedIncrease) {
-            config.executeIncrease.execute(key, callbackData.order, callbackData.eventData);
-        } else if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.ExecutedDecrease) {
-            config.executeDecrease.execute(key, callbackData.order, callbackData.eventData);
-        } else if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.Cancelled) {
-            config.executeRevertedAdjustment.handleCancelled(key, callbackData.order);
-        } else if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.Frozen) {
-            config.executeRevertedAdjustment.handleFrozen(key, callbackData.order);
-        }
+    function mirror(
+        RequestLogic.MirrorPositionParams calldata params
+    ) external payable nonReentrant auth {
+        config.requestLogic.mirror(params);
+    }
+
+    function settle(bytes32 key, address[] calldata puppetList) external nonReentrant auth {
+        config.allocationLogic.settle(key, puppetList);
     }
 
     // governance
 
     /// @notice Set the mint rate limit for the token.
     /// @param _config The new rate limit configuration.
-    function setConfig(Config calldata _config) external auth {
+    function setConfig(
+        Config calldata _config
+    ) external auth {
         config = _config;
         logEvent("SetConfig", abi.encode(_config));
-    }
-
-    // internal
-
-    function storeUnhandledCallback(
-        GmxPositionUtils.OrderExecutionStatus status,
-        GmxPositionUtils.Props calldata order,
-        bytes32 key,
-        bytes calldata eventData
-    ) internal auth {
-        positionStore.setUnhandledCallback(status, order, key, eventData);
-        logEvent("StoreUnhandledCallback", abi.encode(status, key, order, eventData));
     }
 }

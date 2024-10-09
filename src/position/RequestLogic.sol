@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.24;
+pragma solidity 0.8.27;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -18,10 +18,7 @@ import {MirrorPositionStore} from "./store/MirrorPositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
-contract RequestPositionLogic is CoreContract {
-    // bytes32 constant GMX_DATASTORE_SIZE_IN_USD = keccak256(abi.encode("SIZE_IN_USD"));
-    // bytes32 constant GMX_DATASTORE_COLLATERAL_AMOUNT = keccak256(abi.encode("COLLATERAL_AMOUNT"));
-
+contract RequestLogic is CoreContract {
     struct Config {
         IGmxExchangeRouter gmxExchangeRouter;
         IGmxDatastore gmxDatastore;
@@ -32,7 +29,7 @@ contract RequestPositionLogic is CoreContract {
         uint callbackGasLimit;
     }
 
-    struct RequestMirrorPosition {
+    struct MirrorPositionParams {
         IERC20 collateralToken;
         bytes32 originRequestKey;
         bytes32 allocationKey;
@@ -40,7 +37,6 @@ contract RequestPositionLogic is CoreContract {
         address market;
         bool isIncrease;
         bool isLong;
-        GmxPositionUtils.OrderType orderType;
         uint executionFee;
         uint collateralDelta;
         uint sizeDeltaInUsd;
@@ -58,13 +54,13 @@ contract RequestPositionLogic is CoreContract {
         EventEmitter _eventEmitter,
         PuppetStore _puppetStore,
         MirrorPositionStore _positionStore
-    ) CoreContract("RequestPositionLogic", "1", _authority, _eventEmitter) {
+    ) CoreContract("RequestLogic", "1", _authority, _eventEmitter) {
         puppetStore = _puppetStore;
         positionStore = _positionStore;
     }
 
     function submitOrder(
-        RequestMirrorPosition calldata order,
+        MirrorPositionParams calldata order,
         Subaccount subaccount,
         MirrorPositionStore.RequestAdjustment memory request,
         GmxPositionUtils.OrderType orderType,
@@ -108,134 +104,139 @@ contract RequestPositionLogic is CoreContract {
         requestKey = abi.decode(orderReturnData, (bytes32));
     }
 
+    function getTargetLeverage(
+        uint size,
+        uint collateral,
+        uint sizeDeltaInUsd,
+        uint collateralDelta,
+        bool isIncrease
+    ) internal pure returns (uint) {
+        return isIncrease
+            ? Precision.toBasisPoints(size + sizeDeltaInUsd, collateral + collateralDelta)
+            : sizeDeltaInUsd < size ? Precision.toBasisPoints(size - sizeDeltaInUsd, collateral - collateralDelta) : 0;
+    }
+
+    function logRequest(
+        string memory name,
+        MirrorPositionParams calldata params,
+        Subaccount subaccount,
+        MirrorPositionStore.RequestAdjustment memory request,
+        bytes32 requestKey,
+        uint deltaLeverage
+    ) internal {
+        logEvent(
+            name,
+            abi.encode(
+                subaccount,
+                params.trader,
+                params.allocationKey,
+                params.originRequestKey,
+                requestKey,
+                // request.traderPositionKey,
+                // request.positionKey,
+                request.sizeDelta,
+                request.transactionCost,
+                deltaLeverage
+            )
+        );
+    }
+
     function adjust(
-        RequestMirrorPosition calldata order,
+        MirrorPositionParams calldata params,
         MirrorPositionStore.RequestAdjustment memory request,
         PuppetStore.Allocation memory allocation,
         Subaccount subaccount
     ) internal returns (bytes32 requestKey) {
-        // uint traderSize = getDatstoreValue(request.traderPositionKey, GMX_DATASTORE_SIZE_IN_USD);
-        // uint traderCollateral = getDatstoreValue(request.traderPositionKey, GMX_DATASTORE_COLLATERAL_AMOUNT);
         uint leverage = Precision.toBasisPoints(allocation.size, allocation.collateral);
-        uint targetLeverage = order.isIncrease
-            ? Precision.toBasisPoints(allocation.size + order.sizeDeltaInUsd, allocation.collateral + order.collateralDelta)
-            : order.sizeDeltaInUsd < allocation.size
-                ? Precision.toBasisPoints(allocation.size - order.sizeDeltaInUsd, allocation.collateral - order.collateralDelta)
-                : 0;
+        uint targetLeverage = getTargetLeverage(
+            allocation.size, allocation.collateral, params.sizeDeltaInUsd, params.collateralDelta, params.isIncrease
+        );
+
+        uint deltaLeverage;
 
         if (targetLeverage > leverage) {
-            uint deltaLeverage = targetLeverage - leverage;
+            deltaLeverage = targetLeverage - leverage;
+            requestKey = submitOrder(params, subaccount, request, GmxPositionUtils.OrderType.MarketIncrease, 0);
             request.sizeDelta = allocation.size * deltaLeverage / targetLeverage;
-            requestKey = submitOrder(order, subaccount, request, GmxPositionUtils.OrderType.MarketIncrease, 0);
-
-            request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + order.executionFee;
-            positionStore.setRequestAdjustment(requestKey, request);
-
-            logEvent(
-                "RequestIncrease",
-                abi.encode(
-                    order.originRequestKey,
-                    requestKey,
-                    request.traderPositionKey,
-                    request.positionKey,
-                    request.sizeDelta,
-                    request.transactionCost,
-                    deltaLeverage
-                )
-            );
         } else {
-            uint deltaLeverage = leverage - targetLeverage;
+            deltaLeverage = leverage - targetLeverage;
+            requestKey = submitOrder(params, subaccount, request, GmxPositionUtils.OrderType.MarketDecrease, 0);
             request.sizeDelta = allocation.size * deltaLeverage / leverage;
-
-            requestKey = submitOrder(order, subaccount, request, GmxPositionUtils.OrderType.MarketDecrease, 0);
-
-            request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + order.executionFee;
-            positionStore.setRequestAdjustment(requestKey, request);
-
-            logEvent(
-                "RequestDecrease",
-                abi.encode(
-                    order.originRequestKey,
-                    requestKey,
-                    request.traderPositionKey,
-                    request.positionKey,
-                    request.sizeDelta,
-                    request.transactionCost,
-                    deltaLeverage
-                )
-            );
         }
+
+        positionStore.setRequestAdjustment(requestKey, request);
+        request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + params.executionFee;
+
+        logRequest(
+            targetLeverage > leverage ? "RequestDecrease" : "RequestIncrease",
+            params,
+            subaccount,
+            request,
+            requestKey,
+            deltaLeverage
+        );
     }
 
-    function mirror(RequestMirrorPosition calldata order) external payable auth returns (bytes32 requestKey) {
+    function mirror(
+        MirrorPositionParams calldata params
+    ) external payable auth returns (bytes32 requestKey) {
         uint startGas = gasleft();
 
-        PuppetStore.Allocation memory allocation = puppetStore.getAllocation(order.allocationKey);
+        PuppetStore.Allocation memory allocation = puppetStore.getAllocation(params.allocationKey);
 
         Subaccount subaccount = positionStore.getSubaccount(allocation.matchKey);
         address subaccountAddress = address(subaccount);
 
         if (subaccountAddress == address(0)) {
-            subaccount = positionStore.createSubaccount(allocation.matchKey, order.trader);
+            subaccount = positionStore.createSubaccount(allocation.matchKey, params.trader);
         }
 
         MirrorPositionStore.RequestAdjustment memory request = MirrorPositionStore.RequestAdjustment({
             matchKey: allocation.matchKey,
-            positionKey: GmxPositionUtils.getPositionKey(
-                subaccountAddress, order.market, order.collateralToken, order.isLong
-                ),
-            traderRequestKey: order.originRequestKey,
-            traderPositionKey: GmxPositionUtils.getPositionKey(
-                order.trader, order.market, order.collateralToken, order.isLong
-                ),
+            allocationKey: params.allocationKey,
+            // positionKey: GmxPositionUtils.getPositionKey(
+            //     subaccountAddress, params.market, params.collateralToken, params.isLong
+            // ),
+            traderRequestKey: params.originRequestKey,
+            // traderPositionKey: GmxPositionUtils.getPositionKey(
+            //     params.trader, params.market, params.collateralToken, params.isLong
+            // ),
             sizeDelta: 0,
             transactionCost: startGas
         });
 
         if (allocation.size == 0) {
             if (allocation.allocated == 0) {
-                revert Error.RequestPositionLogic__NoAllocation();
+                revert Error.RequestLogic__NoAllocation();
             }
 
-            if (allocation.collateral > 0) revert Error.RequestPositionLogic__PendingExecution();
+            if (allocation.collateral > 0) revert Error.RequestLogic__PendingExecution();
 
             allocation.collateral = allocation.allocated;
 
-            puppetStore.transferOut(order.collateralToken, config.gmxOrderVault, allocation.allocated);
-            puppetStore.setAllocation(order.allocationKey, allocation);
+            puppetStore.transferOut(params.collateralToken, config.gmxOrderVault, allocation.allocated);
+            puppetStore.setAllocation(params.allocationKey, allocation);
 
-            requestKey =
-                submitOrder(order, subaccount, request, GmxPositionUtils.OrderType.MarketIncrease, allocation.allocated);
+            requestKey = submitOrder(
+                params, subaccount, request, GmxPositionUtils.OrderType.MarketIncrease, allocation.allocated
+            );
 
-            request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + order.executionFee;
+            request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + params.executionFee;
             positionStore.setRequestAdjustment(requestKey, request);
 
-            logEvent(
-                "RequestIncrease",
-                abi.encode(
-                    order.originRequestKey,
-                    requestKey,
-                    request.traderPositionKey,
-                    request.positionKey,
-                    request.sizeDelta,
-                    request.transactionCost,
-                    0
-                )
-            );
+            logRequest("RequestIncrease", params, subaccount, request, requestKey, 0);
         } else {
-            requestKey = adjust(order, request, allocation, subaccount);
+            requestKey = adjust(params, request, allocation, subaccount);
         }
     }
-
-    // function getDatstoreValue(bytes32 positionKey, bytes32 prop) internal view returns (uint) {
-    //     return config.gmxDatastore.getUint(keccak256(abi.encode(positionKey, prop)));
-    // }
 
     // governance
 
     /// @notice Set the mint rate limit for the token.
     /// @param _config The new rate limit configuration.
-    function setConfig(Config calldata _config) external auth {
+    function setConfig(
+        Config calldata _config
+    ) external auth {
         config = _config;
         logEvent("SetConfig", abi.encode(_config));
     }

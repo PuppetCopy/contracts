@@ -117,52 +117,62 @@ contract AllocationLogic is CoreContract {
             revert Error.AllocationLogic__AllocationStillUtilized();
         }
 
-        bytes32 listHash = keccak256(abi.encode(puppetList));
-        if (puppetStore.getSettledAllocationHash(listHash) != allocationKey) {
+        bytes32 puppetListHash = keccak256(abi.encode(puppetList));
+        if (puppetStore.getSettledAllocationHash(puppetListHash) != allocationKey) {
             revert Error.AllocationLogic__InvalidPuppetListIntegrity();
         }
-        puppetStore.setSettledAllocationHash(listHash, allocationKey);
+        puppetStore.setSettledAllocationHash(puppetListHash, allocationKey);
 
         uint[] memory allocationToSettledAmountList = puppetStore.getUserAllocationList(allocationKey, puppetList);
         uint[] memory contributionAmountList = new uint[](puppetList.length);
-        uint totalContribution;
-        int profit = int(allocation.settled) - int(allocation.allocated);
+        uint totalPuppetContribution;
+        uint traderPerformanceContribution;
 
-        if (profit > 0) {
-            totalContribution = Precision.applyFactor(config.performanceContributionRate, uint(profit));
-            uint traderContribution = Precision.applyFactor(config.traderPerformanceContributionShare, uint(profit));
+        if (allocation.profit > 0) {
+            totalPuppetContribution = Precision.applyFactor(config.performanceContributionRate, allocation.profit);
 
-            for (uint i = 0; i < allocationToSettledAmountList.length; i++) {
-                uint puppetAllocation = allocationToSettledAmountList[i];
-                if (puppetAllocation > 0) {
-                    contributionAmountList[i] = puppetAllocation * totalContribution / allocation.allocated;
-                    allocationToSettledAmountList[i] -= contributionAmountList[i];
-                }
-            }
+            if (config.traderPerformanceContributionShare > 0) {
+                traderPerformanceContribution =
+                    Precision.applyFactor(config.traderPerformanceContributionShare, allocation.profit);
 
-            if (traderContribution > 0) {
                 contributeStore.contribute(
                     allocation.collateralToken,
                     positionStore,
                     positionStore.getSubaccount(allocation.matchKey).account(),
-                    traderContribution
+                    traderPerformanceContribution
                 );
             }
+
+            uint settledAfterContribution = allocation.settled - totalPuppetContribution - traderPerformanceContribution;
+
+            for (uint i = 0; i < allocationToSettledAmountList.length; i++) {
+                uint puppetAllocation = allocationToSettledAmountList[i];
+                if (puppetAllocation == 0) continue;
+
+                contributionAmountList[i] = puppetAllocation * totalPuppetContribution / allocation.allocated;
+                allocationToSettledAmountList[i] = puppetAllocation * settledAfterContribution / allocation.allocated;
+            }
+
+            contributeStore.contributeMany(allocation.collateralToken, puppetStore, puppetList, contributionAmountList);
         } else if (allocation.settled > 0) {
             for (uint i = 0; i < allocationToSettledAmountList.length; i++) {
                 uint puppetAllocation = allocationToSettledAmountList[i];
-                if (puppetAllocation > 0) {
-                    contributionAmountList[i] = puppetAllocation * allocation.settled / allocation.allocated;
-                    allocationToSettledAmountList[i] -= contributionAmountList[i];
-                }
+                if (puppetAllocation == 0) continue;
+
+                allocationToSettledAmountList[i] = puppetAllocation * allocation.settled / allocation.allocated;
             }
         }
 
         puppetStore.settleList(allocation.collateralToken, puppetList, allocationToSettledAmountList);
-        if (totalContribution > 0) {
-            contributeStore.contributeMany(allocation.collateralToken, puppetStore, puppetList, contributionAmountList);
+
+        if (allocation.size > 0) {
+            allocation.profit = 0;
+            allocation.allocated -= allocation.settled;
+
+            puppetStore.setAllocation(allocationKey, allocation);
+        } else {
+            puppetStore.removeAllocation(allocationKey);
         }
-        puppetStore.removeAllocation(allocationKey);
 
         logEvent(
             "Settle",
@@ -170,14 +180,16 @@ contract AllocationLogic is CoreContract {
                 allocation.collateralToken,
                 allocation.matchKey,
                 allocationKey,
-                listHash,
+                puppetListHash,
                 puppetList,
                 allocationToSettledAmountList,
                 contributionAmountList,
-                profit, // Now a single value for both profit and loss
+                allocation.allocated,
                 allocation.settled,
-                totalContribution,
-                (startGas - gasleft()) * tx.gasprice
+                totalPuppetContribution,
+                traderPerformanceContribution,
+                (startGas - gasleft()) * tx.gasprice,
+                allocation.profit
             )
         );
     }

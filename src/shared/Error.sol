@@ -16,10 +16,10 @@ library Error {
     error PuppetLogic__InvalidLength();
     error PuppetLogic__InvalidActivityThrottle(uint minAllocationActivity, uint maxAllocationActivity);
 
-    error RequestPositionLogic__ValueNotFound();
-    error RequestPositionLogic__NoAllocation();
-    error RequestPositionLogic__PendingExecution();
-    error RequestPositionLogic__InvalidAllocationMatchKey();
+    error RequestLogic__ValueNotFound();
+    error RequestLogic__NoAllocation();
+    error RequestLogic__PendingExecution();
+    error RequestLogic__InvalidAllocationMatchKey();
 
     error AllocationLogic__AllocationStillUtilized();
     error AllocationLogic__PuppetListLimit();
@@ -27,14 +27,12 @@ library Error {
     error AllocationLogic__InvalidListLength();
     error AllocationLogic__AllocationDoesNotExist();
 
-    error ExecuteIncreasePositionLogic__RequestDoesNotExist();
-
-    error ExecuteDecreasePositionLogic__InvalidRequest(bytes32 positionKey, bytes32 key);
-    error ExecuteDecreasePositionLogic__UnexpectedEventData();
-    error ExecuteDecreasePositionLogic__MismatchedAmountIn(uint recordedAmountIn, uint amountIn);
-    error ExecuteDecreasePositionLogic__RequestDoesNotExist();
-    error ExecuteDecreasePositionLogic__PositionDoesNotExist();
-    error ExecuteDecreasePositionLogic__AllocationDoesNotExist();
+    error ExecutionLogic__RequestDoesNotExist();
+    error ExecutionLogic__InvalidRequest(bytes32 positionKey, bytes32 key);
+    error ExecutionLogic__UnexpectedEventData();
+    error ExecutionLogic__MismatchedAmountIn(uint recordedAmountIn, uint amountIn);
+    error ExecutionLogic__PositionDoesNotExist();
+    error ExecutionLogic__AllocationDoesNotExist();
 
     error PositionRouter__InvalidOrderType(GmxPositionUtils.OrderType orderType);
 }

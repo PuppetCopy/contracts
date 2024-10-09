@@ -11,16 +11,16 @@ import {GmxPositionUtils} from "./../utils/GmxPositionUtils.sol";
 
 contract MirrorPositionStore is BankStore {
     struct RequestAdjustment {
-        bytes32 traderPositionKey;
+        // bytes32 traderPositionKey;
+        bytes32 allocationKey;
         bytes32 traderRequestKey;
         bytes32 matchKey;
-        bytes32 positionKey;
+        // bytes32 positionKey;
         uint sizeDelta;
         uint transactionCost;
     }
 
     struct UnhandledCallback {
-        GmxPositionUtils.OrderExecutionStatus status;
         GmxPositionUtils.Props order;
         bytes eventData;
     }
@@ -32,7 +32,9 @@ contract MirrorPositionStore is BankStore {
 
     constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
 
-    function getRequestAdjustment(bytes32 _key) external view returns (RequestAdjustment memory) {
+    function getRequestAdjustment(
+        bytes32 _key
+    ) external view returns (RequestAdjustment memory) {
         return requestAdjustmentMap[_key];
     }
 
@@ -40,35 +42,44 @@ contract MirrorPositionStore is BankStore {
         requestAdjustmentMap[_key] = _ra;
     }
 
-    function removeRequestAdjustment(bytes32 _key) external auth {
+    function removeRequestAdjustment(
+        bytes32 _key
+    ) external auth {
         delete requestAdjustmentMap[_key];
     }
 
-    function removeRequestDecrease(bytes32 _key) external auth {
+    function removeRequestDecrease(
+        bytes32 _key
+    ) external auth {
         delete requestAdjustmentMap[_key];
     }
 
     function setUnhandledCallback(
-        GmxPositionUtils.OrderExecutionStatus _status,
         GmxPositionUtils.Props calldata _order,
         bytes32 _key,
         bytes calldata _eventData
     ) external auth {
         MirrorPositionStore.UnhandledCallback memory callbackResponse =
-            MirrorPositionStore.UnhandledCallback({status: _status, order: _order, eventData: _eventData});
+            MirrorPositionStore.UnhandledCallback({order: _order, eventData: _eventData});
 
         unhandledCallbackMap[_key] = callbackResponse;
     }
 
-    function getUnhandledCallback(bytes32 _key) external view returns (UnhandledCallback memory) {
+    function getUnhandledCallback(
+        bytes32 _key
+    ) external view returns (UnhandledCallback memory) {
         return unhandledCallbackMap[_key];
     }
 
-    function removeUnhandledCallback(bytes32 _key) external auth {
+    function removeUnhandledCallback(
+        bytes32 _key
+    ) external auth {
         delete unhandledCallbackMap[_key];
     }
 
-    function getSubaccount(bytes32 _key) external view returns (Subaccount) {
+    function getSubaccount(
+        bytes32 _key
+    ) external view returns (Subaccount) {
         return routeSubaccountMap[_key];
     }
 
