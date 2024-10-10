@@ -84,8 +84,9 @@ contract AllocationLogic is CoreContract {
 
         puppetStore.setSettledAllocationHash(puppetListHash, allocationKey);
 
-        allocation.allocated +=
-            puppetStore.allocatePuppetList(collateralToken, allocationKey, puppetList, balanceToAllocationList);
+        allocation.allocated += puppetStore.allocatePuppetList(
+            collateralToken, matchKey, allocationKey, puppetList, balanceToAllocationList
+        );
         puppetStore.setAllocation(allocationKey, allocation);
 
         uint transactionCost = (startGas - gasleft()) * tx.gasprice;

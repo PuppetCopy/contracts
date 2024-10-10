@@ -66,7 +66,6 @@ contract TradingTest is BasicSetup {
 
         dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
         dictator.setPermission(puppetLogic, puppetLogic.withdraw.selector, address(puppetRouter));
-        dictator.setPermission(puppetLogic, puppetLogic.setAllocationRule.selector, address(puppetRouter));
         dictator.setPermission(puppetLogic, puppetLogic.setMatchRule.selector, address(puppetRouter));
         dictator.setPermission(puppetLogic, puppetLogic.setMatchRuleList.selector, address(puppetRouter));
 
@@ -223,9 +222,11 @@ contract TradingTest is BasicSetup {
         IERC20(collateralToken).approve(address(router), fundValue);
 
         puppetRouter.deposit(collateralToken, fundValue);
-        puppetRouter.setAllocationRule(collateralToken, PuppetStore.AllocationRule({throttleActivity: 3600}), user);
+
         puppetRouter.setMatchRule(
-            collateralToken, PuppetStore.MatchRule({allowanceRate: 1000, expiry: block.timestamp + 100000}), trader
+            collateralToken,
+            PuppetStore.MatchRule({allowanceRate: 1000, throttleActivity: 3600, expiry: block.timestamp + 100000}),
+            trader
         );
 
         return user;

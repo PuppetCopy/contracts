@@ -4,6 +4,10 @@ pragma solidity 0.8.27;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 library PositionUtils {
+    function getRouteKey(IERC20 collateralToken, address market) internal pure returns (bytes32) {
+        return keccak256(abi.encode(collateralToken, market));
+    }
+
     function getMatchKey(IERC20 collateralToken, address trader) internal pure returns (bytes32) {
         return keccak256(abi.encode(collateralToken, trader));
     }

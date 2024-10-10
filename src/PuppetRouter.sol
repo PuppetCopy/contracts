@@ -31,14 +31,6 @@ contract PuppetRouter is CoreContract, ReentrancyGuardTransient {
         config.logic.withdraw(token, msg.sender, receiver, amount);
     }
 
-    function setAllocationRule(
-        IERC20 collateralToken,
-        PuppetStore.AllocationRule calldata ruleParams,
-        address puppet
-    ) external nonReentrant {
-        config.logic.setAllocationRule(collateralToken, puppet, ruleParams);
-    }
-
     function setMatchRule(
         IERC20 collateralToken,
         PuppetStore.MatchRule calldata ruleParams,
@@ -59,7 +51,9 @@ contract PuppetRouter is CoreContract, ReentrancyGuardTransient {
 
     /// @notice Set the mint rate limit for the token.
     /// @param _config The new rate limit configuration.
-    function setConfig(Config calldata _config) external auth {
+    function setConfig(
+        Config calldata _config
+    ) external auth {
         config = _config;
         logEvent("SetConfig", abi.encode(_config));
     }

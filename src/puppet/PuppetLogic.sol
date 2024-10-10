@@ -51,36 +51,6 @@ contract PuppetLogic is CoreContract {
         logEvent("Withdraw", abi.encode(token, user, balance));
     }
 
-    function setAllocationRule(
-        IERC20 collateralToken,
-        address puppet,
-        PuppetStore.AllocationRule calldata ruleParams
-    ) external auth {
-        uint throttleTime = store.getActivityThrottle(puppet);
-
-        if (
-            ruleParams.throttleActivity < config.minAllocationActivity
-                || ruleParams.throttleActivity > config.maxAllocationActivity
-        ) {
-            revert Error.PuppetLogic__InvalidActivityThrottle(
-                config.minAllocationActivity, config.maxAllocationActivity
-            );
-        }
-
-        if (throttleTime == 0) {
-            store.setActivityThrottle(puppet, 1);
-        }
-
-        uint nextThrottleTime = block.timestamp + ruleParams.throttleActivity;
-        if (throttleTime > nextThrottleTime) {
-            store.setActivityThrottle(puppet, nextThrottleTime);
-        }
-
-        store.setAllocationRule(puppet, ruleParams);
-
-        logEvent("SetAllocationRule", abi.encode(collateralToken, puppet, ruleParams));
-    }
-
     function setMatchRule(
         IERC20 collateralToken,
         PuppetStore.MatchRule calldata ruleParams,
@@ -142,7 +112,18 @@ contract PuppetLogic is CoreContract {
         return tokenAllowance;
     }
 
-    function _validateRuleParams(PuppetStore.MatchRule memory ruleParams) internal view {
+    function _validateRuleParams(
+        PuppetStore.MatchRule memory ruleParams
+    ) internal view {
+        if (
+            ruleParams.throttleActivity < config.minAllocationActivity
+                || ruleParams.throttleActivity > config.maxAllocationActivity
+        ) {
+            revert Error.PuppetLogic__InvalidActivityThrottle(
+                config.minAllocationActivity, config.maxAllocationActivity
+            );
+        }
+
         if (ruleParams.allowanceRate < config.minAllowanceRate || ruleParams.allowanceRate > config.maxAllowanceRate) {
             revert Error.PuppetLogic__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate);
         }
@@ -162,7 +143,9 @@ contract PuppetLogic is CoreContract {
 
     /// @notice Set the mint rate limit for the token.
     /// @param _config The new rate limit configuration.
-    function setConfig(Config calldata _config) external auth {
+    function setConfig(
+        Config calldata _config
+    ) external auth {
         if (_config.tokenAllowanceList.length != _config.tokenAllowanceAmountList.length) {
             revert Error.PuppetLogic__InvalidLength();
         }
