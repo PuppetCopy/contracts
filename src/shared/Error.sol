@@ -4,6 +4,9 @@ pragma solidity 0.8.27;
 import {GmxPositionUtils} from "../position/utils/GmxPositionUtils.sol";
 
 library Error {
+    error Access__Unauthorized();
+    error Permission__Unauthorized();
+
     error Store__InvalidLength();
 
     error PuppetStore__OverwriteAllocation();
