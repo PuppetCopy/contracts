@@ -31,7 +31,7 @@ contract RequestLogic is CoreContract {
 
     struct MirrorPositionParams {
         IERC20 collateralToken;
-        bytes32 originRequestKey;
+        bytes32 sourceRequestKey;
         bytes32 allocationKey;
         address trader;
         address market;
@@ -116,31 +116,6 @@ contract RequestLogic is CoreContract {
             : sizeDeltaInUsd < size ? Precision.toBasisPoints(size - sizeDeltaInUsd, collateral - collateralDelta) : 0;
     }
 
-    function logRequest(
-        string memory name,
-        MirrorPositionParams calldata params,
-        Subaccount subaccount,
-        MirrorPositionStore.RequestAdjustment memory request,
-        bytes32 requestKey,
-        uint deltaLeverage
-    ) internal {
-        logEvent(
-            name,
-            abi.encode(
-                subaccount,
-                params.trader,
-                params.allocationKey,
-                params.originRequestKey,
-                requestKey,
-                // request.traderPositionKey,
-                // request.positionKey,
-                request.sizeDelta,
-                request.transactionCost,
-                deltaLeverage
-            )
-        );
-    }
-
     function adjust(
         MirrorPositionParams calldata params,
         MirrorPositionStore.RequestAdjustment memory request,
@@ -167,13 +142,19 @@ contract RequestLogic is CoreContract {
         positionStore.setRequestAdjustment(requestKey, request);
         request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + params.executionFee;
 
-        logRequest(
+        logEvent(
             targetLeverage > leverage ? "RequestDecrease" : "RequestIncrease",
-            params,
-            subaccount,
-            request,
-            requestKey,
-            deltaLeverage
+            abi.encode(
+                subaccount,
+                params.trader,
+                params.allocationKey,
+                params.sourceRequestKey,
+                requestKey,
+                request.matchKey,
+                request.sizeDelta,
+                request.transactionCost,
+                deltaLeverage
+            )
         );
     }
 
@@ -194,13 +175,7 @@ contract RequestLogic is CoreContract {
         MirrorPositionStore.RequestAdjustment memory request = MirrorPositionStore.RequestAdjustment({
             matchKey: allocation.matchKey,
             allocationKey: params.allocationKey,
-            // positionKey: GmxPositionUtils.getPositionKey(
-            //     subaccountAddress, params.market, params.collateralToken, params.isLong
-            // ),
-            traderRequestKey: params.originRequestKey,
-            // traderPositionKey: GmxPositionUtils.getPositionKey(
-            //     params.trader, params.market, params.collateralToken, params.isLong
-            // ),
+            sourceRequestKey: params.sourceRequestKey,
             sizeDelta: 0,
             transactionCost: startGas
         });
@@ -224,7 +199,20 @@ contract RequestLogic is CoreContract {
             request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + params.executionFee;
             positionStore.setRequestAdjustment(requestKey, request);
 
-            logRequest("RequestIncrease", params, subaccount, request, requestKey, 0);
+            logEvent(
+                "RequestIncrease",
+                abi.encode(
+                    subaccount,
+                    params.trader,
+                    params.allocationKey,
+                    params.sourceRequestKey,
+                    requestKey,
+                    request.matchKey,
+                    request.sizeDelta,
+                    request.transactionCost,
+                    0
+                )
+            );
         } else {
             requestKey = adjust(params, request, allocation, subaccount);
         }

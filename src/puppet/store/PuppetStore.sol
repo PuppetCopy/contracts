@@ -63,12 +63,6 @@ contract PuppetStore is BankStore {
         return userBalanceMap[_token][_account];
     }
 
-    function increaseBalance(IERC20 _token, address _depositor, uint _value) external auth returns (uint) {
-        transferIn(_token, _depositor, _value);
-
-        return userBalanceMap[_token][_depositor] += _value;
-    }
-
     function getBalanceList(IERC20 _token, address[] calldata _accountList) external view returns (uint[] memory) {
         uint _accountListLength = _accountList.length;
         uint[] memory _balanceList = new uint[](_accountListLength);
@@ -154,28 +148,8 @@ contract PuppetStore is BankStore {
         return allocated;
     }
 
-    function increaseBalanceList(
-        IERC20 _token,
-        address[] calldata _accountList,
-        uint[] calldata _valueList
-    ) external auth returns (uint) {
-        uint _accountListLength = _accountList.length;
-        uint totalAmountIn;
-
-        if (_accountListLength != _valueList.length) revert Error.Store__InvalidLength();
-
-        for (uint i = 0; i < _accountListLength; i++) {
-            userBalanceMap[_token][_accountList[i]] += _valueList[i];
-            totalAmountIn += _valueList[i];
-        }
-
-        return totalAmountIn;
-    }
-
-    function decreaseBalance(IERC20 _token, address _user, address _receiver, uint _value) public auth returns (uint) {
-        transferOut(_token, _receiver, _value);
-
-        return userBalanceMap[_token][_user] -= _value;
+    function setBalance(IERC20 _token, address _user, uint _value) public auth returns (uint) {
+        return userBalanceMap[_token][_user] = _value;
     }
 
     function getMatchRuleList(

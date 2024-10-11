@@ -20,7 +20,9 @@ contract ContributeStore is BankStore {
 
     constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
 
-    function getBuybackQuote(IERC20 _token) external view returns (uint) {
+    function getBuybackQuote(
+        IERC20 _token
+    ) external view returns (uint) {
         return buybackQuoteMap[_token];
     }
 
@@ -28,7 +30,9 @@ contract ContributeStore is BankStore {
         buybackQuoteMap[_token] = _value;
     }
 
-    function getCursor(IERC20 _token) external view returns (uint) {
+    function getCursor(
+        IERC20 _token
+    ) external view returns (uint) {
         return cursorMap[_token];
     }
 
@@ -36,7 +40,9 @@ contract ContributeStore is BankStore {
         cursorMap[_token] = _value;
     }
 
-    function getCursorBalance(IERC20 _token) external view returns (uint) {
+    function getCursorBalance(
+        IERC20 _token
+    ) external view returns (uint) {
         return cursorBalanceMap[_token];
     }
 
@@ -70,7 +76,6 @@ contract ContributeStore is BankStore {
 
     function contribute(
         IERC20 _token, //
-        BankStore _bank,
         address _user,
         uint _amount
     ) external auth {
@@ -80,16 +85,9 @@ contract ContributeStore is BankStore {
         _updateCursorReward(_token, _user, _cursor, _userCursor);
         userContributionBalanceMap[_token][_user] += _amount;
         cursorBalanceMap[_token] += _amount;
-
-        interTransferIn(_token, _bank, _amount);
     }
 
-    function contributeMany(
-        IERC20 _token,
-        BankStore _bank,
-        address[] calldata _userList,
-        uint[] calldata _valueList
-    ) external auth {
+    function contributeMany(IERC20 _token, address[] calldata _userList, uint[] calldata _valueList) external auth {
         uint _cursor = cursorMap[_token];
         uint _totalAmount = 0;
 
@@ -104,11 +102,11 @@ contract ContributeStore is BankStore {
             cursorBalanceMap[_token] += value;
             _totalAmount += value;
         }
-
-        interTransferIn(_token, _bank, _totalAmount);
     }
 
-    function getUserAccruedReward(address _user) external view returns (uint) {
+    function getUserAccruedReward(
+        address _user
+    ) external view returns (uint) {
         return userAccruedRewardMap[_user];
     }
 

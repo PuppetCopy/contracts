@@ -36,19 +36,26 @@ contract PuppetLogic is CoreContract {
     function deposit(IERC20 token, address user, uint amount) external auth {
         if (amount == 0) revert Error.PuppetLogic__InvalidAmount();
 
-        uint balance = store.increaseBalance(token, user, amount);
+        uint balance = store.getUserBalance(token, user);
+        uint nextBalance = balance + amount;
 
-        logEvent("Deposit", abi.encode(token, user, balance));
+        store.transferIn(token, user, amount);
+        store.setBalance(token, user, nextBalance);
+
+        logEvent("Deposit", abi.encode(token, user, nextBalance, amount));
     }
 
     function withdraw(IERC20 token, address user, address receiver, uint amount) external auth {
         if (amount == 0) revert Error.PuppetLogic__InvalidAmount();
+        uint balance = store.getUserBalance(token, user);
 
-        if (amount > store.getUserBalance(token, user)) revert Error.PuppetLogic__InsufficientBalance();
+        if (amount > balance) revert Error.PuppetLogic__InsufficientBalance();
+        uint nextBalance = balance - amount;
 
-        uint balance = store.decreaseBalance(token, user, receiver, amount);
+        store.setBalance(token, user, nextBalance);
+        store.transferOut(token, receiver, amount);
 
-        logEvent("Withdraw", abi.encode(token, user, balance));
+        logEvent("Withdraw", abi.encode(token, user, nextBalance, amount));
     }
 
     function setMatchRule(

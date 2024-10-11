@@ -64,10 +64,6 @@ contract ExecutionLogic is CoreContract {
     ) internal {
         MirrorPositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
 
-        // if (request.positionKey == bytes32(0)) {
-        //     revert Error.ExecuteIncreasePositionLogic__RequestDoesNotExist();
-        // }
-
         PuppetStore.Allocation memory allocation = puppetStore.getAllocation(request.allocationKey);
 
         allocation.size += request.sizeDelta;
@@ -77,10 +73,9 @@ contract ExecutionLogic is CoreContract {
             "ExecuteIncrease",
             abi.encode(
                 requestKey,
-                request.traderRequestKey,
+                request.sourceRequestKey,
                 request.allocationKey,
-                // request.traderPositionKey,
-                // request.positionKey,
+                request.matchKey,
                 request.sizeDelta,
                 request.transactionCost,
                 allocation.size
@@ -94,10 +89,6 @@ contract ExecutionLogic is CoreContract {
         bytes calldata /*eventData*/
     ) internal {
         MirrorPositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
-
-        // if (request.positionKey == bytes32(0)) {
-        //     revert Error.ExecuteDecreasePositionLogic__RequestDoesNotExist();
-        // }
 
         PuppetStore.Allocation memory allocation = puppetStore.getAllocation(request.allocationKey);
 
@@ -127,11 +118,9 @@ contract ExecutionLogic is CoreContract {
             "ExecuteDecrease",
             abi.encode(
                 requestKey,
-                request.traderRequestKey,
+                request.sourceRequestKey,
                 request.allocationKey,
-                // request.traderPositionKey,
-                // request.matchKey,
-                // request.positionKey,
+                request.matchKey,
                 request.sizeDelta,
                 request.transactionCost,
                 recordedAmountIn,

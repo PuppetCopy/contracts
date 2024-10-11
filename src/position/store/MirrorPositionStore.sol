@@ -11,11 +11,9 @@ import {GmxPositionUtils} from "./../utils/GmxPositionUtils.sol";
 
 contract MirrorPositionStore is BankStore {
     struct RequestAdjustment {
-        // bytes32 traderPositionKey;
         bytes32 allocationKey;
-        bytes32 traderRequestKey;
+        bytes32 sourceRequestKey;
         bytes32 matchKey;
-        // bytes32 positionKey;
         uint sizeDelta;
         uint transactionCost;
     }

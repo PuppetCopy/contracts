@@ -42,7 +42,7 @@ contract AllocationLogic is CoreContract {
 
     function allocate(
         IERC20 collateralToken,
-        bytes32 originRequestKey,
+        bytes32 sourceRequestKey,
         bytes32 matchKey,
         address[] calldata puppetList
     ) external auth returns (bytes32 allocationKey) {
@@ -95,7 +95,7 @@ contract AllocationLogic is CoreContract {
             "Allocate",
             abi.encode(
                 collateralToken,
-                originRequestKey,
+                sourceRequestKey,
                 matchKey,
                 allocationKey,
                 puppetListHash,
@@ -136,9 +136,9 @@ contract AllocationLogic is CoreContract {
                 traderPerformanceContribution =
                     Precision.applyFactor(config.traderPerformanceContributionShare, allocation.profit);
 
+                contributeStore.interTransferIn(allocation.collateralToken, positionStore, totalPuppetContribution);
                 contributeStore.contribute(
                     allocation.collateralToken,
-                    positionStore,
                     positionStore.getSubaccount(allocation.matchKey).account(),
                     traderPerformanceContribution
                 );
@@ -154,7 +154,8 @@ contract AllocationLogic is CoreContract {
                 allocationToSettledAmountList[i] = puppetAllocation * settledAfterContribution / allocation.allocated;
             }
 
-            contributeStore.contributeMany(allocation.collateralToken, puppetStore, puppetList, contributionAmountList);
+            contributeStore.interTransferIn(allocation.collateralToken, positionStore, totalPuppetContribution);
+            contributeStore.contributeMany(allocation.collateralToken, puppetList, contributionAmountList);
         } else if (allocation.settled > 0) {
             for (uint i = 0; i < allocationToSettledAmountList.length; i++) {
                 uint puppetAllocation = allocationToSettledAmountList[i];
