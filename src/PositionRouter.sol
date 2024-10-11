@@ -71,11 +71,11 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
 
     function allocate(
         IERC20 collateralToken,
-        bytes32 originRequestKey,
+        bytes32 sourceRequestKey,
         bytes32 matchKey,
         address[] calldata puppetList
     ) external nonReentrant auth returns (bytes32 allocationKey) {
-        return config.allocationLogic.allocate(collateralToken, originRequestKey, matchKey, puppetList);
+        return config.allocationLogic.allocate(collateralToken, sourceRequestKey, matchKey, puppetList);
     }
 
     function mirror(

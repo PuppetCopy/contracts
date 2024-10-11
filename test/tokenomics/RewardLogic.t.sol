@@ -291,7 +291,7 @@ contract RewardRouterTest is BasicSetup {
         vm.startPrank(users.owner);
         _dealERC20(address(token), users.owner, amount);
         contributeStore.transferIn(token, users.owner, amount);
-        contributeStore.contribute(token, contributeStore, user, amount);
+        contributeStore.contribute(token, user, amount);
     }
 
     function contributeLock(IERC20 token, address user, uint lockDuration, uint contribution) public returns (uint) {

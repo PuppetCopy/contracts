@@ -46,10 +46,13 @@ contract TradingTest is BasicSetup {
         super.setUp();
 
         mockGmxExchangeRouter = new MockGmxExchangeRouter();
+
+        puppetRouter = new PuppetRouter(dictator, eventEmitter);
+        dictator.setAccess(eventEmitter, address(puppetRouter));
+
         contributeStore = new ContributeStore(dictator, router);
 
         puppetStore = new PuppetStore(dictator, router);
-        dictator.setAccess(puppetStore, address(contributeStore));
         dictator.setPermission(router, router.transfer.selector, address(puppetStore));
         positionStore = new MirrorPositionStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(positionStore));
@@ -57,22 +60,19 @@ contract TradingTest is BasicSetup {
         puppetLogic = new PuppetLogic(dictator, eventEmitter, puppetStore);
         dictator.setAccess(eventEmitter, address(puppetLogic));
         dictator.setAccess(puppetStore, address(puppetLogic));
-
-        positionRouter = new PositionRouter(dictator, eventEmitter, positionStore);
-        dictator.setAccess(eventEmitter, address(positionRouter));
-
-        puppetRouter = new PuppetRouter(dictator, eventEmitter);
-        dictator.setAccess(eventEmitter, address(puppetRouter));
-
         dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
         dictator.setPermission(puppetLogic, puppetLogic.withdraw.selector, address(puppetRouter));
         dictator.setPermission(puppetLogic, puppetLogic.setMatchRule.selector, address(puppetRouter));
         dictator.setPermission(puppetLogic, puppetLogic.setMatchRuleList.selector, address(puppetRouter));
 
+        positionRouter = new PositionRouter(dictator, eventEmitter, positionStore);
+        dictator.setAccess(eventEmitter, address(positionRouter));
+
         allocationLogic = new AllocationLogic(dictator, eventEmitter, contributeStore, puppetStore, positionStore);
         dictator.setAccess(eventEmitter, address(allocationLogic));
         dictator.setAccess(contributeStore, address(allocationLogic));
         dictator.setAccess(puppetStore, address(allocationLogic));
+        dictator.setAccess(puppetStore, address(contributeStore));
 
         requestLogic = new RequestLogic(dictator, eventEmitter, puppetStore, positionStore);
         dictator.setAccess(eventEmitter, address(requestLogic));
@@ -82,6 +82,7 @@ contract TradingTest is BasicSetup {
         ExecutionLogic executionLogic = new ExecutionLogic(dictator, eventEmitter, puppetStore, positionStore);
         dictator.setAccess(eventEmitter, address(executionLogic));
         dictator.setAccess(positionStore, address(executionLogic));
+        dictator.setAccess(puppetStore, address(executionLogic));
 
         UnhandledCallbackLogic unhandledCallbackLogic =
             new UnhandledCallbackLogic(dictator, eventEmitter, positionStore);
@@ -171,10 +172,10 @@ contract TradingTest is BasicSetup {
         // vm.startPrank(trader);
         vm.startPrank(users.owner);
 
-        bytes32 mockOriginRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
+        bytes32 mockSourceRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
 
         bytes32 allocationKey =
-            allocationLogic.allocate(usdc, mockOriginRequestKey, PositionUtils.getMatchKey(usdc, trader), puppetList);
+            allocationLogic.allocate(usdc, mockSourceRequestKey, PositionUtils.getMatchKey(usdc, trader), puppetList);
 
         // allocationLogic.settle(allocationKey, puppetList);
 
@@ -182,7 +183,7 @@ contract TradingTest is BasicSetup {
             RequestLogic.MirrorPositionParams({
                 trader: trader,
                 allocationKey: allocationKey,
-                originRequestKey: mockOriginRequestKey,
+                sourceRequestKey: mockSourceRequestKey,
                 market: Address.gmxEthUsdcMarket,
                 collateralToken: usdc,
                 isIncrease: true,
