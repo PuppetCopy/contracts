@@ -4,5 +4,5 @@ pragma solidity 0.8.27;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IERC20Mintable is IERC20 {
-    function mint(address _receiver, uint _amount) external returns (uint);
+    function mint(address _receiver, uint _amount) external;
 }

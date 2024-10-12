@@ -14,7 +14,7 @@ import {RewardStore} from "src/tokenomics/store/RewardStore.sol";
 import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
-contract RewardRouterTest is BasicSetup {
+contract TokenomicsTest is BasicSetup {
     uint constant MAXTIME = 106 weeks; // about 2 years
 
     VotingEscrowLogic veLogic;
@@ -38,15 +38,9 @@ contract RewardRouterTest is BasicSetup {
         veStore = new VotingEscrowStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(veStore));
 
-        allowNextLoggerAccess();
-        veLogic = new VotingEscrowLogic(
-            dictator,
-            eventEmitter,
-            veStore,
-            puppetToken,
-            vPuppetToken,
-            VotingEscrowLogic.Config({baseMultiplier: 0.6e30})
-        );
+        veLogic = new VotingEscrowLogic(dictator, eventEmitter, veStore, puppetToken, vPuppetToken);
+        dictator.setAccess(eventEmitter, address(veLogic));
+        dictator.setPermission(veLogic, veLogic.setConfig.selector, users.owner);
         dictator.setAccess(veStore, address(veLogic));
         dictator.setPermission(puppetToken, puppetToken.mint.selector, address(veLogic));
         dictator.setPermission(vPuppetToken, vPuppetToken.mint.selector, address(veLogic));
@@ -56,10 +50,9 @@ contract RewardRouterTest is BasicSetup {
         rewardStore = new RewardStore(dictator, router);
         dictator.setAccess(contributeStore, address(rewardStore));
 
-        allowNextLoggerAccess();
-        contributeLogic = new ContributeLogic(
-            dictator, eventEmitter, puppetToken, contributeStore, ContributeLogic.Config({baselineEmissionRate: 0.5e30})
-        );
+        contributeLogic = new ContributeLogic(dictator, eventEmitter, puppetToken, contributeStore);
+        dictator.setAccess(eventEmitter, address(contributeLogic));
+        dictator.setPermission(contributeLogic, contributeLogic.setConfig.selector, users.owner);
         dictator.setPermission(puppetToken, puppetToken.mint.selector, address(contributeLogic));
         dictator.setAccess(contributeStore, address(contributeLogic));
 
@@ -67,23 +60,14 @@ contract RewardRouterTest is BasicSetup {
         dictator.setPermission(router, router.transfer.selector, address(rewardStore));
         dictator.setPermission(router, router.transfer.selector, address(veStore));
 
-        allowNextLoggerAccess();
-        rewardLogic = new RewardLogic(
-            dictator,
-            eventEmitter,
-            puppetToken,
-            vPuppetToken,
-            rewardStore,
-            RewardLogic.Config({distributionStore: contributeStore, distributionTimeframe: 1 weeks})
-        );
+        rewardLogic = new RewardLogic(dictator, eventEmitter, puppetToken, vPuppetToken, rewardStore);
+        dictator.setAccess(eventEmitter, address(rewardLogic));
+        dictator.setPermission(rewardLogic, rewardLogic.setConfig.selector, users.owner);
         dictator.setAccess(rewardStore, address(rewardLogic));
 
-        allowNextLoggerAccess();
-        rewardRouter = new RewardRouter(
-            dictator,
-            eventEmitter,
-            RewardRouter.Config({contributeLogic: contributeLogic, rewardLogic: rewardLogic, veLogic: veLogic})
-        );
+        rewardRouter = new RewardRouter(dictator, eventEmitter);
+        dictator.setAccess(eventEmitter, address(rewardRouter));
+        dictator.setPermission(rewardRouter, rewardRouter.setConfig.selector, users.owner);
 
         dictator.setPermission(contributeLogic, contributeLogic.buyback.selector, address(rewardRouter));
         dictator.setPermission(contributeLogic, contributeLogic.claim.selector, address(rewardRouter));
@@ -107,6 +91,13 @@ contract RewardRouterTest is BasicSetup {
         puppetToken.approve(address(router), type(uint).max - 1);
         dictator.setAccess(contributeStore, users.owner);
         dictator.setAccess(contributeStore, address(contributeStore));
+
+        veLogic.setConfig(VotingEscrowLogic.Config({baseMultiplier: 0.1e30}));
+        contributeLogic.setConfig(ContributeLogic.Config({baselineEmissionRate: 0.5e30}));
+        rewardLogic.setConfig(RewardLogic.Config({distributionStore: contributeStore, distributionTimeframe: 1 weeks}));
+        rewardRouter.setConfig(
+            RewardRouter.Config({contributeLogic: contributeLogic, rewardLogic: rewardLogic, veLogic: veLogic})
+        );
     }
 
     function testInitalContributionDelayLock() public {
@@ -322,7 +313,9 @@ contract RewardRouterTest is BasicSetup {
         return deltaBalance;
     }
 
-    function fromPriceToSqrt(uint usdcPerWeth) public pure returns (uint160) {
+    function fromPriceToSqrt(
+        uint usdcPerWeth
+    ) public pure returns (uint160) {
         return uint160(Math.sqrt(usdcPerWeth * 1e12) << 96) / 1e12 + 1;
     }
 }

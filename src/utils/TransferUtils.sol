@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.27;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IWNT} from "./interfaces/IWNT.sol";
+import {Error} from "../shared/Error.sol";
 import {ErrorUtils} from "./ErrorUtils.sol";
 import {ExternalCallUtils} from "./ExternalCallUtils.sol";
+import {IWNT} from "./interfaces/IWNT.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title TransferUtils
@@ -60,7 +61,13 @@ library TransferUtils {
      * @param receiver the address of the recipient of the wrapped native token transfer
      * @param amount the amount of native token to deposit and the amount of wrapped native token to send
      */
-    function depositAndSendWnt(IWNT wnt, address holdingAddress, uint gasLimit, address receiver, uint amount) internal {
+    function depositAndSendWnt(
+        IWNT wnt,
+        address holdingAddress,
+        uint gasLimit,
+        address receiver,
+        uint amount
+    ) internal {
         if (amount == 0) return;
         ExternalCallUtils.validateDestination(receiver);
 
@@ -84,7 +91,13 @@ library TransferUtils {
      * @param receiver the address of the recipient of the native token transfer
      * @param amount the amount of wrapped native token to withdraw and the amount of native token to send
      */
-    function withdrawAndSendNativeToken(IWNT wnt, uint gasLimit, address holdingAddress, address receiver, uint amount) internal {
+    function withdrawAndSendNativeToken(
+        IWNT wnt,
+        uint gasLimit,
+        address holdingAddress,
+        address receiver,
+        uint amount
+    ) internal {
         if (amount == 0) return;
         ExternalCallUtils.validateDestination(receiver);
 
@@ -131,31 +144,33 @@ library TransferUtils {
         ExternalCallUtils.validateDestination(receiver);
 
         if (gasLimit == 0) {
-            revert TransferUtils__EmptyTokenTranferGasLimit(address(token));
+            revert Error.TransferUtils__EmptyTokenTranferGasLimit(address(token));
         }
 
-        (bool success0, /* bytes memory returndata */ ) = nonRevertingTransferWithGasLimit(token, receiver, amount, gasLimit);
+        (bool success0, /* bytes memory returndata */ ) =
+            nonRevertingTransferWithGasLimit(token, receiver, amount, gasLimit);
 
         if (success0) return;
 
         if (holdingAddress == address(0)) {
-            revert TransferUtils__EmptyHoldingAddress();
+            revert Error.TransferUtils__EmptyHoldingAddress();
         }
 
         // in case transfers to the receiver fail due to blacklisting or other reasons
         // send the tokens to a holding address to avoid possible gaming through reverting
         // transfers
-        (bool success1, bytes memory returndata) = nonRevertingTransferWithGasLimit(token, holdingAddress, amount, gasLimit);
+        (bool success1, bytes memory returndata) =
+            nonRevertingTransferWithGasLimit(token, holdingAddress, amount, gasLimit);
 
         if (success1) return;
 
         (string memory reason, /* bool hasRevertMessage */ ) = ErrorUtils.getRevertMessage(returndata);
-        emit TransferUtils__TokenTransferReverted(reason, returndata);
+        emit Error.TransferUtils__TokenTransferReverted(reason, returndata);
 
         // throw custom errors to prevent spoofing of errors
         // this is necessary because contracts like DepositHandler, WithdrawalHandler, OrderHandler
         // do not cancel requests for specific errors
-        revert TransferUtils__TokenTransferError(address(token), receiver, amount);
+        revert Error.TransferUtils__TokenTransferError(address(token), receiver, amount);
     }
 
     /**
@@ -171,7 +186,12 @@ library TransferUtils {
      * @return a tuple containing a boolean indicating the success or failure of the
      * token transfer, and a bytes value containing the return data from the token transfer
      */
-    function nonRevertingTransferWithGasLimit(IERC20 token, address to, uint amount, uint gasLimit) internal returns (bool, bytes memory) {
+    function nonRevertingTransferWithGasLimit(
+        IERC20 token,
+        address to,
+        uint amount,
+        uint gasLimit
+    ) internal returns (bool, bytes memory) {
         bytes memory data = abi.encodeWithSelector(token.transfer.selector, to, amount);
         (bool success, bytes memory returndata) = address(token).call{gas: gasLimit}(data);
 
@@ -197,10 +217,4 @@ library TransferUtils {
 
         return (false, returndata);
     }
-
-    error TransferUtils__EmptyTokenTranferGasLimit(address token);
-    error TransferUtils__TokenTransferError(address token, address receiver, uint amount);
-    error TransferUtils__EmptyHoldingAddress();
-
-    event TransferUtils__TokenTransferReverted(string reason, bytes returndata);
 }

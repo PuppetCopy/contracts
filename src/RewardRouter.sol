@@ -24,11 +24,8 @@ contract RewardRouter is CoreContract, ReentrancyGuardTransient, Multicall {
 
     constructor(
         IAuthority _authority,
-        EventEmitter _eventEmitter,
-        Config memory _config
-    ) CoreContract("RewardRouter", "1", _authority, _eventEmitter) {
-        _setConfig(_config);
-    }
+        EventEmitter _eventEmitter
+    ) CoreContract("RewardRouter", "1", _authority, _eventEmitter) {}
 
     /// @notice Executes the buyback of revenue tokens using the protocol's accumulated fees.
     /// @param token The address of the revenue token to be bought back.
@@ -85,13 +82,9 @@ contract RewardRouter is CoreContract, ReentrancyGuardTransient, Multicall {
 
     /// @notice Set the mint rate limit for the token.
     /// @param _config The new rate limit configuration.
-    function setConfig(Config calldata _config) external auth nonReentrant {
-        _setConfig(_config);
-    }
-
-    /// @dev Internal function to set the configuration.
-    /// @param _config The configuration to set.
-    function _setConfig(Config memory _config) internal {
+    function setConfig(
+        Config calldata _config
+    ) external auth nonReentrant {
         config = _config;
         logEvent("SetConfig", abi.encode(_config));
     }

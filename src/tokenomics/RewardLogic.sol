@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IGmxReferralStorage} from "../position/interface/IGmxReferralStorage.sol";
+import {Error} from "../shared/Error.sol";
 import {BankStore} from "../shared/store/BankStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
@@ -42,7 +43,9 @@ contract RewardLogic is CoreContract {
         reward = Math.min(balance * timeElapsed / config.distributionTimeframe, balance);
     }
 
-    function getClaimable(address user) external view returns (uint) {
+    function getClaimable(
+        address user
+    ) external view returns (uint) {
         RewardStore.UserRewardCursor memory cursor = store.getUserRewardCursor(user);
 
         uint cumulativeRewardPerToken =
@@ -57,14 +60,11 @@ contract RewardLogic is CoreContract {
         EventEmitter _eventEmitter,
         IERC20 _rewardToken,
         IERC20 _vToken,
-        RewardStore _store,
-        Config memory _config
+        RewardStore _store
     ) CoreContract("RewardLogic", "1", _authority, _eventEmitter) {
         rewardToken = _rewardToken;
         vToken = _vToken;
         store = _store;
-
-        _setConfig(_config);
     }
 
     /// @notice Claims the accrued rewards for a user based on their voting power
@@ -79,7 +79,7 @@ contract RewardLogic is CoreContract {
             getPendingReward(nextRewardPerTokenCursor, cursor.rewardPerToken, vToken.balanceOf(user));
         cursor.rewardPerToken = nextRewardPerTokenCursor;
 
-        if (amount > cursor.accruedReward) revert RewardLogic__NoClaimableAmount(cursor.accruedReward);
+        if (amount > cursor.accruedReward) revert Error.RewardLogic__NoClaimableAmount(cursor.accruedReward);
 
         cursor.accruedReward -= amount;
 
@@ -91,7 +91,9 @@ contract RewardLogic is CoreContract {
 
     /// @notice Distributes the rewards to the users based on the current token emission rate and the time elapsed
     /// @param user The address of the user to distribute the rewards for
-    function userDistribute(address user) public auth {
+    function userDistribute(
+        address user
+    ) public auth {
         uint nextRewardPerTokenCursor = distribute();
         uint userVBalance = vToken.balanceOf(user);
 
@@ -144,17 +146,10 @@ contract RewardLogic is CoreContract {
     /// @notice Set the mint rate limit for the token.
     /// @param _config The new rate limit configuration.
 
-    function setConfig(Config calldata _config) external auth {
-        _setConfig(_config);
-    }
-
-    /// @dev Internal function to set the configuration.
-    /// @param _config The configuration to set.
-    function _setConfig(Config memory _config) internal {
+    function setConfig(
+        Config calldata _config
+    ) external auth {
         config = _config;
         logEvent("SetConfig", abi.encode(_config));
     }
-
-    /// @notice Error emitted when there is no claimable amount for a user
-    error RewardLogic__NoClaimableAmount(uint accruedReward);
 }

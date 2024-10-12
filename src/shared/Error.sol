@@ -38,4 +38,40 @@ library Error {
     error ExecutionLogic__AllocationDoesNotExist();
 
     error PositionRouter__InvalidOrderType(GmxPositionUtils.OrderType orderType);
+
+    error Subaccount__UnauthorizedOperator();
+
+    /// @notice Error emitted when the claim token is invalid
+    error ContributeLogic__InvalidBuybackToken();
+    /// @notice Error emitted when the claimable reward is insufficient
+    error ContributeLogic__InsufficientClaimableReward(uint accruedReward);
+
+    /// @dev Error for when the rate is invalid (zero).
+    error PuppetToken__InvalidRate();
+    /// @dev Error for when the minting exceeds the rate limit.
+    /// @param rateLimit The rate limit.
+    /// @param emissionRate The current emission rate.
+    error PuppetToken__ExceededRateLimit(uint rateLimit, uint emissionRate);
+    /// @dev Error for when the core share exceeds the mintable amount.
+    error PuppetToken__CoreShareExceedsMining();
+
+    /// @notice Error emitted when there is no claimable amount for a user
+    error RewardLogic__NoClaimableAmount(uint accruedReward);
+
+    /// @notice Transfers are restricted in this contract.
+    error VotingEscrow__Unsupported();
+
+    error VotingEscrowLogic__ZeroAmount();
+    error VotingEscrowLogic__ExceedMaxTime();
+    error VotingEscrowLogic__ExceedingAccruedAmount(uint accrued);
+
+    error ExternalCallUtils__EmptyReceiver();
+    error ExternalCallUtils__AddressEmptyCode(address target);
+    error ExternalCallUtils__FailedInnerCall();
+    error ExternalCallUtils__SafeERC20FailedOperation(address token);
+
+    error TransferUtils__EmptyTokenTranferGasLimit(address token);
+    error TransferUtils__TokenTransferError(address token, address receiver, uint amount);
+    error TransferUtils__EmptyHoldingAddress();
+    event TransferUtils__TokenTransferReverted(string reason, bytes returndata);
 }

@@ -3,6 +3,7 @@ pragma solidity 0.8.27;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {Error} from "../shared/Error.sol";
 import {PuppetToken} from "../tokenomics/PuppetToken.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
@@ -37,7 +38,9 @@ contract VotingEscrowLogic is CoreContract {
     /// @dev Returns a Vested struct reflecting the state after accounting for the time elapsed since the last accrual.
     /// @param user The address of the user whose vesting state is to be calculated.
     /// @return vested The updated vesting state for the user.
-    function getVestingCursor(address user) public view returns (VotingEscrowStore.Vested memory vested) {
+    function getVestingCursor(
+        address user
+    ) public view returns (VotingEscrowStore.Vested memory vested) {
         vested = store.getVested(user);
         uint timeElapsed = block.timestamp - vested.lastAccruedTime;
         uint accruedDelta = timeElapsed >= vested.remainingDuration
@@ -58,7 +61,9 @@ contract VotingEscrowLogic is CoreContract {
     /// elapsed.
     /// @param user The address of the user whose claimable amount is to be calculated.
     /// @return The amount of tokens that can be claimed by the user.
-    function getClaimable(address user) external view returns (uint) {
+    function getClaimable(
+        address user
+    ) external view returns (uint) {
         return getVestingCursor(user).accrued;
     }
 
@@ -66,7 +71,9 @@ contract VotingEscrowLogic is CoreContract {
     /// @dev The multiplier follows an exponential scale to incentivize longer lock durations.
     /// @param duration The lock duration in seconds.
     /// @return The calculated duration multiplier.
-    function calcDurationMultiplier(uint duration) public view returns (uint) {
+    function calcDurationMultiplier(
+        uint duration
+    ) public view returns (uint) {
         uint numerator = config.baseMultiplier * duration ** 2;
 
         return numerator / MAXTIME ** 2;
@@ -89,14 +96,11 @@ contract VotingEscrowLogic is CoreContract {
         EventEmitter _eventEmitter,
         VotingEscrowStore _store,
         PuppetToken _token,
-        PuppetVoteToken _vToken,
-        Config memory _config
+        PuppetVoteToken _vToken
     ) CoreContract("VotingEscrowLogic", "1", _authority, _eventEmitter) {
         store = _store;
         token = _token;
         vToken = _vToken;
-
-        _setConfig(_config);
     }
 
     /// @notice Locks tokens on behalf of a user, granting them voting power and bonus rewards.
@@ -108,8 +112,8 @@ contract VotingEscrowLogic is CoreContract {
     /// @param amount The amount of tokens to be locked.
     /// @param duration The duration for which the tokens are to be locked.
     function lock(address depositor, address user, uint amount, uint duration) external auth {
-        if (amount == 0) revert VotingEscrowLogic__ZeroAmount();
-        if (duration > MAXTIME) revert VotingEscrowLogic__ExceedMaxTime();
+        if (amount == 0) revert Error.VotingEscrowLogic__ZeroAmount();
+        if (duration > MAXTIME) revert Error.VotingEscrowLogic__ExceedMaxTime();
 
         uint bonusAmount = getVestedBonus(amount, duration);
 
@@ -146,11 +150,11 @@ contract VotingEscrowLogic is CoreContract {
     /// @param receiver The address that will receive the claimed tokens.
     /// @param amount The amount of tokens to be claimed.
     function claim(address user, address receiver, uint amount) external auth {
-        if (amount == 0) revert VotingEscrowLogic__ZeroAmount();
+        if (amount == 0) revert Error.VotingEscrowLogic__ZeroAmount();
         VotingEscrowStore.Vested memory vested = getVestingCursor(user);
 
         if (amount > vested.accrued) {
-            revert VotingEscrowLogic__ExceedingAccruedAmount(vested.accrued);
+            revert Error.VotingEscrowLogic__ExceedingAccruedAmount(vested.accrued);
         }
 
         vested.accrued -= amount;
@@ -164,21 +168,16 @@ contract VotingEscrowLogic is CoreContract {
 
     /// @notice Set the mint rate limit for the token.
     /// @param _config The new rate limit configuration.
-    function setConfig(Config calldata _config) external auth {
-        _setConfig(_config);
-    }
-
-    /// @notice Sets the configuration parameters for the contract.
-    /// @dev Can only be called by an authorized entity. Updates the contract's configuration.
-    /// @param _config The new configuration parameters.
-    function _setConfig(Config memory _config) internal {
+    function setConfig(
+        Config calldata _config
+    ) external auth {
         config = _config;
         logEvent("SetConfig", abi.encode(_config));
     }
 
     // internal
     function _vest(address user, address receiver, uint amount, uint duration) internal {
-        if (amount == 0) revert VotingEscrowLogic__ZeroAmount();
+        if (amount == 0) revert Error.VotingEscrowLogic__ZeroAmount();
 
         VotingEscrowStore.Vested memory vested = getVestingCursor(user);
 
@@ -191,8 +190,4 @@ contract VotingEscrowLogic is CoreContract {
 
         logEvent("Vest", abi.encode(user, receiver, vested));
     }
-
-    error VotingEscrowLogic__ZeroAmount();
-    error VotingEscrowLogic__ExceedMaxTime();
-    error VotingEscrowLogic__ExceedingAccruedAmount(uint accrued);
 }

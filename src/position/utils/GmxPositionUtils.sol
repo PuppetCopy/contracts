@@ -65,8 +65,6 @@ library GmxPositionUtils {
         bool isFrozen;
     }
 
-    error InvalidOrderType();
-
     struct CreateOrderParams {
         CreateOrderParamsAddresses addresses;
         CreateOrderParamsNumbers numbers;

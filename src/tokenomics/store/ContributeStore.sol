@@ -164,6 +164,4 @@ contract ContributeStore is BankStore {
     function updateCursorReward(IERC20 _token, address _user) public auth {
         _updateCursorReward(_token, _user);
     }
-
-    error RewardStore__InvalidLength();
 }

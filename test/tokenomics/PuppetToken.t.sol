@@ -3,9 +3,9 @@ pragma solidity 0.8.27;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Precision} from "src/utils/Precision.sol";
-
+import {Error} from "src/shared/Error.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+import {Precision} from "src/utils/Precision.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
 contract PuppetTest is BasicSetup {
@@ -19,85 +19,85 @@ contract PuppetTest is BasicSetup {
     }
 
     function testCanFrontRunToReduceMintAmountForOtherUsers() public {
-        // Assume 3 hours has passed, this should allow _decayRate to be equal to 3 * getLimitAmount()
+        // Assume 3 hours has passed, this should allow _decayRate to be equal to 3 * getEmissionRateLimit()
         skip(3 hours);
         // However, an attacker (some authorized protocol) called Bob front-runs the call to the mint function
         puppetToken.mint(users.bob, 0); // This resets the lastMintTime which means that the call now should revert
 
-        // Normally Alice should be Able to mint up to 4 * getLimitAmount(). but it doesnt work since _decayRate is now equal to 0. Alice can only
-        // mint a max equal to getLimitAmount() even after 3 epochs of nothing minted
-        uint amountToMint = 2 * puppetToken.getLimitAmount();
-        vm.expectRevert(abi.encodeWithSelector(PuppetToken.Puppet__ExceededRateLimit.selector, 1000000000000000000000, 2000000000000000000000));
+        // Normally Alice should be Able to mint up to 4 * getEmissionRateLimit(). but it doesnt work since _decayRate
+        // is now equal to 0. Alice can only mint a max equal to getEmissionRateLimit() even after 3 epochs of nothing
+        // minted
+        uint amountToMint = 2 * puppetToken.getEmissionRateLimit();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Error.PuppetToken__ExceededRateLimit.selector, 1000000000000000000000, 2000000000000000000000
+            )
+        );
         puppetToken.mint(users.alice, amountToMint);
-        uint maxAmountToMint = puppetToken.getLimitAmount();
+        uint maxAmountToMint = puppetToken.getEmissionRateLimit();
         puppetToken.mint(users.alice, maxAmountToMint);
 
-        // Alice can only mint getLimitAmount() effectively losing 3 * getLimitAmount()
+        // Alice can only mint getEmissionRateLimit() effectively losing 3 * getEmissionRateLimit()
     }
 
     function testMintSmallAmountContinuouslyGivesMoreTokens() public {
         skip(1 hours);
-        assertEq(puppetToken.getLimitAmount(), 1000e18); // Max amount that can be minted in one shot at time 0
+        assertEq(puppetToken.getEmissionRateLimit(), 1000e18); // Max amount that can be minted in one shot at time 0
 
         // Alice notices that by dividing the buys into smaller ones she can earn more tokens.
-        puppetToken.mint(users.alice, puppetToken.getLimitAmount() / 5);
-        puppetToken.mint(users.alice, puppetToken.getLimitAmount() / 5);
-        puppetToken.mint(users.alice, puppetToken.getLimitAmount() / 5);
-        puppetToken.mint(users.alice, puppetToken.getLimitAmount() / 5);
-        puppetToken.mint(users.alice, puppetToken.getLimitAmount() / 5);
+        puppetToken.mint(users.alice, puppetToken.getEmissionRateLimit() / 5);
+        puppetToken.mint(users.alice, puppetToken.getEmissionRateLimit() / 5);
+        puppetToken.mint(users.alice, puppetToken.getEmissionRateLimit() / 5);
+        puppetToken.mint(users.alice, puppetToken.getEmissionRateLimit() / 5);
+        puppetToken.mint(users.alice, puppetToken.getEmissionRateLimit() / 5);
 
-        assertLt(puppetToken.balanceOf(users.alice), puppetToken.getLimitAmount());
+        assertLt(puppetToken.balanceOf(users.alice), puppetToken.getEmissionRateLimit());
     }
 
     function testMintMoreThanLimitAmount() public {
         skip(1 hours / 2);
 
-        uint initialLimit = puppetToken.getLimitAmount();
+        uint initialLimit = puppetToken.getEmissionRateLimit();
 
         vm.expectRevert();
-        puppetToken.mint(users.alice, initialLimit);
+        puppetToken.mint(users.alice, initialLimit + 1);
 
         skip(1 hours / 2);
-        puppetToken.mint(users.alice, puppetToken.getLimitAmount());
+        puppetToken.mint(users.alice, puppetToken.getEmissionRateLimit());
 
-        uint halfAmount = puppetToken.getLimitAmount() / 2;
+        uint halfAmount = puppetToken.getEmissionRateLimit() / 2;
         vm.expectRevert();
         puppetToken.mint(users.alice, halfAmount);
         skip(1 hours);
-        puppetToken.mint(users.alice, puppetToken.getLimitAmount() / 2);
+        puppetToken.mint(users.alice, puppetToken.getEmissionRateLimit() / 2);
     }
 
     function testMint() public {
-        skip(1 hours);
-        vm.expectRevert(abi.encodeWithSelector(PuppetToken.Puppet__ExceededRateLimit.selector, 1000e18, 1001e18));
-        puppetToken.mint(users.alice, 1001e18);
-
-        assertEq(puppetToken.mint(users.alice, 100e18), 100e18);
-
-        vm.expectRevert(abi.encodeWithSelector(PuppetToken.Puppet__ExceededRateLimit.selector, 1001e18, 1100e18));
         puppetToken.mint(users.alice, 1000e18);
+
+        vm.expectRevert(abi.encodeWithSelector(Error.PuppetToken__ExceededRateLimit.selector, 1010e18, 2000e18));
+        puppetToken.mint(users.alice, 1000e18);
+        skip(1 hours / 2);
         puppetToken.mint(users.alice, 500e18);
 
         skip(1 hours);
-        puppetToken.mint(users.alice, 1000e18);
-        assertEq(puppetToken.getLimitAmount(), 1016e18);
+        puppetToken.mint(users.alice, 500e18);
+        assertEq(puppetToken.getEmissionRateLimit(), 1020e18);
         skip(1 hours / 2);
-        vm.expectRevert(abi.encodeWithSelector(PuppetToken.Puppet__ExceededRateLimit.selector, 1016e18, 1492e18));
-        puppetToken.mint(users.alice, 1000e18);
+        vm.expectRevert(abi.encodeWithSelector(Error.PuppetToken__ExceededRateLimit.selector, 1020e18, 1021e18));
+        puppetToken.mint(users.alice, 1021e18);
         skip(1 hours / 2);
         puppetToken.mint(users.alice, 1000e18);
-        assertEq(puppetToken.getLimitAmount(), 1026e18);
+        assertEq(puppetToken.getEmissionRateLimit(), 1030e18);
     }
 
     function testCoreDistribution() public {
-        skip(1 hours / 2);
-
         for (uint i = 0; i < 200; i++) {
             puppetToken.mint(users.alice, 500e18);
             skip(1 hours / 2);
-
-            puppetToken.mintCore(users.owner);
         }
+
+        puppetToken.mintCore(users.owner);
 
         assertEq(
             Precision.applyFactor(puppetToken.getCoreShare(), puppetToken.balanceOf(users.alice)), //
@@ -117,6 +117,6 @@ contract PuppetTest is BasicSetup {
             puppetToken.mintedCoreAmount()
         );
 
-        assertApproxEqAbs(puppetToken.getLimitAmount(), 7234e18, 6e18);
+        assertApproxEqAbs(puppetToken.getEmissionRateLimit(), 7234e18, 6e18);
     }
 }

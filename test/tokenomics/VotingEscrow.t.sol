@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.27;
 
+import {Error} from "src/shared/Error.sol";
 import {Router} from "src/shared/Router.sol";
 import {VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
 import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
@@ -20,31 +21,23 @@ contract VotingEscrowTest is BasicSetup {
         veStore = new VotingEscrowStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(veStore));
 
-        allowNextLoggerAccess();
-        veLogic = new VotingEscrowLogic(
-            dictator, //
-            eventEmitter,
-            veStore,
-            puppetToken,
-            vPuppetToken,
-            VotingEscrowLogic.Config({baseMultiplier: 0.1e30})
-        );
-
+        veLogic = new VotingEscrowLogic(dictator, eventEmitter, veStore, puppetToken, vPuppetToken);
         dictator.setAccess(eventEmitter, address(veLogic));
+        dictator.setPermission(veLogic, veLogic.setConfig.selector, users.owner);
         dictator.setAccess(veStore, address(veLogic));
 
         dictator.setPermission(puppetToken, puppetToken.mint.selector, address(veLogic));
         dictator.setPermission(vPuppetToken, vPuppetToken.mint.selector, address(veLogic));
         dictator.setPermission(vPuppetToken, vPuppetToken.burn.selector, address(veLogic));
 
-        // test setup
-
         veRouter = new VotingEscrowRouter(veLogic);
         dictator.setPermission(veLogic, veLogic.lock.selector, address(veRouter));
         dictator.setPermission(veLogic, veLogic.vest.selector, address(veRouter));
         dictator.setPermission(veLogic, veLogic.claim.selector, address(veRouter));
-
         dictator.setPermission(puppetToken, puppetToken.mint.selector, users.owner);
+
+        // test setup
+        veLogic.setConfig(VotingEscrowLogic.Config({baseMultiplier: 0.1e30}));
 
         puppetToken.mint(users.alice, 100 * 1e18);
         puppetToken.mint(users.bob, 100 * 1e18);
@@ -157,7 +150,7 @@ contract VotingEscrowTest is BasicSetup {
         puppetToken.approve(address(router), amount);
 
         // Expect the transaction to revert because the duration exceeds MAXTIME
-        vm.expectRevert(VotingEscrowLogic.VotingEscrowLogic__ExceedMaxTime.selector);
+        vm.expectRevert(Error.VotingEscrowLogic__ExceedMaxTime.selector);
         veRouter.lock(amount, durationExceedingMax);
 
         vm.stopPrank();
@@ -192,7 +185,9 @@ contract VotingEscrowTest is BasicSetup {
 contract VotingEscrowRouter {
     VotingEscrowLogic votingEscrow;
 
-    constructor(VotingEscrowLogic _votingEscrow) {
+    constructor(
+        VotingEscrowLogic _votingEscrow
+    ) {
         votingEscrow = _votingEscrow;
     }
 
@@ -200,11 +195,15 @@ contract VotingEscrowRouter {
         votingEscrow.lock(msg.sender, msg.sender, amount, duration);
     }
 
-    function vest(uint amount) public {
+    function vest(
+        uint amount
+    ) public {
         votingEscrow.vest(msg.sender, msg.sender, amount);
     }
 
-    function claim(uint amount) public {
+    function claim(
+        uint amount
+    ) public {
         votingEscrow.claim(msg.sender, msg.sender, amount);
     }
 }

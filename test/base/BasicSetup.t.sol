@@ -48,13 +48,10 @@ contract BasicSetup is Test {
         eventEmitter = new EventEmitter(dictator);
         router = new Router(dictator, 200_000);
 
-        allowNextLoggerAccess();
-        puppetToken = new PuppetToken(
-            dictator, //
-            eventEmitter,
-            PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}),
-            users.owner
-        );
+        puppetToken = new PuppetToken(dictator, eventEmitter, users.owner);
+        dictator.setAccess(eventEmitter, address(puppetToken));
+        dictator.setPermission(puppetToken, puppetToken.setConfig.selector, users.owner);
+        puppetToken.setConfig(PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}));
         vPuppetToken = new PuppetVoteToken(dictator);
 
         skip(1 hours);
@@ -64,12 +61,10 @@ contract BasicSetup is Test {
         return vm.computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1);
     }
 
-    function allowNextLoggerAccess() internal {
-        dictator.setAccess(eventEmitter, vm.computeCreateAddress(users.owner, vm.getNonce(users.owner)));
-    }
-
     /// @dev Generates a user, labels its address, and funds it with test assets
-    function _createUser(string memory _name) internal virtual returns (address payable) {
+    function _createUser(
+        string memory _name
+    ) internal virtual returns (address payable) {
         address payable _user = payable(makeAddr(_name));
 
         vm.deal(_user, 100 ether);

@@ -21,13 +21,10 @@ contract DeployPuppet is BaseScript {
         Dictator dictator = new Dictator(Address.dao);
         EventEmitter eventEmitter = new EventEmitter(dictator);
 
-        dictator.setAccess(eventEmitter, getNextCreateAddress());
-        new PuppetToken(
-            dictator, //
-            eventEmitter,
-            PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}),
-            Address.dao
-        );
+        PuppetToken puppetToken = new PuppetToken(dictator, eventEmitter, Address.dao);
+        dictator.setAccess(eventEmitter, address(puppetToken));
+        dictator.setPermission(puppetToken, puppetToken.setConfig.selector, Address.dao);
+        puppetToken.setConfig(PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}));
         new PuppetVoteToken(dictator);
 
         new Router(dictator, 200_000);

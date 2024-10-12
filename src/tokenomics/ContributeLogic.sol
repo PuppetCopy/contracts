@@ -4,6 +4,7 @@ pragma solidity 0.8.27;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {Error} from "../shared/Error.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {EventEmitter} from "../utils/EventEmitter.sol";
 import {Precision} from "../utils/Precision.sol";
@@ -53,13 +54,10 @@ contract ContributeLogic is CoreContract {
         IAuthority _authority,
         EventEmitter _eventEmitter,
         IERC20Mintable _rewardToken,
-        ContributeStore _store,
-        Config memory _config
+        ContributeStore _store
     ) CoreContract("ContributeLogic", "1", _authority, _eventEmitter) {
         rewardToken = _rewardToken;
         store = _store;
-
-        _setConfig(_config);
     }
 
     /// @notice Executes the buyback of revenue tokens using the protocol's accumulated fees.
@@ -70,7 +68,7 @@ contract ContributeLogic is CoreContract {
     function buyback(IERC20 token, address depositor, address receiver, uint revenueAmount) external auth {
         uint quoteAmount = store.getBuybackQuote(token);
 
-        if (quoteAmount == 0) revert ContributeLogic__InvalidBuybackToken();
+        if (quoteAmount == 0) revert Error.ContributeLogic__InvalidBuybackToken();
 
         store.transferIn(rewardToken, depositor, quoteAmount);
         store.transferOut(token, receiver, revenueAmount);
@@ -101,7 +99,7 @@ contract ContributeLogic is CoreContract {
 
         uint accruedReward = store.getUserAccruedReward(user);
 
-        if (amount > accruedReward) revert ContributeLogic__InsufficientClaimableReward(accruedReward);
+        if (amount > accruedReward) revert Error.ContributeLogic__InsufficientClaimableReward(accruedReward);
 
         accruedReward -= amount;
 
@@ -126,19 +124,10 @@ contract ContributeLogic is CoreContract {
 
     /// @notice Set the mint rate limit for the token.
     /// @param _config The new rate limit configuration.
-    function setConfig(Config calldata _config) external auth {
-        _setConfig(_config);
-    }
-
-    /// @dev Internal function to set the configuration.
-    /// @param _config The configuration to set.
-    function _setConfig(Config memory _config) internal {
+    function setConfig(
+        Config calldata _config
+    ) external auth {
         config = _config;
         logEvent("SetConfig", abi.encode(_config));
     }
-
-    /// @notice Error emitted when the claim token is invalid
-    error ContributeLogic__InvalidBuybackToken();
-    /// @notice Error emitted when the claimable reward is insufficient
-    error ContributeLogic__InsufficientClaimableReward(uint accruedReward);
 }
