@@ -10,9 +10,9 @@ import {EventEmitter} from "src/utils/EventEmitter.sol";
 import {BaseScript} from "./BaseScript.s.sol";
 import {Address} from "./Const.sol";
 
-contract DeployPuppet is BaseScript {
+contract DeployPuppetToken is BaseScript {
     function run() public {
-        vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
+        vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
         deployContracts();
         vm.stopBroadcast();
     }
@@ -20,13 +20,15 @@ contract DeployPuppet is BaseScript {
     function deployContracts() internal {
         Dictator dictator = new Dictator(Address.dao);
         EventEmitter eventEmitter = new EventEmitter(dictator);
-
         PuppetToken puppetToken = new PuppetToken(dictator, eventEmitter, Address.dao);
         dictator.setAccess(eventEmitter, address(puppetToken));
         dictator.setPermission(puppetToken, puppetToken.setConfig.selector, Address.dao);
-        puppetToken.setConfig(PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}));
         new PuppetVoteToken(dictator);
+        Router router = new Router(dictator);
+        dictator.setPermission(router, router.setTransferGasLimit.selector, Address.dao);
 
-        new Router(dictator, 200_000);
+        // Config
+        router.setTransferGasLimit(200_000);
+        puppetToken.setConfig(PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}));
     }
 }

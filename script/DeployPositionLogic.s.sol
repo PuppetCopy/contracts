@@ -28,74 +28,32 @@ import {EventEmitter} from "src/utils/EventEmitter.sol";
 import {BaseScript} from "./BaseScript.s.sol";
 import {Address} from "./Const.sol";
 
-contract DeployTrading is BaseScript {
+contract DeployPositionLogic is BaseScript {
     Dictator dictator = Dictator(Address.Dictator);
-    EventEmitter eventEmitter = EventEmitter(Address.EventEmitter);
-    PuppetToken puppetToken = PuppetToken(Address.PuppetToken);
-    PuppetVoteToken vPuppetToken = PuppetVoteToken(Address.PuppetVoteToken);
-    Router router = Router(Address.Router);
 
     function run() public {
-        vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
-
-        deployPuppetLogic();
-        // deployPositionLogic();
-
+        vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
+        deployContracts();
         vm.stopBroadcast();
     }
 
-    function deployPuppetLogic() internal {
-        PuppetStore puppetStore = new PuppetStore(dictator, router);
-        dictator.setPermission(router, router.transfer.selector, address(puppetStore));
-        PuppetRouter puppetRouter = new PuppetRouter(dictator, eventEmitter);
-        dictator.setAccess(eventEmitter, address(puppetRouter));
-
-        // PuppetStore puppetStore = PuppetStore(Address.PuppetStore);
-        // PuppetRouter puppetRouter = PuppetRouter(Address.PuppetRouter);
-
-        PuppetLogic puppetLogic = new PuppetLogic(dictator, eventEmitter, puppetStore);
-        dictator.setAccess(eventEmitter, address(puppetLogic));
-        dictator.setAccess(puppetStore, address(puppetLogic));
-        dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
-        dictator.setPermission(puppetLogic, puppetLogic.withdraw.selector, address(puppetRouter));
-        dictator.setPermission(puppetLogic, puppetLogic.setMatchRule.selector, address(puppetRouter));
-        dictator.setPermission(puppetLogic, puppetLogic.setMatchRuleList.selector, address(puppetRouter));
-        dictator.setPermission(puppetLogic, puppetLogic.setConfig.selector, Address.dao);
-        IERC20[] memory tokenAllowanceCapList = new IERC20[](2);
-        tokenAllowanceCapList[0] = IERC20(Address.wnt);
-        tokenAllowanceCapList[1] = IERC20(Address.usdc);
-        uint[] memory tokenAllowanceCapAmountList = new uint[](2);
-        tokenAllowanceCapAmountList[0] = 0.2e18;
-        tokenAllowanceCapAmountList[1] = 500e30;
-        puppetLogic.setConfig(
-            PuppetLogic.Config({
-                minExpiryDuration: 1 days,
-                minAllowanceRate: 100, // 10 basis points
-                maxAllowanceRate: 10000,
-                minAllocationActivity: 3600,
-                maxAllocationActivity: 604800,
-                tokenAllowanceList: tokenAllowanceCapList,
-                tokenAllowanceAmountList: tokenAllowanceCapAmountList
-            })
-        );
-
-        dictator.setPermission(puppetRouter, puppetRouter.setConfig.selector, Address.dao);
-        puppetRouter.setConfig(PuppetRouter.Config({logic: puppetLogic}));
-    }
-
-    function deployPositionLogic() internal {
+    function deployContracts() internal {
+        EventEmitter eventEmitter = EventEmitter(Address.EventEmitter);
+        Router router = Router(Address.Router);
         PuppetStore puppetStore = PuppetStore(Address.PuppetStore);
+        ContributeStore contributeStore = ContributeStore(Address.ContributeStore);
 
         MirrorPositionStore positionStore = new MirrorPositionStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(positionStore));
         PositionRouter positionRouter = new PositionRouter(dictator, eventEmitter, positionStore);
+        dictator.setPermission(positionRouter, positionRouter.setConfig.selector, Address.dao);
         dictator.setAccess(eventEmitter, address(positionRouter));
 
         // MirrorPositionStore positionStore = MirrorPositionStore(Address.MirrorPositionStore);
-        ContributeStore contributeStore = ContributeStore(Address.ContributeStore);
         // PositionRouter positionRouter = PositionRouter(Address.PositionRouter);
 
         RequestLogic requestLogic = new RequestLogic(dictator, eventEmitter, puppetStore, positionStore);
+        dictator.setPermission(requestLogic, requestLogic.setConfig.selector, Address.dao);
         dictator.setAccess(eventEmitter, address(requestLogic));
         dictator.setAccess(puppetStore, address(requestLogic));
         dictator.setAccess(positionStore, address(requestLogic));
@@ -111,13 +69,13 @@ contract DeployTrading is BaseScript {
 
         AllocationLogic allocationLogic =
             new AllocationLogic(dictator, eventEmitter, contributeStore, puppetStore, positionStore);
+        dictator.setPermission(allocationLogic, allocationLogic.setConfig.selector, Address.dao);
         dictator.setAccess(eventEmitter, address(allocationLogic));
         dictator.setAccess(contributeStore, address(allocationLogic));
         dictator.setAccess(puppetStore, address(allocationLogic));
         dictator.setAccess(puppetStore, address(contributeStore));
 
         // config
-        dictator.setPermission(allocationLogic, allocationLogic.setConfig.selector, Address.dao);
         allocationLogic.setConfig(
             AllocationLogic.Config({
                 limitAllocationListLength: 100,
@@ -125,8 +83,6 @@ contract DeployTrading is BaseScript {
                 traderPerformanceContributionShare: 0
             })
         );
-
-        dictator.setPermission(requestLogic, requestLogic.setConfig.selector, Address.dao);
         requestLogic.setConfig(
             RequestLogic.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
@@ -138,8 +94,6 @@ contract DeployTrading is BaseScript {
                 callbackGasLimit: 2_000_000
             })
         );
-
-        dictator.setPermission(positionRouter, positionRouter.setConfig.selector, Address.dao);
         positionRouter.setConfig(
             PositionRouter.Config({
                 requestLogic: requestLogic,

@@ -20,7 +20,6 @@ abstract contract CoreContract is Permission, EIP712 {
         EventEmitter _eventEmitter
     ) EIP712(_name, _version) Permission(_authority) {
         eventEmitter = _eventEmitter;
-
         name = _name;
         version = _version;
     }

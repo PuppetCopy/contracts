@@ -46,14 +46,16 @@ contract BasicSetup is Test {
 
         dictator = new Dictator(users.owner);
         eventEmitter = new EventEmitter(dictator);
-        router = new Router(dictator, 200_000);
+        router = new Router(dictator);
+        dictator.setPermission(router, router.setTransferGasLimit.selector, users.owner);
 
         puppetToken = new PuppetToken(dictator, eventEmitter, users.owner);
         dictator.setAccess(eventEmitter, address(puppetToken));
         dictator.setPermission(puppetToken, puppetToken.setConfig.selector, users.owner);
-        puppetToken.setConfig(PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}));
         vPuppetToken = new PuppetVoteToken(dictator);
 
+        router.setTransferGasLimit(200_000);
+        puppetToken.setConfig(PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}));
         skip(1 hours);
     }
 

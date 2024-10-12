@@ -66,11 +66,11 @@ contract ContributeStore is BankStore {
         userCursorMap[_token][_user] = _value;
     }
 
-    function getUserContributionBalanceMap(IERC20 _token, address _user) external view returns (uint) {
+    function getUserContributionBalance(IERC20 _token, address _user) external view returns (uint) {
         return userContributionBalanceMap[_token][_user];
     }
 
-    function setUserContributionBalanceMap(IERC20 _token, address _user, uint _value) external auth {
+    function setUserContributionBalance(IERC20 _token, address _user, uint _value) external auth {
         userContributionBalanceMap[_token][_user] = _value;
     }
 

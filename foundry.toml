@@ -46,4 +46,4 @@
   arbitrum = "${ARBITRUM_RPC_URL}"
 
 [etherscan]
-  arbitrum = { key = "${ARBISCAN_API_KEY}", chain = "arbitrum" }
+  arbitrum = { key = "${ARBISCAN_API_KEY}", chain = 42161 }

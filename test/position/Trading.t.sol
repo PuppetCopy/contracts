@@ -48,6 +48,7 @@ contract TradingTest is BasicSetup {
         mockGmxExchangeRouter = new MockGmxExchangeRouter();
 
         puppetRouter = new PuppetRouter(dictator, eventEmitter);
+        dictator.setPermission(puppetRouter, puppetRouter.setConfig.selector, users.owner);
         dictator.setAccess(eventEmitter, address(puppetRouter));
 
         contributeStore = new ContributeStore(dictator, router);
@@ -58,6 +59,7 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(router, router.transfer.selector, address(positionStore));
 
         puppetLogic = new PuppetLogic(dictator, eventEmitter, puppetStore);
+        dictator.setPermission(puppetLogic, puppetLogic.setConfig.selector, users.owner);
         dictator.setAccess(eventEmitter, address(puppetLogic));
         dictator.setAccess(puppetStore, address(puppetLogic));
         dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
@@ -66,15 +68,20 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(puppetLogic, puppetLogic.setMatchRuleList.selector, address(puppetRouter));
 
         positionRouter = new PositionRouter(dictator, eventEmitter, positionStore);
+        dictator.setPermission(positionRouter, positionRouter.setConfig.selector, users.owner);
         dictator.setAccess(eventEmitter, address(positionRouter));
 
         allocationLogic = new AllocationLogic(dictator, eventEmitter, contributeStore, puppetStore, positionStore);
+        dictator.setPermission(allocationLogic, allocationLogic.setConfig.selector, users.owner);
         dictator.setAccess(eventEmitter, address(allocationLogic));
         dictator.setAccess(contributeStore, address(allocationLogic));
         dictator.setAccess(puppetStore, address(allocationLogic));
         dictator.setAccess(puppetStore, address(contributeStore));
+        dictator.setPermission(allocationLogic, allocationLogic.allocate.selector, users.owner);
+        dictator.setPermission(allocationLogic, allocationLogic.settle.selector, users.owner);
 
         requestLogic = new RequestLogic(dictator, eventEmitter, puppetStore, positionStore);
+        dictator.setPermission(requestLogic, requestLogic.setConfig.selector, users.owner);
         dictator.setAccess(eventEmitter, address(requestLogic));
         dictator.setAccess(puppetStore, address(requestLogic));
         dictator.setAccess(positionStore, address(requestLogic));
@@ -89,8 +96,6 @@ contract TradingTest is BasicSetup {
         dictator.setAccess(eventEmitter, address(unhandledCallbackLogic));
 
         // config
-
-        dictator.setPermission(puppetLogic, puppetLogic.setConfig.selector, users.owner);
         IERC20[] memory tokenAllowanceCapList = new IERC20[](2);
         tokenAllowanceCapList[0] = wnt;
         tokenAllowanceCapList[1] = usdc;
@@ -108,8 +113,6 @@ contract TradingTest is BasicSetup {
                 tokenAllowanceAmountList: tokenAllowanceCapAmountList
             })
         );
-
-        dictator.setPermission(requestLogic, requestLogic.setConfig.selector, users.owner);
         requestLogic.setConfig(
             RequestLogic.Config({
                 gmxExchangeRouter: mockGmxExchangeRouter,
@@ -121,8 +124,6 @@ contract TradingTest is BasicSetup {
                 callbackGasLimit: 2_000_000
             })
         );
-
-        dictator.setPermission(allocationLogic, allocationLogic.setConfig.selector, users.owner);
         allocationLogic.setConfig(
             AllocationLogic.Config({
                 limitAllocationListLength: 100,
@@ -130,13 +131,7 @@ contract TradingTest is BasicSetup {
                 traderPerformanceContributionShare: 0
             })
         );
-        dictator.setPermission(allocationLogic, allocationLogic.allocate.selector, users.owner);
-        dictator.setPermission(allocationLogic, allocationLogic.settle.selector, users.owner);
-
-        dictator.setPermission(puppetRouter, puppetRouter.setConfig.selector, users.owner);
         puppetRouter.setConfig(PuppetRouter.Config({logic: puppetLogic}));
-
-        dictator.setPermission(positionRouter, positionRouter.setConfig.selector, users.owner);
         positionRouter.setConfig(
             PositionRouter.Config({
                 requestLogic: requestLogic,
@@ -155,8 +150,8 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(positionRouter, positionRouter.afterOrderExecution.selector, Address.gmxOrderHandler);
         dictator.setPermission(positionRouter, positionRouter.afterOrderCancellation.selector, Address.gmxOrderHandler);
         dictator.setPermission(positionRouter, positionRouter.afterOrderFrozen.selector, Address.gmxOrderHandler);
-        dictator.setPermission(positionRouter, positionRouter.mirror.selector, users.owner);
         dictator.setPermission(positionRouter, positionRouter.allocate.selector, users.owner);
+        dictator.setPermission(positionRouter, positionRouter.mirror.selector, users.owner);
         dictator.setPermission(positionRouter, positionRouter.settle.selector, users.owner);
     }
 

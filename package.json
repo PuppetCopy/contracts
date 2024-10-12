@@ -1,18 +1,16 @@
 {
   "name": "contracts",
   "files": [
-    "src/**/*"
+    "src/**/*",
+    "deployments/**/*"
   ],
   "scripts": {
-    "test": "forge test --match-contract PuppetTest -vvvvv",
+    "test": "forge test -vvvvv",
     "test:dev": "FOUNDRY_PROFILE=dev forge test --match-contract PuppetTest -vvvvv",
     "test:dev:fork": "FOUNDRY_PROFILE=dev forge test --chain arbitrum --match-contract TradingTest -vvvvv --fork-block-number 192315592 --fork-url=$ARBITRUM_RPC_URL",
     "build": "forge build --sizes",
     "build:dev": "FOUNDRY_PROFILE=dev forge build --sizes",
-    "script:DeployPuppet": "forge script script/DeployPuppet.s.sol:DeployPuppet --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL",
-    "script:Tokenomics": "forge script script/DeployTokenomics.s.sol:DeployTokenomics --broadcast --verify -vvvv --rpc-url ARBITRUM_RPC_URL=$ARBITRUM_RPC_URL",
-    "script:Trading": "forge script script/DeployTrading.s.sol:DeployTrading --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL",
-    "script:ManagePeriphery": "forge script script/ManagePeriphery.s.sol:ManagePeriphery --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL",
+    "script:deploy": "bun deploy.ts",
     "docgen": "forge doc --out '.docgen' --build",
     "gas-report": "forge test --gas-report",
     "lint": "bun run lint:sol",

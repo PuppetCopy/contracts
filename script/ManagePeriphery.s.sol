@@ -27,7 +27,7 @@ contract ManagePeriphery is BaseScript {
     IWeightedPoolFactory poolFactory = IWeightedPoolFactory(0xc7E5ED1054A24Ef31D827E6F86caA58B3Bc168d7);
 
     function run() public {
-        vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
+        vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
         // initPool();
         // exitPool();
         vm.stopBroadcast();

@@ -29,7 +29,7 @@ contract DeployTokenomics is BaseScript {
     Router router = Router(Address.Router);
 
     function run() public {
-        vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
+        vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
         // deployStores();
         // deployContributeLogic();
         // deployVotingEscrowLogic();

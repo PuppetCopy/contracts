@@ -14,9 +14,10 @@ import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 contract Router is Permission {
     uint transferGasLimit;
 
-    constructor(IAuthority _authority, uint _trasnferGasLimit) Permission(_authority) {
+    constructor(
+        IAuthority _authority
+    ) Permission(_authority) {
         authority = _authority;
-        transferGasLimit = _trasnferGasLimit;
     }
 
     /**
@@ -32,7 +33,9 @@ contract Router is Permission {
         );
     }
 
-    function setTransferGasLimit(uint _trasnferGasLimit) external auth {
+    function setTransferGasLimit(
+        uint _trasnferGasLimit
+    ) external auth {
         transferGasLimit = _trasnferGasLimit;
     }
 }

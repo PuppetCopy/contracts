@@ -64,27 +64,15 @@ contract PuppetToken is CoreContract, ERC20, IERC20Mintable {
     /// @notice Returns the core share based on the last mint time.
     /// @return The core share.
     function getCoreShare() public view returns (uint) {
-        return getCoreShare(lastMintTime);
-    }
-
-    /// @notice Returns the core share based on a specific time.
-    /// @param _time The time to calculate the core share for.
-    /// @return The core share.
-    function getCoreShare(
-        uint _time
-    ) public view returns (uint) {
-        uint _timeElapsed = _time - deployTimestamp;
+        uint _timeElapsed = lastMintTime - deployTimestamp;
         return Precision.toFactor(CORE_RELEASE_DURATION_DIVISOR, CORE_RELEASE_DURATION_DIVISOR + _timeElapsed);
     }
 
     /// @notice Returns the amount of core tokens that can be minted based on the last mint time.
-    /// @param _lastMintTime The last mint time to calculate for.
     /// @return The mintable core amount.
-    function getMintableCoreAmount(
-        uint _lastMintTime
-    ) public view returns (uint) {
+    function getMintableCoreAmount() public view returns (uint) {
         uint _totalMintedAmount = totalSupply() - mintedCoreAmount - GENESIS_MINT_AMOUNT;
-        uint _maxMintableAmount = Precision.applyFactor(getCoreShare(_lastMintTime), _totalMintedAmount);
+        uint _maxMintableAmount = Precision.applyFactor(getCoreShare(), _totalMintedAmount);
 
         if (_maxMintableAmount < mintedCoreAmount) revert Error.PuppetToken__CoreShareExceedsMining();
 
@@ -125,8 +113,7 @@ contract PuppetToken is CoreContract, ERC20, IERC20Mintable {
     function mintCore(
         address _receiver
     ) external auth returns (uint) {
-        uint _lastMintTime = lastMintTime;
-        uint _mintableAmount = getMintableCoreAmount(_lastMintTime);
+        uint _mintableAmount = getMintableCoreAmount();
 
         mintedCoreAmount += _mintableAmount;
         _mint(_receiver, _mintableAmount);
