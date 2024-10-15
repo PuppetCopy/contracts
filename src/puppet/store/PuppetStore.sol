@@ -63,13 +63,42 @@ contract PuppetStore is BankStore {
         return userBalanceMap[_token][_account];
     }
 
-    function getBalanceList(IERC20 _token, address[] calldata _accountList) external view returns (uint[] memory) {
-        uint _accountListLength = _accountList.length;
+    function getBalanceList(IERC20 _token, address[] calldata _userList) external view returns (uint[] memory) {
+        uint _accountListLength = _userList.length;
         uint[] memory _balanceList = new uint[](_accountListLength);
         for (uint i = 0; i < _accountListLength; i++) {
-            _balanceList[i] = userBalanceMap[_token][_accountList[i]];
+            _balanceList[i] = userBalanceMap[_token][_userList[i]];
         }
         return _balanceList;
+    }
+
+    function getBalanceAndAllocationList(
+        IERC20 _token,
+        bytes32 _key,
+        address[] calldata _puppetList
+    ) external view returns (uint[] memory _balanceList, uint[] memory _allocationList) {
+        uint _puppetListLength = _puppetList.length;
+        _balanceList = new uint[](_puppetListLength);
+        _allocationList = new uint[](_puppetListLength);
+
+        for (uint i = 0; i < _puppetListLength; i++) {
+            address _puppet = _puppetList[i];
+            _balanceList[i] = userBalanceMap[_token][_puppet];
+            _allocationList[i] = userAllocationMap[_key][_puppet];
+        }
+
+        return (_balanceList, _allocationList);
+    }
+
+    function setBalanceList(
+        IERC20 _token,
+        address[] calldata _accountList,
+        uint[] calldata _balanceList
+    ) external auth {
+        uint _accountListLength = _accountList.length;
+        for (uint i = 0; i < _accountListLength; i++) {
+            userBalanceMap[_token][_accountList[i]] = _balanceList[i];
+        }
     }
 
     function getRequestId() external view returns (uint) {
@@ -192,7 +221,7 @@ contract PuppetStore is BankStore {
         }
     }
 
-    function getPuppetRouteRuleList(
+    function getPuppetMatchRuleList(
         address _puppet,
         bytes32[] calldata _matchKeyList
     ) external view returns (MatchRule[] memory) {
@@ -277,18 +306,5 @@ contract PuppetStore is BankStore {
 
     function settle(IERC20 _token, address _puppet, uint _settleAmount) external auth {
         userBalanceMap[_token][_puppet] += _settleAmount;
-    }
-
-    function settleList(
-        IERC20 _token,
-        address[] calldata _puppetList,
-        uint[] calldata _settleAmountList
-    ) external auth {
-        mapping(address => uint) storage tokenBalanceMap = userBalanceMap[_token];
-
-        uint _puppetListLength = _puppetList.length;
-        for (uint i = 0; i < _puppetListLength; i++) {
-            tokenBalanceMap[_puppetList[i]] += _settleAmountList[i];
-        }
     }
 }

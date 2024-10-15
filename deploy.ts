@@ -43,7 +43,7 @@ if (!config.RPC_URL) {
 const scriptName = `DeployPuppetLogic`;
 const scriptFile = `${scriptName}.s.sol`;
 
-// await $`forge script script/${scriptFile}:${scriptName} --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL`;
+await $`forge script script/${scriptFile}:${scriptName} --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL`;
 
 const deploymentsFilePath = "./deployments/addresses.json";
 const deploymentsFile = file(deploymentsFilePath);

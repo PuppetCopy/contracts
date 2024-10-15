@@ -124,7 +124,9 @@ contract AllocationLogic is CoreContract {
         }
         puppetStore.setSettledAllocationHash(puppetListHash, allocationKey);
 
-        uint[] memory allocationToSettledAmountList = puppetStore.getUserAllocationList(allocationKey, puppetList);
+        (uint[] memory balanceList, uint[] memory allocationList) =
+            puppetStore.getBalanceAndAllocationList(allocation.collateralToken, allocationKey, puppetList);
+
         uint[] memory contributionAmountList = new uint[](puppetList.length);
         uint totalPuppetContribution;
         uint traderPerformanceContribution;
@@ -146,26 +148,26 @@ contract AllocationLogic is CoreContract {
 
             uint settledAfterContribution = allocation.settled - totalPuppetContribution - traderPerformanceContribution;
 
-            for (uint i = 0; i < allocationToSettledAmountList.length; i++) {
-                uint puppetAllocation = allocationToSettledAmountList[i];
+            for (uint i = 0; i < allocationList.length; i++) {
+                uint puppetAllocation = allocationList[i];
                 if (puppetAllocation == 0) continue;
 
                 contributionAmountList[i] = puppetAllocation * totalPuppetContribution / allocation.allocated;
-                allocationToSettledAmountList[i] = puppetAllocation * settledAfterContribution / allocation.allocated;
+                balanceList[i] += puppetAllocation * settledAfterContribution / allocation.allocated;
             }
 
             contributeStore.interTransferIn(allocation.collateralToken, positionStore, totalPuppetContribution);
             contributeStore.contributeMany(allocation.collateralToken, puppetList, contributionAmountList);
         } else if (allocation.settled > 0) {
-            for (uint i = 0; i < allocationToSettledAmountList.length; i++) {
-                uint puppetAllocation = allocationToSettledAmountList[i];
+            for (uint i = 0; i < allocationList.length; i++) {
+                uint puppetAllocation = allocationList[i];
                 if (puppetAllocation == 0) continue;
 
-                allocationToSettledAmountList[i] = puppetAllocation * allocation.settled / allocation.allocated;
+                balanceList[i] += puppetAllocation * allocation.settled / allocation.allocated;
             }
         }
 
-        puppetStore.settleList(allocation.collateralToken, puppetList, allocationToSettledAmountList);
+        puppetStore.setBalanceList(allocation.collateralToken, puppetList, allocationList);
 
         if (allocation.size > 0) {
             allocation.profit = 0;
@@ -184,7 +186,7 @@ contract AllocationLogic is CoreContract {
                 allocationKey,
                 puppetListHash,
                 puppetList,
-                allocationToSettledAmountList,
+                allocationList,
                 contributionAmountList,
                 allocation.allocated,
                 allocation.settled,

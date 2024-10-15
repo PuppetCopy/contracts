@@ -33,29 +33,31 @@ contract PuppetLogic is CoreContract {
         store = _store;
     }
 
-    function deposit(IERC20 token, address user, uint amount) external auth {
+    function deposit(IERC20 collateralToken, address user, uint amount) external auth {
         if (amount == 0) revert Error.PuppetLogic__InvalidAmount();
 
-        uint balance = store.getUserBalance(token, user);
+        validatePuppetTokenAllowance(collateralToken, user, amount);
+
+        uint balance = store.getUserBalance(collateralToken, user);
         uint nextBalance = balance + amount;
 
-        store.transferIn(token, user, amount);
-        store.setBalance(token, user, nextBalance);
+        store.transferIn(collateralToken, user, amount);
+        store.setBalance(collateralToken, user, nextBalance);
 
-        logEvent("Deposit", abi.encode(token, user, nextBalance, amount));
+        logEvent("Deposit", abi.encode(collateralToken, user, nextBalance, amount));
     }
 
-    function withdraw(IERC20 token, address user, address receiver, uint amount) external auth {
+    function withdraw(IERC20 collateralToken, address user, address receiver, uint amount) external auth {
         if (amount == 0) revert Error.PuppetLogic__InvalidAmount();
-        uint balance = store.getUserBalance(token, user);
+        uint balance = store.getUserBalance(collateralToken, user);
 
         if (amount > balance) revert Error.PuppetLogic__InsufficientBalance();
         uint nextBalance = balance - amount;
 
-        store.setBalance(token, user, nextBalance);
-        store.transferOut(token, receiver, amount);
+        store.setBalance(collateralToken, user, nextBalance);
+        store.transferOut(collateralToken, receiver, amount);
 
-        logEvent("Withdraw", abi.encode(token, user, nextBalance, amount));
+        logEvent("Withdraw", abi.encode(collateralToken, user, nextBalance, amount));
     }
 
     function setMatchRule(
@@ -65,7 +67,6 @@ contract PuppetLogic is CoreContract {
         address trader
     ) external auth {
         bytes32 key = PositionUtils.getMatchKey(collateralToken, trader);
-        validatePuppetTokenAllowance(collateralToken, puppet);
         _validateRuleParams(ruleParams);
 
         store.setMatchRule(key, puppet, ruleParams);
@@ -82,7 +83,6 @@ contract PuppetLogic is CoreContract {
         uint length = traderList.length;
         if (length != ruleParamList.length) revert Error.PuppetLogic__InvalidLength();
 
-        IERC20[] memory verifyAllowanceTokenList = new IERC20[](0);
         bytes32[] memory matchKeyList = new bytes32[](length);
 
         for (uint i = 0; i < length; i++) {
@@ -90,16 +90,8 @@ contract PuppetLogic is CoreContract {
             IERC20 collateralToken = collateralTokenList[i];
 
             _validateRuleParams(rule);
-
             bytes32 key = PositionUtils.getMatchKey(collateralToken, traderList[i]);
-
             matchKeyList[i] = key;
-
-            if (!_isArrayContains(verifyAllowanceTokenList, collateralToken)) {
-                verifyAllowanceTokenList[verifyAllowanceTokenList.length] = collateralToken;
-
-                validatePuppetTokenAllowance(collateralToken, puppet);
-            }
         }
 
         store.setMatchRuleList(puppet, matchKeyList, ruleParamList);
@@ -109,12 +101,16 @@ contract PuppetLogic is CoreContract {
 
     // internal
 
-    function validatePuppetTokenAllowance(IERC20 token, address puppet) internal view returns (uint) {
+    function validatePuppetTokenAllowance(
+        IERC20 token,
+        address puppet,
+        uint deltaAmount
+    ) internal view returns (uint) {
         uint tokenAllowance = store.getUserBalance(token, puppet);
         uint allowanceCap = store.getTokenAllowanceCap(token);
 
         if (allowanceCap == 0) revert Error.PuppetLogic__TokenNotAllowed();
-        if (tokenAllowance > allowanceCap) revert Error.PuppetLogic__AllowanceAboveLimit(allowanceCap);
+        if (tokenAllowance + deltaAmount > allowanceCap) revert Error.PuppetLogic__AllowanceAboveLimit(allowanceCap);
 
         return tokenAllowance;
     }
@@ -134,16 +130,6 @@ contract PuppetLogic is CoreContract {
         if (ruleParams.allowanceRate < config.minAllowanceRate || ruleParams.allowanceRate > config.maxAllowanceRate) {
             revert Error.PuppetLogic__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate);
         }
-    }
-
-    function _isArrayContains(IERC20[] memory array, IERC20 value) internal pure returns (bool) {
-        for (uint i = 0; i < array.length; i++) {
-            if (array[i] == value) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     // governance
