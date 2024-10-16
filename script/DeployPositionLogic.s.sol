@@ -23,7 +23,6 @@ import {Router} from "src/shared/Router.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
 import {ContributeStore} from "src/tokenomics/store/ContributeStore.sol";
-import {EventEmitter} from "src/utils/EventEmitter.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
 import {Address} from "./Const.sol";
@@ -38,69 +37,67 @@ contract DeployPositionLogic is BaseScript {
     }
 
     function deployContracts() internal {
-        EventEmitter eventEmitter = EventEmitter(Address.EventEmitter);
         Router router = Router(Address.Router);
         PuppetStore puppetStore = PuppetStore(Address.PuppetStore);
         ContributeStore contributeStore = ContributeStore(Address.ContributeStore);
 
         MirrorPositionStore positionStore = new MirrorPositionStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(positionStore));
-        PositionRouter positionRouter = new PositionRouter(dictator, eventEmitter, positionStore);
-        dictator.setPermission(positionRouter, positionRouter.setConfig.selector, Address.dao);
-        dictator.setAccess(eventEmitter, address(positionRouter));
+        PositionRouter positionRouter = new PositionRouter(dictator, positionStore);
 
         // MirrorPositionStore positionStore = MirrorPositionStore(Address.MirrorPositionStore);
         // PositionRouter positionRouter = PositionRouter(Address.PositionRouter);
 
-        RequestLogic requestLogic = new RequestLogic(dictator, eventEmitter, puppetStore, positionStore);
-        dictator.setPermission(requestLogic, requestLogic.setConfig.selector, Address.dao);
-        dictator.setAccess(eventEmitter, address(requestLogic));
+        RequestLogic requestLogic = new RequestLogic(dictator, puppetStore, positionStore);
         dictator.setAccess(puppetStore, address(requestLogic));
         dictator.setAccess(positionStore, address(requestLogic));
 
-        ExecutionLogic executionLogic = new ExecutionLogic(dictator, eventEmitter, puppetStore, positionStore);
-        dictator.setAccess(eventEmitter, address(executionLogic));
+        ExecutionLogic executionLogic = new ExecutionLogic(dictator, puppetStore, positionStore);
         dictator.setAccess(positionStore, address(executionLogic));
         dictator.setAccess(puppetStore, address(executionLogic));
 
-        UnhandledCallbackLogic unhandledCallbackLogic =
-            new UnhandledCallbackLogic(dictator, eventEmitter, positionStore);
-        dictator.setAccess(eventEmitter, address(unhandledCallbackLogic));
+        UnhandledCallbackLogic unhandledCallbackLogic = new UnhandledCallbackLogic(dictator, positionStore);
 
-        AllocationLogic allocationLogic =
-            new AllocationLogic(dictator, eventEmitter, contributeStore, puppetStore, positionStore);
-        dictator.setPermission(allocationLogic, allocationLogic.setConfig.selector, Address.dao);
-        dictator.setAccess(eventEmitter, address(allocationLogic));
+        AllocationLogic allocationLogic = new AllocationLogic(dictator, contributeStore, puppetStore, positionStore);
         dictator.setAccess(contributeStore, address(allocationLogic));
         dictator.setAccess(puppetStore, address(allocationLogic));
         dictator.setAccess(puppetStore, address(contributeStore));
 
         // config
-        allocationLogic.setConfig(
-            AllocationLogic.Config({
-                limitAllocationListLength: 100,
-                performanceContributionRate: 0.1e30,
-                traderPerformanceContributionShare: 0
-            })
+        dictator.initContract(
+            allocationLogic,
+            abi.encode(
+                AllocationLogic.Config({
+                    limitAllocationListLength: 100,
+                    performanceContributionRate: 0.1e30,
+                    traderPerformanceContributionShare: 0
+                })
+            )
         );
-        requestLogic.setConfig(
-            RequestLogic.Config({
-                gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
-                gmxDatastore: IGmxDatastore(Address.gmxDatastore),
-                callbackHandler: Address.PositionRouter,
-                gmxFundsReciever: Address.PuppetStore,
-                gmxOrderVault: Address.gmxOrderVault,
-                referralCode: Address.referralCode,
-                callbackGasLimit: 2_000_000
-            })
+        dictator.initContract(
+            requestLogic,
+            abi.encode(
+                RequestLogic.Config({
+                    gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
+                    gmxDatastore: IGmxDatastore(Address.gmxDatastore),
+                    callbackHandler: Address.PositionRouter,
+                    gmxFundsReciever: Address.PuppetStore,
+                    gmxOrderVault: Address.gmxOrderVault,
+                    referralCode: Address.referralCode,
+                    callbackGasLimit: 2_000_000
+                })
+            )
         );
-        positionRouter.setConfig(
-            PositionRouter.Config({
-                requestLogic: requestLogic,
-                allocationLogic: allocationLogic,
-                executionLogic: executionLogic,
-                unhandledCallbackLogic: unhandledCallbackLogic
-            })
+        dictator.initContract(
+            positionRouter,
+            abi.encode(
+                PositionRouter.Config({
+                    requestLogic: requestLogic,
+                    allocationLogic: allocationLogic,
+                    executionLogic: executionLogic,
+                    unhandledCallbackLogic: unhandledCallbackLogic
+                })
+            )
         );
 
         // Operation

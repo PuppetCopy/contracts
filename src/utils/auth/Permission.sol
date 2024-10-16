@@ -28,7 +28,7 @@ abstract contract Permission is IPermission {
         }
     }
 
-    modifier checkAuthority() {
+    modifier onlyAuthority() {
         if (msg.sender == address(authority)) {
             _;
         } else {
@@ -36,11 +36,8 @@ abstract contract Permission is IPermission {
         }
     }
 
-    function set(bytes4 functionSig, address user) external checkAuthority {
-        permissionMap[functionSig][user] = true;
+    function setPermission(bytes4 functionSig, address user, bool isEnabled) external onlyAuthority {
+        permissionMap[functionSig][user] = isEnabled;
     }
 
-    function remove(bytes4 functionSig, address user) external checkAuthority {
-        permissionMap[functionSig][user] = false;
-    }
 }

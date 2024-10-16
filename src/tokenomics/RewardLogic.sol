@@ -8,7 +8,6 @@ import {IGmxReferralStorage} from "../position/interface/IGmxReferralStorage.sol
 import {Error} from "../shared/Error.sol";
 import {BankStore} from "../shared/store/BankStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
-import {EventEmitter} from "../utils/EventEmitter.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {RewardStore} from "./store/RewardStore.sol";
@@ -57,11 +56,10 @@ contract RewardLogic is CoreContract {
 
     constructor(
         IAuthority _authority,
-        EventEmitter _eventEmitter,
         IERC20 _rewardToken,
         IERC20 _vToken,
         RewardStore _store
-    ) CoreContract("RewardLogic", "1", _authority, _eventEmitter) {
+    ) CoreContract("RewardLogic", "1", _authority) {
         rewardToken = _rewardToken;
         vToken = _vToken;
         store = _store;
@@ -86,7 +84,7 @@ contract RewardLogic is CoreContract {
         store.setUserRewardCursor(user, cursor);
         store.transferOut(rewardToken, receiver, amount);
 
-        logEvent("Claim", abi.encode(user, receiver, amount));
+        _logEvent("Claim", abi.encode(user, receiver, amount));
     }
 
     /// @notice Distributes the rewards to the users based on the current token emission rate and the time elapsed
@@ -118,7 +116,7 @@ contract RewardLogic is CoreContract {
 
         uint rewardPerToken = store.incrementCumulativePerContribution(Precision.toFactor(emission, supply));
 
-        logEvent("Distribute", abi.encode(rewardPerToken, supply, emission));
+        _logEvent("Distribute", abi.encode(rewardPerToken, supply, emission));
 
         return rewardPerToken;
     }
@@ -144,12 +142,10 @@ contract RewardLogic is CoreContract {
         _referralStorage.setCodeOwner(_code, _newOwner);
     }
     /// @notice Set the mint rate limit for the token.
-    /// @param _config The new rate limit configuration.
-
-    function setConfig(
-        Config calldata _config
-    ) external auth {
-        config = _config;
-        logEvent("SetConfig", abi.encode(_config));
+    /// @param data The new rate limit configuration.
+    function _setConfig(
+        bytes calldata data
+    ) internal override {
+        config = abi.decode(data, (Config));
     }
 }

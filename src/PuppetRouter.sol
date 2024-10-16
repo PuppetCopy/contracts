@@ -7,7 +7,6 @@ import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {PuppetLogic} from "./puppet/PuppetLogic.sol";
 import {PuppetStore} from "./puppet/store/PuppetStore.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
-import {EventEmitter} from "./utils/EventEmitter.sol";
 import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
 import {Access} from "./utils/auth/Access.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
@@ -20,9 +19,8 @@ contract PuppetRouter is CoreContract, ReentrancyGuardTransient, Multicall {
     Config public config;
 
     constructor(
-        IAuthority _authority,
-        EventEmitter _eventEmitter
-    ) CoreContract("PuppetRouter", "1", _authority, _eventEmitter) {}
+        IAuthority _authority
+    ) CoreContract("PuppetRouter", "1", _authority) {}
 
     function deposit(IERC20 token, uint amount) external nonReentrant {
         config.logic.deposit(token, msg.sender, amount);
@@ -42,20 +40,17 @@ contract PuppetRouter is CoreContract, ReentrancyGuardTransient, Multicall {
 
     function setMatchRuleList(
         IERC20[] calldata collateralTokenList,
-        PuppetStore.MatchRule[] calldata ruleParams,
-        address[] calldata traderList
+        address[] calldata traderList,
+        PuppetStore.MatchRule[] calldata ruleParams
     ) external nonReentrant {
         config.logic.setMatchRuleList(collateralTokenList, traderList, ruleParams, msg.sender);
     }
 
     // governance
 
-    /// @notice Set the mint rate limit for the token.
-    /// @param _config The new rate limit configuration.
-    function setConfig(
-        Config calldata _config
-    ) external auth {
-        config = _config;
-        logEvent("SetConfig", abi.encode(_config));
+    function _setConfig(
+        bytes calldata data
+    ) internal override {
+        config = abi.decode(data, (Config));
     }
 }

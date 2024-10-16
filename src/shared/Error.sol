@@ -4,6 +4,11 @@ pragma solidity 0.8.27;
 import {GmxPositionUtils} from "../position/utils/GmxPositionUtils.sol";
 
 library Error {
+    error Dictator__ConfigurationUpdateFailed();
+    error Dictator__ContractNotInitialized();
+    error Dictator__ContractAlreadyInitialized();
+    error CoreContract__Unauthorized(string contractName, string version);
+
     error Access__Unauthorized();
     error Permission__Unauthorized();
 

@@ -6,7 +6,6 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Error} from "../shared/Error.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
-import {EventEmitter} from "../utils/EventEmitter.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {IERC20Mintable} from "../utils/interfaces/IERC20Mintable.sol";
@@ -52,10 +51,9 @@ contract ContributeLogic is CoreContract {
 
     constructor(
         IAuthority _authority,
-        EventEmitter _eventEmitter,
         IERC20Mintable _rewardToken,
         ContributeStore _store
-    ) CoreContract("ContributeLogic", "1", _authority, _eventEmitter) {
+    ) CoreContract("ContributeLogic", "1", _authority) {
         rewardToken = _rewardToken;
         store = _store;
     }
@@ -80,7 +78,7 @@ contract ContributeLogic is CoreContract {
         store.setCursor(token, cursor + 1);
         store.setCursorBalance(token, 0);
 
-        logEvent("Buyback", abi.encode(token, depositor, receiver, cursor, revenueAmount, quoteAmount));
+        _logEvent("Buyback", abi.encode(token, depositor, receiver, cursor, revenueAmount, quoteAmount));
     }
 
     /// @notice Claims the rewards for a specific token contribution.
@@ -108,7 +106,7 @@ contract ContributeLogic is CoreContract {
         store.setUserAccruedReward(user, accruedReward);
         rewardToken.mint(receiver, reward);
 
-        logEvent("Claim", abi.encode(user, accruedReward, reward));
+        _logEvent("Claim", abi.encode(user, accruedReward, reward));
 
         return reward;
     }
@@ -122,12 +120,11 @@ contract ContributeLogic is CoreContract {
         store.setBuybackQuote(token, value);
     }
 
-    /// @notice Set the mint rate limit for the token.
-    /// @param _config The new rate limit configuration.
-    function setConfig(
-        Config calldata _config
-    ) external auth {
-        config = _config;
-        logEvent("SetConfig", abi.encode(_config));
+    /// @notice Set the configuration parameters for the ContributeLogic contract.
+    /// @param data The new configuration parameters.
+    function _setConfig(
+        bytes calldata data
+    ) internal override {
+        config = abi.decode(data, (Config));
     }
 }

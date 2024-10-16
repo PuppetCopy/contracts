@@ -6,7 +6,6 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Error} from "../shared/Error.sol";
 import {PuppetToken} from "../tokenomics/PuppetToken.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
-import {EventEmitter} from "../utils/EventEmitter.sol";
 import {Precision} from "../utils/Precision.sol";
 import {Permission} from "../utils/auth/Permission.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
@@ -93,11 +92,10 @@ contract VotingEscrowLogic is CoreContract {
     /// @param _token The address of the ERC20 token to be locked.
     constructor(
         IAuthority _authority,
-        EventEmitter _eventEmitter,
         VotingEscrowStore _store,
         PuppetToken _token,
         PuppetVoteToken _vToken
-    ) CoreContract("VotingEscrowLogic", "1", _authority, _eventEmitter) {
+    ) CoreContract("VotingEscrowLogic", "1", _authority) {
         store = _store;
         token = _token;
         vToken = _vToken;
@@ -130,7 +128,7 @@ contract VotingEscrowLogic is CoreContract {
         store.setLockDuration(user, nextDuration);
         vToken.mint(user, amount);
 
-        logEvent("Lock", abi.encode(depositor, user, nextAmount, nextDuration, bonusAmount));
+        _logEvent("Lock", abi.encode(depositor, user, nextAmount, nextDuration, bonusAmount));
     }
 
     /// @notice Initiates the vesting process for a user's locked tokens.
@@ -161,18 +159,16 @@ contract VotingEscrowLogic is CoreContract {
         store.setVested(user, vested);
         store.transferOut(token, receiver, amount);
 
-        logEvent("Claim", abi.encode(user, receiver, amount));
+        _logEvent("Claim", abi.encode(user, receiver, amount));
     }
 
     // governance
 
-    /// @notice Set the mint rate limit for the token.
-    /// @param _config The new rate limit configuration.
-    function setConfig(
-        Config calldata _config
-    ) external auth {
-        config = _config;
-        logEvent("SetConfig", abi.encode(_config));
+    /// @notice Sets the configuration parameters for the VotingEscrowLogic contract.
+    function _setConfig(
+        bytes calldata data
+    ) internal override {
+        config = abi.decode(data, (Config));
     }
 
     // internal
@@ -188,6 +184,6 @@ contract VotingEscrowLogic is CoreContract {
 
         store.setVested(user, vested);
 
-        logEvent("Vest", abi.encode(user, receiver, vested));
+        _logEvent("Vest", abi.encode(user, receiver, vested));
     }
 }

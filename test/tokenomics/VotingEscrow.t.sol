@@ -21,9 +21,7 @@ contract VotingEscrowTest is BasicSetup {
         veStore = new VotingEscrowStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(veStore));
 
-        veLogic = new VotingEscrowLogic(dictator, eventEmitter, veStore, puppetToken, vPuppetToken);
-        dictator.setAccess(eventEmitter, address(veLogic));
-        dictator.setPermission(veLogic, veLogic.setConfig.selector, users.owner);
+        veLogic = new VotingEscrowLogic(dictator, veStore, puppetToken, vPuppetToken);
         dictator.setAccess(veStore, address(veLogic));
 
         dictator.setPermission(puppetToken, puppetToken.mint.selector, address(veLogic));
@@ -37,7 +35,7 @@ contract VotingEscrowTest is BasicSetup {
         dictator.setPermission(puppetToken, puppetToken.mint.selector, users.owner);
 
         // test setup
-        veLogic.setConfig(VotingEscrowLogic.Config({baseMultiplier: 0.1e30}));
+        dictator.initContract(veLogic, abi.encode(VotingEscrowLogic.Config({baseMultiplier: 0.1e30})));
 
         puppetToken.mint(users.alice, 100 * 1e18);
         puppetToken.mint(users.bob, 100 * 1e18);

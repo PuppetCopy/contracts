@@ -7,7 +7,6 @@ import {PuppetStore} from "../puppet/store/PuppetStore.sol";
 import {Error} from "../shared/Error.sol";
 import {ContributeStore} from "../tokenomics/store/ContributeStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
-import {EventEmitter} from "../utils/EventEmitter.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "./../utils/Precision.sol";
 import {MirrorPositionStore} from "./store/MirrorPositionStore.sol";
@@ -19,10 +18,9 @@ contract ExecutionLogic is CoreContract {
 
     constructor(
         IAuthority _authority,
-        EventEmitter _eventEmitter,
         PuppetStore _puppetStore,
         MirrorPositionStore _positionStore
-    ) CoreContract("ExecutionLogic", "1", _authority, _eventEmitter) {
+    ) CoreContract("ExecutionLogic", "1", _authority) {
         puppetStore = _puppetStore;
         positionStore = _positionStore;
     }
@@ -69,7 +67,7 @@ contract ExecutionLogic is CoreContract {
         allocation.size += request.sizeDelta;
         positionStore.removeRequestAdjustment(requestKey);
 
-        logEvent(
+        _logEvent(
             "ExecuteIncrease",
             abi.encode(
                 requestKey,
@@ -114,7 +112,7 @@ contract ExecutionLogic is CoreContract {
         positionStore.removeRequestDecrease(requestKey);
         puppetStore.setAllocation(request.allocationKey, allocation);
 
-        logEvent(
+        _logEvent(
             "ExecuteDecrease",
             abi.encode(
                 requestKey,
@@ -127,5 +125,11 @@ contract ExecutionLogic is CoreContract {
                 allocation.settled
             )
         );
+    }
+
+    function _setConfig(
+        bytes calldata data
+    ) internal override {
+        revert("Not implemented");
     }
 }

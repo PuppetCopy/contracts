@@ -16,14 +16,12 @@ import {VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
 import {ContributeStore} from "src/tokenomics/store/ContributeStore.sol";
 import {RewardStore} from "src/tokenomics/store/RewardStore.sol";
 import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
-import {EventEmitter} from "src/utils/EventEmitter.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
 import {Address} from "./Const.sol";
 
 contract DeployTokenomics is BaseScript {
     Dictator dictator = Dictator(Address.Dictator);
-    EventEmitter eventEmitter = EventEmitter(Address.EventEmitter);
     PuppetToken puppetToken = PuppetToken(Address.PuppetToken);
     PuppetVoteToken vPuppetToken = PuppetVoteToken(Address.PuppetVoteToken);
     Router router = Router(Address.Router);
@@ -64,7 +62,7 @@ contract DeployTokenomics is BaseScript {
     function deployContributeLogic() internal returns (ContributeLogic contributeLogic) {
         ContributeStore contributeStore = ContributeStore(Address.ContributeStore);
 
-        contributeLogic = new ContributeLogic(dictator, eventEmitter, puppetToken, contributeStore);
+        contributeLogic = new ContributeLogic(dictator, puppetToken, contributeStore);
         dictator.setPermission(puppetToken, puppetToken.mint.selector, address(contributeLogic));
         dictator.setAccess(contributeStore, address(contributeLogic));
 
@@ -72,34 +70,31 @@ contract DeployTokenomics is BaseScript {
         contributeLogic.setBuybackQuote(IERC20(Address.wnt), 100e18);
         contributeLogic.setBuybackQuote(IERC20(Address.usdc), 100e18);
 
-        dictator.setAccess(eventEmitter, address(contributeLogic));
-        dictator.setPermission(contributeLogic, contributeLogic.setConfig.selector, Address.dao);
-        contributeLogic.setConfig(ContributeLogic.Config({baselineEmissionRate: 0.5e30}));
+        dictator.initContract(contributeLogic, abi.encode(ContributeLogic.Config({baselineEmissionRate: 0.5e30})));
     }
 
     function deployVotingEscrowLogic() internal returns (VotingEscrowLogic veLogic) {
         VotingEscrowStore veStore = VotingEscrowStore(Address.VotingEscrowStore);
-        veLogic = new VotingEscrowLogic(dictator, eventEmitter, veStore, puppetToken, vPuppetToken);
+        veLogic = new VotingEscrowLogic(dictator, veStore, puppetToken, vPuppetToken);
         dictator.setAccess(veStore, address(veLogic));
         dictator.setPermission(puppetToken, puppetToken.mint.selector, address(veLogic));
         dictator.setPermission(vPuppetToken, vPuppetToken.mint.selector, address(veLogic));
         dictator.setPermission(vPuppetToken, vPuppetToken.burn.selector, address(veLogic));
 
-        dictator.setAccess(eventEmitter, address(veLogic));
-        dictator.setPermission(veLogic, veLogic.setConfig.selector, Address.dao);
-        veLogic.setConfig(VotingEscrowLogic.Config({baseMultiplier: 0.3e30}));
+        dictator.initContract(veLogic, abi.encode(VotingEscrowLogic.Config({baseMultiplier: 0.3e30})));
     }
 
     function deployRewardLogic() internal returns (RewardLogic rewardLogic) {
         RewardStore rewardStore = RewardStore(Address.RewardStore);
         ContributeStore contributeStore = ContributeStore(Address.ContributeStore);
 
-        rewardLogic = new RewardLogic(dictator, eventEmitter, puppetToken, vPuppetToken, rewardStore);
+        rewardLogic = new RewardLogic(dictator, puppetToken, vPuppetToken, rewardStore);
         dictator.setAccess(rewardStore, address(rewardLogic));
 
-        dictator.setAccess(eventEmitter, address(rewardLogic));
-        dictator.setPermission(rewardLogic, rewardLogic.setConfig.selector, Address.dao);
-        rewardLogic.setConfig(RewardLogic.Config({distributionStore: contributeStore, distributionTimeframe: 1 weeks}));
+        dictator.initContract(
+            rewardLogic,
+            abi.encode(RewardLogic.Config({distributionStore: contributeStore, distributionTimeframe: 1 weeks}))
+        );
     }
 
     function swapContributeLogic(
@@ -109,12 +104,15 @@ contract DeployTokenomics is BaseScript {
         dictator.setPermission(contributeLogic, contributeLogic.buyback.selector, address(rewardRouter));
         dictator.setPermission(contributeLogic, contributeLogic.claim.selector, address(rewardRouter));
 
-        rewardRouter.setConfig(
-            RewardRouter.Config({
-                contributeLogic: contributeLogic,
-                veLogic: VotingEscrowLogic(Address.VotingEscrowLogic),
-                rewardLogic: RewardLogic(Address.RewardLogic)
-            })
+        dictator.initContract(
+            rewardRouter,
+            abi.encode(
+                RewardRouter.Config({
+                    contributeLogic: contributeLogic,
+                    veLogic: VotingEscrowLogic(Address.VotingEscrowLogic),
+                    rewardLogic: RewardLogic(Address.RewardLogic)
+                })
+            )
         );
     }
 
@@ -126,12 +124,15 @@ contract DeployTokenomics is BaseScript {
         dictator.setPermission(veLogic, veLogic.vest.selector, address(rewardRouter));
         dictator.setPermission(veLogic, veLogic.claim.selector, address(rewardRouter));
 
-        rewardRouter.setConfig(
-            RewardRouter.Config({
-                veLogic: veLogic,
-                contributeLogic: ContributeLogic(Address.ContributeLogic),
-                rewardLogic: RewardLogic(Address.RewardLogic)
-            })
+        dictator.initContract(
+            rewardRouter,
+            abi.encode(
+                RewardRouter.Config({
+                    veLogic: veLogic,
+                    contributeLogic: ContributeLogic(Address.ContributeLogic),
+                    rewardLogic: RewardLogic(Address.RewardLogic)
+                })
+            )
         );
     }
 
@@ -143,12 +144,15 @@ contract DeployTokenomics is BaseScript {
         dictator.setPermission(rewardLogic, rewardLogic.userDistribute.selector, address(rewardRouter));
         dictator.setPermission(rewardLogic, rewardLogic.distribute.selector, address(rewardRouter));
 
-        rewardRouter.setConfig(
-            RewardRouter.Config({
-                contributeLogic: ContributeLogic(Address.ContributeLogic),
-                veLogic: VotingEscrowLogic(Address.VotingEscrowLogic),
-                rewardLogic: rewardLogic
-            })
+        dictator.initContract(
+            rewardRouter,
+            abi.encode(
+                RewardRouter.Config({
+                    contributeLogic: ContributeLogic(Address.ContributeLogic),
+                    veLogic: VotingEscrowLogic(Address.VotingEscrowLogic),
+                    rewardLogic: rewardLogic
+                })
+            )
         );
     }
 
@@ -157,8 +161,7 @@ contract DeployTokenomics is BaseScript {
         RewardLogic rewardLogic,
         VotingEscrowLogic veLogic
     ) internal returns (RewardRouter rewardRouter) {
-        rewardRouter = new RewardRouter(dictator, eventEmitter);
-        dictator.setPermission(rewardRouter, rewardRouter.setConfig.selector, Address.dao);
+        rewardRouter = new RewardRouter(dictator);
 
         dictator.setPermission(contributeLogic, contributeLogic.buyback.selector, address(rewardRouter));
         dictator.setPermission(contributeLogic, contributeLogic.claim.selector, address(rewardRouter));
@@ -171,10 +174,11 @@ contract DeployTokenomics is BaseScript {
         dictator.setPermission(rewardLogic, rewardLogic.userDistribute.selector, address(rewardRouter));
         dictator.setPermission(rewardLogic, rewardLogic.distribute.selector, address(rewardRouter));
 
-        dictator.setAccess(eventEmitter, address(rewardRouter));
-        dictator.setPermission(rewardRouter, rewardRouter.setConfig.selector, Address.dao);
-        rewardRouter.setConfig(
-            RewardRouter.Config({contributeLogic: contributeLogic, rewardLogic: rewardLogic, veLogic: veLogic})
+        dictator.initContract(
+            rewardRouter,
+            abi.encode(
+                RewardRouter.Config({contributeLogic: contributeLogic, rewardLogic: rewardLogic, veLogic: veLogic})
+            )
         );
     }
 }

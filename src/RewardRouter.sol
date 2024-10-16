@@ -8,7 +8,6 @@ import {ContributeLogic} from "./tokenomics/ContributeLogic.sol";
 import {RewardLogic} from "./tokenomics/RewardLogic.sol";
 import {VotingEscrowLogic} from "./tokenomics/VotingEscrowLogic.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
-import {EventEmitter} from "./utils/EventEmitter.sol";
 import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
 import {Access} from "./utils/auth/Access.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
@@ -23,9 +22,8 @@ contract RewardRouter is CoreContract, ReentrancyGuardTransient, Multicall {
     Config public config;
 
     constructor(
-        IAuthority _authority,
-        EventEmitter _eventEmitter
-    ) CoreContract("RewardRouter", "1", _authority, _eventEmitter) {}
+        IAuthority _authority
+    ) CoreContract("RewardRouter", "1", _authority) {}
 
     /// @notice Executes the buyback of revenue tokens using the protocol's accumulated fees.
     /// @param token The address of the revenue token to be bought back.
@@ -78,14 +76,11 @@ contract RewardRouter is CoreContract, ReentrancyGuardTransient, Multicall {
         config.veLogic.claim(msg.sender, receiver, amount);
     }
 
-    // governance
+    // internal
 
-    /// @notice Set the mint rate limit for the token.
-    /// @param _config The new rate limit configuration.
-    function setConfig(
-        Config calldata _config
-    ) external auth nonReentrant {
-        config = _config;
-        logEvent("SetConfig", abi.encode(_config));
+    function _setConfig(
+        bytes calldata data
+    ) internal override {
+        config = abi.decode(data, (Config));
     }
 }

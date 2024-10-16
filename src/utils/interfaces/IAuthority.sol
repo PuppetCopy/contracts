@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.27;
 
-interface IAuthority {}
+interface IAuthority {
+    function logEvent(string memory method, string memory name, string memory version, bytes memory data) external;
+}

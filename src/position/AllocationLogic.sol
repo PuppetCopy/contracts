@@ -8,7 +8,6 @@ import {PuppetStore} from "../puppet/store/PuppetStore.sol";
 import {Error} from "../shared/Error.sol";
 import {ContributeStore} from "../tokenomics/store/ContributeStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
-import {EventEmitter} from "../utils/EventEmitter.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "./../utils/Precision.sol";
 import {MirrorPositionStore} from "./store/MirrorPositionStore.sol";
@@ -30,11 +29,10 @@ contract AllocationLogic is CoreContract {
 
     constructor(
         IAuthority _authority,
-        EventEmitter _eventEmitter,
         ContributeStore _contributeStore,
         PuppetStore _puppetStore,
         MirrorPositionStore _positionStore
-    ) CoreContract("AllocationLogic", "1", _authority, _eventEmitter) {
+    ) CoreContract("AllocationLogic", "1", _authority) {
         positionStore = _positionStore;
         puppetStore = _puppetStore;
         contributeStore = _contributeStore;
@@ -91,7 +89,7 @@ contract AllocationLogic is CoreContract {
 
         uint transactionCost = (startGas - gasleft()) * tx.gasprice;
 
-        logEvent(
+        _logEvent(
             "Allocate",
             abi.encode(
                 collateralToken,
@@ -178,7 +176,7 @@ contract AllocationLogic is CoreContract {
             puppetStore.removeAllocation(allocationKey);
         }
 
-        logEvent(
+        _logEvent(
             "Settle",
             abi.encode(
                 allocation.collateralToken,
@@ -198,12 +196,11 @@ contract AllocationLogic is CoreContract {
         );
     }
 
-    // governance
-    function setConfig(
-        Config memory _config
-    ) external auth {
-        config = _config;
+    // internal
 
-        logEvent("SetConfig", abi.encode(_config));
+    function _setConfig(
+        bytes calldata data
+    ) internal override {
+        config = abi.decode(data, (Config));
     }
 }

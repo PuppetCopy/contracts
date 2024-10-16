@@ -6,7 +6,6 @@ library Address {
 
     // Puppet core
     address constant Dictator = 0x6474AF87CbF50cbdE88710b3DaF7247A22910AA1;
-    address constant EventEmitter = 0xfA3fA156d39235994Ed8b87DB6e0cBE74c942C41;
     address constant PuppetToken = 0x29e21E47E2a1C4128b789b1b49FEAB91dBD7A80A;
     address constant PuppetVoteToken = 0xFeDA7274a47e142170824A4AbC8CF6A38033A254;
     address constant Router = 0xFd5943807B3A9dB50DB8D0DAf4162E68f7139b2C;

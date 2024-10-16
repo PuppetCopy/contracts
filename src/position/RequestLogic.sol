@@ -5,7 +5,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {CoreContract} from "../utils/CoreContract.sol";
-import {EventEmitter} from "../utils/EventEmitter.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {PuppetStore} from "./../puppet/store/PuppetStore.sol";
 import {Error} from "./../shared/Error.sol";
@@ -51,10 +50,9 @@ contract RequestLogic is CoreContract {
 
     constructor(
         IAuthority _authority,
-        EventEmitter _eventEmitter,
         PuppetStore _puppetStore,
         MirrorPositionStore _positionStore
-    ) CoreContract("RequestLogic", "1", _authority, _eventEmitter) {
+    ) CoreContract("RequestLogic", "1", _authority) {
         puppetStore = _puppetStore;
         positionStore = _positionStore;
     }
@@ -142,7 +140,7 @@ contract RequestLogic is CoreContract {
         positionStore.setRequestAdjustment(requestKey, request);
         request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + params.executionFee;
 
-        logEvent(
+        _logEvent(
             targetLeverage > leverage ? "RequestDecrease" : "RequestIncrease",
             abi.encode(
                 subaccount,
@@ -199,7 +197,7 @@ contract RequestLogic is CoreContract {
             request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + params.executionFee;
             positionStore.setRequestAdjustment(requestKey, request);
 
-            logEvent(
+            _logEvent(
                 "RequestIncrease",
                 abi.encode(
                     subaccount,
@@ -218,14 +216,11 @@ contract RequestLogic is CoreContract {
         }
     }
 
-    // governance
+    // internal
 
-    /// @notice Set the mint rate limit for the token.
-    /// @param _config The new rate limit configuration.
-    function setConfig(
-        Config calldata _config
-    ) external auth {
-        config = _config;
-        logEvent("SetConfig", abi.encode(_config));
+    function _setConfig(
+        bytes calldata data
+    ) internal override {
+        config = abi.decode(data, (Config));
     }
 }

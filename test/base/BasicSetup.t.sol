@@ -10,7 +10,6 @@ import {Dictator} from "src/shared/Dictator.sol";
 import {Router} from "src/shared/Router.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
-import {EventEmitter} from "src/utils/EventEmitter.sol";
 import {IWNT} from "src/utils/interfaces/IWNT.sol";
 
 contract BasicSetup is Test {
@@ -27,7 +26,6 @@ contract BasicSetup is Test {
     IERC20 usdc = IERC20(address(deployMockERC20("USDC", "USDC", 6)));
 
     Dictator dictator;
-    EventEmitter eventEmitter;
     PuppetToken puppetToken;
     Router router;
     PuppetVoteToken vPuppetToken;
@@ -45,17 +43,16 @@ contract BasicSetup is Test {
         vm.startPrank(users.owner);
 
         dictator = new Dictator(users.owner);
-        eventEmitter = new EventEmitter(dictator);
         router = new Router(dictator);
         dictator.setPermission(router, router.setTransferGasLimit.selector, users.owner);
 
-        puppetToken = new PuppetToken(dictator, eventEmitter, users.owner);
-        dictator.setAccess(eventEmitter, address(puppetToken));
-        dictator.setPermission(puppetToken, puppetToken.setConfig.selector, users.owner);
+        puppetToken = new PuppetToken(dictator, users.owner);
+        dictator.initContract(puppetToken, abi.encode(PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours})));
+
         vPuppetToken = new PuppetVoteToken(dictator);
 
         router.setTransferGasLimit(200_000);
-        puppetToken.setConfig(PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}));
+
         skip(1 hours);
     }
 

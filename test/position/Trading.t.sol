@@ -47,10 +47,7 @@ contract TradingTest is BasicSetup {
 
         mockGmxExchangeRouter = new MockGmxExchangeRouter();
 
-        puppetRouter = new PuppetRouter(dictator, eventEmitter);
-        dictator.setPermission(puppetRouter, puppetRouter.setConfig.selector, users.owner);
-        dictator.setAccess(eventEmitter, address(puppetRouter));
-
+        puppetRouter = new PuppetRouter(dictator);
         contributeStore = new ContributeStore(dictator, router);
 
         puppetStore = new PuppetStore(dictator, router);
@@ -58,42 +55,31 @@ contract TradingTest is BasicSetup {
         positionStore = new MirrorPositionStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(positionStore));
 
-        puppetLogic = new PuppetLogic(dictator, eventEmitter, puppetStore);
-        dictator.setPermission(puppetLogic, puppetLogic.setConfig.selector, users.owner);
-        dictator.setAccess(eventEmitter, address(puppetLogic));
+        puppetLogic = new PuppetLogic(dictator, puppetStore);
         dictator.setAccess(puppetStore, address(puppetLogic));
         dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
         dictator.setPermission(puppetLogic, puppetLogic.withdraw.selector, address(puppetRouter));
         dictator.setPermission(puppetLogic, puppetLogic.setMatchRule.selector, address(puppetRouter));
         dictator.setPermission(puppetLogic, puppetLogic.setMatchRuleList.selector, address(puppetRouter));
 
-        positionRouter = new PositionRouter(dictator, eventEmitter, positionStore);
-        dictator.setPermission(positionRouter, positionRouter.setConfig.selector, users.owner);
-        dictator.setAccess(eventEmitter, address(positionRouter));
+        positionRouter = new PositionRouter(dictator, positionStore);
 
-        allocationLogic = new AllocationLogic(dictator, eventEmitter, contributeStore, puppetStore, positionStore);
-        dictator.setPermission(allocationLogic, allocationLogic.setConfig.selector, users.owner);
-        dictator.setAccess(eventEmitter, address(allocationLogic));
+        allocationLogic = new AllocationLogic(dictator, contributeStore, puppetStore, positionStore);
         dictator.setAccess(contributeStore, address(allocationLogic));
         dictator.setAccess(puppetStore, address(allocationLogic));
         dictator.setAccess(puppetStore, address(contributeStore));
         dictator.setPermission(allocationLogic, allocationLogic.allocate.selector, users.owner);
         dictator.setPermission(allocationLogic, allocationLogic.settle.selector, users.owner);
 
-        requestLogic = new RequestLogic(dictator, eventEmitter, puppetStore, positionStore);
-        dictator.setPermission(requestLogic, requestLogic.setConfig.selector, users.owner);
-        dictator.setAccess(eventEmitter, address(requestLogic));
+        requestLogic = new RequestLogic(dictator, puppetStore, positionStore);
         dictator.setAccess(puppetStore, address(requestLogic));
         dictator.setAccess(positionStore, address(requestLogic));
 
-        ExecutionLogic executionLogic = new ExecutionLogic(dictator, eventEmitter, puppetStore, positionStore);
-        dictator.setAccess(eventEmitter, address(executionLogic));
+        ExecutionLogic executionLogic = new ExecutionLogic(dictator, puppetStore, positionStore);
         dictator.setAccess(positionStore, address(executionLogic));
         dictator.setAccess(puppetStore, address(executionLogic));
 
-        UnhandledCallbackLogic unhandledCallbackLogic =
-            new UnhandledCallbackLogic(dictator, eventEmitter, positionStore);
-        dictator.setAccess(eventEmitter, address(unhandledCallbackLogic));
+        UnhandledCallbackLogic unhandledCallbackLogic = new UnhandledCallbackLogic(dictator, positionStore);
 
         // config
         IERC20[] memory tokenAllowanceCapList = new IERC20[](2);
@@ -102,43 +88,55 @@ contract TradingTest is BasicSetup {
         uint[] memory tokenAllowanceCapAmountList = new uint[](2);
         tokenAllowanceCapAmountList[0] = 0.2e18;
         tokenAllowanceCapAmountList[1] = 500e30;
-        puppetLogic.setConfig(
-            PuppetLogic.Config({
-                minExpiryDuration: 1 days,
-                minAllowanceRate: 100, // 10 basis points
-                maxAllowanceRate: 10000,
-                minAllocationActivity: 3600,
-                maxAllocationActivity: 604800,
-                tokenAllowanceList: tokenAllowanceCapList,
-                tokenAllowanceAmountList: tokenAllowanceCapAmountList
-            })
+        dictator.initContract(
+            puppetLogic,
+            abi.encode(
+                PuppetLogic.Config({
+                    minExpiryDuration: 1 days,
+                    minAllowanceRate: 100, // 10 basis points
+                    maxAllowanceRate: 10000,
+                    minAllocationActivity: 3600,
+                    maxAllocationActivity: 604800,
+                    tokenAllowanceList: tokenAllowanceCapList,
+                    tokenAllowanceAmountList: tokenAllowanceCapAmountList
+                })
+            )
         );
-        requestLogic.setConfig(
-            RequestLogic.Config({
-                gmxExchangeRouter: mockGmxExchangeRouter,
-                gmxDatastore: IGmxDatastore(Address.gmxDatastore),
-                callbackHandler: address(positionRouter),
-                gmxFundsReciever: address(positionStore),
-                gmxOrderVault: Address.gmxOrderVault,
-                referralCode: Address.referralCode,
-                callbackGasLimit: 2_000_000
-            })
+        dictator.initContract(
+            requestLogic,
+            abi.encode(
+                RequestLogic.Config({
+                    gmxExchangeRouter: mockGmxExchangeRouter,
+                    gmxDatastore: IGmxDatastore(Address.gmxDatastore),
+                    callbackHandler: address(positionRouter),
+                    gmxFundsReciever: address(positionStore),
+                    gmxOrderVault: Address.gmxOrderVault,
+                    referralCode: Address.referralCode,
+                    callbackGasLimit: 2_000_000
+                })
+            )
         );
-        allocationLogic.setConfig(
-            AllocationLogic.Config({
-                limitAllocationListLength: 100,
-                performanceContributionRate: 0.1e30,
-                traderPerformanceContributionShare: 0
-            })
+        dictator.initContract(
+            allocationLogic,
+            abi.encode(
+                AllocationLogic.Config({
+                    limitAllocationListLength: 100,
+                    performanceContributionRate: 0.1e30,
+                    traderPerformanceContributionShare: 0
+                })
+            )
         );
-        puppetRouter.setConfig(PuppetRouter.Config({logic: puppetLogic}));
-        positionRouter.setConfig(
-            PositionRouter.Config({
-                requestLogic: requestLogic,
-                allocationLogic: allocationLogic,
-                executionLogic: executionLogic,
-                unhandledCallbackLogic: unhandledCallbackLogic
-            })
+        dictator.initContract(puppetRouter, abi.encode(PuppetRouter.Config({logic: puppetLogic})));
+        dictator.initContract(
+            positionRouter,
+            abi.encode(
+                PositionRouter.Config({
+                    requestLogic: requestLogic,
+                    allocationLogic: allocationLogic,
+                    executionLogic: executionLogic,
+                    unhandledCallbackLogic: unhandledCallbackLogic
+                })
+            )
         );
 
         // test setup

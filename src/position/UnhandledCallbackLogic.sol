@@ -2,7 +2,6 @@
 pragma solidity 0.8.27;
 
 import {CoreContract} from "../utils/CoreContract.sol";
-import {EventEmitter} from "../utils/EventEmitter.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 
 import {MirrorPositionStore} from "./store/MirrorPositionStore.sol";
@@ -13,9 +12,8 @@ contract UnhandledCallbackLogic is CoreContract {
 
     constructor(
         IAuthority _authority,
-        EventEmitter _eventEmitter,
         MirrorPositionStore _positionStore
-    ) CoreContract("UnhandledCallbackLogic", "1", _authority, _eventEmitter) {
+    ) CoreContract("UnhandledCallbackLogic", "1", _authority) {
         positionStore = _positionStore;
     }
 
@@ -25,7 +23,7 @@ contract UnhandledCallbackLogic is CoreContract {
         bytes calldata eventData
     ) external auth {
         positionStore.setUnhandledCallback(order, key, eventData);
-        logEvent("StoreUnhandledCallback", abi.encode(key, order, eventData));
+        _logEvent("StoreUnhandledCallback", abi.encode(key, order, eventData));
     }
 
     // function executeUnhandledExecutionCallback(
@@ -43,4 +41,10 @@ contract UnhandledCallbackLogic is CoreContract {
     //         config.executeRevertedAdjustment.handleFrozen(key, callbackData.order);
     //     }
     // }
+
+    function _setConfig(
+        bytes calldata data
+    ) internal override {
+        revert("NOT_IMPLEMENTED");
+    }
 }

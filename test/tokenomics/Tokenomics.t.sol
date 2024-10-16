@@ -38,9 +38,7 @@ contract TokenomicsTest is BasicSetup {
         veStore = new VotingEscrowStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(veStore));
 
-        veLogic = new VotingEscrowLogic(dictator, eventEmitter, veStore, puppetToken, vPuppetToken);
-        dictator.setAccess(eventEmitter, address(veLogic));
-        dictator.setPermission(veLogic, veLogic.setConfig.selector, users.owner);
+        veLogic = new VotingEscrowLogic(dictator, veStore, puppetToken, vPuppetToken);
         dictator.setAccess(veStore, address(veLogic));
         dictator.setPermission(puppetToken, puppetToken.mint.selector, address(veLogic));
         dictator.setPermission(vPuppetToken, vPuppetToken.mint.selector, address(veLogic));
@@ -50,9 +48,7 @@ contract TokenomicsTest is BasicSetup {
         rewardStore = new RewardStore(dictator, router);
         dictator.setAccess(contributeStore, address(rewardStore));
 
-        contributeLogic = new ContributeLogic(dictator, eventEmitter, puppetToken, contributeStore);
-        dictator.setAccess(eventEmitter, address(contributeLogic));
-        dictator.setPermission(contributeLogic, contributeLogic.setConfig.selector, users.owner);
+        contributeLogic = new ContributeLogic(dictator, puppetToken, contributeStore);
         dictator.setPermission(puppetToken, puppetToken.mint.selector, address(contributeLogic));
         dictator.setAccess(contributeStore, address(contributeLogic));
 
@@ -60,14 +56,10 @@ contract TokenomicsTest is BasicSetup {
         dictator.setPermission(router, router.transfer.selector, address(rewardStore));
         dictator.setPermission(router, router.transfer.selector, address(veStore));
 
-        rewardLogic = new RewardLogic(dictator, eventEmitter, puppetToken, vPuppetToken, rewardStore);
-        dictator.setAccess(eventEmitter, address(rewardLogic));
-        dictator.setPermission(rewardLogic, rewardLogic.setConfig.selector, users.owner);
+        rewardLogic = new RewardLogic(dictator, puppetToken, vPuppetToken, rewardStore);
         dictator.setAccess(rewardStore, address(rewardLogic));
 
-        rewardRouter = new RewardRouter(dictator, eventEmitter);
-        dictator.setAccess(eventEmitter, address(rewardRouter));
-        dictator.setPermission(rewardRouter, rewardRouter.setConfig.selector, users.owner);
+        rewardRouter = new RewardRouter(dictator);
 
         dictator.setPermission(contributeLogic, contributeLogic.buyback.selector, address(rewardRouter));
         dictator.setPermission(contributeLogic, contributeLogic.claim.selector, address(rewardRouter));
@@ -92,11 +84,17 @@ contract TokenomicsTest is BasicSetup {
         dictator.setAccess(contributeStore, users.owner);
         dictator.setAccess(contributeStore, address(contributeStore));
 
-        veLogic.setConfig(VotingEscrowLogic.Config({baseMultiplier: 0.1e30}));
-        contributeLogic.setConfig(ContributeLogic.Config({baselineEmissionRate: 0.5e30}));
-        rewardLogic.setConfig(RewardLogic.Config({distributionStore: contributeStore, distributionTimeframe: 1 weeks}));
-        rewardRouter.setConfig(
-            RewardRouter.Config({contributeLogic: contributeLogic, rewardLogic: rewardLogic, veLogic: veLogic})
+        dictator.initContract(veLogic, abi.encode(VotingEscrowLogic.Config({baseMultiplier: 0.1e30})));
+        dictator.initContract(contributeLogic, abi.encode(ContributeLogic.Config({baselineEmissionRate: 0.5e30})));
+        dictator.initContract(
+            rewardLogic,
+            abi.encode(RewardLogic.Config({distributionStore: contributeStore, distributionTimeframe: 1 weeks}))
+        );
+        dictator.initContract(
+            rewardRouter,
+            abi.encode(
+                RewardRouter.Config({contributeLogic: contributeLogic, rewardLogic: rewardLogic, veLogic: veLogic})
+            )
         );
     }
 

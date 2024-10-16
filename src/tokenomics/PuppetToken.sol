@@ -6,7 +6,6 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Error} from "../shared/Error.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
-import {EventEmitter} from "../utils/EventEmitter.sol";
 import {Precision} from "../utils/Precision.sol";
 import {Permission} from "../utils/auth/Permission.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
@@ -21,7 +20,7 @@ import {IERC20Mintable} from "../utils/interfaces/IERC20Mintable.sol";
 /// intended to gradually transfer governance power and incentivises broader ownership.
 contract PuppetToken is CoreContract, ERC20, IERC20Mintable {
     /// @dev Constant representing the divisor for calculating core release duration.
-    uint private constant CORE_RELEASE_DURATION_DIVISOR = 31560000; // 1 year
+    uint private constant CORE_RELEASE_DURATION_DIVISOR = 31_536_000; // 1 year in seconds
 
     /// @dev Constant representing the amount of tokens minted at genesis.
     uint private constant GENESIS_MINT_AMOUNT = 100_000e18;
@@ -55,9 +54,8 @@ contract PuppetToken is CoreContract, ERC20, IERC20Mintable {
     /// @param receiver The address to receive the genesis mint amount.
     constructor(
         IAuthority _authority,
-        EventEmitter _eventEmitter,
         address receiver
-    ) ERC20("Puppet Test", "PUPPET-TEST") CoreContract("PuppetToken", "1", _authority, _eventEmitter) {
+    ) ERC20("Puppet Test", "PUPPET-TEST") CoreContract("PuppetToken", "1", _authority) {
         _mint(receiver, GENESIS_MINT_AMOUNT);
     }
 
@@ -104,7 +102,7 @@ contract PuppetToken is CoreContract, ERC20, IERC20Mintable {
         lastMintTime = block.timestamp;
         _mint(_receiver, _amount);
 
-        logEvent("Mint", abi.encode(msg.sender, _receiver, _allowance, _nextEmissionRate, _amount));
+        _logEvent("Mint", abi.encode(msg.sender, _receiver, _allowance, _nextEmissionRate, _amount));
     }
 
     /// @notice Mints new tokens to the core with a time-based reduction release schedule.
@@ -118,22 +116,21 @@ contract PuppetToken is CoreContract, ERC20, IERC20Mintable {
         mintedCoreAmount += _mintableAmount;
         _mint(_receiver, _mintableAmount);
 
-        logEvent("MintCore", abi.encode(msg.sender, _receiver, mintedCoreAmount));
+        _logEvent("MintCore", abi.encode(msg.sender, _receiver, mintedCoreAmount));
 
         return _mintableAmount;
     }
 
     // governance
 
-    /// @notice Set the mint rate limit for the token.
-    /// @param _config The new rate limit configuration.
-    function setConfig(
-        Config calldata _config
-    ) external auth {
-        if (_config.limitFactor == 0) revert Error.PuppetToken__InvalidRate();
+    function _setConfig(
+        bytes calldata data
+    ) internal override {
+        Config memory _config = abi.decode(data, (Config));
+
+        require(_config.limitFactor > 0 && _config.limitFactor <= 1e30, "Invalid limit factor");
+        require(_config.durationWindow > 0, "Invalid duration window");
 
         config = _config;
-
-        logEvent("SetConfig", abi.encode(_config));
     }
 }

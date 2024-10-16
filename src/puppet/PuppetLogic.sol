@@ -6,7 +6,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {PositionUtils} from "../position/utils/PositionUtils.sol";
 import {Error} from "../shared/Error.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
-import {EventEmitter} from "../utils/EventEmitter.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {PuppetStore} from "./store/PuppetStore.sol";
 
@@ -25,11 +24,7 @@ contract PuppetLogic is CoreContract {
 
     PuppetStore immutable store;
 
-    constructor(
-        IAuthority _authority,
-        EventEmitter _eventEmitter,
-        PuppetStore _store
-    ) CoreContract("PuppetLogic", "1", _authority, _eventEmitter) {
+    constructor(IAuthority _authority, PuppetStore _store) CoreContract("PuppetLogic", "1", _authority) {
         store = _store;
     }
 
@@ -44,7 +39,7 @@ contract PuppetLogic is CoreContract {
         store.transferIn(collateralToken, user, amount);
         store.setBalance(collateralToken, user, nextBalance);
 
-        logEvent("Deposit", abi.encode(collateralToken, user, nextBalance, amount));
+        _logEvent("Deposit", abi.encode(collateralToken, user, nextBalance, amount));
     }
 
     function withdraw(IERC20 collateralToken, address user, address receiver, uint amount) external auth {
@@ -57,7 +52,7 @@ contract PuppetLogic is CoreContract {
         store.setBalance(collateralToken, user, nextBalance);
         store.transferOut(collateralToken, receiver, amount);
 
-        logEvent("Withdraw", abi.encode(collateralToken, user, nextBalance, amount));
+        _logEvent("Withdraw", abi.encode(collateralToken, user, nextBalance, amount));
     }
 
     function setMatchRule(
@@ -71,7 +66,7 @@ contract PuppetLogic is CoreContract {
 
         store.setMatchRule(key, puppet, ruleParams);
 
-        logEvent("SetMatchRule", abi.encode(puppet, trader, key, ruleParams));
+        _logEvent("SetMatchRule", abi.encode(puppet, trader, key, ruleParams));
     }
 
     function setMatchRuleList(
@@ -96,7 +91,7 @@ contract PuppetLogic is CoreContract {
 
         store.setMatchRuleList(puppet, matchKeyList, ruleParamList);
 
-        logEvent("SetMatchRuleList", abi.encode(puppet, traderList, matchKeyList, ruleParamList));
+        _logEvent("SetMatchRuleList", abi.encode(puppet, traderList, matchKeyList, ruleParamList));
     }
 
     // internal
@@ -133,21 +128,19 @@ contract PuppetLogic is CoreContract {
     }
 
     // governance
+    /// @notice  Sets the configuration parameters for the PuppetLogic contract.
+    /// @dev Emits a SetConfig event upon successful execution
+    function _setConfig(
+        bytes calldata data
+    ) internal override {
+        config = abi.decode(data, (Config));
 
-    /// @notice Set the mint rate limit for the token.
-    /// @param _config The new rate limit configuration.
-    function setConfig(
-        Config calldata _config
-    ) external auth {
-        if (_config.tokenAllowanceList.length != _config.tokenAllowanceAmountList.length) {
+        if (config.tokenAllowanceList.length != config.tokenAllowanceAmountList.length) {
             revert Error.PuppetLogic__InvalidLength();
         }
 
-        for (uint i; i < _config.tokenAllowanceList.length; i++) {
-            store.setTokenAllowanceCap(_config.tokenAllowanceList[i], _config.tokenAllowanceAmountList[i]);
+        for (uint i; i < config.tokenAllowanceList.length; i++) {
+            store.setTokenAllowanceCap(config.tokenAllowanceList[i], config.tokenAllowanceAmountList[i]);
         }
-
-        config = _config;
-        logEvent("SetConfig", abi.encode(_config));
     }
 }

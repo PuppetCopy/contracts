@@ -12,7 +12,6 @@ import {MirrorPositionStore} from "./position/store/MirrorPositionStore.sol";
 import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
 import {Error} from "./shared/Error.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
-import {EventEmitter} from "./utils/EventEmitter.sol";
 import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
@@ -30,9 +29,8 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
 
     constructor(
         IAuthority _authority,
-        EventEmitter _eventEmitter,
         MirrorPositionStore _positionStore
-    ) CoreContract("PositionRouter", "1", _authority, _eventEmitter) {
+    ) CoreContract("PositionRouter", "1", _authority) {
         positionStore = _positionStore;
     }
 
@@ -88,14 +86,9 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         config.allocationLogic.settle(key, puppetList);
     }
 
-    // governance
-
-    /// @notice Set the mint rate limit for the token.
-    /// @param _config The new rate limit configuration.
-    function setConfig(
-        Config calldata _config
-    ) external auth {
-        config = _config;
-        logEvent("SetConfig", abi.encode(_config));
+    function _setConfig(
+        bytes calldata data
+    ) internal override {
+        config = abi.decode(data, (Config));
     }
 }

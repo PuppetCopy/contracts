@@ -30,7 +30,7 @@ abstract contract Access is IAccess {
         }
     }
 
-    modifier checkAuthority() {
+    modifier onlyAuthority() {
         if (msg.sender == address(authority)) {
             _;
         } else {
@@ -38,15 +38,7 @@ abstract contract Access is IAccess {
         }
     }
 
-    function set(
-        address user
-    ) external checkAuthority {
-        authMap[user] = true;
-    }
-
-    function remove(
-        address user
-    ) external checkAuthority {
-        authMap[user] = false;
+    function setAccess(address user, bool isEnabled) external onlyAuthority {
+        authMap[user] = isEnabled;
     }
 }

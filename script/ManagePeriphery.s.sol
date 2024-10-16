@@ -10,7 +10,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {Dictator} from "src/shared/Dictator.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
-import {EventEmitter} from "src/utils/EventEmitter.sol";
 import {IWNT} from "src/utils/interfaces/IWNT.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
@@ -20,7 +19,6 @@ contract ManagePeriphery is BaseScript {
     IWNT wnt;
     Dictator dictator = Dictator(Address.Dictator);
     PuppetToken puppetToken = PuppetToken(Address.PuppetToken);
-    EventEmitter eventEmitter = EventEmitter(Address.EventEmitter);
     IERC20 weth = IERC20(Address.wnt);
 
     IVault vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);

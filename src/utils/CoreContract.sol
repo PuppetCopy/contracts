@@ -3,28 +3,35 @@ pragma solidity 0.8.27;
 
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-import {EventEmitter} from "./EventEmitter.sol";
+import {Error} from "../shared/Error.sol";
 import {Permission} from "./auth/Permission.sol";
 import {IAuthority} from "./interfaces/IAuthority.sol";
 
 abstract contract CoreContract is Permission, EIP712 {
-    EventEmitter eventEmitter;
-
     string private name;
     string private version;
 
     constructor(
         string memory _name,
         string memory _version,
-        IAuthority _authority,
-        EventEmitter _eventEmitter
-    ) EIP712(_name, _version) Permission(_authority) {
-        eventEmitter = _eventEmitter;
+        IAuthority _authority
+    ) Permission(_authority) EIP712(_name, _version) {
         name = _name;
         version = _version;
     }
 
-    function logEvent(string memory eventName, bytes memory data) internal {
-        eventEmitter.logEvent(name, version, eventName, data);
+    function setConfig(
+        bytes calldata data
+    ) external onlyAuthority {
+        _setConfig(data);
+        _logEvent("SetConfig", data);
     }
+
+    function _logEvent(string memory method, bytes memory data) internal {
+        authority.logEvent(method, name, version, data);
+    }
+
+    function _setConfig(
+        bytes calldata data
+    ) internal virtual;
 }

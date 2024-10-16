@@ -109,7 +109,7 @@ contract PuppetStore is BankStore {
         return requestId += 1;
     }
 
-    function getUserAllocation(address _puppet, bytes32 _key) external view returns (uint) {
+    function getUserAllocation(bytes32 _key, address _puppet) external view returns (uint) {
         return userAllocationMap[_key][_puppet];
     }
 
@@ -131,16 +131,22 @@ contract PuppetStore is BankStore {
         return _allocationList;
     }
 
-    function allocate(IERC20 _token, bytes32 _matchKey, address _puppet, uint _allocationAmount) external auth {
-        if (userAllocationMap[_matchKey][_puppet] > 0) {
+    function allocate(
+        IERC20 _token,
+        bytes32 _matchKey,
+        bytes32 _allocationKey,
+        address _puppet,
+        uint _allocationAmount
+    ) external auth {
+        if (userAllocationMap[_allocationKey][_puppet] > 0) {
             revert Error.PuppetStore__OverwriteAllocation();
         }
 
         if (_allocationAmount == 0) return;
 
         userBalanceMap[_token][_puppet] -= _allocationAmount;
-        userAllocationMap[_matchKey][_puppet] = _allocationAmount;
-        allocationMap[_matchKey].allocated += _allocationAmount;
+        userAllocationMap[_allocationKey][_puppet] = _allocationAmount;
+        allocationMap[_allocationKey].allocated += _allocationAmount;
         activityThrottleMap[_matchKey][_puppet] = block.timestamp + matchRuleMap[_matchKey][_puppet].throttleActivity;
     }
 
@@ -201,9 +207,11 @@ contract PuppetStore is BankStore {
 
     function setMatchRule(bytes32 _key, address _puppet, MatchRule calldata _rule) external auth {
         matchRuleMap[_key][_puppet] = _rule;
-
         // pre-store to save gas during inital allocation or-and reset throttle activity
-        activityThrottleMap[_key][_puppet] = 1;
+
+        if (activityThrottleMap[_key][_puppet] == 0) {
+            activityThrottleMap[_key][_puppet] = 1;
+        }
     }
 
     function setMatchRuleList(
@@ -214,10 +222,13 @@ contract PuppetStore is BankStore {
         uint _keyListLength = _matchKeyList.length;
         if (_keyListLength != _rules.length) revert Error.Store__InvalidLength();
 
-        mapping(address => MatchRule) storage matchRule = matchRuleMap[_matchKeyList[0]];
-
         for (uint i = 0; i < _keyListLength; i++) {
-            matchRule[_puppet] = _rules[i];
+            bytes32 _key = _matchKeyList[i];
+            matchRuleMap[_key][_puppet] = _rules[i];
+            // pre-store to save gas during inital allocation or-and reset throttle activity
+            if (activityThrottleMap[_key][_puppet] == 0) {
+                activityThrottleMap[_key][_puppet] = 1;
+            }
         }
     }
 

@@ -5,9 +5,9 @@
   out = 'forge-artifacts'
   cache_path  = 'forge-cache'
   libs = ['node_modules']
-  allow_paths = []
   test = 'test'
   fs_permissions = [
+    { access = "read", path = "./deployments" },
     { access = "read", path = "./out-dev" },
     { access = "read", path = "package.json" },
     { access = "read-write", path = "./benchmark/results" },
