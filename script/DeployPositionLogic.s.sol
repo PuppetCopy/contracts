@@ -45,8 +45,8 @@ contract DeployPositionLogic is BaseScript {
         dictator.setPermission(router, router.transfer.selector, address(positionStore));
         PositionRouter positionRouter = new PositionRouter(dictator, positionStore);
 
-        // MirrorPositionStore positionStore = MirrorPositionStore(Address.MirrorPositionStore);
-        // PositionRouter positionRouter = PositionRouter(Address.PositionRouter);
+        // MirrorPositionStore positionStore = MirrorPositionStore(getContractAddress("MirrorPositionStore"));
+        // PositionRouter positionRouter = PositionRouter(getContractAddress("PositionRouter"));
 
         RequestLogic requestLogic = new RequestLogic(dictator, puppetStore, positionStore);
         dictator.setAccess(puppetStore, address(requestLogic));

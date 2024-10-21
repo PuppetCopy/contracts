@@ -63,10 +63,9 @@ contract PuppetLogic is CoreContract {
     ) external auth {
         bytes32 key = PositionUtils.getMatchKey(collateralToken, trader);
         _validateRuleParams(ruleParams);
-
         store.setMatchRule(key, puppet, ruleParams);
 
-        _logEvent("SetMatchRule", abi.encode(puppet, trader, key, ruleParams));
+        _logEvent("SetMatchRule", abi.encode(collateralToken, puppet, trader, key, ruleParams));
     }
 
     function setMatchRuleList(
@@ -91,7 +90,7 @@ contract PuppetLogic is CoreContract {
 
         store.setMatchRuleList(puppet, matchKeyList, ruleParamList);
 
-        _logEvent("SetMatchRuleList", abi.encode(puppet, traderList, matchKeyList, ruleParamList));
+        _logEvent("SetMatchRuleList", abi.encode(collateralTokenList, puppet, traderList, matchKeyList, ruleParamList));
     }
 
     // internal

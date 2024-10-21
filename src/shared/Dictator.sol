@@ -26,7 +26,8 @@ contract Dictator is Ownable, IAuthority {
     event UpdateAccess(address target, bool enabled);
     event UpdatePermission(address target, bytes4 functionSig, bool enabled);
     event SetConfig(address target, bytes config);
-    event LogEvent(address operator, string name, string version, string method, bytes data);
+    event LogEvent(address operator, string method, string name, string version, bytes data);
+    event AddContractAccess(address target);
     event RemoveContractAccess(address target);
 
     mapping(address => bool) public contractAccessMap;
@@ -78,6 +79,8 @@ contract Dictator is Ownable, IAuthority {
 
         if (contractAccessMap[targetAddress]) revert Error.Dictator__ContractAlreadyInitialized();
         contractAccessMap[targetAddress] = true;
+
+        emit AddContractAccess(targetAddress);
 
         setConfig(target, config);
     }
