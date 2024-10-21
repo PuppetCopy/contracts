@@ -40,7 +40,7 @@ if (!config.RPC_URL) {
 	throw new Error("RPC_URL is required");
 }
 
-const scriptName = `DeployPuppetToken`;
+const scriptName = `DeployPuppetLogic`;
 const scriptFile = `${scriptName}.s.sol`;
 
 await $`forge script script/${scriptFile}:${scriptName} --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL`;

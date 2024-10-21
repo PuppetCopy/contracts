@@ -23,20 +23,20 @@ contract DeployPuppetLogic is BaseScript {
         Dictator dictator = Dictator(getContractAddress("Dictator"));
         Router router = Router(getContractAddress("Router"));
 
-        // PuppetStore puppetStore = new PuppetStore(dictator, router);
-        // dictator.setPermission(router, router.transfer.selector, address(puppetStore));
-        // PuppetRouter puppetRouter = new PuppetRouter(dictator);
+        PuppetStore puppetStore = new PuppetStore(dictator, router);
+        dictator.setPermission(router, router.transfer.selector, address(puppetStore));
+        PuppetRouter puppetRouter = new PuppetRouter(dictator);
+        PuppetLogic puppetLogic = new PuppetLogic(dictator, puppetStore);
+
+        dictator.setAccess(puppetStore, address(puppetLogic));
+        dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.withdraw.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.setMatchRule.selector, address(puppetRouter));
+        dictator.setPermission(puppetLogic, puppetLogic.setMatchRuleList.selector, address(puppetRouter));
 
         // PuppetStore puppetStore = PuppetStore(getContractAddress("PuppetStore"));
         // PuppetRouter puppetRouter = PuppetRouter(getContractAddress("PuppetRouter"));
-
-        // PuppetLogic puppetLogic = new PuppetLogic(dictator, puppetStore);
-        PuppetLogic puppetLogic = PuppetLogic(getContractAddress("PuppetLogic"));
-        // dictator.setAccess(puppetStore, address(puppetLogic));
-        // dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
-        // dictator.setPermission(puppetLogic, puppetLogic.withdraw.selector, address(puppetRouter));
-        // dictator.setPermission(puppetLogic, puppetLogic.setMatchRule.selector, address(puppetRouter));
-        // dictator.setPermission(puppetLogic, puppetLogic.setMatchRuleList.selector, address(puppetRouter));
+        // PuppetLogic puppetLogic = PuppetLogic(getContractAddress("PuppetLogic"));
 
         // config
         IERC20[] memory tokenAllowanceCapList = new IERC20[](2);
@@ -59,6 +59,6 @@ contract DeployPuppetLogic is BaseScript {
                 })
             )
         );
-        // dictator.initContract(puppetRouter, abi.encode(PuppetRouter.Config({logic: puppetLogic})));
+        dictator.initContract(puppetRouter, abi.encode(PuppetRouter.Config({logic: puppetLogic})));
     }
 }
