@@ -20,8 +20,8 @@ contract DeployPuppetLogic is BaseScript {
     }
 
     function deployContracts() internal {
-        Dictator dictator = Dictator(getContractAddress("Dictator"));
-        Router router = Router(getContractAddress("Router"));
+        Dictator dictator = Dictator(getDeployedAddress("Dictator"));
+        Router router = Router(getDeployedAddress("Router"));
 
         PuppetStore puppetStore = new PuppetStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(puppetStore));

@@ -12,7 +12,7 @@ import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
 import {Access} from "./utils/auth/Access.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
-contract RewardRouter is CoreContract, ReentrancyGuardTransient, Multicall {
+contract TokenomicsRouter is CoreContract, ReentrancyGuardTransient, Multicall {
     struct Config {
         RewardLogic rewardLogic;
         VotingEscrowLogic veLogic;
@@ -23,7 +23,7 @@ contract RewardRouter is CoreContract, ReentrancyGuardTransient, Multicall {
 
     constructor(
         IAuthority _authority
-    ) CoreContract("RewardRouter", "1", _authority) {}
+    ) CoreContract("TokenomicsRouter", "1", _authority) {}
 
     /// @notice Executes the buyback of revenue tokens using the protocol's accumulated fees.
     /// @param token The address of the revenue token to be bought back.

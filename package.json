@@ -10,8 +10,7 @@
     "test:dev:fork": "FOUNDRY_PROFILE=dev forge test --chain arbitrum --match-contract TradingTest -vvvvv --fork-block-number 192315592 --fork-url=$ARBITRUM_RPC_URL",
     "build": "forge build --sizes",
     "build:dev": "FOUNDRY_PROFILE=dev forge build --sizes",
-    "deploy": "bun deploy.ts",
-    "script": "forge script script/DeployPuppetLogic.s.sol:DeployPuppetLogic -vvvv",
+    "deploy": "CHAIN=42161 SCRIPT='DeployTokenomics' bun deploy.ts",
     "docgen": "forge doc --out '.docgen' --build",
     "gas-report": "forge test --gas-report",
     "lint": "bun run lint:sol",
@@ -27,5 +26,5 @@
     "forge-std": "github:foundry-rs/forge-std#v1.9.3",
     "solhint": "5.0.3"
   },
-  "packageManager": "bun@1.1.22"
+  "packageManager": "bun@1.1.32"
 }

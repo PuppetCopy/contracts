@@ -170,24 +170,24 @@ contract TradingTest is BasicSetup {
         bytes32 allocationKey =
             allocationLogic.allocate(usdc, mockSourceRequestKey, PositionUtils.getMatchKey(usdc, trader), puppetList);
 
-        allocationLogic.settle(allocationKey, puppetList);
+        // allocationLogic.settle(allocationKey, puppetList);
 
-        // positionRouter.mirror{value: executionFee}(
-        //     RequestLogic.MirrorPositionParams({
-        //         trader: trader,
-        //         allocationKey: allocationKey,
-        //         sourceRequestKey: mockSourceRequestKey,
-        //         market: Address.gmxEthUsdcMarket,
-        //         collateralToken: usdc,
-        //         isIncrease: true,
-        //         isLong: true,
-        //         executionFee: executionFee,
-        //         collateralDelta: 1e18,
-        //         sizeDeltaInUsd: 30e30,
-        //         acceptablePrice: 1000e12,
-        //         triggerPrice: 1000e12
-        //     })
-        // );
+        positionRouter.mirror{value: executionFee}(
+            RequestLogic.MirrorPositionParams({
+                trader: trader,
+                allocationKey: allocationKey,
+                sourceRequestKey: mockSourceRequestKey,
+                market: Address.gmxEthUsdcMarket,
+                collateralToken: usdc,
+                isIncrease: true,
+                isLong: true,
+                executionFee: executionFee,
+                collateralDelta: 1e18,
+                sizeDeltaInUsd: 30e30,
+                acceptablePrice: 1000e12,
+                triggerPrice: 1000e12
+            })
+        );
     }
 
     function getGeneratePuppetList(

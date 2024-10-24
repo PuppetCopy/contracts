@@ -17,20 +17,20 @@ contract DeployPuppetToken is BaseScript {
     }
 
     function deployContracts() internal {
-        // Dictator dictator = new Dictator(Address.dao);
-        Dictator dictator = Dictator(getContractAddress("Dictator"));
+        Dictator dictator = new Dictator(Address.dao);
+        // Dictator dictator = Dictator(getDeployedAddress("Dictator"));
 
-        // PuppetToken puppetToken = new PuppetToken(dictator, Address.dao);
-        // PuppetToken puppetToken = PuppetToken(getContractAddress("PuppetToken"));
+        PuppetToken puppetToken = new PuppetToken(dictator, Address.dao);
+        // PuppetToken puppetToken = PuppetToken(getDeployedAddress("PuppetToken"));
 
         new PuppetVoteToken(dictator);
-        // Router router = new Router(dictator);
-        // dictator.setPermission(router, router.setTransferGasLimit.selector, Address.dao);
+        Router router = new Router(dictator);
+        dictator.setPermission(router, router.setTransferGasLimit.selector, Address.dao);
 
-        // // Config
-        // router.setTransferGasLimit(200_000);
-        // dictator.initContract(
-        //     puppetToken, abi.encode(PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}))
-        // );
+        // Config
+        router.setTransferGasLimit(200_000);
+        dictator.initContract(
+            puppetToken, abi.encode(PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}))
+        );
     }
 }

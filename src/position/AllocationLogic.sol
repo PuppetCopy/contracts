@@ -98,6 +98,7 @@ contract AllocationLogic is CoreContract {
                 allocationKey,
                 puppetListHash,
                 puppetList,
+                activityThrottleList,
                 balanceToAllocationList,
                 allocation.allocated,
                 transactionCost

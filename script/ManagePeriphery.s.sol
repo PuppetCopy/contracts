@@ -17,8 +17,8 @@ import {Address} from "script/Const.sol";
 
 contract ManagePeriphery is BaseScript {
     IWNT wnt;
-    Dictator dictator = Dictator(Address.Dictator);
-    PuppetToken puppetToken = PuppetToken(Address.PuppetToken);
+    Dictator dictator = Dictator(getDeployedAddress("Dictator"));
+    PuppetToken puppetToken = PuppetToken(getDeployedAddress("PuppetToken"));
     IERC20 weth = IERC20(Address.wnt);
 
     IVault vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
@@ -34,7 +34,7 @@ contract ManagePeriphery is BaseScript {
     function initPool() public {
         IERC20[] memory tokens = new IERC20[](2);
         tokens[0] = IERC20(Address.wnt);
-        tokens[1] = IERC20(Address.PuppetToken);
+        tokens[1] = puppetToken;
 
         uint[] memory normalizedWeights = new uint[](2);
         normalizedWeights[0] = 0.2e18;

@@ -4,7 +4,7 @@ pragma solidity 0.8.27;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {RewardRouter} from "src/RewardRouter.sol";
+import {TokenomicsRouter} from "src/TokenomicsRouter.sol";
 import {ContributeLogic} from "src/tokenomics/ContributeLogic.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
@@ -23,7 +23,7 @@ contract TokenomicsTest is BasicSetup {
     RewardLogic rewardLogic;
     ContributeLogic contributeLogic;
     VotingEscrowStore veStore;
-    RewardRouter rewardRouter;
+    TokenomicsRouter tokenomicsRouter;
 
     IERC20[] claimableTokenList = new IERC20[](2);
 
@@ -59,16 +59,16 @@ contract TokenomicsTest is BasicSetup {
         rewardLogic = new RewardLogic(dictator, puppetToken, vPuppetToken, rewardStore);
         dictator.setAccess(rewardStore, address(rewardLogic));
 
-        rewardRouter = new RewardRouter(dictator);
+        tokenomicsRouter = new TokenomicsRouter(dictator);
 
-        dictator.setPermission(contributeLogic, contributeLogic.buyback.selector, address(rewardRouter));
-        dictator.setPermission(contributeLogic, contributeLogic.claim.selector, address(rewardRouter));
-        dictator.setPermission(rewardLogic, rewardLogic.claim.selector, address(rewardRouter));
-        dictator.setPermission(rewardLogic, rewardLogic.userDistribute.selector, address(rewardRouter));
-        dictator.setPermission(rewardLogic, rewardLogic.distribute.selector, address(rewardRouter));
-        dictator.setPermission(veLogic, veLogic.lock.selector, address(rewardRouter));
-        dictator.setPermission(veLogic, veLogic.vest.selector, address(rewardRouter));
-        dictator.setPermission(veLogic, veLogic.claim.selector, address(rewardRouter));
+        dictator.setPermission(contributeLogic, contributeLogic.buyback.selector, address(tokenomicsRouter));
+        dictator.setPermission(contributeLogic, contributeLogic.claim.selector, address(tokenomicsRouter));
+        dictator.setPermission(rewardLogic, rewardLogic.claim.selector, address(tokenomicsRouter));
+        dictator.setPermission(rewardLogic, rewardLogic.userDistribute.selector, address(tokenomicsRouter));
+        dictator.setPermission(rewardLogic, rewardLogic.distribute.selector, address(tokenomicsRouter));
+        dictator.setPermission(veLogic, veLogic.lock.selector, address(tokenomicsRouter));
+        dictator.setPermission(veLogic, veLogic.vest.selector, address(tokenomicsRouter));
+        dictator.setPermission(veLogic, veLogic.claim.selector, address(tokenomicsRouter));
 
         // store settings setup
         dictator.setPermission(contributeLogic, contributeLogic.setBuybackQuote.selector, address(users.owner));
@@ -91,9 +91,9 @@ contract TokenomicsTest is BasicSetup {
             abi.encode(RewardLogic.Config({distributionStore: contributeStore, distributionTimeframe: 1 weeks}))
         );
         dictator.initContract(
-            rewardRouter,
+            tokenomicsRouter,
             abi.encode(
-                RewardRouter.Config({contributeLogic: contributeLogic, rewardLogic: rewardLogic, veLogic: veLogic})
+                TokenomicsRouter.Config({contributeLogic: contributeLogic, rewardLogic: rewardLogic, veLogic: veLogic})
             )
         );
     }
@@ -102,14 +102,14 @@ contract TokenomicsTest is BasicSetup {
         contribute(usdc, users.alice, 100e6);
         buyback(usdc, 100e6);
         vm.startPrank(users.alice);
-        uint claimedAmount = rewardRouter.claimContribution(claimableTokenList, users.alice, 100e18);
+        uint claimedAmount = tokenomicsRouter.claimContribution(claimableTokenList, users.alice, 100e18);
 
         uint contributionAmount = contributeStore.getBuybackQuote(usdc);
 
         skip(1000);
 
         puppetToken.approve(address(router), type(uint).max - 1);
-        rewardRouter.lock(claimedAmount, MAXTIME);
+        tokenomicsRouter.lock(claimedAmount, MAXTIME);
 
         (uint distributionTimeframe,) = rewardLogic.config();
         skip(distributionTimeframe / 2);
@@ -133,10 +133,10 @@ contract TokenomicsTest is BasicSetup {
         _dealERC20(address(puppetToken), users.alice, quote);
         puppetToken.approve(address(router), type(uint).max - 1);
         vm.expectRevert();
-        rewardRouter.buyback(usdc, users.alice, contributionAmount + 1);
-        rewardRouter.buyback(usdc, users.alice, contributionAmount);
+        tokenomicsRouter.buyback(usdc, users.alice, contributionAmount + 1);
+        tokenomicsRouter.buyback(usdc, users.alice, contributionAmount);
         vm.expectRevert();
-        rewardRouter.buyback(usdc, users.alice, contributionAmount);
+        tokenomicsRouter.buyback(usdc, users.alice, contributionAmount);
 
         assertEq(
             usdc.balanceOf(users.alice),
@@ -152,7 +152,7 @@ contract TokenomicsTest is BasicSetup {
 
         vm.startPrank(users.alice);
         _dealERC20(address(puppetToken), users.alice, quote);
-        rewardRouter.buyback(usdc, users.alice, contributionAmount);
+        tokenomicsRouter.buyback(usdc, users.alice, contributionAmount);
 
         // rewardRouter.updateCursor(usdc, users.yossi);
 
@@ -162,7 +162,7 @@ contract TokenomicsTest is BasicSetup {
         contribute(usdc, address(0), 123e6);
         vm.startPrank(users.alice);
         _dealERC20(address(puppetToken), users.alice, quote);
-        rewardRouter.buyback(usdc, users.alice, 50e6);
+        tokenomicsRouter.buyback(usdc, users.alice, 50e6);
 
         // possible case where contribution is lower in market value than the buyback amount
         // this would result in premium value rewards for the contributors
@@ -172,7 +172,7 @@ contract TokenomicsTest is BasicSetup {
 
         vm.startPrank(users.alice);
         _dealERC20(address(puppetToken), users.alice, quote);
-        rewardRouter.buyback(usdc, users.alice, 50e6);
+        tokenomicsRouter.buyback(usdc, users.alice, 50e6);
 
         assertEq(contributeLogic.getClaimable(claimableTokenList, users.yossi), 100e18);
     }
@@ -273,7 +273,7 @@ contract TokenomicsTest is BasicSetup {
     function buyback(IERC20 token, uint contribution) public {
         uint quote = contributeStore.getBuybackQuote(token);
         _dealERC20(address(token), users.owner, quote);
-        rewardRouter.buyback(token, users.owner, contribution);
+        tokenomicsRouter.buyback(token, users.owner, contribution);
     }
 
     function contribute(IERC20 token, address user, uint amount) public {
@@ -291,10 +291,10 @@ contract TokenomicsTest is BasicSetup {
 
         vm.startPrank(user);
 
-        uint amount = rewardRouter.claimContribution(claimableTokenList, user, contributionQuote);
+        uint amount = tokenomicsRouter.claimContribution(claimableTokenList, user, contributionQuote);
 
         puppetToken.approve(address(router), type(uint).max - 1);
-        rewardRouter.lock(amount, lockDuration);
+        tokenomicsRouter.lock(amount, lockDuration);
 
         return amount;
     }
@@ -303,7 +303,7 @@ contract TokenomicsTest is BasicSetup {
         vm.startPrank(user);
 
         uint claimable = rewardLogic.getClaimable(user);
-        rewardRouter.claimEmission(user, amount);
+        tokenomicsRouter.claimEmission(user, amount);
         uint deltaBalance = claimable - rewardLogic.getClaimable(user);
 
         assertEq(deltaBalance, amount, "Claimed amount should be equal to the expected amount");

@@ -28,7 +28,7 @@ import {BaseScript} from "./BaseScript.s.sol";
 import {Address} from "./Const.sol";
 
 contract DeployPositionLogic is BaseScript {
-    Dictator dictator = Dictator(Address.Dictator);
+    Dictator dictator = Dictator(getDeployedAddress("Dictator"));
 
     function run() public {
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
@@ -37,9 +37,9 @@ contract DeployPositionLogic is BaseScript {
     }
 
     function deployContracts() internal {
-        Router router = Router(Address.Router);
-        PuppetStore puppetStore = PuppetStore(Address.PuppetStore);
-        ContributeStore contributeStore = ContributeStore(Address.ContributeStore);
+        Router router = Router(getDeployedAddress("Router"));
+        PuppetStore puppetStore = PuppetStore(getDeployedAddress("PuppetStore"));
+        ContributeStore contributeStore = ContributeStore(getDeployedAddress("ContributeStore"));
 
         MirrorPositionStore positionStore = new MirrorPositionStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(positionStore));
@@ -68,7 +68,7 @@ contract DeployPositionLogic is BaseScript {
             allocationLogic,
             abi.encode(
                 AllocationLogic.Config({
-                    limitAllocationListLength: 100,
+                    limitAllocationListLength: 50,
                     performanceContributionRate: 0.1e30,
                     traderPerformanceContributionShare: 0
                 })
@@ -80,8 +80,8 @@ contract DeployPositionLogic is BaseScript {
                 RequestLogic.Config({
                     gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
                     gmxDatastore: IGmxDatastore(Address.gmxDatastore),
-                    callbackHandler: Address.PositionRouter,
-                    gmxFundsReciever: Address.PuppetStore,
+                    callbackHandler: getDeployedAddress("PositionRouter"),
+                    gmxFundsReciever: getDeployedAddress("PuppetStore"),
                     gmxOrderVault: Address.gmxOrderVault,
                     referralCode: Address.referralCode,
                     callbackGasLimit: 2_000_000
