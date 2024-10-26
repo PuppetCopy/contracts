@@ -32,8 +32,8 @@ contract DeployTokenomics is BaseScript {
     }
 
     function deployContracts() internal {
-        VotingEscrowStore veStore = new VotingEscrowStore(dictator, router);
         ContributeStore contributeStore = new ContributeStore(dictator, router);
+        VotingEscrowStore veStore = new VotingEscrowStore(dictator, router);
         RewardStore rewardStore = new RewardStore(dictator, router);
         dictator.setAccess(contributeStore, address(rewardStore));
         dictator.setPermission(router, router.transfer.selector, address(contributeStore));

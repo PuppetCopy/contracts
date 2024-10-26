@@ -15,7 +15,7 @@ import {UnhandledCallbackLogic} from "src/position/UnhandledCallbackLogic.sol";
 import {IGmxDatastore} from "src/position/interface/IGmxDatastore.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxOracle} from "src/position/interface/IGmxOracle.sol";
-import {MirrorPositionStore} from "src/position/store/MirrorPositionStore.sol";
+import {PositionStore} from "src/position/store/PositionStore.sol";
 import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {PuppetLogic} from "src/puppet/PuppetLogic.sol";
@@ -30,7 +30,7 @@ import {MockGmxExchangeRouter} from "../mock/MockGmxExchangeRouter.sol";
 contract TradingTest is BasicSetup {
     PuppetStore puppetStore;
     PuppetLogic puppetLogic;
-    MirrorPositionStore positionStore;
+    PositionStore positionStore;
     ContributeStore contributeStore;
     PuppetRouter puppetRouter;
     PositionRouter positionRouter;
@@ -52,7 +52,7 @@ contract TradingTest is BasicSetup {
 
         puppetStore = new PuppetStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(puppetStore));
-        positionStore = new MirrorPositionStore(dictator, router);
+        positionStore = new PositionStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(positionStore));
 
         puppetLogic = new PuppetLogic(dictator, puppetStore);

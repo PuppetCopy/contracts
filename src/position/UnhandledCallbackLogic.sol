@@ -4,15 +4,15 @@ pragma solidity 0.8.27;
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 
-import {MirrorPositionStore} from "./store/MirrorPositionStore.sol";
+import {PositionStore} from "./store/PositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
 contract UnhandledCallbackLogic is CoreContract {
-    MirrorPositionStore immutable positionStore;
+    PositionStore immutable positionStore;
 
     constructor(
         IAuthority _authority,
-        MirrorPositionStore _positionStore
+        PositionStore _positionStore
     ) CoreContract("UnhandledCallbackLogic", "1", _authority) {
         positionStore = _positionStore;
     }
@@ -29,7 +29,7 @@ contract UnhandledCallbackLogic is CoreContract {
     // function executeUnhandledExecutionCallback(
     //     bytes32 key
     // ) external auth {
-    //     MirrorPositionStore.UnhandledCallback memory callbackData = positionStore.getUnhandledCallback(key);
+    //     PositionStore.UnhandledCallback memory callbackData = positionStore.getUnhandledCallback(key);
 
     //     if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.ExecutedIncrease) {
     //         config.executeIncrease.execute(key, callbackData.order, callbackData.eventData);

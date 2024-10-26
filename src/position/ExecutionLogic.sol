@@ -9,17 +9,17 @@ import {ContributeStore} from "../tokenomics/store/ContributeStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "./../utils/Precision.sol";
-import {MirrorPositionStore} from "./store/MirrorPositionStore.sol";
+import {PositionStore} from "./store/PositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
 contract ExecutionLogic is CoreContract {
     PuppetStore immutable puppetStore;
-    MirrorPositionStore immutable positionStore;
+    PositionStore immutable positionStore;
 
     constructor(
         IAuthority _authority,
         PuppetStore _puppetStore,
-        MirrorPositionStore _positionStore
+        PositionStore _positionStore
     ) CoreContract("ExecutionLogic", "1", _authority) {
         puppetStore = _puppetStore;
         positionStore = _positionStore;
@@ -60,7 +60,7 @@ contract ExecutionLogic is CoreContract {
         GmxPositionUtils.Props calldata, /*order*/
         bytes calldata /*eventData*/
     ) internal {
-        MirrorPositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
+        PositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
 
         PuppetStore.Allocation memory allocation = puppetStore.getAllocation(request.allocationKey);
 
@@ -86,7 +86,7 @@ contract ExecutionLogic is CoreContract {
         GmxPositionUtils.Props calldata, /*order*/
         bytes calldata /*eventData*/
     ) internal {
-        MirrorPositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
+        PositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
 
         PuppetStore.Allocation memory allocation = puppetStore.getAllocation(request.allocationKey);
 

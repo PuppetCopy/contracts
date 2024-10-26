@@ -13,8 +13,7 @@ import {RequestLogic} from "src/position/RequestLogic.sol";
 import {UnhandledCallbackLogic} from "src/position/UnhandledCallbackLogic.sol";
 import {IGmxDatastore} from "src/position/interface/IGmxDatastore.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
-import {MirrorPositionStore} from "src/position/store/MirrorPositionStore.sol";
-import {MirrorPositionStore} from "src/position/store/MirrorPositionStore.sol";
+import {PositionStore} from "src/position/store/PositionStore.sol";
 import {PuppetLogic} from "src/puppet/PuppetLogic.sol";
 import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
 import {Dictator} from "src/shared/Dictator.sol";
@@ -41,12 +40,13 @@ contract DeployPositionLogic is BaseScript {
         PuppetStore puppetStore = PuppetStore(getDeployedAddress("PuppetStore"));
         ContributeStore contributeStore = ContributeStore(getDeployedAddress("ContributeStore"));
 
-        MirrorPositionStore positionStore = new MirrorPositionStore(dictator, router);
-        dictator.setPermission(router, router.transfer.selector, address(positionStore));
-        PositionRouter positionRouter = new PositionRouter(dictator, positionStore);
+        PositionStore positionStore = new PositionStore(dictator, router);
+        // PositionStore positionStore = PositionStore(getContractAddress("PositionStore"));
 
-        // MirrorPositionStore positionStore = MirrorPositionStore(getContractAddress("MirrorPositionStore"));
-        // PositionRouter positionRouter = PositionRouter(getContractAddress("PositionRouter"));
+        AllocationLogic allocationLogic = new AllocationLogic(dictator, contributeStore, puppetStore, positionStore);
+        dictator.setAccess(contributeStore, address(allocationLogic));
+        dictator.setAccess(puppetStore, address(allocationLogic));
+        dictator.setAccess(puppetStore, address(contributeStore));
 
         RequestLogic requestLogic = new RequestLogic(dictator, puppetStore, positionStore);
         dictator.setAccess(puppetStore, address(requestLogic));
@@ -58,10 +58,10 @@ contract DeployPositionLogic is BaseScript {
 
         UnhandledCallbackLogic unhandledCallbackLogic = new UnhandledCallbackLogic(dictator, positionStore);
 
-        AllocationLogic allocationLogic = new AllocationLogic(dictator, contributeStore, puppetStore, positionStore);
-        dictator.setAccess(contributeStore, address(allocationLogic));
-        dictator.setAccess(puppetStore, address(allocationLogic));
-        dictator.setAccess(puppetStore, address(contributeStore));
+        dictator.setPermission(router, router.transfer.selector, address(positionStore));
+
+        // PositionRouter positionRouter = PositionRouter(getContractAddress("PositionRouter"));
+        PositionRouter positionRouter = new PositionRouter(dictator, positionStore);
 
         // config
         dictator.initContract(
@@ -80,8 +80,8 @@ contract DeployPositionLogic is BaseScript {
                 RequestLogic.Config({
                     gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
                     gmxDatastore: IGmxDatastore(Address.gmxDatastore),
-                    callbackHandler: getDeployedAddress("PositionRouter"),
-                    gmxFundsReciever: getDeployedAddress("PuppetStore"),
+                    callbackHandler: address(positionRouter),
+                    gmxFundsReciever: address(puppetStore),
                     gmxOrderVault: Address.gmxOrderVault,
                     referralCode: Address.referralCode,
                     callbackGasLimit: 2_000_000

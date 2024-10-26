@@ -13,7 +13,7 @@ import {ErrorUtils} from "./../utils/ErrorUtils.sol";
 import {Precision} from "./../utils/Precision.sol";
 import {IGmxDatastore} from "./interface/IGmxDatastore.sol";
 import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
-import {MirrorPositionStore} from "./store/MirrorPositionStore.sol";
+import {PositionStore} from "./store/PositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
@@ -44,14 +44,14 @@ contract RequestLogic is CoreContract {
     }
 
     PuppetStore immutable puppetStore;
-    MirrorPositionStore immutable positionStore;
+    PositionStore immutable positionStore;
 
     Config public config;
 
     constructor(
         IAuthority _authority,
         PuppetStore _puppetStore,
-        MirrorPositionStore _positionStore
+        PositionStore _positionStore
     ) CoreContract("RequestLogic", "1", _authority) {
         puppetStore = _puppetStore;
         positionStore = _positionStore;
@@ -60,7 +60,7 @@ contract RequestLogic is CoreContract {
     function submitOrder(
         MirrorPositionParams calldata order,
         Subaccount subaccount,
-        MirrorPositionStore.RequestAdjustment memory request,
+        PositionStore.RequestAdjustment memory request,
         GmxPositionUtils.OrderType orderType,
         uint collateralDelta
     ) internal returns (bytes32 requestKey) {
@@ -116,7 +116,7 @@ contract RequestLogic is CoreContract {
 
     function adjust(
         MirrorPositionParams calldata params,
-        MirrorPositionStore.RequestAdjustment memory request,
+        PositionStore.RequestAdjustment memory request,
         PuppetStore.Allocation memory allocation,
         Subaccount subaccount
     ) internal returns (bytes32 requestKey) {
@@ -170,7 +170,7 @@ contract RequestLogic is CoreContract {
             subaccount = positionStore.createSubaccount(allocation.matchKey, params.trader);
         }
 
-        MirrorPositionStore.RequestAdjustment memory request = MirrorPositionStore.RequestAdjustment({
+        PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
             matchKey: allocation.matchKey,
             allocationKey: params.allocationKey,
             sourceRequestKey: params.sourceRequestKey,

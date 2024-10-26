@@ -10,7 +10,7 @@ import {ContributeStore} from "../tokenomics/store/ContributeStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "./../utils/Precision.sol";
-import {MirrorPositionStore} from "./store/MirrorPositionStore.sol";
+import {PositionStore} from "./store/PositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
@@ -21,7 +21,7 @@ contract AllocationLogic is CoreContract {
         uint traderPerformanceContributionShare;
     }
 
-    MirrorPositionStore immutable positionStore;
+    PositionStore immutable positionStore;
     PuppetStore immutable puppetStore;
     ContributeStore immutable contributeStore;
 
@@ -31,7 +31,7 @@ contract AllocationLogic is CoreContract {
         IAuthority _authority,
         ContributeStore _contributeStore,
         PuppetStore _puppetStore,
-        MirrorPositionStore _positionStore
+        PositionStore _positionStore
     ) CoreContract("AllocationLogic", "1", _authority) {
         positionStore = _positionStore;
         puppetStore = _puppetStore;

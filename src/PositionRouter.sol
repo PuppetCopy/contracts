@@ -8,7 +8,7 @@ import {ExecutionLogic} from "./position/ExecutionLogic.sol";
 import {RequestLogic} from "./position/RequestLogic.sol";
 import {UnhandledCallbackLogic} from "./position/UnhandledCallbackLogic.sol";
 import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
-import {MirrorPositionStore} from "./position/store/MirrorPositionStore.sol";
+import {PositionStore} from "./position/store/PositionStore.sol";
 import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
 import {Error} from "./shared/Error.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
@@ -23,13 +23,13 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         UnhandledCallbackLogic unhandledCallbackLogic;
     }
 
-    MirrorPositionStore immutable positionStore;
+    PositionStore immutable positionStore;
 
     Config public config;
 
     constructor(
         IAuthority _authority,
-        MirrorPositionStore _positionStore
+        PositionStore _positionStore
     ) CoreContract("PositionRouter", "1", _authority) {
         positionStore = _positionStore;
     }

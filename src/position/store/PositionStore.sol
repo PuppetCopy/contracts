@@ -9,7 +9,7 @@ import {BankStore} from "./../../shared/store/BankStore.sol";
 import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 import {GmxPositionUtils} from "./../utils/GmxPositionUtils.sol";
 
-contract MirrorPositionStore is BankStore {
+contract PositionStore is BankStore {
     struct RequestAdjustment {
         bytes32 allocationKey;
         bytes32 sourceRequestKey;
@@ -57,8 +57,8 @@ contract MirrorPositionStore is BankStore {
         bytes32 _key,
         bytes calldata _eventData
     ) external auth {
-        MirrorPositionStore.UnhandledCallback memory callbackResponse =
-            MirrorPositionStore.UnhandledCallback({order: _order, eventData: _eventData});
+        PositionStore.UnhandledCallback memory callbackResponse =
+            PositionStore.UnhandledCallback({order: _order, eventData: _eventData});
 
         unhandledCallbackMap[_key] = callbackResponse;
     }

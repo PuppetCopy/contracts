@@ -10,7 +10,7 @@
     "test:dev:fork": "FOUNDRY_PROFILE=dev forge test --chain arbitrum --match-contract TradingTest -vvvvv --fork-block-number 192315592 --fork-url=$ARBITRUM_RPC_URL",
     "build": "forge build --sizes",
     "build:dev": "FOUNDRY_PROFILE=dev forge build --sizes",
-    "deploy": "CHAIN=42161 SCRIPT='DeployTokenomics' bun deploy.ts",
+    "deploy": "CHAIN=42161 SCRIPT='DeployPositionLogic' bun deploy.ts",
     "docgen": "forge doc --out '.docgen' --build",
     "gas-report": "forge test --gas-report",
     "lint": "bun run lint:sol",
