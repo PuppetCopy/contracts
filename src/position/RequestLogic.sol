@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -25,7 +25,8 @@ contract RequestLogic is CoreContract {
         address gmxFundsReciever;
         address gmxOrderVault;
         bytes32 referralCode;
-        uint callbackGasLimit;
+        uint increaseCallbackGasLimit;
+        uint decreaseCallbackGasLimit;
     }
 
     struct MirrorPositionParams {
@@ -62,7 +63,8 @@ contract RequestLogic is CoreContract {
         Subaccount subaccount,
         PositionStore.RequestAdjustment memory request,
         GmxPositionUtils.OrderType orderType,
-        uint collateralDelta
+        uint collateralDelta,
+        uint callbackGasLimit
     ) internal returns (bytes32 requestKey) {
         (bool orderSuccess, bytes memory orderReturnData) = subaccount.execute(
             address(config.gmxExchangeRouter),
@@ -83,7 +85,7 @@ contract RequestLogic is CoreContract {
                         triggerPrice: order.triggerPrice,
                         acceptablePrice: order.acceptablePrice,
                         executionFee: order.executionFee,
-                        callbackGasLimit: config.callbackGasLimit,
+                        callbackGasLimit: callbackGasLimit,
                         minOutputAmount: 0
                     }),
                     orderType: orderType,
@@ -129,11 +131,25 @@ contract RequestLogic is CoreContract {
 
         if (targetLeverage > leverage) {
             deltaLeverage = targetLeverage - leverage;
-            requestKey = submitOrder(params, subaccount, request, GmxPositionUtils.OrderType.MarketIncrease, 0);
+            requestKey = submitOrder(
+                params,
+                subaccount,
+                request,
+                GmxPositionUtils.OrderType.MarketIncrease,
+                0,
+                config.increaseCallbackGasLimit
+            );
             request.sizeDelta = allocation.size * deltaLeverage / targetLeverage;
         } else {
             deltaLeverage = leverage - targetLeverage;
-            requestKey = submitOrder(params, subaccount, request, GmxPositionUtils.OrderType.MarketDecrease, 0);
+            requestKey = submitOrder(
+                params,
+                subaccount,
+                request,
+                GmxPositionUtils.OrderType.MarketDecrease,
+                0,
+                config.decreaseCallbackGasLimit
+            );
             request.sizeDelta = allocation.size * deltaLeverage / leverage;
         }
 
@@ -189,12 +205,17 @@ contract RequestLogic is CoreContract {
 
             puppetStore.transferOut(params.collateralToken, config.gmxOrderVault, allocation.allocated);
             puppetStore.setAllocation(params.allocationKey, allocation);
-
             requestKey = submitOrder(
-                params, subaccount, request, GmxPositionUtils.OrderType.MarketIncrease, allocation.allocated
+                params,
+                subaccount,
+                request,
+                GmxPositionUtils.OrderType.MarketIncrease,
+                allocation.allocated,
+                config.increaseCallbackGasLimit
             );
 
             request.transactionCost = (request.transactionCost - gasleft()) * tx.gasprice + params.executionFee;
+            request.sizeDelta = params.sizeDeltaInUsd;
             positionStore.setRequestAdjustment(requestKey, request);
 
             _logEvent(

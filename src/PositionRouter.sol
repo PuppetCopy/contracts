@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 
 import {AllocationLogic} from "./position/AllocationLogic.sol";
 import {ExecutionLogic} from "./position/ExecutionLogic.sol";
@@ -15,7 +16,7 @@ import {CoreContract} from "./utils/CoreContract.sol";
 import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
-contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallbackReceiver {
+contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallbackReceiver, Multicall {
     struct Config {
         RequestLogic requestLogic;
         AllocationLogic allocationLogic;
@@ -27,10 +28,7 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
 
     Config public config;
 
-    constructor(
-        IAuthority _authority,
-        PositionStore _positionStore
-    ) CoreContract("PositionRouter", "1", _authority) {
+    constructor(IAuthority _authority, PositionStore _positionStore) CoreContract("PositionRouter", "1", _authority) {
         positionStore = _positionStore;
     }
 
@@ -70,16 +68,17 @@ contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
     function allocate(
         IERC20 collateralToken,
         bytes32 sourceRequestKey,
+        bytes32 positionKey,
         bytes32 matchKey,
         address[] calldata puppetList
     ) external nonReentrant auth returns (bytes32 allocationKey) {
-        return config.allocationLogic.allocate(collateralToken, sourceRequestKey, matchKey, puppetList);
+        return config.allocationLogic.allocate(collateralToken, sourceRequestKey, positionKey, matchKey, puppetList);
     }
 
     function mirror(
         RequestLogic.MirrorPositionParams calldata params
-    ) external payable nonReentrant auth {
-        config.requestLogic.mirror(params);
+    ) external payable nonReentrant auth returns (bytes32 requestKey) {
+        return config.requestLogic.mirror(params);
     }
 
     function settle(bytes32 key, address[] calldata puppetList) external nonReentrant auth {

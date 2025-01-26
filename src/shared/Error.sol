@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 import {GmxPositionUtils} from "../position/utils/GmxPositionUtils.sol";
 
@@ -10,7 +10,7 @@ library Error {
     error CoreContract__Unauthorized(string contractName, string version);
 
     error Access__Unauthorized();
-    error Permission__Unauthorized();
+    error Permission__Unauthorized(address user);
 
     error Store__InvalidLength();
 
@@ -29,7 +29,8 @@ library Error {
     error RequestLogic__PendingExecution();
     error RequestLogic__InvalidAllocationMatchKey();
 
-    error AllocationLogic__AllocationStillUtilized();
+    error AllocationLogic__UtillizedAllocationed();
+    error AllocationLogic__PendingSettlment();
     error AllocationLogic__PuppetListLimit();
     error AllocationLogic__InvalidPuppetListIntegrity();
     error AllocationLogic__InvalidListLength();
@@ -40,6 +41,7 @@ library Error {
     error ExecutionLogic__UnexpectedEventData();
     error ExecutionLogic__MismatchedAmountIn(uint recordedAmountIn, uint amountIn);
     error ExecutionLogic__PositionDoesNotExist();
+    error ExecutionLogic__RequestDoesNotMatchExecution();
     error ExecutionLogic__AllocationDoesNotExist();
 
     error PositionRouter__InvalidOrderType(GmxPositionUtils.OrderType orderType);
@@ -47,9 +49,10 @@ library Error {
     error Subaccount__UnauthorizedOperator();
 
     /// @notice Error emitted when the claim token is invalid
-    error ContributeLogic__InvalidBuybackToken();
+    error FeeMarketplace__NotAuctionableToken();
+
     /// @notice Error emitted when the claimable reward is insufficient
-    error ContributeLogic__InsufficientClaimableReward(uint accruedReward);
+    error FeeMarketplace__InsufficientUnlockedBalance(uint accruedReward);
 
     /// @dev Error for when the rate is invalid (zero).
     error PuppetToken__InvalidRate();
@@ -61,7 +64,8 @@ library Error {
     error PuppetToken__CoreShareExceedsMining();
 
     /// @notice Error emitted when there is no claimable amount for a user
-    error RewardLogic__NoClaimableAmount(uint accruedReward);
+    error RewardLogic__InvalidAmount();
+    error RewardLogic__InsufficientRewards(uint accruedReward);
 
     /// @notice Transfers are restricted in this contract.
     error VotingEscrow__Unsupported();
@@ -78,5 +82,6 @@ library Error {
     error TransferUtils__EmptyTokenTranferGasLimit(address token);
     error TransferUtils__TokenTransferError(address token, address receiver, uint amount);
     error TransferUtils__EmptyHoldingAddress();
+
     event TransferUtils__TokenTransferReverted(string reason, bytes returndata);
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -7,7 +7,7 @@ import {PuppetRouter} from "src/PuppetRouter.sol";
 import {PuppetLogic} from "src/puppet/PuppetLogic.sol";
 import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
 import {Dictator} from "src/shared/Dictator.sol";
-import {Router} from "src/shared/Router.sol";
+import {TokenRouter} from "src/shared/TokenRouter.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
 import {Address} from "./Const.sol";
@@ -21,7 +21,7 @@ contract DeployPuppetLogic is BaseScript {
 
     function deployContracts() internal {
         Dictator dictator = Dictator(getDeployedAddress("Dictator"));
-        Router router = Router(getDeployedAddress("Router"));
+        TokenRouter router = TokenRouter(getDeployedAddress("Router"));
 
         PuppetStore puppetStore = new PuppetStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(puppetStore));

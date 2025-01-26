@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {PuppetStore} from "../puppet/store/PuppetStore.sol";
 import {Error} from "../shared/Error.sol";
-import {ContributeStore} from "../tokenomics/store/ContributeStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "./../utils/Precision.sol";
@@ -62,9 +61,14 @@ contract ExecutionLogic is CoreContract {
     ) internal {
         PositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
 
+        if (request.matchKey == 0) {
+            revert Error.ExecutionLogic__RequestDoesNotMatchExecution();
+        }
+
         PuppetStore.Allocation memory allocation = puppetStore.getAllocation(request.allocationKey);
 
         allocation.size += request.sizeDelta;
+        puppetStore.setAllocation(request.allocationKey, allocation);
         positionStore.removeRequestAdjustment(requestKey);
 
         _logEvent(
@@ -87,6 +91,10 @@ contract ExecutionLogic is CoreContract {
         bytes calldata /*eventData*/
     ) internal {
         PositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
+
+        if (request.matchKey == 0) {
+            revert Error.ExecutionLogic__RequestDoesNotMatchExecution();
+        }
 
         PuppetStore.Allocation memory allocation = puppetStore.getAllocation(request.allocationKey);
 
@@ -125,11 +133,5 @@ contract ExecutionLogic is CoreContract {
                 allocation.settled
             )
         );
-    }
-
-    function _setConfig(
-        bytes calldata data
-    ) internal override {
-        revert("Not implemented");
     }
 }

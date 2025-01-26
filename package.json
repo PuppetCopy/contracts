@@ -6,25 +6,25 @@
   ],
   "scripts": {
     "test": "forge test -vvvvv",
-    "test:dev": "FOUNDRY_PROFILE=dev forge test --match-contract TradingTest -vvvvv",
+    "test:dev": "FOUNDRY_PROFILE=dev forge test --match-contract FeeMarketplaceTest -vvvvv",
     "test:dev:fork": "FOUNDRY_PROFILE=dev forge test --chain arbitrum --match-contract TradingTest -vvvvv --fork-block-number 192315592 --fork-url=$ARBITRUM_RPC_URL",
     "build": "forge build --sizes",
     "build:dev": "FOUNDRY_PROFILE=dev forge build --sizes",
-    "deploy": "CHAIN=42161 SCRIPT='DeployPositionLogic' bun deploy.ts",
+    "deploy": "CHAIN=42161 SCRIPT='DeployTokenomics' bun deploy.ts",
     "docgen": "forge doc --out '.docgen' --build",
-    "gas-report": "forge test --gas-report",
+    "gas-report": "forge test --match-contract TradingTest --gas-report",
     "lint": "bun run lint:sol",
     "lint:sol": "forge fmt --check && bun solhint \"{script,src,test}/**/*.sol\""
   },
   "dependencies": {
     "@aragon/osx": "^1.3.0",
     "@balancer-labs/v2-interfaces": "0.4.0",
-    "@openzeppelin/contracts": "5.0.2",
+    "@openzeppelin/contracts": "5.2.0",
     "@uniswap/v3-core": "1.0.1",
     "@zeframlou/create3-factory": "github:zeframlou/create3-factory#main",
     "dotenv": "^16.4.5",
-    "forge-std": "github:foundry-rs/forge-std#v1.9.3",
-    "solhint": "5.0.3"
+    "forge-std": "github:foundry-rs/forge-std#v1.9.5",
+    "solhint": "5.0.5"
   },
-  "packageManager": "bun@1.1.32"
+  "packageManager": "bun@1.2.0"
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 import {Error} from "./../../shared/Error.sol";
 import {IAuthority} from "./../interfaces/IAuthority.sol";
@@ -24,7 +24,7 @@ abstract contract Permission is IPermission {
         if (canCall(msg.sig, msg.sender)) {
             _;
         } else {
-            revert Error.Permission__Unauthorized();
+            revert Error.Permission__Unauthorized(msg.sender);
         }
     }
 
@@ -32,7 +32,7 @@ abstract contract Permission is IPermission {
         if (msg.sender == address(authority)) {
             _;
         } else {
-            revert Error.Permission__Unauthorized();
+            revert Error.Permission__Unauthorized(msg.sender);
         }
     }
 

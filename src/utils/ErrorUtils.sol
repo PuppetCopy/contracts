@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 library ErrorUtils {
 	// To get the revert reason, referenced from https://ethereum.stackexchange.com/a/83577

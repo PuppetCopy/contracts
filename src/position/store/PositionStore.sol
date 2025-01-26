@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Router} from "./../../shared/Router.sol";
+import {TokenRouter} from "./../../shared/TokenRouter.sol";
 import {Subaccount} from "./../../shared/Subaccount.sol";
 import {BankStore} from "./../../shared/store/BankStore.sol";
 import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
@@ -20,15 +20,19 @@ contract PositionStore is BankStore {
 
     struct UnhandledCallback {
         GmxPositionUtils.Props order;
+        address operator;
         bytes eventData;
+        bytes32 key;
     }
 
     mapping(bytes32 matchKey => Subaccount) routeSubaccountMap;
     mapping(bytes32 matchKey => IERC20) routeTokenMap;
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
-    mapping(bytes32 positionKey => UnhandledCallback) public unhandledCallbackMap;
 
-    constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
+    uint unhandledCallbackListId = 0;
+    mapping(uint unhandledCallbackListSequenceId => UnhandledCallback) public unhandledCallbackMap;
+
+    constructor(IAuthority _authority, TokenRouter _router) BankStore(_authority, _router) {}
 
     function getRequestAdjustment(
         bytes32 _key
@@ -52,27 +56,31 @@ contract PositionStore is BankStore {
         delete requestAdjustmentMap[_key];
     }
 
-    function setUnhandledCallback(
+    function setUnhandledCallbackList(
         GmxPositionUtils.Props calldata _order,
+        address _operator,
         bytes32 _key,
         bytes calldata _eventData
-    ) external auth {
+    ) external auth returns (uint) {
         PositionStore.UnhandledCallback memory callbackResponse =
-            PositionStore.UnhandledCallback({order: _order, eventData: _eventData});
+            PositionStore.UnhandledCallback({order: _order, operator: _operator, eventData: _eventData, key: _key});
 
-        unhandledCallbackMap[_key] = callbackResponse;
+        uint id = ++unhandledCallbackListId;
+        unhandledCallbackMap[id] = callbackResponse;
+
+        return id;
     }
 
     function getUnhandledCallback(
-        bytes32 _key
+        uint _id
     ) external view returns (UnhandledCallback memory) {
-        return unhandledCallbackMap[_key];
+        return unhandledCallbackMap[_id];
     }
 
     function removeUnhandledCallback(
-        bytes32 _key
+        uint _id
     ) external auth {
-        delete unhandledCallbackMap[_key];
+        delete unhandledCallbackMap[_id];
     }
 
     function getSubaccount(

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
@@ -22,8 +22,8 @@ contract UnhandledCallbackLogic is CoreContract {
         bytes32 key,
         bytes calldata eventData
     ) external auth {
-        positionStore.setUnhandledCallback(order, key, eventData);
-        _logEvent("StoreUnhandledCallback", abi.encode(key, order, eventData));
+        uint id = positionStore.setUnhandledCallbackList(order, msg.sender, key, eventData);
+        _logEvent("StoreUnhandledCallback", abi.encode(id, key, order, eventData));
     }
 
     // function executeUnhandledExecutionCallback(
@@ -41,10 +41,4 @@ contract UnhandledCallbackLogic is CoreContract {
     //         config.executeRevertedAdjustment.handleFrozen(key, callbackData.order);
     //     }
     // }
-
-    function _setConfig(
-        bytes calldata data
-    ) internal override {
-        revert("NOT_IMPLEMENTED");
-    }
 }

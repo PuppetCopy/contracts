@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Error} from "../../shared/Error.sol";
-import {Router} from "./../../shared/Router.sol";
+import {TokenRouter} from "./../../shared/TokenRouter.sol";
 import {BankStore} from "./../../shared/store/BankStore.sol";
 import {Precision} from "./../../utils/Precision.sol";
 import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
@@ -37,7 +37,7 @@ contract PuppetStore is BankStore {
     mapping(bytes32 allocationKey => mapping(address puppet => uint amount)) userAllocationMap;
     mapping(bytes32 allocationKey => Allocation) allocationMap;
 
-    constructor(IAuthority _authority, Router _router) BankStore(_authority, _router) {}
+    constructor(IAuthority _authority, TokenRouter _router) BankStore(_authority, _router) {}
 
     function getSettledAllocationHash(
         bytes32 _hash
@@ -207,8 +207,8 @@ contract PuppetStore is BankStore {
 
     function setMatchRule(bytes32 _key, address _puppet, MatchRule calldata _rule) external auth {
         matchRuleMap[_key][_puppet] = _rule;
-        // pre-store to save gas during inital allocation or-and reset throttle activity
 
+        // pre-store to save gas during inital allocation or-and reset throttle activity
         if (activityThrottleMap[_key][_puppet] == 0) {
             activityThrottleMap[_key][_puppet] = 1;
         }

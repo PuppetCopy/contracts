@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 import {Dictator} from "src/shared/Dictator.sol";
-import {Router} from "src/shared/Router.sol";
+import {TokenRouter} from "src/shared/TokenRouter.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
 
@@ -20,17 +20,14 @@ contract DeployPuppetToken is BaseScript {
         Dictator dictator = new Dictator(Address.dao);
         // Dictator dictator = Dictator(getDeployedAddress("Dictator"));
 
-        PuppetToken puppetToken = new PuppetToken(dictator, Address.dao);
+        PuppetToken puppetToken = new PuppetToken();
         // PuppetToken puppetToken = PuppetToken(getDeployedAddress("PuppetToken"));
 
         new PuppetVoteToken(dictator);
-        Router router = new Router(dictator);
+        TokenRouter router = new TokenRouter(dictator);
         dictator.setPermission(router, router.setTransferGasLimit.selector, Address.dao);
 
         // Config
         router.setTransferGasLimit(200_000);
-        dictator.initContract(
-            puppetToken, abi.encode(PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours}))
-        );
     }
 }

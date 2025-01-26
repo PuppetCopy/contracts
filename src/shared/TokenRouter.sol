@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -11,7 +11,7 @@ import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
  * @title Router
  * @dev Users will approve this router for token spenditures
  */
-contract Router is Permission {
+contract TokenRouter is Permission {
     uint transferGasLimit;
 
     constructor(

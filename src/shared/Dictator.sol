@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -83,6 +83,15 @@ contract Dictator is Ownable, IAuthority {
         emit AddContractAccess(targetAddress);
 
         setConfig(target, config);
+    }
+
+    function initContract(CoreContract target) public onlyOwner {
+        address targetAddress = address(target);
+
+        if (contractAccessMap[targetAddress]) revert Error.Dictator__ContractAlreadyInitialized();
+        contractAccessMap[targetAddress] = true;
+
+        emit AddContractAccess(targetAddress);
     }
 
     function setConfig(CoreContract target, bytes calldata config) public onlyOwner {

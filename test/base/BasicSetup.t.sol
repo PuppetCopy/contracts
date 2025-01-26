@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test} from "forge-std/src/Test.sol";
 
 import {Dictator} from "src/shared/Dictator.sol";
-import {Router} from "src/shared/Router.sol";
+import {TokenRouter} from "src/shared/TokenRouter.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
 import {IWNT} from "src/utils/interfaces/IWNT.sol";
@@ -27,7 +27,7 @@ contract BasicSetup is Test {
 
     Dictator dictator;
     PuppetToken puppetToken;
-    Router router;
+    TokenRouter tokenRouter;
     PuppetVoteToken vPuppetToken;
 
     function setUp() public virtual {
@@ -43,15 +43,12 @@ contract BasicSetup is Test {
         vm.startPrank(users.owner);
 
         dictator = new Dictator(users.owner);
-        router = new Router(dictator);
-        dictator.setPermission(router, router.setTransferGasLimit.selector, users.owner);
-
-        puppetToken = new PuppetToken(dictator, users.owner);
-        dictator.initContract(puppetToken, abi.encode(PuppetToken.Config({limitFactor: 0.01e30, durationWindow: 1 hours})));
-
+        tokenRouter = new TokenRouter(dictator);
+        puppetToken = new PuppetToken();
         vPuppetToken = new PuppetVoteToken(dictator);
 
-        router.setTransferGasLimit(200_000);
+        dictator.setPermission(tokenRouter, tokenRouter.setTransferGasLimit.selector, users.owner);
+        tokenRouter.setTransferGasLimit(200_000);
 
         skip(1 hours);
     }

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Router} from "../Router.sol";
+import {TokenRouter} from "../TokenRouter.sol";
 import {Access} from "./../../utils/auth/Access.sol";
 import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 
@@ -12,9 +12,9 @@ import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 abstract contract BankStore is Access {
     mapping(IERC20 => uint) public tokenBalanceMap;
 
-    Router immutable router;
+    TokenRouter immutable router;
 
-    constructor(IAuthority _authority, Router _router) Access(_authority) {
+    constructor(IAuthority _authority, TokenRouter _router) Access(_authority) {
         router = _router;
     }
 

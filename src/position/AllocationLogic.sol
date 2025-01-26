@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.27;
+pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {PuppetStore} from "../puppet/store/PuppetStore.sol";
 import {Error} from "../shared/Error.sol";
-import {ContributeStore} from "../tokenomics/store/ContributeStore.sol";
+import {FeeMarketplace} from "../tokenomics/FeeMarketplace.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "./../utils/Precision.sol";
@@ -23,43 +23,46 @@ contract AllocationLogic is CoreContract {
 
     PositionStore immutable positionStore;
     PuppetStore immutable puppetStore;
-    ContributeStore immutable contributeStore;
+    FeeMarketplace immutable buyAndBurn;
 
     Config public config;
 
     constructor(
         IAuthority _authority,
-        ContributeStore _contributeStore,
+        FeeMarketplace _buyAndBurn,
         PuppetStore _puppetStore,
         PositionStore _positionStore
     ) CoreContract("AllocationLogic", "1", _authority) {
+        buyAndBurn = _buyAndBurn;
         positionStore = _positionStore;
         puppetStore = _puppetStore;
-        contributeStore = _contributeStore;
     }
 
     function allocate(
         IERC20 collateralToken,
         bytes32 sourceRequestKey,
         bytes32 matchKey,
+        bytes32 positionKey,
         address[] calldata puppetList
     ) external auth returns (bytes32 allocationKey) {
         uint startGas = gasleft();
 
-        allocationKey = PositionUtils.getAllocationKey(matchKey, puppetStore.getRequestId());
+        allocationKey = PositionUtils.getAllocationKey(matchKey, positionKey);
 
         PuppetStore.Allocation memory allocation = puppetStore.getAllocation(allocationKey);
 
-        if (allocation.matchKey == bytes32(0)) {
-            allocation.matchKey = matchKey;
-            allocation.collateralToken = collateralToken;
-            allocationKey = PositionUtils.getAllocationKey(matchKey, puppetStore.incrementRequestId());
+        if (allocation.size > 0) {
+            revert Error.AllocationLogic__PendingSettlment();
         }
-
         uint puppetListLength = puppetList.length;
 
         if (puppetListLength > config.limitAllocationListLength) {
             revert Error.AllocationLogic__PuppetListLimit();
+        }
+
+        if (allocation.matchKey == bytes32(0)) {
+            allocation.matchKey = matchKey;
+            allocation.collateralToken = collateralToken;
         }
 
         bytes32 puppetListHash = keccak256(abi.encode(puppetList));
@@ -95,6 +98,7 @@ contract AllocationLogic is CoreContract {
                 collateralToken,
                 sourceRequestKey,
                 matchKey,
+                positionKey,
                 allocationKey,
                 puppetListHash,
                 puppetList,
@@ -114,7 +118,7 @@ contract AllocationLogic is CoreContract {
             revert Error.AllocationLogic__AllocationDoesNotExist();
         }
         if (allocation.collateral > 0) {
-            revert Error.AllocationLogic__AllocationStillUtilized();
+            revert Error.AllocationLogic__UtillizedAllocationed();
         }
 
         bytes32 puppetListHash = keccak256(abi.encode(puppetList));
@@ -126,37 +130,21 @@ contract AllocationLogic is CoreContract {
         (uint[] memory balanceList, uint[] memory allocationList) =
             puppetStore.getBalanceAndAllocationList(allocation.collateralToken, allocationKey, puppetList);
 
-        uint[] memory contributionAmountList = new uint[](puppetList.length);
         uint totalPuppetContribution;
-        uint traderPerformanceContribution;
 
         if (allocation.profit > 0) {
             totalPuppetContribution = Precision.applyFactor(config.performanceContributionRate, allocation.profit);
 
-            if (config.traderPerformanceContributionShare > 0) {
-                traderPerformanceContribution =
-                    Precision.applyFactor(config.traderPerformanceContributionShare, allocation.profit);
-
-                contributeStore.interTransferIn(allocation.collateralToken, positionStore, totalPuppetContribution);
-                contributeStore.contribute(
-                    allocation.collateralToken,
-                    positionStore.getSubaccount(allocation.matchKey).account(),
-                    traderPerformanceContribution
-                );
-            }
-
-            uint settledAfterContribution = allocation.settled - totalPuppetContribution - traderPerformanceContribution;
+            uint settledAfterContribution = allocation.settled - totalPuppetContribution;
 
             for (uint i = 0; i < allocationList.length; i++) {
                 uint puppetAllocation = allocationList[i];
                 if (puppetAllocation == 0) continue;
 
-                contributionAmountList[i] = puppetAllocation * totalPuppetContribution / allocation.allocated;
                 balanceList[i] += puppetAllocation * settledAfterContribution / allocation.allocated;
             }
 
-            contributeStore.interTransferIn(allocation.collateralToken, positionStore, totalPuppetContribution);
-            contributeStore.contributeMany(allocation.collateralToken, puppetList, contributionAmountList);
+            buyAndBurn.deposit(allocation.collateralToken, address(positionStore), totalPuppetContribution);
         } else if (allocation.settled > 0) {
             for (uint i = 0; i < allocationList.length; i++) {
                 uint puppetAllocation = allocationList[i];
@@ -166,7 +154,7 @@ contract AllocationLogic is CoreContract {
             }
         }
 
-        puppetStore.setBalanceList(allocation.collateralToken, puppetList, allocationList);
+        puppetStore.setBalanceList(allocation.collateralToken, puppetList, balanceList);
 
         if (allocation.size > 0) {
             allocation.profit = 0;
@@ -186,12 +174,10 @@ contract AllocationLogic is CoreContract {
                 puppetListHash,
                 puppetList,
                 allocationList,
-                contributionAmountList,
+                totalPuppetContribution,
+                (startGas - gasleft()) * tx.gasprice,
                 allocation.allocated,
                 allocation.settled,
-                totalPuppetContribution,
-                traderPerformanceContribution,
-                (startGas - gasleft()) * tx.gasprice,
                 allocation.profit
             )
         );
