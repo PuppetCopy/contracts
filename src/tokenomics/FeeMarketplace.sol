@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {Error} from "../shared/Error.sol";
 import {TokenRouter} from "../shared/TokenRouter.sol";
@@ -28,7 +29,7 @@ import {FeeMarketplaceStore} from "./store/FeeMarketplaceStore.sol";
  * 3. Users exchange protocol tokens for available fees at fixed rates
  * 4. Exchanged protocol tokens are burned, rest sent to rewards
  */
-contract FeeMarketplace is CoreContract {
+contract FeeMarketplace is CoreContract, ReentrancyGuardTransient {
     /**
      * @dev Controls market parameters
      * @param distributionTimeframe Time window for new fee deposits to fully unlock
@@ -46,7 +47,7 @@ contract FeeMarketplace is CoreContract {
     PuppetToken public immutable protocolToken;
 
     mapping(IERC20 => uint) public askAmount;
-    mapping(IERC20 => uint) public accuredFeeBalance;
+    mapping(IERC20 => uint) public accruedFeeBalance;
     mapping(IERC20 => uint) public lastUpdateTimestamp;
 
     Config public config;
@@ -66,7 +67,7 @@ contract FeeMarketplace is CoreContract {
         IERC20 feeToken
     ) public view returns (uint pending) {
         uint totalDeposited = store.getTokenBalance(feeToken);
-        uint alreadyUnlocked = accuredFeeBalance[feeToken];
+        uint alreadyUnlocked = accruedFeeBalance[feeToken];
 
         if (totalDeposited <= alreadyUnlocked) return 0;
 
@@ -79,40 +80,43 @@ contract FeeMarketplace is CoreContract {
     function getTotalUnlocked(
         IERC20 feeToken
     ) public view returns (uint) {
-        return accuredFeeBalance[feeToken] + getPendingUnlock(feeToken);
+        return accruedFeeBalance[feeToken] + getPendingUnlock(feeToken);
     }
 
     function deposit(IERC20 feeToken, address depositor, uint amount) external auth {
-        accuredFeeBalance[feeToken] += getPendingUnlock(feeToken);
+        if (amount == 0) revert Error.FeeMarketplace__ZeroDeposit();
+
+        accruedFeeBalance[feeToken] += getPendingUnlock(feeToken);
         lastUpdateTimestamp[feeToken] = block.timestamp;
 
         store.transferIn(feeToken, depositor, amount);
         _logEvent("Deposit", abi.encode(feeToken, depositor, amount));
     }
 
-    function acceptOffer(IERC20 feeToken, address receiver, uint purchaseAmount) external {
+    function acceptOffer(IERC20 feeToken, address receiver, uint purchaseAmount) external nonReentrant {
         uint currentAsk = askAmount[feeToken];
         if (currentAsk == 0) revert Error.FeeMarketplace__NotAuctionableToken();
 
         uint available = getTotalUnlocked(feeToken);
-        lastUpdateTimestamp[feeToken] = block.timestamp;
 
         if (available < purchaseAmount) {
             revert Error.FeeMarketplace__InsufficientUnlockedBalance(available);
         }
 
-        tokenRouter.transfer(protocolToken, msg.sender, address(this), currentAsk);
 
         uint burnAmount = Precision.applyBasisPoints(config.burnBasisPoints, currentAsk);
         uint rewardAmount = currentAsk - burnAmount;
 
+        tokenRouter.transfer(protocolToken, msg.sender, address(this), currentAsk);
         protocolToken.burn(burnAmount);
 
         if (rewardAmount > 0) {
             // Safe due to config validation in _setConfig
             protocolToken.transfer(config.rewardDistributor, rewardAmount);
         }
-        accuredFeeBalance[feeToken] = available - purchaseAmount;
+        accruedFeeBalance[feeToken] = available - purchaseAmount;
+        lastUpdateTimestamp[feeToken] = block.timestamp;
+
         store.transferOut(feeToken, receiver, purchaseAmount);
 
         _logEvent("AcceptOffer", abi.encode(feeToken, receiver, purchaseAmount, burnAmount, rewardAmount));

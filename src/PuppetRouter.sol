@@ -3,11 +3,11 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {PuppetLogic} from "./puppet/PuppetLogic.sol";
 import {PuppetStore} from "./puppet/store/PuppetStore.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
-import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
 import {Access} from "./utils/auth/Access.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 

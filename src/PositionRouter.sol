@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {AllocationLogic} from "./position/AllocationLogic.sol";
 import {ExecutionLogic} from "./position/ExecutionLogic.sol";
@@ -13,7 +14,6 @@ import {PositionStore} from "./position/store/PositionStore.sol";
 import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
 import {Error} from "./shared/Error.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
-import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
 contract PositionRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallbackReceiver, Multicall {

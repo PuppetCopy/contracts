@@ -48,26 +48,17 @@ library Error {
 
     error Subaccount__UnauthorizedOperator();
 
-    /// @notice Error emitted when the claim token is invalid
     error FeeMarketplace__NotAuctionableToken();
-
-    /// @notice Error emitted when the claimable reward is insufficient
     error FeeMarketplace__InsufficientUnlockedBalance(uint accruedReward);
+    error FeeMarketplace__ZeroDeposit();
 
-    /// @dev Error for when the rate is invalid (zero).
     error PuppetToken__InvalidRate();
-    /// @dev Error for when the minting exceeds the rate limit.
-    /// @param rateLimit The rate limit.
-    /// @param emissionRate The current emission rate.
     error PuppetToken__ExceededRateLimit(uint rateLimit, uint emissionRate);
-    /// @dev Error for when the core share exceeds the mintable amount.
     error PuppetToken__CoreShareExceedsMining();
 
-    /// @notice Error emitted when there is no claimable amount for a user
     error RewardLogic__InvalidAmount();
     error RewardLogic__InsufficientRewards(uint accruedReward);
 
-    /// @notice Transfers are restricted in this contract.
     error VotingEscrow__Unsupported();
 
     error VotingEscrowLogic__ZeroAmount();

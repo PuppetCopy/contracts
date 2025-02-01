@@ -23,17 +23,17 @@ contract AllocationLogic is CoreContract {
 
     PositionStore immutable positionStore;
     PuppetStore immutable puppetStore;
-    FeeMarketplace immutable buyAndBurn;
+    FeeMarketplace immutable feeMarket;
 
     Config public config;
 
     constructor(
         IAuthority _authority,
-        FeeMarketplace _buyAndBurn,
+        FeeMarketplace _feeMarketplace,
         PuppetStore _puppetStore,
         PositionStore _positionStore
     ) CoreContract("AllocationLogic", "1", _authority) {
-        buyAndBurn = _buyAndBurn;
+        feeMarket = _feeMarketplace;
         positionStore = _positionStore;
         puppetStore = _puppetStore;
     }
@@ -144,7 +144,10 @@ contract AllocationLogic is CoreContract {
                 balanceList[i] += puppetAllocation * settledAfterContribution / allocation.allocated;
             }
 
-            buyAndBurn.deposit(allocation.collateralToken, address(positionStore), totalPuppetContribution);
+            if (feeMarket.askAmount(allocation.collateralToken) > 0) {
+                feeMarket.deposit(allocation.collateralToken, address(positionStore), totalPuppetContribution);
+            }
+
         } else if (allocation.settled > 0) {
             for (uint i = 0; i < allocationList.length; i++) {
                 uint puppetAllocation = allocationList[i];
