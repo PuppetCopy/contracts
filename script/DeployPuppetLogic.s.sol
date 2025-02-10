@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {PuppetRouter} from "src/PuppetRouter.sol";
+import {Router} from "src/Router.sol";
 import {PuppetLogic} from "src/puppet/PuppetLogic.sol";
 import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
 import {Dictator} from "src/shared/Dictator.sol";
@@ -25,14 +25,9 @@ contract DeployPuppetLogic is BaseScript {
 
         PuppetStore puppetStore = new PuppetStore(dictator, router);
         dictator.setPermission(router, router.transfer.selector, address(puppetStore));
-        PuppetRouter puppetRouter = new PuppetRouter(dictator);
         PuppetLogic puppetLogic = new PuppetLogic(dictator, puppetStore);
 
         dictator.setAccess(puppetStore, address(puppetLogic));
-        dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));
-        dictator.setPermission(puppetLogic, puppetLogic.withdraw.selector, address(puppetRouter));
-        dictator.setPermission(puppetLogic, puppetLogic.setMatchRule.selector, address(puppetRouter));
-        dictator.setPermission(puppetLogic, puppetLogic.setMatchRuleList.selector, address(puppetRouter));
 
         // PuppetStore puppetStore = PuppetStore(getContractAddress("PuppetStore"));
         // PuppetRouter puppetRouter = PuppetRouter(getContractAddress("PuppetRouter"));
@@ -59,6 +54,5 @@ contract DeployPuppetLogic is BaseScript {
                 })
             )
         );
-        dictator.initContract(puppetRouter, abi.encode(PuppetRouter.Config({logic: puppetLogic})));
     }
 }

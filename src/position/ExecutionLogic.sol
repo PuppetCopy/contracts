@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.28;
 
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {PuppetStore} from "../puppet/store/PuppetStore.sol";
@@ -8,12 +9,16 @@ import {Error} from "../shared/Error.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "./../utils/Precision.sol";
+
+import {UnhandledCallbackLogic} from "./UnhandledCallbackLogic.sol";
+import {IGmxOrderCallbackReceiver} from "./interface/IGmxOrderCallbackReceiver.sol";
 import {PositionStore} from "./store/PositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
-contract ExecutionLogic is CoreContract {
+contract ExecutionLogic is CoreContract, IGmxOrderCallbackReceiver, ReentrancyGuardTransient {
     PuppetStore immutable puppetStore;
     PositionStore immutable positionStore;
+    UnhandledCallbackLogic immutable unhandledCallbackLogic;
 
     constructor(
         IAuthority _authority,
@@ -24,11 +29,7 @@ contract ExecutionLogic is CoreContract {
         positionStore = _positionStore;
     }
 
-    function handleCancelled(
-        bytes32 key,
-        GmxPositionUtils.Props memory order,
-        bytes calldata eventData
-    ) external auth {
+    function handleCancelled(bytes32 key, GmxPositionUtils.Props memory order, bytes calldata eventData) internal {
         revert("Not implemented");
     }
 
@@ -36,15 +37,11 @@ contract ExecutionLogic is CoreContract {
         bytes32 key, //
         GmxPositionUtils.Props memory order,
         bytes calldata eventData
-    ) external auth {
+    ) internal {
         revert("Not implemented");
     }
 
-    function handleExecution(
-        bytes32 key,
-        GmxPositionUtils.Props calldata order,
-        bytes calldata eventData
-    ) external auth {
+    function handleExecution(bytes32 key, GmxPositionUtils.Props calldata order, bytes calldata eventData) internal {
         if (GmxPositionUtils.isIncreaseOrder(order.numbers.orderType)) {
             increase(key, order, eventData);
         } else if (GmxPositionUtils.isDecreaseOrder(order.numbers.orderType)) {
@@ -133,5 +130,53 @@ contract ExecutionLogic is CoreContract {
                 allocation.settled
             )
         );
+    }
+
+    /**
+     * @notice Called after an order is executed.
+     */
+    function afterOrderExecution(
+        bytes32 key,
+        GmxPositionUtils.Props calldata order,
+        bytes calldata eventData
+    ) external nonReentrant auth {
+        handleExecution(key, order, eventData);
+        // try handleExecution(key, order, eventData) {
+        //     // Successful execution
+        // } catch {
+        //     unhandledCallbackLogic.storeUnhandledCallback(order, key, eventData);
+        // }
+    }
+
+    /**
+     * @notice Called after an order is cancelled.
+     */
+    function afterOrderCancellation(
+        bytes32 key,
+        GmxPositionUtils.Props calldata order,
+        bytes calldata eventData
+    ) external nonReentrant auth {
+        handleCancelled(key, order, eventData);
+        // try handleCancelled(key, order, eventData) {
+        //     // Successful cancellation handling
+        // } catch {
+        //     unhandledCallbackLogic.storeUnhandledCallback(order, key, eventData);
+        // }
+    }
+
+    /**
+     * @notice Called after an order is frozen.
+     */
+    function afterOrderFrozen(
+        bytes32 key,
+        GmxPositionUtils.Props calldata order,
+        bytes calldata eventData
+    ) external nonReentrant auth {
+        handleFrozen(key, order, eventData);
+        // try handleFrozen(key, order, eventData) {
+        //     // Successful frozen handling
+        // } catch {
+        //     unhandledCallbackLogic.storeUnhandledCallback(order, key, eventData);
+        // }
     }
 }

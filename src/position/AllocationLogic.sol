@@ -144,7 +144,7 @@ contract AllocationLogic is CoreContract {
                 balanceList[i] += puppetAllocation * settledAfterContribution / allocation.allocated;
             }
 
-            if (feeMarket.askAmount(allocation.collateralToken) > 0) {
+            if (feeMarket.askPrice(allocation.collateralToken) > 0) {
                 feeMarket.deposit(allocation.collateralToken, address(positionStore), totalPuppetContribution);
             }
 
