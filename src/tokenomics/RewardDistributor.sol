@@ -3,7 +3,6 @@ pragma solidity 0.8.28;
 
 import {IGmxReferralStorage} from "../position/interface/IGmxReferralStorage.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Error} from "../shared/Error.sol";
@@ -13,7 +12,7 @@ import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {RewardStore} from "./store/RewardStore.sol";
 
-contract RewardDistributor is CoreContract, ReentrancyGuardTransient {
+contract RewardDistributor is CoreContract {
     /// @notice Configuration parameters
     struct Config {
         uint distributionWindow; // Time window for reward distribution (in seconds)
@@ -77,7 +76,7 @@ contract RewardDistributor is CoreContract, ReentrancyGuardTransient {
     /// @notice Deposit new rewards into the system.
     /// @param depositor The address depositing rewards.
     /// @param amount Amount of reward tokens to deposit.
-    function deposit(address depositor, uint amount) external auth nonReentrant {
+    function deposit(address depositor, uint amount) external auth {
         if (amount == 0) revert Error.RewardLogic__InvalidAmount();
 
         _distribute();
@@ -91,7 +90,7 @@ contract RewardDistributor is CoreContract, ReentrancyGuardTransient {
     /// @param user The address whose rewards are claimed.
     /// @param receiver The address receiving the rewards.
     /// @param amount The amount of rewards to claim.
-    function claim(address user, address receiver, uint amount) external auth nonReentrant {
+    function claim(address user, address receiver, uint amount) external auth {
         if (amount == 0) revert Error.RewardLogic__InvalidAmount();
 
         uint currentCumulative = _distribute();
@@ -115,7 +114,7 @@ contract RewardDistributor is CoreContract, ReentrancyGuardTransient {
     /// @param user The user whose rewards are to be updated.
     function updateUserRewards(
         address user
-    ) external auth nonReentrant {
+    ) external auth {
         uint currentCumulative = _distribute();
         UserRewards storage ur = userRewards[user];
         uint userBalance = vToken.balanceOf(user);
@@ -125,7 +124,7 @@ contract RewardDistributor is CoreContract, ReentrancyGuardTransient {
     }
 
     /// @notice Distribute pending rewards to the system.
-    function distribute() external auth nonReentrant returns (uint) {
+    function distribute() external auth returns (uint) {
         return _distribute();
     }
 

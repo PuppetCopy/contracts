@@ -2,8 +2,6 @@
 pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Error} from "../shared/Error.sol";
@@ -30,7 +28,7 @@ import {FeeMarketplaceStore} from "./store/FeeMarketplaceStore.sol";
  * 3. Users exchange protocol tokens for available fees at fixed rates.
  * 4. Exchanged protocol tokens are burned with the remaining sent to rewards.
  */
-contract FeeMarketplace is CoreContract, ReentrancyGuardTransient {
+contract FeeMarketplace is CoreContract {
     /**
      * @dev Controls market parameters.
      * @param distributionTimeframe Time window for new fee deposits to fully unlock.
@@ -126,7 +124,7 @@ contract FeeMarketplace is CoreContract, ReentrancyGuardTransient {
         address user,
         address receiver,
         uint purchaseAmount
-    ) external nonReentrant auth {
+    ) external auth {
         uint currentAskPrice = askPrice[feeToken];
         if (currentAskPrice == 0) {
             revert Error.FeeMarketplace__NotAuctionableToken();

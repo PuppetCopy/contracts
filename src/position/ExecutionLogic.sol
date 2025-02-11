@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.28;
 
-import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {PuppetStore} from "../puppet/store/PuppetStore.sol";
@@ -15,7 +14,7 @@ import {IGmxOrderCallbackReceiver} from "./interface/IGmxOrderCallbackReceiver.s
 import {PositionStore} from "./store/PositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
-contract ExecutionLogic is CoreContract, IGmxOrderCallbackReceiver, ReentrancyGuardTransient {
+contract ExecutionLogic is CoreContract, IGmxOrderCallbackReceiver {
     PuppetStore immutable puppetStore;
     PositionStore immutable positionStore;
     UnhandledCallbackLogic immutable unhandledCallbackLogic;
@@ -139,7 +138,7 @@ contract ExecutionLogic is CoreContract, IGmxOrderCallbackReceiver, ReentrancyGu
         bytes32 key,
         GmxPositionUtils.Props calldata order,
         bytes calldata eventData
-    ) external nonReentrant auth {
+    ) external auth {
         handleExecution(key, order, eventData);
         // try handleExecution(key, order, eventData) {
         //     // Successful execution
@@ -155,7 +154,7 @@ contract ExecutionLogic is CoreContract, IGmxOrderCallbackReceiver, ReentrancyGu
         bytes32 key,
         GmxPositionUtils.Props calldata order,
         bytes calldata eventData
-    ) external nonReentrant auth {
+    ) external auth {
         handleCancelled(key, order, eventData);
         // try handleCancelled(key, order, eventData) {
         //     // Successful cancellation handling
@@ -171,7 +170,7 @@ contract ExecutionLogic is CoreContract, IGmxOrderCallbackReceiver, ReentrancyGu
         bytes32 key,
         GmxPositionUtils.Props calldata order,
         bytes calldata eventData
-    ) external nonReentrant auth {
+    ) external auth {
         handleFrozen(key, order, eventData);
         // try handleFrozen(key, order, eventData) {
         //     // Successful frozen handling
