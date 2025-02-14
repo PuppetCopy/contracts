@@ -48,16 +48,22 @@ contract FeeMarketplaceTest is BasicSetup {
         _dealERC20(address(puppetToken), users.bob, 100e18);
         _dealERC20(address(usdc), users.owner, 1000e6);
 
-        // Approvals for router & FeeMarketplace.
-        wnt.approve(address(tokenRouter), type(uint).max);
-        usdc.approve(address(tokenRouter), type(uint).max);
-        usdc.approve(address(feeMarketplace), type(uint).max);
-
         // Deploy a dummy token for multi-token tests and mint tokens.
         dummyToken = new DummyToken();
         dummyToken.mint(users.owner, 1000e18);
 
-        vm.stopPrank();
+        // Approvals for router & FeeMarketplace.
+        dummyToken.approve(address(tokenRouter), type(uint).max);
+        wnt.approve(address(tokenRouter), type(uint).max);
+        usdc.approve(address(tokenRouter), type(uint).max);
+
+        // Participants approval
+        vm.startPrank(users.alice);
+        puppetToken.approve(address(tokenRouter), type(uint).max);
+        vm.startPrank(users.bob);
+        puppetToken.approve(address(tokenRouter), type(uint).max);
+
+        vm.startPrank(users.owner);
     }
 
     //----------------------------------------------------------------------------
@@ -66,44 +72,33 @@ contract FeeMarketplaceTest is BasicSetup {
 
     function testFullLifecycle() public {
         // Phase 1: Setup ask prices.
-        vm.startPrank(users.owner);
         feeMarketplace.setAskPrice(usdc, 10e18); // 10 protocol tokens per USDC.
         feeMarketplace.setAskPrice(wnt, 5e18); // 5 protocol tokens per WNT.
         _dealERC20(address(usdc), users.owner, 800e6);
         _dealERC20(address(wnt), users.owner, 80e18);
-        vm.stopPrank();
 
         // Capture initial puppet token supply.
         uint initialSupply = puppetToken.totalSupply();
 
         // Phase 2: Deposits (USDC and WNT).
-        vm.prank(users.owner);
         feeMarketplace.deposit(usdc, users.owner, 500e6);
-        vm.prank(users.owner);
         feeMarketplace.deposit(wnt, users.owner, 50e18);
 
         // Phase 3: Unlock fees after 1 day.
         skip(1 days);
 
         // Phase 4: Alice buys two batches of USDC fees.
-        vm.startPrank(users.alice);
-        // Ensure sufficient protocol token allowance.
-        puppetToken.approve(address(tokenRouter), 20e18);
         feeMarketplace.acceptOffer(usdc, users.alice, users.alice, 250e6); // Burns 10e18.
         feeMarketplace.acceptOffer(usdc, users.alice, users.alice, 250e6); // Burns another 10e18.
-        vm.stopPrank();
 
         // Phase 5: Second deposit and partial unlock.
-        vm.prank(users.owner);
         feeMarketplace.deposit(usdc, users.owner, 300e6);
         skip(12 hours); // Roughly 50% available (150e6 unlocked).
 
         // Phase 6: Bob completes purchases.
-        vm.startPrank(users.bob);
         puppetToken.approve(address(tokenRouter), 15e18);
         feeMarketplace.acceptOffer(usdc, users.bob, users.bob, 150e6); // Burns 10e18.
         feeMarketplace.acceptOffer(wnt, users.bob, users.bob, 25e18); // Burns 5e18.
-        vm.stopPrank();
 
         // Final verifications.
         assertEq(usdc.balanceOf(users.alice), 500e6, "Alice should receive 500e6 USDC");
@@ -119,7 +114,6 @@ contract FeeMarketplaceTest is BasicSetup {
     }
 
     function testDepositUpdatesState() public {
-        vm.prank(users.owner);
         feeMarketplace.deposit(usdc, users.owner, 100e6);
 
         assertEq(usdc.balanceOf(address(feeMarketplaceStore)), 100e6, "BankStore balance mismatch after deposit");
@@ -134,68 +128,53 @@ contract FeeMarketplaceTest is BasicSetup {
     function testBuyAndBurnSuccess() public {
         uint initialSupply = puppetToken.totalSupply();
 
-        vm.startPrank(users.owner);
         feeMarketplace.deposit(usdc, users.owner, 100e6);
         feeMarketplace.setAskPrice(usdc, 10e18);
         skip(1 days);
-        vm.stopPrank();
 
-        vm.startPrank(users.alice);
         // Approve for one acceptOffer call.
-        puppetToken.approve(address(tokenRouter), 10e18);
         feeMarketplace.acceptOffer(usdc, users.alice, users.alice, 50e6);
 
         // Verify fee token transfer and supply burn.
         assertEq(usdc.balanceOf(users.alice), 50e6, "Alice should receive 50e6 USDC");
         assertEq(puppetToken.totalSupply(), initialSupply - 10e18, "Protocol token supply decreased by burn amount");
         assertEq(feeMarketplace.accruedFee(usdc), 50e6, "Remaining unlocked fee for USDC must be updated");
-        vm.stopPrank();
     }
 
     function testPartialUnlock() public {
-        vm.startPrank(users.owner);
         feeMarketplace.deposit(usdc, users.owner, 100e6);
         skip(6 hours); // 25% unlock over half a day.
         uint pending = feeMarketplace.getPendingUnlock(usdc);
         assertEq(pending, 25e6, "Expected 25e6 pending unlock after 6 hours");
-        vm.stopPrank();
     }
 
     function testInsufficientUnlocked() public {
-        vm.startPrank(users.owner);
         feeMarketplace.deposit(usdc, users.owner, 100e6);
         feeMarketplace.setAskPrice(usdc, 10e18);
         skip(1 days / 2); // Only half the deposit unlocked (50e6 available).
-        vm.stopPrank();
 
-        vm.startPrank(users.alice);
-        puppetToken.approve(address(tokenRouter), 10e18);
         vm.expectRevert(abi.encodeWithSelector(Error.FeeMarketplace__InsufficientUnlockedBalance.selector, 50e6));
         feeMarketplace.acceptOffer(usdc, users.alice, users.alice, 100e6);
-        vm.stopPrank();
     }
 
     function testZeroBuybackQuote() public {
-        vm.startPrank(users.owner);
         feeMarketplace.deposit(usdc, users.owner, 100e6);
         feeMarketplace.setAskPrice(usdc, 0);
         skip(1 days);
-        vm.stopPrank();
 
-        vm.startPrank(users.alice);
         vm.expectRevert(Error.FeeMarketplace__NotAuctionableToken.selector);
         feeMarketplace.acceptOffer(puppetToken, users.alice, users.alice, 50e6);
-        vm.stopPrank();
     }
 
     function testUnauthorizedAccess() public {
-        vm.prank(users.alice);
+        feeMarketplace.deposit(usdc, users.owner, 100e6);
+
+        vm.startPrank(users.alice);
         vm.expectRevert(abi.encodeWithSelector(Error.Permission__Unauthorized.selector, users.alice));
         feeMarketplace.deposit(usdc, users.owner, 100e6);
     }
 
     function testMultipleDeposits() public {
-        vm.startPrank(users.owner);
         // First deposit of 100e6 at time 0.
         feeMarketplace.deposit(usdc, users.owner, 100e6);
         skip(12 hours); // First deposit accrues 50e6 (half unlocked).
@@ -213,11 +192,9 @@ contract FeeMarketplaceTest is BasicSetup {
         // Total unlocked = 50e6 + 75e6 = 125e6.
         uint totalUnlocked = feeMarketplace.getTotalUnlocked(usdc);
         assertEq(totalUnlocked, 125e6, "Multi-deposit drip mismatch");
-        vm.stopPrank();
     }
 
     function testConfigUpdate() public {
-        vm.startPrank(users.owner);
         feeMarketplace.deposit(usdc, users.owner, 100e6);
 
         // Update config: increase distribution timeframe to 2 days.
@@ -230,63 +207,47 @@ contract FeeMarketplaceTest is BasicSetup {
         skip(1 days); // Now only about 50% (50e6) should have unlocked.
         uint pending = feeMarketplace.getPendingUnlock(usdc);
         assertEq(pending, 50e6, "Updated config not resulting in correct unlock");
-        vm.stopPrank();
     }
 
     function testBurnAddressReceipt() public {
         uint initialSupply = puppetToken.totalSupply();
-        vm.startPrank(users.owner);
         feeMarketplace.deposit(usdc, users.owner, 100e6);
         feeMarketplace.setAskPrice(usdc, 10e18);
         skip(1 days);
-        vm.stopPrank();
 
-        vm.startPrank(users.alice);
-        puppetToken.approve(address(tokenRouter), 10e18);
         feeMarketplace.acceptOffer(usdc, users.alice, users.alice, 50e6);
         // In 100% burn config, supply should decrease fully.
         assertEq(puppetToken.totalSupply(), initialSupply - 10e18, "Burn amount must equal ask price in full-burn mode");
-        vm.stopPrank();
     }
 
     function testExactTimeUnlock() public {
-        vm.startPrank(users.owner);
         feeMarketplace.deposit(usdc, users.owner, 100e6);
         // Skip 1 day plus a few seconds.
         skip(1 days + 1 seconds);
         assertEq(feeMarketplace.getPendingUnlock(usdc), 100e6, "After 1 day +, entire deposit should be unlocked");
-        vm.stopPrank();
     }
 
     function testSmallAmountPrecision() public {
-        vm.startPrank(users.owner);
         feeMarketplace.deposit(usdc, users.owner, 1); // Deposit 1 wei USDC.
         skip(12 hours);
         // Expect rounding down yields 0 pending unlock.
         assertEq(feeMarketplace.getPendingUnlock(usdc), 0, "Small deposit should not unlock fractions");
         skip(12 hours);
         assertEq(feeMarketplace.getPendingUnlock(usdc), 1, "Fraction should round up after full time");
-        vm.stopPrank();
     }
 
     function testMaxPurchase() public {
-        vm.startPrank(users.owner);
         feeMarketplace.deposit(usdc, users.owner, 100e6);
         feeMarketplace.setAskPrice(usdc, 10e18);
         skip(1 days);
         uint maxAmount = feeMarketplace.getTotalUnlocked(usdc);
-        vm.stopPrank();
 
-        vm.startPrank(users.alice);
-        puppetToken.approve(address(tokenRouter), 10e18);
         feeMarketplace.acceptOffer(usdc, users.alice, users.alice, maxAmount);
         assertEq(usdc.balanceOf(users.alice), maxAmount, "Alice should receive full unlocked balance");
         assertEq(feeMarketplace.accruedFee(usdc), 0, "No unlocked balance should remain");
-        vm.stopPrank();
     }
 
     function testPartialBurnWithRewards() public {
-        vm.startPrank(users.owner);
         // Change config: 50% burn, remaining to distributor.
         FeeMarketplace.Config memory newConfig = FeeMarketplace.Config({
             distributionTimeframe: 1 days,
@@ -300,10 +261,7 @@ contract FeeMarketplaceTest is BasicSetup {
         skip(1 days);
         uint initialSupply = puppetToken.totalSupply();
         uint initialDistributorBal = puppetToken.balanceOf(address(0x1234));
-        vm.stopPrank();
 
-        vm.startPrank(users.alice);
-        puppetToken.approve(address(tokenRouter), 10e18);
         feeMarketplace.acceptOffer(usdc, users.alice, users.alice, 50e6);
         // Expect 50% of 10e18 burned, 50% transferred to distributor.
         assertEq(puppetToken.totalSupply(), initialSupply - 5e18, "Total burned amount should be 5e18");
@@ -312,7 +270,6 @@ contract FeeMarketplaceTest is BasicSetup {
             initialDistributorBal + 5e18,
             "Reward distributor did not receive correct amount"
         );
-        vm.stopPrank();
     }
 
     //----------------------------------------------------------------------------
@@ -321,56 +278,43 @@ contract FeeMarketplaceTest is BasicSetup {
 
     // Test: Zero deposit should revert.
     function testZeroDepositReverts() public {
-        vm.startPrank(users.owner);
         vm.expectRevert(Error.FeeMarketplace__ZeroDeposit.selector);
         feeMarketplace.deposit(usdc, users.owner, 0);
-        vm.stopPrank();
     }
 
     // Test: No pending unlock immediately after deposit.
     function testNoPendingUnlockImmediately() public {
-        vm.startPrank(users.owner);
         feeMarketplace.deposit(usdc, users.owner, 100e6);
         uint pending = feeMarketplace.getPendingUnlock(usdc);
         assertEq(pending, 0, "Pending unlock should be zero immediately after deposit");
-        vm.stopPrank();
     }
 
     // Test: Multiple fee tokens are tracked independently.
     function testMultipleFeeTokens() public {
-        vm.startPrank(users.owner);
         feeMarketplace.setAskPrice(usdc, 10e18);
         feeMarketplace.setAskPrice(dummyToken, 20e18);
 
         feeMarketplace.deposit(usdc, users.owner, 200e6);
-        dummyToken.approve(address(tokenRouter), type(uint).max);
         feeMarketplace.deposit(dummyToken, users.owner, 100e18);
         skip(1 days);
         uint usdcUnlocked = feeMarketplace.getTotalUnlocked(usdc);
         uint dummyUnlocked = feeMarketplace.getTotalUnlocked(dummyToken);
         assertEq(usdcUnlocked, 200e6, "USDC should be fully unlocked");
         assertEq(dummyUnlocked, 100e18, "Dummy token should be fully unlocked");
-        vm.stopPrank();
     }
 
     // Test: Repeated acceptOffer calls update state correctly.
     function testRepeatedAcceptOfferUpdatesUnlocked() public {
-        vm.startPrank(users.owner);
         feeMarketplace.deposit(usdc, users.owner, 100e6);
         feeMarketplace.setAskPrice(usdc, 10e18);
         skip(1 days);
         uint initiallyUnlocked = feeMarketplace.getTotalUnlocked(usdc);
         assertEq(initiallyUnlocked, 100e6, "Expected full unlock before purchases");
-        vm.stopPrank();
 
-        vm.startPrank(users.alice);
-        // Provide enough approval for two calls.
-        puppetToken.approve(address(tokenRouter), 20e18);
         feeMarketplace.acceptOffer(usdc, users.alice, users.alice, 60e6);
         assertEq(feeMarketplace.accruedFee(usdc), 40e6, "Remaining unlocked fee should be reduced to 40e6");
         feeMarketplace.acceptOffer(usdc, users.alice, users.alice, 40e6);
         assertEq(feeMarketplace.accruedFee(usdc), 0, "After full redemption, no unlocked fee should remain");
-        vm.stopPrank();
     }
 }
 

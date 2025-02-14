@@ -116,15 +116,11 @@ contract FeeMarketplace is CoreContract {
     /**
      * @notice Executes a fee redemption offer.
      * @param feeToken The fee token to be redeemed.
-     * @param receiver The address receiving fee tokens.
+     * @param depositor The address making the redemption.
+     * @param receiver The address receiving the fee tokens.
      * @param purchaseAmount The amount of fee tokens to redeem.
      */
-    function acceptOffer(
-        IERC20 feeToken,
-        address user,
-        address receiver,
-        uint purchaseAmount
-    ) external auth {
+    function acceptOffer(IERC20 feeToken, address depositor, address receiver, uint purchaseAmount) external auth {
         uint currentAskPrice = askPrice[feeToken];
         if (currentAskPrice == 0) {
             revert Error.FeeMarketplace__NotAuctionableToken();
@@ -141,7 +137,7 @@ contract FeeMarketplace is CoreContract {
         uint rewardAmount = currentAskPrice - burnAmount;
 
         // Transfer protocol tokens from the user to the contract.
-        tokenRouter.transfer(protocolToken, user, address(this), currentAskPrice);
+        tokenRouter.transfer(protocolToken, depositor, address(this), currentAskPrice);
 
         // Burn the designated portion of protocol tokens.
         protocolToken.burn(burnAmount);
