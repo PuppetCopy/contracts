@@ -133,21 +133,22 @@ contract AllocationLogic is CoreContract {
         uint totalPuppetContribution;
 
         if (allocation.profit > 0) {
-            totalPuppetContribution = Precision.applyFactor(config.performanceContributionRate, allocation.profit);
+            if (feeMarket.askPrice(allocation.collateralToken) > 0) {
+                totalPuppetContribution -= Precision.applyFactor(config.performanceContributionRate, allocation.profit);
 
-            uint settledAfterContribution = allocation.settled - totalPuppetContribution;
+                feeMarket.deposit(
+                    allocation.collateralToken, address(positionStore), allocation.settled - totalPuppetContribution
+                );
+            } else {
+                totalPuppetContribution = allocation.settled;
+            }
 
             for (uint i = 0; i < allocationList.length; i++) {
                 uint puppetAllocation = allocationList[i];
                 if (puppetAllocation == 0) continue;
 
-                balanceList[i] += puppetAllocation * settledAfterContribution / allocation.allocated;
+                balanceList[i] += puppetAllocation * totalPuppetContribution / allocation.allocated;
             }
-
-            if (feeMarket.askPrice(allocation.collateralToken) > 0) {
-                feeMarket.deposit(allocation.collateralToken, address(positionStore), totalPuppetContribution);
-            }
-
         } else if (allocation.settled > 0) {
             for (uint i = 0; i < allocationList.length; i++) {
                 uint puppetAllocation = allocationList[i];
