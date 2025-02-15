@@ -21,23 +21,18 @@ abstract contract Permission is IPermission {
     }
 
     modifier auth() {
-        if (canCall(msg.sig, msg.sender)) {
-            _;
-        } else {
-            revert Error.Permission__Unauthorized(msg.sender);
-        }
+        require(canCall(msg.sig, msg.sender), Error.Permission__Unauthorized(msg.sender));
+
+        _;
     }
 
     modifier onlyAuthority() {
-        if (msg.sender == address(authority)) {
-            _;
-        } else {
-            revert Error.Permission__Unauthorized(msg.sender);
-        }
+        require(msg.sender == address(authority), Error.Permission__Unauthorized(msg.sender));
+
+        _;
     }
 
     function setPermission(bytes4 functionSig, address user, bool isEnabled) external onlyAuthority {
         permissionMap[functionSig][user] = isEnabled;
     }
-
 }

@@ -138,9 +138,7 @@ contract PuppetStore is BankStore {
         address _puppet,
         uint _allocationAmount
     ) external auth {
-        if (userAllocationMap[_allocationKey][_puppet] > 0) {
-            revert Error.PuppetStore__OverwriteAllocation();
-        }
+        require(userAllocationMap[_allocationKey][_puppet] == 0, Error.PuppetStore__OverwriteAllocation());
 
         if (_allocationAmount == 0) return;
 
@@ -167,10 +165,11 @@ contract PuppetStore is BankStore {
         uint allocated;
 
         for (uint i = 0; i < listLength; i++) {
-            uint _allocation = _allocationList[i];
             address _puppet = _puppetList[i];
+            require(allocationAmount[_puppet] == 0, Error.PuppetStore__OverwriteAllocation());
 
-            if (allocationAmount[_puppet] > 0) revert Error.PuppetStore__OverwriteAllocation();
+            uint _allocation = _allocationList[i];
+
             if (_allocation == 0) continue;
 
             balance[_puppet] -= _allocation;
@@ -220,7 +219,7 @@ contract PuppetStore is BankStore {
         MatchRule[] calldata _rules
     ) external auth {
         uint _keyListLength = _matchKeyList.length;
-        if (_keyListLength != _rules.length) revert Error.Store__InvalidLength();
+        require(_keyListLength == _rules.length, Error.Store__InvalidLength());
 
         for (uint i = 0; i < _keyListLength; i++) {
             bytes32 _key = _matchKeyList[i];

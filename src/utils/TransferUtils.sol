@@ -143,18 +143,14 @@ library TransferUtils {
         if (amount == 0) return;
         ExternalCallUtils.validateDestination(receiver);
 
-        if (gasLimit == 0) {
-            revert Error.TransferUtils__EmptyTokenTranferGasLimit(address(token));
-        }
+        require(gasLimit > 0, Error.TransferUtils__EmptyTokenTranferGasLimit(address(token)));
 
         (bool success0, /* bytes memory returndata */ ) =
             nonRevertingTransferWithGasLimit(token, receiver, amount, gasLimit);
 
         if (success0) return;
 
-        if (holdingAddress == address(0)) {
-            revert Error.TransferUtils__EmptyHoldingAddress();
-        }
+        require(holdingAddress != address(0), Error.TransferUtils__EmptyHoldingAddress());
 
         // in case transfers to the receiver fail due to blacklisting or other reasons
         // send the tokens to a holding address to avoid possible gaming through reverting

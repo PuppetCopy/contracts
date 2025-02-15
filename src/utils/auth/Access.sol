@@ -23,19 +23,15 @@ abstract contract Access is IAccess {
     }
 
     modifier auth() {
-        if (canCall(msg.sender)) {
-            _;
-        } else {
-            revert Error.Access__Unauthorized();
-        }
+        require(canCall(msg.sender), Error.Access__Unauthorized());
+
+        _;
     }
 
     modifier onlyAuthority() {
-        if (msg.sender == address(authority)) {
-            _;
-        } else {
-            revert Error.Access__Unauthorized();
-        }
+        require(msg.sender == address(authority), Error.Access__Unauthorized());
+
+        _;
     }
 
     function setAccess(address user, bool isEnabled) external onlyAuthority {

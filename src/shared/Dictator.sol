@@ -69,7 +69,7 @@ contract Dictator is Ownable, IAuthority {
     }
 
     function logEvent(string memory method, string memory name, string memory version, bytes memory data) external {
-        if (!contractAccessMap[msg.sender]) revert Error.Dictator__ContractNotInitialized();
+        require(contractAccessMap[msg.sender], Error.Dictator__ContractNotInitialized());
 
         emit LogEvent(msg.sender, method, name, version, data);
     }
@@ -77,7 +77,7 @@ contract Dictator is Ownable, IAuthority {
     function initContract(CoreContract target, bytes calldata config) public onlyOwner {
         address targetAddress = address(target);
 
-        if (contractAccessMap[targetAddress]) revert Error.Dictator__ContractAlreadyInitialized();
+        require(!contractAccessMap[targetAddress], Error.Dictator__ContractAlreadyInitialized());
         contractAccessMap[targetAddress] = true;
 
         emit AddContractAccess(targetAddress);
@@ -85,10 +85,12 @@ contract Dictator is Ownable, IAuthority {
         setConfig(target, config);
     }
 
-    function initContract(CoreContract target) public onlyOwner {
+    function initContract(
+        CoreContract target
+    ) public onlyOwner {
         address targetAddress = address(target);
 
-        if (contractAccessMap[targetAddress]) revert Error.Dictator__ContractAlreadyInitialized();
+        require(!contractAccessMap[targetAddress], Error.Dictator__ContractAlreadyInitialized());
         contractAccessMap[targetAddress] = true;
 
         emit AddContractAccess(targetAddress);
@@ -98,7 +100,7 @@ contract Dictator is Ownable, IAuthority {
         address targetAddress = address(target);
         (bool success,) = targetAddress.call(abi.encodeWithSignature("setConfig(bytes)", config));
 
-        if (!success) revert Error.Dictator__ConfigurationUpdateFailed();
+        require(success, Error.Dictator__ConfigurationUpdateFailed());
 
         emit SetConfig(targetAddress, config);
     }
@@ -108,7 +110,7 @@ contract Dictator is Ownable, IAuthority {
     ) public onlyOwner {
         address targetAddress = address(target);
 
-        if (!contractAccessMap[targetAddress]) revert Error.Dictator__ContractNotInitialized();
+        require(contractAccessMap[targetAddress], Error.Dictator__ContractNotInitialized());
         contractAccessMap[targetAddress] = false;
 
         emit RemoveContractAccess(targetAddress);

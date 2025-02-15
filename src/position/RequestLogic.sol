@@ -195,11 +195,8 @@ contract RequestLogic is CoreContract {
         });
 
         if (allocation.size == 0) {
-            if (allocation.allocated == 0) {
-                revert Error.RequestLogic__NoAllocation();
-            }
-
-            if (allocation.collateral > 0) revert Error.RequestLogic__PendingExecution();
+            require(allocation.allocated > 0, Error.RequestLogic__NoAllocation());
+            require(allocation.collateral == 0, Error.RequestLogic__PendingExecution());
 
             allocation.collateral = allocation.allocated;
 

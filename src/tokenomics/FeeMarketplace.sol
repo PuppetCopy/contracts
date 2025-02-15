@@ -102,7 +102,7 @@ contract FeeMarketplace is CoreContract {
      * @param amount The deposit amount.
      */
     function deposit(IERC20 feeToken, address depositor, uint amount) external auth {
-        if (amount == 0) revert Error.FeeMarketplace__ZeroDeposit();
+        require(amount > 0, Error.FeeMarketplace__ZeroDeposit());
 
         // Update the fee token's unlocked balance before processing the deposit.
         _updateUnlockedBalance(feeToken);
@@ -122,15 +122,14 @@ contract FeeMarketplace is CoreContract {
      */
     function acceptOffer(IERC20 feeToken, address depositor, address receiver, uint purchaseAmount) external auth {
         uint currentAskPrice = askPrice[feeToken];
-        if (currentAskPrice == 0) {
-            revert Error.FeeMarketplace__NotAuctionableToken();
-        }
+
+        require(currentAskPrice > 0, Error.FeeMarketplace__NotAuctionableToken());
 
         // Update the fee token's unlocked balance before redemption.
         _updateUnlockedBalance(feeToken);
 
         uint available = accruedFee[feeToken];
-        if (available < purchaseAmount) revert Error.FeeMarketplace__InsufficientUnlockedBalance(available);
+        require(available >= purchaseAmount, Error.FeeMarketplace__InsufficientUnlockedBalance(available));
 
         // Calculate protocol token burn and reward amounts.
         uint burnAmount = Precision.applyBasisPoints(config.burnBasisPoints, currentAskPrice);

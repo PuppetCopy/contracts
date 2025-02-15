@@ -17,7 +17,7 @@ contract Subaccount {
         address _contract,
         bytes calldata _data
     ) external payable returns (bool _success, bytes memory _returnData) {
-        if (!store.canCall(msg.sender)) revert Error.Subaccount__UnauthorizedOperator();
+        require(store.canCall(msg.sender), Error.Subaccount__UnauthorizedOperator());
 
         return _contract.call{value: msg.value, gas: gasleft()}(_data);
     }

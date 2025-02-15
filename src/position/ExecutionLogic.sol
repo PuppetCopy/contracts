@@ -57,9 +57,7 @@ contract ExecutionLogic is CoreContract, IGmxOrderCallbackReceiver {
     ) internal {
         PositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
 
-        if (request.matchKey == 0) {
-            revert Error.ExecutionLogic__RequestDoesNotMatchExecution();
-        }
+        require(request.matchKey != 0, Error.ExecutionLogic__RequestDoesNotMatchExecution());
 
         PuppetStore.Allocation memory allocation = puppetStore.getAllocation(request.allocationKey);
 
@@ -88,15 +86,11 @@ contract ExecutionLogic is CoreContract, IGmxOrderCallbackReceiver {
     ) internal {
         PositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
 
-        if (request.matchKey == 0) {
-            revert Error.ExecutionLogic__RequestDoesNotMatchExecution();
-        }
+        require(request.matchKey != 0, Error.ExecutionLogic__RequestDoesNotMatchExecution());
 
         PuppetStore.Allocation memory allocation = puppetStore.getAllocation(request.allocationKey);
 
-        if (allocation.size == 0) {
-            revert Error.ExecutionLogic__PositionDoesNotExist();
-        }
+        require(allocation.size > 0, Error.ExecutionLogic__PositionDoesNotExist());
 
         uint recordedAmountIn = puppetStore.recordTransferIn(allocation.collateralToken);
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91

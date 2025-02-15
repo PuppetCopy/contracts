@@ -29,12 +29,11 @@ contract PuppetLogic is CoreContract {
     }
 
     function deposit(IERC20 collateralToken, address user, uint amount) external auth {
-        if (amount == 0) revert Error.PuppetLogic__InvalidAmount();
+        require(amount > 0, Error.PuppetLogic__InvalidAmount());
 
-        validatePuppetTokenAllowance(collateralToken, user, amount);
+        uint nextBalance = store.getUserBalance(collateralToken, user) + amount;
 
-        uint balance = store.getUserBalance(collateralToken, user);
-        uint nextBalance = balance + amount;
+        validatePuppetTokenAllowance(collateralToken, user, nextBalance);
 
         store.transferIn(collateralToken, user, amount);
         store.setBalance(collateralToken, user, nextBalance);
@@ -43,10 +42,12 @@ contract PuppetLogic is CoreContract {
     }
 
     function withdraw(IERC20 collateralToken, address user, address receiver, uint amount) external auth {
-        if (amount == 0) revert Error.PuppetLogic__InvalidAmount();
+        require(amount > 0, Error.PuppetLogic__InvalidAmount());
+
         uint balance = store.getUserBalance(collateralToken, user);
 
-        if (amount > balance) revert Error.PuppetLogic__InsufficientBalance();
+        require(amount <= balance, Error.PuppetLogic__InsufficientBalance());
+
         uint nextBalance = balance - amount;
 
         store.setBalance(collateralToken, user, nextBalance);
@@ -75,7 +76,7 @@ contract PuppetLogic is CoreContract {
         address puppet
     ) external auth {
         uint length = traderList.length;
-        if (length != ruleParamList.length) revert Error.PuppetLogic__InvalidLength();
+        require(length == ruleParamList.length, Error.PuppetLogic__InvalidLength());
 
         bytes32[] memory matchKeyList = new bytes32[](length);
 
@@ -95,16 +96,12 @@ contract PuppetLogic is CoreContract {
 
     // internal
 
-    function validatePuppetTokenAllowance(
-        IERC20 token,
-        address puppet,
-        uint deltaAmount
-    ) internal view returns (uint) {
+    function validatePuppetTokenAllowance(IERC20 token, address puppet, uint amount) internal view returns (uint) {
         uint tokenAllowance = store.getUserBalance(token, puppet);
         uint allowanceCap = store.getTokenAllowanceCap(token);
 
-        if (allowanceCap == 0) revert Error.PuppetLogic__TokenNotAllowed();
-        if (tokenAllowance + deltaAmount > allowanceCap) revert Error.PuppetLogic__AllowanceAboveLimit(allowanceCap);
+        require(allowanceCap > 0, Error.PuppetLogic__TokenNotAllowed());
+        require(amount <= allowanceCap, Error.PuppetLogic__AllowanceAboveLimit(allowanceCap));
 
         return tokenAllowance;
     }
@@ -121,9 +118,10 @@ contract PuppetLogic is CoreContract {
             );
         }
 
-        if (ruleParams.allowanceRate < config.minAllowanceRate || ruleParams.allowanceRate > config.maxAllowanceRate) {
-            revert Error.PuppetLogic__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate);
-        }
+        require(
+            ruleParams.allowanceRate >= config.minAllowanceRate && ruleParams.allowanceRate <= config.maxAllowanceRate,
+            Error.PuppetLogic__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate)
+        );
     }
 
     // governance
@@ -134,9 +132,10 @@ contract PuppetLogic is CoreContract {
     ) internal override {
         config = abi.decode(data, (Config));
 
-        if (config.tokenAllowanceList.length != config.tokenAllowanceAmountList.length) {
-            revert Error.PuppetLogic__InvalidLength();
-        }
+        require(
+            config.tokenAllowanceList.length == config.tokenAllowanceAmountList.length,
+            Error.PuppetLogic__InvalidLength()
+        );
 
         for (uint i; i < config.tokenAllowanceList.length; i++) {
             store.setTokenAllowanceCap(config.tokenAllowanceList[i], config.tokenAllowanceAmountList[i]);

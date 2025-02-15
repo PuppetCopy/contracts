@@ -80,8 +80,8 @@ contract VotingEscrowLogic is CoreContract {
     }
 
     function lock(address depositor, address user, uint amount, uint duration) external auth {
-        if (amount == 0) revert Error.VotingEscrowLogic__ZeroAmount();
-        if (duration > MAXTIME) revert Error.VotingEscrowLogic__ExceedMaxTime();
+        require(amount > 0, Error.VotingEscrowLogic__ZeroAmount());
+        require(duration <= MAXTIME, Error.VotingEscrowLogic__ExceedMaxTime());
 
         uint bonusAmount = getVestedBonus(amount, duration);
 
@@ -107,10 +107,11 @@ contract VotingEscrowLogic is CoreContract {
     }
 
     function claim(address user, address receiver, uint amount) external auth {
-        if (amount == 0) revert Error.VotingEscrowLogic__ZeroAmount();
+        require(amount > 0, Error.VotingEscrowLogic__ZeroAmount());
+
         Vested memory vested = getVestingCursor(user);
 
-        if (amount > vested.accrued) revert Error.VotingEscrowLogic__ExceedingAccruedAmount(vested.accrued);
+        require(amount <= vested.accrued, Error.VotingEscrowLogic__ExceedingAccruedAmount(vested.accrued));
 
         vested.accrued -= amount;
         vestMap[user] = vested;
@@ -119,7 +120,9 @@ contract VotingEscrowLogic is CoreContract {
         _logEvent("Claim", abi.encode(user, receiver, amount));
     }
 
-    function _setConfig(bytes calldata data) internal override {
+    function _setConfig(
+        bytes calldata data
+    ) internal override {
         config = abi.decode(data, (Config));
     }
 

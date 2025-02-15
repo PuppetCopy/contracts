@@ -51,14 +51,11 @@ contract AllocationLogic is CoreContract {
 
         PuppetStore.Allocation memory allocation = puppetStore.getAllocation(allocationKey);
 
-        if (allocation.size > 0) {
-            revert Error.AllocationLogic__PendingSettlment();
-        }
+        require(allocation.size == 0, Error.AllocationLogic__PendingSettlment());
+
         uint puppetListLength = puppetList.length;
 
-        if (puppetListLength > config.limitAllocationListLength) {
-            revert Error.AllocationLogic__PuppetListLimit();
-        }
+        require(config.limitAllocationListLength > puppetListLength, Error.AllocationLogic__PuppetListLimit());
 
         if (allocation.matchKey == bytes32(0)) {
             allocation.matchKey = matchKey;
@@ -114,17 +111,17 @@ contract AllocationLogic is CoreContract {
         uint startGas = gasleft();
 
         PuppetStore.Allocation memory allocation = puppetStore.getAllocation(allocationKey);
-        if (allocation.matchKey == bytes32(0)) {
-            revert Error.AllocationLogic__AllocationDoesNotExist();
-        }
-        if (allocation.collateral > 0) {
-            revert Error.AllocationLogic__UtillizedAllocationed();
-        }
+
+        require(allocation.matchKey != bytes32(0), Error.AllocationLogic__AllocationDoesNotExist());
+        require(allocation.collateral == 0, Error.AllocationLogic__UtillizedAllocationed());
 
         bytes32 puppetListHash = keccak256(abi.encode(puppetList));
-        if (puppetStore.getSettledAllocationHash(puppetListHash) != allocationKey) {
-            revert Error.AllocationLogic__InvalidPuppetListIntegrity();
-        }
+
+        require(
+            puppetStore.getSettledAllocationHash(puppetListHash) == allocationKey,
+            Error.AllocationLogic__InvalidPuppetListIntegrity()
+        );
+
         puppetStore.setSettledAllocationHash(puppetListHash, allocationKey);
 
         (uint[] memory balanceList, uint[] memory allocationList) =

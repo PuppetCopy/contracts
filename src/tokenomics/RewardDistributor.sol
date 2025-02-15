@@ -77,7 +77,7 @@ contract RewardDistributor is CoreContract {
     /// @param depositor The address depositing rewards.
     /// @param amount Amount of reward tokens to deposit.
     function deposit(address depositor, uint amount) external auth {
-        if (amount == 0) revert Error.RewardLogic__InvalidAmount();
+        require(amount > 0, Error.RewardLogic__InvalidAmount());
 
         _distribute();
         totalUndistributed += amount;
@@ -91,7 +91,7 @@ contract RewardDistributor is CoreContract {
     /// @param receiver The address receiving the rewards.
     /// @param amount The amount of rewards to claim.
     function claim(address user, address receiver, uint amount) external auth {
-        if (amount == 0) revert Error.RewardLogic__InvalidAmount();
+        require(amount > 0, Error.RewardLogic__InvalidAmount());
 
         uint currentCumulative = _distribute();
         UserRewards storage ur = userRewards[user];
@@ -101,9 +101,8 @@ contract RewardDistributor is CoreContract {
         ur.accrued += _calculatePendingRewardPerToken(ur.cumulativeRewardCheckpoint, currentCumulative, userBalance);
         ur.cumulativeRewardCheckpoint = currentCumulative;
 
-        if (amount > ur.accrued) {
-            revert Error.RewardLogic__InsufficientRewards(ur.accrued);
-        }
+        require(amount <= ur.accrued, Error.RewardLogic__InsufficientRewards(ur.accrued));
+
         ur.accrued -= amount;
 
         store.transferOut(rewardToken, receiver, amount);

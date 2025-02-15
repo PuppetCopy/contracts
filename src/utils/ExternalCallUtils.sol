@@ -36,9 +36,7 @@ library ExternalCallUtils {
     function validateDestination(
         address destination
     ) internal pure {
-        if (destination == address(0)) {
-            revert Error.ExternalCallUtils__EmptyReceiver();
-        }
+        require(destination != address(0), Error.ExternalCallUtils__EmptyReceiver());
     }
 
     /**
@@ -49,16 +47,14 @@ library ExternalCallUtils {
     function callTarget(uint gasLimit, address target, bytes memory data) internal returns (bytes memory) {
         (bool success, bytes memory returndata) = target.call{gas: gasLimit}(data);
 
-        if (returndata.length != 0 && !abi.decode(returndata, (bool))) {
-            revert Error.ExternalCallUtils__SafeERC20FailedOperation(target);
-        }
+        require(
+            returndata.length != 0 && abi.decode(returndata, (bool)),
+            Error.ExternalCallUtils__SafeERC20FailedOperation(target)
+        );
 
         if (success) {
-            // only check if target is a contract if the call was successful and the return data is empty
-            // otherwise we already know that it was a contract
-            if (returndata.length == 0 && target.code.length == 0) {
-                revert Error.ExternalCallUtils__AddressEmptyCode(target);
-            }
+            require(returndata.length > 0 && target.code.length > 0, Error.ExternalCallUtils__AddressEmptyCode(target));
+
             return returndata;
         } else {
             _revert(returndata);
