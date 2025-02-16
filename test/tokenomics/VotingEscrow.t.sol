@@ -1,5 +1,5 @@
 // // SPDX-License-Identifier: BUSL-1.1
-// pragma solidity 0.8.28;
+// pragma solidity ^0.8.28;
 
 // import {Error} from "src/shared/Error.sol";
 // import {TokenRouter} from "src/shared/TokenRouter.sol";

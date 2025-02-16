@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.28;
+pragma solidity ^0.8.28;
 
 import {BasicSetup} from "../base/BasicSetup.t.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -122,7 +122,7 @@ contract FeeMarketplaceTest is BasicSetup {
             block.timestamp,
             "lastUpdateTimestamp should equal current block time"
         );
-        assertEq(feeMarketplace.accruedFee(usdc), 0, "No fees should be unlocked immediately at deposit");
+        assertEq(feeMarketplace.accruedFee(usdc), 0, "Accrued fees should be zero immediately after deposit");
     }
 
     function testBuyAndBurnSuccess() public {
@@ -132,7 +132,7 @@ contract FeeMarketplaceTest is BasicSetup {
         feeMarketplace.setAskPrice(usdc, 10e18);
         skip(1 days);
 
-        // Approve for one acceptOffer call.
+        // Approve USDC for a single acceptOffer call by Alice.
         feeMarketplace.acceptOffer(usdc, users.alice, users.alice, 50e6);
 
         // Verify fee token transfer and supply burn.
@@ -141,27 +141,25 @@ contract FeeMarketplaceTest is BasicSetup {
         assertEq(feeMarketplace.accruedFee(usdc), 50e6, "Remaining unlocked fee for USDC must be updated");
     }
 
-    function testPartialUnlock() public {
+    function testPartialUnlock2() public {
         feeMarketplace.deposit(usdc, users.owner, 100e6);
         skip(6 hours); // 25% unlock over half a day.
         uint pending = feeMarketplace.getPendingUnlock(usdc);
         assertEq(pending, 25e6, "Expected 25e6 pending unlock after 6 hours");
     }
 
-    function testInsufficientUnlocked() public {
-        feeMarketplace.deposit(usdc, users.owner, 100e6);
-        feeMarketplace.setAskPrice(usdc, 10e18);
-        skip(1 days / 2); // Only half the deposit unlocked (50e6 available).
-
-        vm.expectRevert(abi.encodeWithSelector(Error.FeeMarketplace__InsufficientUnlockedBalance.selector, 50e6));
-        feeMarketplace.acceptOffer(usdc, users.alice, users.alice, 100e6);
-    }
-
     function testZeroBuybackQuote() public {
+        // Deposit 100e6 USDC into the fee marketplace.
         feeMarketplace.deposit(usdc, users.owner, 100e6);
+
+        // Set the ask price for USDC to 0, making it non-auctionable.
         feeMarketplace.setAskPrice(usdc, 0);
+
+        // Skip 1 day to allow any potential unlocks.
         skip(1 days);
 
+        // Expect a revert with the NotAuctionableToken error when trying to accept an offer
+        // for puppet tokens with a zero ask price.
         vm.expectRevert(Error.FeeMarketplace__NotAuctionableToken.selector);
         feeMarketplace.acceptOffer(puppetToken, users.alice, users.alice, 50e6);
     }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.28;
+pragma solidity ^0.8.28;
 
 import {Error} from "../shared/Error.sol";
 import {ErrorUtils} from "./ErrorUtils.sol";
@@ -143,7 +143,7 @@ library TransferUtils {
         if (amount == 0) return;
         ExternalCallUtils.validateDestination(receiver);
 
-        require(gasLimit > 0, Error.TransferUtils__EmptyTokenTranferGasLimit(address(token)));
+        require(gasLimit > 0, Error.TransferUtils__EmptyTokenTranferGasLimit(token));
 
         (bool success0, /* bytes memory returndata */ ) =
             nonRevertingTransferWithGasLimit(token, receiver, amount, gasLimit);
@@ -166,7 +166,7 @@ library TransferUtils {
         // throw custom errors to prevent spoofing of errors
         // this is necessary because contracts like DepositHandler, WithdrawalHandler, OrderHandler
         // do not cancel requests for specific errors
-        revert Error.TransferUtils__TokenTransferError(address(token), receiver, amount);
+        revert Error.TransferUtils__TokenTransferError(token, receiver, amount);
     }
 
     /**

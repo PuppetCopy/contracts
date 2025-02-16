@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.28;
+pragma solidity ^0.8.28;
 
 import {Dictator} from "src/shared/Dictator.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";

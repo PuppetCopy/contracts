@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.28;
+pragma solidity ^0.8.28;
 
 import {IGmxReferralStorage} from "../position/interface/IGmxReferralStorage.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -77,7 +77,7 @@ contract RewardDistributor is CoreContract {
     /// @param depositor The address depositing rewards.
     /// @param amount Amount of reward tokens to deposit.
     function deposit(address depositor, uint amount) external auth {
-        require(amount > 0, Error.RewardLogic__InvalidAmount());
+        require(amount > 0, Error.RewardDistributor__InvalidAmount());
 
         _distribute();
         totalUndistributed += amount;
@@ -91,7 +91,7 @@ contract RewardDistributor is CoreContract {
     /// @param receiver The address receiving the rewards.
     /// @param amount The amount of rewards to claim.
     function claim(address user, address receiver, uint amount) external auth {
-        require(amount > 0, Error.RewardLogic__InvalidAmount());
+        require(amount > 0, Error.RewardDistributor__InvalidAmount());
 
         uint currentCumulative = _distribute();
         UserRewards storage ur = userRewards[user];
@@ -101,7 +101,7 @@ contract RewardDistributor is CoreContract {
         ur.accrued += _calculatePendingRewardPerToken(ur.cumulativeRewardCheckpoint, currentCumulative, userBalance);
         ur.cumulativeRewardCheckpoint = currentCumulative;
 
-        require(amount <= ur.accrued, Error.RewardLogic__InsufficientRewards(ur.accrued));
+        require(amount <= ur.accrued, Error.RewardDistributor__InsufficientRewards(ur.accrued));
 
         ur.accrued -= amount;
 
