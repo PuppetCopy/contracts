@@ -9,17 +9,17 @@ import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "./../utils/Precision.sol";
 
-import {PositionLogic} from "./PositionLogic.sol";
-import {UnhandledCallbackLogic} from "./UnhandledCallbackLogic.sol";
+import {MirrorPosition} from "./MirrorPosition.sol";
+import {UnhandledCallback} from "./UnhandledCallback.sol";
 import {IGmxOrderCallbackReceiver} from "./interface/IGmxOrderCallbackReceiver.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
-contract ExecutionCallbackLogic is CoreContract, IGmxOrderCallbackReceiver {
-    UnhandledCallbackLogic immutable unhandledCallbackLogic;
-    PositionLogic immutable positionLogic;
+contract ExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
+    UnhandledCallback immutable unhandledCallbackLogic;
+    MirrorPosition immutable position;
 
-    constructor(IAuthority _authority, PositionLogic _positionLogic) CoreContract("ExecutionCallbackLogic", "1", _authority) {
-        positionLogic = _positionLogic;
+    constructor(IAuthority _authority, MirrorPosition _position) CoreContract("ExecutionCallback", "1", _authority) {
+        position = _position;
     }
 
     /**
@@ -31,9 +31,9 @@ contract ExecutionCallbackLogic is CoreContract, IGmxOrderCallbackReceiver {
         bytes calldata eventData
     ) external auth {
         if (GmxPositionUtils.isIncreaseOrder(order.numbers.orderType)) {
-            positionLogic.increase(key, order, eventData);
+            position.increase(key, order, eventData);
         } else if (GmxPositionUtils.isDecreaseOrder(order.numbers.orderType)) {
-            positionLogic.decrease(key, order, eventData);
+            position.decrease(key, order, eventData);
         } else {
             revert Error.PositionRouter__InvalidOrderType(order.numbers.orderType);
         }

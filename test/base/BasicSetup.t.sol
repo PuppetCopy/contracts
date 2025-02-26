@@ -5,6 +5,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Test} from "forge-std/src/Test.sol";
+import {MockERC20} from "test/mock/MockERC20.sol";
 
 import {Dictator} from "src/shared/Dictator.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
@@ -22,8 +23,9 @@ contract BasicSetup is Test {
 
     Users users;
 
-    IWNT wnt = IWNT(address(deployMockERC20("Wrapped Native", "WNT", 18)));
-    IERC20 usdc = IERC20(address(deployMockERC20("USDC", "USDC", 6)));
+    IWNT wnt = IWNT(address(new MockERC20("Wrapped Native", "WNT", 18)));
+    // IERC20 usdc = IERC20(address(deployMockERC20("USDC", "USDC", 6)));
+    IERC20 usdc = new MockERC20("USDC", "USDC", 6);
 
     Dictator dictator;
     PuppetToken puppetToken;

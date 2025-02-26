@@ -49,37 +49,30 @@ library Error {
     // PuppetStore
     error PuppetStore__OverwriteAllocation();
 
-    // RulebookLogic
-    error RulebookLogic__InvalidAllowanceRate(uint min, uint max);
-    error RulebookLogic__TokenNotAllowed();
-    error RulebookLogic__AllowanceAboveLimit(uint allowanceCap);
-    error RulebookLogic__InvalidAmount();
-    error RulebookLogic__InsufficientBalance();
-    error RulebookLogic__InvalidLength();
-    error RulebookLogic__InvalidActivityThrottle(uint minAllocationActivity, uint maxAllocationActivity);
+    // MatchRule
+    error MatchRule__InvalidAllowanceRate(uint min, uint max);
+    error MatchRule__TokenNotAllowed();
+    error MatchRule__AllowanceAboveLimit(uint allowanceCap);
+    error MatchRule__InvalidAmount();
+    error MatchRule__InsufficientBalance();
+    error MatchRule__InvalidLength();
+    error MatchRule__InvalidActivityThrottle(uint minAllocationActivity, uint maxAllocationActivity);
 
-    // RequestLogic
-    error RequestLogic__ValueNotFound();
-    error RequestLogic__NoAllocation();
-    error RequestLogic__PendingExecution();
-    error RequestLogic__InvalidAllocationMatchKey();
-
-    // AllocationLogic
-    error AllocationLogic__AllocationAlreadyExists();
-    error AllocationLogic__PendingSettlement();
-    error AllocationLogic__PuppetListLimit();
-    error AllocationLogic__InvalidPuppetListIntegrity();
-    error AllocationLogic__InvalidListLength();
-    error AllocationLogic__AllocationDoesNotExist();
-
-    // ExecutionLogic
-    error ExecutionLogic__RequestDoesNotExist();
-    error ExecutionLogic__InvalidRequest(bytes32 positionKey, bytes32 key);
-    error ExecutionLogic__UnexpectedEventData();
-    error ExecutionLogic__MismatchedAmountIn(uint recordedAmountIn, uint amountIn);
-    error ExecutionLogic__PositionDoesNotExist();
-    error ExecutionLogic__RequestDoesNotMatchExecution();
-    error ExecutionLogic__AllocationDoesNotExist();
+    // MirrorPosition
+    error MirrorPosition__AllocationAlreadyExists();
+    error MirrorPosition__PendingSettlement();
+    error MirrorPosition__PuppetListLimit();
+    error MirrorPosition__InvalidPuppetListIntegrity();
+    error MirrorPosition__InvalidListLength();
+    error MirrorPosition__AllocationDoesNotExist();
+    error MirrorPosition__RequestDoesNotExist();
+    error MirrorPosition__InvalidRequest(bytes32 positionKey, bytes32 key);
+    error MirrorPosition__UnexpectedEventData();
+    error MirrorPosition__MismatchedAmountIn(uint recordedAmountIn, uint amountIn);
+    error MirrorPosition__PositionDoesNotExist();
+    error MirrorPosition__RequestDoesNotMatchExecution();
+    error MirrorPosition__NoAllocation();
+    error MirrorPosition__PendingExecution();
 
     // PositionRouter
     error PositionRouter__InvalidOrderType(GmxPositionUtils.OrderType orderType);

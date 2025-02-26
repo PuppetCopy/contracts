@@ -5,13 +5,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-// Imports from your project
-import {PositionLogic} from "./position/PositionLogic.sol";
-import {UnhandledCallbackLogic} from "./position/UnhandledCallbackLogic.sol";
-import {ExecutionCallbackLogic} from "./position/ExecutionCallbackLogic.sol";
+import {ExecutionCallback} from "./position/ExecutionCallback.sol";
+import {MirrorPosition} from "./position/MirrorPosition.sol";
+import {UnhandledCallback} from "./position/UnhandledCallback.sol";
 import {PositionStore} from "./position/store/PositionStore.sol";
 import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
-import {RulebookLogic} from "./puppet/RulebookLogic.sol";
+import {MatchRule} from "./puppet/MatchRule.sol";
 import {PuppetStore} from "./puppet/store/PuppetStore.sol";
 import {FeeMarketplace} from "./tokenomics/FeeMarketplace.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
@@ -20,9 +19,9 @@ import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
     // Position module configuration.
     struct Config {
-        PositionLogic positionLogic;
-        ExecutionCallbackLogic executionCallbackLogic;
-        RulebookLogic rulebookLogic;
+        MatchRule matchRule;
+        MirrorPosition position;
+        ExecutionCallback executionCallback;
         FeeMarketplace feeMarketplace;
     }
 
@@ -42,38 +41,37 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
         bytes32 matchKey,
         address[] calldata puppetList
     ) external nonReentrant auth returns (bytes32 allocationKey) {
-        allocationKey =
-            config.positionLogic.allocate(collateralToken, sourceRequestKey, positionKey, matchKey, puppetList);
+        allocationKey = config.position.allocate(collateralToken, sourceRequestKey, positionKey, matchKey, puppetList);
     }
 
     /**
      * @notice Mirrors a position.
      */
     function mirror(
-        PositionLogic.MirrorPositionParams calldata params
+        MirrorPosition.MirrorPositionParams calldata params
     ) external payable nonReentrant auth returns (bytes32 requestKey) {
-        requestKey = config.positionLogic.mirror(params);
+        requestKey = config.position.mirror(params);
     }
 
     /**
      * @notice Settles an allocated position.
      */
     function settle(bytes32 key, address[] calldata puppetList) external nonReentrant auth {
-        config.positionLogic.settle(key, puppetList);
+        config.position.settle(key, puppetList);
     }
 
     /**
      * @notice Deposits tokens.
      */
     function deposit(IERC20 token, uint amount) external nonReentrant {
-        config.rulebookLogic.deposit(token, msg.sender, amount);
+        config.matchRule.deposit(token, msg.sender, amount);
     }
 
     /**
      * @notice Withdraws tokens.
      */
     function withdraw(IERC20 token, address receiver, uint amount) external nonReentrant {
-        config.rulebookLogic.withdraw(token, msg.sender, receiver, amount);
+        config.matchRule.withdraw(token, msg.sender, receiver, amount);
     }
 
     /**
@@ -82,9 +80,9 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
     function setMatchRuleList(
         IERC20[] calldata collateralTokenList,
         address[] calldata traderList,
-        RulebookLogic.MatchRule[] calldata ruleParams
+        MatchRule.MatchRule[] calldata ruleParams
     ) external nonReentrant {
-        config.rulebookLogic.setMatchRuleList(collateralTokenList, traderList, ruleParams, msg.sender);
+        config.matchRule.setMatchRuleList(collateralTokenList, traderList, ruleParams, msg.sender);
     }
 
     /**

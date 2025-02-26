@@ -13,14 +13,14 @@ import {ErrorUtils} from "./../utils/ErrorUtils.sol";
 import {Precision} from "./../utils/Precision.sol";
 
 import {FeeMarketplace} from "../tokenomics/FeeMarketplace.sol";
-import {RulebookLogic} from "./../puppet/RulebookLogic.sol";
+import {MatchRule} from "./../puppet/MatchRule.sol";
 import {IGmxDatastore} from "./interface/IGmxDatastore.sol";
 import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
 import {PositionStore} from "./store/PositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
-contract PositionLogic is CoreContract {
+contract MirrorPosition is CoreContract {
     struct Config {
         IGmxExchangeRouter gmxExchangeRouter;
         IGmxDatastore gmxDatastore;
@@ -65,7 +65,7 @@ contract PositionLogic is CoreContract {
 
     PuppetStore immutable puppetStore;
     PositionStore immutable positionStore;
-    RulebookLogic immutable rulebookLogic;
+    MatchRule immutable matchRule;
     FeeMarketplace immutable feeMarket;
 
     mapping(bytes32 matchKey => mapping(address puppet => uint)) public activityThrottleMap;
@@ -77,12 +77,12 @@ contract PositionLogic is CoreContract {
         IAuthority _authority,
         PuppetStore _puppetStore,
         PositionStore _positionStore,
-        RulebookLogic _rulebookLogic,
+        MatchRule _matchRule,
         FeeMarketplace _feeMarket
-    ) CoreContract("PositionLogic", "1", _authority) {
+    ) CoreContract("MirrorPosition", "1", _authority) {
         puppetStore = _puppetStore;
         positionStore = _positionStore;
-        rulebookLogic = _rulebookLogic;
+        matchRule = _matchRule;
         feeMarket = _feeMarket;
     }
 
@@ -145,11 +145,11 @@ contract PositionLogic is CoreContract {
 
         Allocation storage allocation = allocationMap[allocationKey];
 
-        require(allocation.size == 0, Error.AllocationLogic__AllocationAlreadyExists());
+        require(allocation.size == 0, Error.MirrorPosition__AllocationAlreadyExists());
 
         uint puppetListLength = _puppetList.length;
 
-        require(puppetListLength <= config.limitAllocationListLength, Error.AllocationLogic__PuppetListLimit());
+        require(puppetListLength <= config.limitAllocationListLength, Error.MirrorPosition__PuppetListLimit());
 
         if (allocation.matchKey == 0) {
             allocation.matchKey = _matchKey;
@@ -158,12 +158,12 @@ contract PositionLogic is CoreContract {
 
         allocation.listHash = keccak256(abi.encode(_puppetList));
 
-        RulebookLogic.MatchRule[] memory ruleList = rulebookLogic.getRuleList(_matchKey, _puppetList);
+        MatchRule.MatchRule[] memory ruleList = matchRule.getRuleList(_matchKey, _puppetList);
         uint[] memory _nextActivityThrottleList = new uint[](puppetListLength);
         uint[] memory _nextBalanceList = puppetStore.getBalanceList(_collateralToken, _puppetList);
 
         for (uint i = 0; i < puppetListLength; i++) {
-            RulebookLogic.MatchRule memory rule = ruleList[i];
+            MatchRule.MatchRule memory rule = ruleList[i];
 
             uint _nextAtivityThrottle = block.timestamp + rule.throttleActivity;
             _nextActivityThrottleList[i] = _nextAtivityThrottle;
@@ -212,12 +212,12 @@ contract PositionLogic is CoreContract {
 
         Allocation storage allocation = allocationMap[allocationKey];
 
-        require(allocation.matchKey != bytes32(0), Error.AllocationLogic__AllocationDoesNotExist());
-        require(allocation.collateral == 0, Error.AllocationLogic__PendingSettlement());
+        require(allocation.matchKey != bytes32(0), Error.MirrorPosition__AllocationDoesNotExist());
+        require(allocation.collateral == 0, Error.MirrorPosition__PendingSettlement());
 
         bytes32 puppetListHash = keccak256(abi.encode(puppetList));
 
-        require(allocation.listHash == puppetListHash, Error.AllocationLogic__InvalidPuppetListIntegrity());
+        require(allocation.listHash == puppetListHash, Error.MirrorPosition__InvalidPuppetListIntegrity());
 
         allocation.listHash = puppetListHash;
 
@@ -279,7 +279,7 @@ contract PositionLogic is CoreContract {
     ) external auth {
         PositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
 
-        require(request.matchKey != 0, Error.ExecutionLogic__RequestDoesNotMatchExecution());
+        require(request.matchKey != 0, Error.MirrorPosition__RequestDoesNotMatchExecution());
 
         Allocation storage allocation = allocationMap[request.allocationKey];
 
@@ -308,11 +308,11 @@ contract PositionLogic is CoreContract {
     ) external auth {
         PositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
 
-        require(request.matchKey != 0, Error.ExecutionLogic__RequestDoesNotMatchExecution());
+        require(request.matchKey != 0, Error.MirrorPosition__RequestDoesNotMatchExecution());
 
         Allocation storage allocation = allocationMap[request.allocationKey];
 
-        require(allocation.size > 0, Error.ExecutionLogic__PositionDoesNotExist());
+        require(allocation.size > 0, Error.MirrorPosition__PositionDoesNotExist());
 
         uint recordedAmountIn = puppetStore.recordTransferIn(allocation.collateralToken);
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
@@ -373,8 +373,8 @@ contract PositionLogic is CoreContract {
         uint targetLeverage;
 
         if (allocation.size == 0) {
-            require(allocation.allocated > 0, Error.RequestLogic__NoAllocation());
-            require(allocation.collateral == 0, Error.RequestLogic__PendingExecution());
+            require(allocation.allocated > 0, Error.MirrorPosition__NoAllocation());
+            require(allocation.collateral == 0, Error.MirrorPosition__PendingExecution());
 
             allocation.collateral = allocation.allocated;
 

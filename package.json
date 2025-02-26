@@ -17,13 +17,13 @@
     "lint:sol": "forge fmt --check && bun solhint \"{script,src,test}/**/*.sol\""
   },
   "dependencies": {
-    "@aragon/osx": "^1.3.0",
+    "@aragon/osx": "^1.4.0",
     "@balancer-labs/v2-interfaces": "0.4.0",
     "@openzeppelin/contracts": "5.2.0",
     "@uniswap/v3-core": "1.0.1",
     "@zeframlou/create3-factory": "github:zeframlou/create3-factory#main",
-    "dotenv": "^16.4.5",
-    "forge-std": "github:foundry-rs/forge-std#v1.9.5",
+    "dotenv": "^16.4.7",
+    "forge-std": "github:foundry-rs/forge-std#v1.9.6",
     "solhint": "5.0.5"
   },
   "packageManager": "bun@1.2.0"

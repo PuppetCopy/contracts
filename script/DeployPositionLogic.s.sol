@@ -24,7 +24,7 @@
 // import {BaseScript} from "./BaseScript.s.sol";
 // import {Address} from "./Const.sol";
 
-// contract DeployPositionLogic is BaseScript {
+// contract DeployPosition is BaseScript {
 //     Dictator dictator = Dictator(getDeployedAddress("Dictator"));
 
 //     function run() public {

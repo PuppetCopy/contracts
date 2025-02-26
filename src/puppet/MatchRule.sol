@@ -9,7 +9,7 @@ import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {PuppetStore} from "./store/PuppetStore.sol";
 
-contract RulebookLogic is CoreContract {
+contract MatchRule is CoreContract {
     struct MatchRule {
         uint allowanceRate;
         uint throttleActivity;
@@ -46,31 +46,31 @@ contract RulebookLogic is CoreContract {
         }
     }
 
-    constructor(IAuthority _authority, PuppetStore _store) CoreContract("RulebookLogic", "1", _authority) {
+    constructor(IAuthority _authority, PuppetStore _store) CoreContract("MatchRule", "1", _authority) {
         store = _store;
     }
 
-    function deposit(IERC20 _collateralToken, address _user, uint amount) external auth {
-        require(amount > 0, Error.RulebookLogic__InvalidAmount());
+    function deposit(IERC20 _collateralToken, address _user, uint _amount) external auth {
+        require(_amount > 0, Error.MatchRule__InvalidAmount());
 
         uint allowanceCap = tokenAllowanceCapMap[_collateralToken];
-        require(allowanceCap > 0, Error.RulebookLogic__TokenNotAllowed());
+        require(allowanceCap > 0, Error.MatchRule__TokenNotAllowed());
 
-        uint nextBalance = store.userBalanceMap(_collateralToken, _user) + amount;
-        require(nextBalance <= allowanceCap, Error.RulebookLogic__AllowanceAboveLimit(allowanceCap));
+        uint nextBalance = store.userBalanceMap(_collateralToken, _user) + _amount;
+        require(nextBalance <= allowanceCap, Error.MatchRule__AllowanceAboveLimit(allowanceCap));
 
-        store.transferIn(_collateralToken, _user, amount);
+        store.transferIn(_collateralToken, _user, _amount);
         store.setUserBalance(_collateralToken, _user, nextBalance);
 
-        _logEvent("Deposit", abi.encode(_collateralToken, _user, nextBalance, amount));
+        _logEvent("Deposit", abi.encode(_collateralToken, _user, nextBalance, _amount));
     }
 
     function withdraw(IERC20 _collateralToken, address _user, address _receiver, uint _amount) external auth {
-        require(_amount > 0, Error.RulebookLogic__InvalidAmount());
+        require(_amount > 0, Error.MatchRule__InvalidAmount());
 
         uint balance = store.userBalanceMap(_collateralToken, _user);
 
-        require(_amount <= balance, Error.RulebookLogic__InsufficientBalance());
+        require(_amount <= balance, Error.MatchRule__InsufficientBalance());
 
         uint nextBalance = balance - _amount;
 
@@ -87,7 +87,7 @@ contract RulebookLogic is CoreContract {
         address _puppet
     ) external auth {
         uint _traderListCount = _traderList.length;
-        require(_traderListCount == _ruleParamList.length, Error.RulebookLogic__InvalidLength());
+        require(_traderListCount == _ruleParamList.length, Error.MatchRule__InvalidLength());
 
         bytes32[] memory _matchKeyList = new bytes32[](_traderListCount);
 
@@ -98,18 +98,18 @@ contract RulebookLogic is CoreContract {
             require(
                 _ruleParams.throttleActivity >= config.minAllocationActivity
                     && _ruleParams.throttleActivity <= config.maxAllocationActivity,
-                Error.RulebookLogic__InvalidActivityThrottle(config.minAllocationActivity, config.maxAllocationActivity)
+                Error.MatchRule__InvalidActivityThrottle(config.minAllocationActivity, config.maxAllocationActivity)
             );
 
             // require(
             //     _ruleParams.expiry >= config.minExpiryDuration,
-            //     Error.RulebookLogic__InvalidExpiryDuration(config.minExpiryDuration)
+            //     Error.MatchRule__InvalidExpiryDuration(config.minExpiryDuration)
             // );
 
             require(
                 _ruleParams.allowanceRate >= config.minAllowanceRate
                     && _ruleParams.allowanceRate <= config.maxAllowanceRate,
-                Error.RulebookLogic__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate)
+                Error.MatchRule__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate)
             );
 
             bytes32 key = PositionUtils.getMatchKey(collateralToken, _traderList[i]);
@@ -143,7 +143,7 @@ contract RulebookLogic is CoreContract {
 
         require(
             config.tokenAllowanceList.length == config.tokenAllowanceAmountList.length,
-            Error.RulebookLogic__InvalidLength()
+            Error.MatchRule__InvalidLength()
         );
 
         for (uint i; i < config.tokenAllowanceList.length; i++) {

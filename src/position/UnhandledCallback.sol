@@ -7,13 +7,13 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {PositionStore} from "./store/PositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
-contract UnhandledCallbackLogic is CoreContract {
+contract UnhandledCallback is CoreContract {
     PositionStore immutable positionStore;
 
     constructor(
         IAuthority _authority,
         PositionStore _positionStore
-    ) CoreContract("UnhandledCallbackLogic", "1", _authority) {
+    ) CoreContract("UnhandledCallback", "1", _authority) {
         positionStore = _positionStore;
     }
 
