@@ -3,14 +3,14 @@ pragma solidity ^0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {PositionUtils} from "../core/utils/PositionUtils.sol";
+import {PositionUtils} from "../position/utils/PositionUtils.sol";
 import {Error} from "../shared/Error.sol";
+import {SubaccountStore} from "../shared/SubaccountStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {PuppetStore} from "./store/PuppetStore.sol";
 
 contract MatchRule is CoreContract {
-    struct MatchRule {
+    struct Rule {
         uint allowanceRate;
         uint throttleActivity;
         uint expiry;
@@ -29,16 +29,16 @@ contract MatchRule is CoreContract {
     Config public config;
 
     mapping(IERC20 token => uint) tokenAllowanceCapMap;
-    mapping(bytes32 matchKey => mapping(address puppet => MatchRule)) public matchRuleMap;
+    mapping(bytes32 matchKey => mapping(address puppet => Rule)) public matchRuleMap;
 
-    PuppetStore immutable store;
+    SubaccountStore immutable store;
 
     function getRuleList(
         bytes32 _matchKey,
         address[] calldata _puppetList
-    ) external view returns (MatchRule[] memory _ruleList) {
+    ) external view returns (Rule[] memory _ruleList) {
         uint _puppetListCount = _puppetList.length;
-        _ruleList = new MatchRule[](_puppetListCount);
+        _ruleList = new Rule[](_puppetListCount);
 
         for (uint i = 0; i < _puppetListCount; i++) {
             address _puppet = _puppetList[i];
@@ -46,7 +46,7 @@ contract MatchRule is CoreContract {
         }
     }
 
-    constructor(IAuthority _authority, PuppetStore _store) CoreContract("MatchRule", "1", _authority) {
+    constructor(IAuthority _authority, SubaccountStore _store) CoreContract("MatchRule", "1", _authority) {
         store = _store;
     }
 
@@ -83,7 +83,7 @@ contract MatchRule is CoreContract {
     function setMatchRuleList(
         IERC20[] calldata _collateralTokenList,
         address[] calldata _traderList,
-        MatchRule[] calldata _ruleParamList,
+        Rule[] calldata _ruleParamList,
         address _puppet
     ) external auth {
         uint _traderListCount = _traderList.length;
@@ -92,7 +92,7 @@ contract MatchRule is CoreContract {
         bytes32[] memory _matchKeyList = new bytes32[](_traderListCount);
 
         for (uint i = 0; i < _traderListCount; i++) {
-            MatchRule memory _ruleParams = _ruleParamList[i];
+            Rule memory _ruleParams = _ruleParamList[i];
             IERC20 collateralToken = _collateralTokenList[i];
 
             require(
@@ -142,8 +142,7 @@ contract MatchRule is CoreContract {
         config = abi.decode(data, (Config));
 
         require(
-            config.tokenAllowanceList.length == config.tokenAllowanceAmountList.length,
-            Error.MatchRule__InvalidLength()
+            config.tokenAllowanceList.length == config.tokenAllowanceAmountList.length, Error.MatchRule__InvalidLength()
         );
 
         for (uint i; i < config.tokenAllowanceList.length; i++) {

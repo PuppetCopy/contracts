@@ -4,8 +4,8 @@
 // import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // import {Router} from "src/Router.sol";
-// import {PuppetLogic} from "src/core/PuppetLogic.sol";
-// import {PuppetStore} from "src/core/store/PuppetStore.sol";
+// import {PuppetLogic} from "src/position/PuppetLogic.sol";
+// import {PuppetStore} from "src/position/store/PuppetStore.sol";
 // import {Dictator} from "src/shared/Dictator.sol";
 // import {TokenRouter} from "src/shared/TokenRouter.sol";
 

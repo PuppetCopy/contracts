@@ -7,11 +7,11 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {FeeMarketplace} from "../tokenomics/FeeMarketplace.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {MatchRule} from "./../core/MatchRule.sol";
+import {MatchRule} from "./../position/MatchRule.sol";
 import {Error} from "./../shared/Error.sol";
 import {Subaccount} from "./../shared/Subaccount.sol";
+import {SubaccountStore} from "./../shared/SubaccountStore.sol";
 import {TokenRouter} from "./../shared/TokenRouter.sol";
-import {BankStore} from "./../utils/BankStore.sol";
 import {ErrorUtils} from "./../utils/ErrorUtils.sol";
 import {Precision} from "./../utils/Precision.sol";
 import {IGmxDatastore} from "./interface/IGmxDatastore.sol";
@@ -77,7 +77,7 @@ contract MirrorPosition is CoreContract {
 
     Config public config;
 
-    PuppetStore immutable puppetStore;
+    SubaccountStore immutable subaccountStore;
     MatchRule immutable matchRule;
     FeeMarketplace immutable feeMarket;
 
@@ -95,12 +95,11 @@ contract MirrorPosition is CoreContract {
 
     constructor(
         IAuthority _authority,
-        TokenRouter _router,
-        PuppetStore _puppetStore,
+        SubaccountStore _puppetStore,
         MatchRule _matchRule,
         FeeMarketplace _feeMarket
     ) CoreContract("MirrorPosition", "1", _authority) {
-        puppetStore = _puppetStore;
+        subaccountStore = _puppetStore;
         matchRule = _matchRule;
         feeMarket = _feeMarket;
     }
@@ -162,7 +161,7 @@ contract MirrorPosition is CoreContract {
     }
 
     function createSubaccount(bytes32 _key, address _account) public auth returns (Subaccount) {
-        return routeSubaccountMap[_key] = new Subaccount(this, _account);
+        return routeSubaccountMap[_key] = new Subaccount(subaccountStore, _account);
     }
 
     // MirrorPosition functions
@@ -238,12 +237,12 @@ contract MirrorPosition is CoreContract {
 
         allocation.listHash = keccak256(abi.encode(_puppetList));
 
-        MatchRule.MatchRule[] memory ruleList = matchRule.getRuleList(_matchKey, _puppetList);
+        MatchRule.Rule[] memory ruleList = matchRule.getRuleList(_matchKey, _puppetList);
         uint[] memory _nextActivityThrottleList = new uint[](puppetListLength);
-        uint[] memory _nextBalanceList = puppetStore.getBalanceList(_collateralToken, _puppetList);
+        uint[] memory _nextBalanceList = subaccountStore.getBalanceList(_collateralToken, _puppetList);
 
         for (uint i = 0; i < puppetListLength; i++) {
-            MatchRule.MatchRule memory rule = ruleList[i];
+            MatchRule.Rule memory rule = ruleList[i];
 
             uint _nextAtivityThrottle = block.timestamp + rule.throttleActivity;
             _nextActivityThrottleList[i] = _nextAtivityThrottle;
@@ -262,10 +261,7 @@ contract MirrorPosition is CoreContract {
             _nextBalanceList[i] = _nextAllocationDelta;
         }
 
-        // puppetStore.setSettledAllocationHash(puppetListHash, allocationKey);
-        // settledAllocationHashMap[puppetListHash] = allocationKey;
-
-        puppetStore.setBalanceList(_collateralToken, _puppetList, _nextBalanceList);
+        subaccountStore.setBalanceList(_collateralToken, _puppetList, _nextBalanceList);
 
         allocation.transactionCost += (startGas - gasleft()) * tx.gasprice;
 
@@ -392,8 +388,8 @@ contract MirrorPosition is CoreContract {
 
         require(allocation.size > 0, Error.MirrorPosition__PositionDoesNotExist());
 
-        uint recordedAmountIn = puppetStore.recordTransferIn(allocation.collateralToken);
-        // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/core/DecreasePositionUtils.sol#L91
+        uint recordedAmountIn = subaccountStore.recordTransferIn(allocation.collateralToken);
+        // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
         if (request.sizeDelta < allocation.size) {
             uint adjustedAllocation = allocation.allocated * request.sizeDelta / allocation.size;
             uint profit = recordedAmountIn > adjustedAllocation ? recordedAmountIn - adjustedAllocation : 0;
@@ -456,7 +452,7 @@ contract MirrorPosition is CoreContract {
 
             allocation.collateral = allocation.allocated;
 
-            puppetStore.transferOut(params.collateralToken, config.gmxOrderVault, allocation.allocated);
+            subaccountStore.transferOut(params.collateralToken, config.gmxOrderVault, allocation.allocated);
             allocationMap[params.allocationKey] = allocation;
             requestKey = submitOrder(
                 params,
@@ -524,9 +520,9 @@ contract MirrorPosition is CoreContract {
         );
     }
 
-    function setConfig(
+    function _setConfig(
         bytes calldata data
-    ) external auth {
+    ) internal override {
         config = abi.decode(data, (Config));
     }
 }

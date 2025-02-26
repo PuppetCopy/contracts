@@ -5,9 +5,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-import {ExecutionCallback} from "./core/ExecutionCallback.sol";
-import {MatchRule} from "./core/MatchRule.sol";
-import {MirrorPosition} from "./core/MirrorPosition.sol";
+import {ExecutionCallback} from "./position/ExecutionCallback.sol";
+import {MatchRule} from "./position/MatchRule.sol";
+import {MirrorPosition} from "./position/MirrorPosition.sol";
 import {FeeMarketplace} from "./tokenomics/FeeMarketplace.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
@@ -76,7 +76,7 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
     function setMatchRuleList(
         IERC20[] calldata collateralTokenList,
         address[] calldata traderList,
-        MatchRule.MatchRule[] calldata ruleParams
+        MatchRule.Rule[] calldata ruleParams
     ) external nonReentrant {
         config.matchRule.setMatchRuleList(collateralTokenList, traderList, ruleParams, msg.sender);
     }

@@ -3,7 +3,6 @@ pragma solidity ^0.8.28;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {PuppetStore} from "../core/store/PuppetStore.sol";
 import {Error} from "../shared/Error.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
