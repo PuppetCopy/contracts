@@ -3,16 +3,15 @@ pragma solidity ^0.8.28;
 
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-
-import {PositionStore} from "./store/PositionStore.sol";
+import {MirrorPosition} from "./MirrorPosition.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
 contract UnhandledCallback is CoreContract {
-    PositionStore immutable positionStore;
+    MirrorPosition immutable positionStore;
 
     constructor(
         IAuthority _authority,
-        PositionStore _positionStore
+        MirrorPosition _positionStore
     ) CoreContract("UnhandledCallback", "1", _authority) {
         positionStore = _positionStore;
     }

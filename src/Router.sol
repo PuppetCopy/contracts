@@ -5,13 +5,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-import {ExecutionCallback} from "./position/ExecutionCallback.sol";
-import {MirrorPosition} from "./position/MirrorPosition.sol";
-import {UnhandledCallback} from "./position/UnhandledCallback.sol";
-import {PositionStore} from "./position/store/PositionStore.sol";
-import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
-import {MatchRule} from "./puppet/MatchRule.sol";
-import {PuppetStore} from "./puppet/store/PuppetStore.sol";
+import {ExecutionCallback} from "./core/ExecutionCallback.sol";
+import {MatchRule} from "./core/MatchRule.sol";
+import {MirrorPosition} from "./core/MirrorPosition.sol";
 import {FeeMarketplace} from "./tokenomics/FeeMarketplace.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";

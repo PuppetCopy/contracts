@@ -4,19 +4,18 @@ pragma solidity ^0.8.28;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {FeeMarketplace} from "../tokenomics/FeeMarketplace.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {PuppetStore} from "./../puppet/store/PuppetStore.sol";
+import {MatchRule} from "./../core/MatchRule.sol";
 import {Error} from "./../shared/Error.sol";
 import {Subaccount} from "./../shared/Subaccount.sol";
+import {TokenRouter} from "./../shared/TokenRouter.sol";
+import {BankStore} from "./../utils/BankStore.sol";
 import {ErrorUtils} from "./../utils/ErrorUtils.sol";
 import {Precision} from "./../utils/Precision.sol";
-
-import {FeeMarketplace} from "../tokenomics/FeeMarketplace.sol";
-import {MatchRule} from "./../puppet/MatchRule.sol";
 import {IGmxDatastore} from "./interface/IGmxDatastore.sol";
 import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
-import {PositionStore} from "./store/PositionStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
@@ -61,35 +60,116 @@ contract MirrorPosition is CoreContract {
         uint triggerPrice;
     }
 
+    struct RequestAdjustment {
+        bytes32 allocationKey;
+        bytes32 sourceRequestKey;
+        bytes32 matchKey;
+        uint sizeDelta;
+        uint transactionCost;
+    }
+
+    struct UnhandledCallback {
+        GmxPositionUtils.Props order;
+        address operator;
+        bytes eventData;
+        bytes32 key;
+    }
+
     Config public config;
 
     PuppetStore immutable puppetStore;
-    PositionStore immutable positionStore;
     MatchRule immutable matchRule;
     FeeMarketplace immutable feeMarket;
 
     mapping(bytes32 matchKey => mapping(address puppet => uint)) public activityThrottleMap;
-
     mapping(bytes32 allocationKey => mapping(address puppet => uint amount)) public userAllocationMap;
     mapping(bytes32 allocationKey => Allocation) public allocationMap;
 
+    // PositionStore state variables
+    mapping(bytes32 matchKey => Subaccount) public routeSubaccountMap;
+    mapping(bytes32 matchKey => IERC20) public routeTokenMap;
+    mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
+
+    uint public unhandledCallbackListId = 0;
+    mapping(uint unhandledCallbackListSequenceId => UnhandledCallback) public unhandledCallbackMap;
+
     constructor(
         IAuthority _authority,
+        TokenRouter _router,
         PuppetStore _puppetStore,
-        PositionStore _positionStore,
         MatchRule _matchRule,
         FeeMarketplace _feeMarket
     ) CoreContract("MirrorPosition", "1", _authority) {
         puppetStore = _puppetStore;
-        positionStore = _positionStore;
         matchRule = _matchRule;
         feeMarket = _feeMarket;
     }
 
+    // PositionStore functions
+    function getRequestAdjustment(
+        bytes32 _key
+    ) external view returns (RequestAdjustment memory) {
+        return requestAdjustmentMap[_key];
+    }
+
+    function setRequestAdjustment(bytes32 _key, RequestAdjustment calldata _ra) external auth {
+        requestAdjustmentMap[_key] = _ra;
+    }
+
+    function removeRequestAdjustment(
+        bytes32 _key
+    ) external auth {
+        delete requestAdjustmentMap[_key];
+    }
+
+    function removeRequestDecrease(
+        bytes32 _key
+    ) external auth {
+        delete requestAdjustmentMap[_key];
+    }
+
+    function setUnhandledCallbackList(
+        GmxPositionUtils.Props calldata _order,
+        address _operator,
+        bytes32 _key,
+        bytes calldata _eventData
+    ) external auth returns (uint) {
+        UnhandledCallback memory callbackResponse =
+            UnhandledCallback({order: _order, operator: _operator, eventData: _eventData, key: _key});
+
+        uint id = ++unhandledCallbackListId;
+        unhandledCallbackMap[id] = callbackResponse;
+
+        return id;
+    }
+
+    function getUnhandledCallback(
+        uint _id
+    ) external view returns (UnhandledCallback memory) {
+        return unhandledCallbackMap[_id];
+    }
+
+    function removeUnhandledCallback(
+        uint _id
+    ) external auth {
+        delete unhandledCallbackMap[_id];
+    }
+
+    function getSubaccount(
+        bytes32 _key
+    ) external view returns (Subaccount) {
+        return routeSubaccountMap[_key];
+    }
+
+    function createSubaccount(bytes32 _key, address _account) public auth returns (Subaccount) {
+        return routeSubaccountMap[_key] = new Subaccount(this, _account);
+    }
+
+    // MirrorPosition functions
     function submitOrder(
         MirrorPositionParams calldata order,
         Subaccount subaccount,
-        PositionStore.RequestAdjustment memory request,
+        RequestAdjustment memory request,
         GmxPositionUtils.OrderType orderType,
         uint collateralDelta,
         uint callbackGasLimit
@@ -100,7 +180,7 @@ contract MirrorPosition is CoreContract {
                 config.gmxExchangeRouter.createOrder.selector,
                 GmxPositionUtils.CreateOrderParams({
                     addresses: GmxPositionUtils.CreateOrderParamsAddresses({
-                        receiver: address(positionStore),
+                        receiver: address(this),
                         callbackContract: config.callbackHandler,
                         uiFeeReceiver: address(0),
                         market: order.market,
@@ -229,9 +309,7 @@ contract MirrorPosition is CoreContract {
         if (allocation.profit > 0 && feeMarket.askPrice(allocation.collateralToken) > 0) {
             totalPuppetContribution -= Precision.applyFactor(config.performanceContributionRate, allocation.profit);
 
-            feeMarket.deposit(
-                allocation.collateralToken, address(positionStore), allocation.settled - totalPuppetContribution
-            );
+            feeMarket.deposit(allocation.collateralToken, address(this), allocation.settled - totalPuppetContribution);
         }
 
         if (totalPuppetContribution > 0) {
@@ -277,7 +355,7 @@ contract MirrorPosition is CoreContract {
         GmxPositionUtils.Props calldata, /*order*/
         bytes calldata /*eventData*/
     ) external auth {
-        PositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
+        RequestAdjustment memory request = requestAdjustmentMap[requestKey];
 
         require(request.matchKey != 0, Error.MirrorPosition__RequestDoesNotMatchExecution());
 
@@ -285,7 +363,7 @@ contract MirrorPosition is CoreContract {
 
         allocation.size += request.sizeDelta;
 
-        positionStore.removeRequestAdjustment(requestKey);
+        delete requestAdjustmentMap[requestKey];
 
         _logEvent(
             "ExecuteIncrease",
@@ -306,7 +384,7 @@ contract MirrorPosition is CoreContract {
         GmxPositionUtils.Props calldata, /*order*/
         bytes calldata /*eventData*/
     ) external auth {
-        PositionStore.RequestAdjustment memory request = positionStore.getRequestAdjustment(requestKey);
+        RequestAdjustment memory request = requestAdjustmentMap[requestKey];
 
         require(request.matchKey != 0, Error.MirrorPosition__RequestDoesNotMatchExecution());
 
@@ -315,7 +393,7 @@ contract MirrorPosition is CoreContract {
         require(allocation.size > 0, Error.MirrorPosition__PositionDoesNotExist());
 
         uint recordedAmountIn = puppetStore.recordTransferIn(allocation.collateralToken);
-        // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
+        // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/core/DecreasePositionUtils.sol#L91
         if (request.sizeDelta < allocation.size) {
             uint adjustedAllocation = allocation.allocated * request.sizeDelta / allocation.size;
             uint profit = recordedAmountIn > adjustedAllocation ? recordedAmountIn - adjustedAllocation : 0;
@@ -329,7 +407,7 @@ contract MirrorPosition is CoreContract {
             allocation.size = 0;
         }
 
-        positionStore.removeRequestDecrease(requestKey);
+        delete requestAdjustmentMap[requestKey];
         allocationMap[request.allocationKey] = allocation;
 
         _logEvent(
@@ -354,14 +432,14 @@ contract MirrorPosition is CoreContract {
 
         Allocation memory allocation = allocationMap[params.allocationKey];
 
-        Subaccount subaccount = positionStore.getSubaccount(allocation.matchKey);
+        Subaccount subaccount = routeSubaccountMap[allocation.matchKey];
         address subaccountAddress = address(subaccount);
 
         if (subaccountAddress == address(0)) {
-            subaccount = positionStore.createSubaccount(allocation.matchKey, params.trader);
+            subaccount = createSubaccount(allocation.matchKey, params.trader);
         }
 
-        PositionStore.RequestAdjustment memory request = PositionStore.RequestAdjustment({
+        RequestAdjustment memory request = RequestAdjustment({
             matchKey: allocation.matchKey,
             allocationKey: params.allocationKey,
             sourceRequestKey: params.sourceRequestKey,
@@ -430,7 +508,7 @@ contract MirrorPosition is CoreContract {
         }
 
         request.transactionCost += (startGas - gasleft()) * tx.gasprice + params.executionFee;
-        positionStore.setRequestAdjustment(requestKey, request);
+        requestAdjustmentMap[requestKey] = request;
 
         _logEvent(
             targetLeverage > leverage ? "RequestIncrease" : "RequestDecrease",
@@ -446,11 +524,9 @@ contract MirrorPosition is CoreContract {
         );
     }
 
-    // internal
-
-    function _setConfig(
+    function setConfig(
         bytes calldata data
-    ) internal override {
+    ) external auth {
         config = abi.decode(data, (Config));
     }
 }

@@ -4,11 +4,11 @@
 // import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // import {Router} from "src/Router.sol";
-// import {AllocationLogic} from "src/position/AllocationLogic.sol";
-// import {ExecutionLogic} from "src/position/ExecutionLogic.sol";
-// import {RequestLogic} from "src/position/RequestLogic.sol";
-// import {PuppetLogic} from "src/puppet/PuppetLogic.sol";
-// import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
+// import {AllocationLogic} from "src/core/AllocationLogic.sol";
+// import {ExecutionLogic} from "src/core/ExecutionLogic.sol";
+// import {RequestLogic} from "src/core/RequestLogic.sol";
+// import {PuppetLogic} from "src/core/PuppetLogic.sol";
+// import {PuppetStore} from "src/core/store/PuppetStore.sol";
 // import {Dictator} from "src/shared/Dictator.sol";
 // import {TokenRouter} from "src/shared/TokenRouter.sol";
 // import {FeeMarketplace} from "src/tokenomics/FeeMarketplace.sol";

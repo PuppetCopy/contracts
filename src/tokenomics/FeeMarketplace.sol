@@ -6,7 +6,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Error} from "../shared/Error.sol";
 import {TokenRouter} from "../shared/TokenRouter.sol";
-import {BankStore} from "../shared/store/BankStore.sol";
+import {BankStore} from "../utils/BankStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";

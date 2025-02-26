@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {TokenRouter} from "./../../shared/TokenRouter.sol";
-import {BankStore} from "./../../shared/store/BankStore.sol";
+import {BankStore} from "./../../utils/BankStore.sol";
 import {IAuthority} from "./../../utils/interfaces/IAuthority.sol";
 
 contract FeeMarketplaceStore is BankStore {

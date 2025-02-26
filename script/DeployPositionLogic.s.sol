@@ -5,16 +5,16 @@
 
 // import {PositionRouter} from "src/PositionRouter.sol";
 // import {PuppetRouter} from "src/PuppetRouter.sol";
-// import {AllocationLogic} from "src/position/AllocationLogic.sol";
-// import {ExecutionLogic} from "src/position/ExecutionLogic.sol";
-// import {RequestLogic} from "src/position/RequestLogic.sol";
-// import {UnhandledCallbackLogic} from "src/position/UnhandledCallbackLogic.sol";
-// import {IGmxDatastore} from "src/position/interface/IGmxDatastore.sol";
-// import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
-// import {PositionStore} from "src/position/store/PositionStore.sol";
-// import {PositionStore} from "src/position/store/PositionStore.sol";
-// import {PuppetLogic} from "src/puppet/PuppetLogic.sol";
-// import {PuppetStore} from "src/puppet/store/PuppetStore.sol";
+// import {AllocationLogic} from "src/core/AllocationLogic.sol";
+// import {ExecutionLogic} from "src/core/ExecutionLogic.sol";
+// import {RequestLogic} from "src/core/RequestLogic.sol";
+// import {UnhandledCallbackLogic} from "src/core/UnhandledCallbackLogic.sol";
+// import {IGmxDatastore} from "src/core/interface/IGmxDatastore.sol";
+// import {IGmxExchangeRouter} from "src/core/interface/IGmxExchangeRouter.sol";
+// import {PositionStore} from "src/core/store/PositionStore.sol";
+// import {PositionStore} from "src/core/store/PositionStore.sol";
+// import {PuppetLogic} from "src/core/PuppetLogic.sol";
+// import {PuppetStore} from "src/core/store/PuppetStore.sol";
 // import {Dictator} from "src/shared/Dictator.sol";
 // import {TokenRouter} from "src/shared/TokenRouter.sol";
 // import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
