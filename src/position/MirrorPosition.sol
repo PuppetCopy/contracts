@@ -68,13 +68,6 @@ contract MirrorPosition is CoreContract {
         uint transactionCost;
     }
 
-    struct UnhandledCallback {
-        GmxPositionUtils.Props order;
-        address operator;
-        bytes eventData;
-        bytes32 key;
-    }
-
     Config public config;
 
     SubaccountStore immutable subaccountStore;
@@ -82,16 +75,9 @@ contract MirrorPosition is CoreContract {
     FeeMarketplace immutable feeMarket;
 
     mapping(bytes32 matchKey => mapping(address puppet => uint)) public activityThrottleMap;
-    mapping(bytes32 allocationKey => mapping(address puppet => uint amount)) public userAllocationMap;
     mapping(bytes32 allocationKey => Allocation) public allocationMap;
-
-    // PositionStore state variables
     mapping(bytes32 matchKey => Subaccount) public routeSubaccountMap;
-    mapping(bytes32 matchKey => IERC20) public routeTokenMap;
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
-
-    uint public unhandledCallbackListId = 0;
-    mapping(uint unhandledCallbackListSequenceId => UnhandledCallback) public unhandledCallbackMap;
 
     constructor(
         IAuthority _authority,
@@ -104,131 +90,19 @@ contract MirrorPosition is CoreContract {
         feeMarket = _feeMarket;
     }
 
-    // PositionStore functions
-    function getRequestAdjustment(
-        bytes32 _key
-    ) external view returns (RequestAdjustment memory) {
-        return requestAdjustmentMap[_key];
-    }
-
-    function setRequestAdjustment(bytes32 _key, RequestAdjustment calldata _ra) external auth {
-        requestAdjustmentMap[_key] = _ra;
-    }
-
-    function removeRequestAdjustment(
-        bytes32 _key
-    ) external auth {
-        delete requestAdjustmentMap[_key];
-    }
-
-    function removeRequestDecrease(
-        bytes32 _key
-    ) external auth {
-        delete requestAdjustmentMap[_key];
-    }
-
-    function setUnhandledCallbackList(
-        GmxPositionUtils.Props calldata _order,
-        address _operator,
-        bytes32 _key,
-        bytes calldata _eventData
-    ) external auth returns (uint) {
-        UnhandledCallback memory callbackResponse =
-            UnhandledCallback({order: _order, operator: _operator, eventData: _eventData, key: _key});
-
-        uint id = ++unhandledCallbackListId;
-        unhandledCallbackMap[id] = callbackResponse;
-
-        return id;
-    }
-
-    function getUnhandledCallback(
-        uint _id
-    ) external view returns (UnhandledCallback memory) {
-        return unhandledCallbackMap[_id];
-    }
-
-    function removeUnhandledCallback(
-        uint _id
-    ) external auth {
-        delete unhandledCallbackMap[_id];
-    }
-
-    function getSubaccount(
-        bytes32 _key
-    ) external view returns (Subaccount) {
-        return routeSubaccountMap[_key];
-    }
-
-    function createSubaccount(bytes32 _key, address _account) public auth returns (Subaccount) {
-        return routeSubaccountMap[_key] = new Subaccount(subaccountStore, _account);
-    }
-
-    // MirrorPosition functions
-    function submitOrder(
-        MirrorPositionParams calldata order,
-        Subaccount subaccount,
-        RequestAdjustment memory request,
-        GmxPositionUtils.OrderType orderType,
-        uint collateralDelta,
-        uint callbackGasLimit
-    ) internal returns (bytes32 requestKey) {
-        (bool orderSuccess, bytes memory orderReturnData) = subaccount.execute(
-            address(config.gmxExchangeRouter),
-            abi.encodeWithSelector(
-                config.gmxExchangeRouter.createOrder.selector,
-                GmxPositionUtils.CreateOrderParams({
-                    addresses: GmxPositionUtils.CreateOrderParamsAddresses({
-                        receiver: address(this),
-                        callbackContract: config.callbackHandler,
-                        uiFeeReceiver: address(0),
-                        market: order.market,
-                        initialCollateralToken: order.collateralToken,
-                        swapPath: new address[](0)
-                    }),
-                    numbers: GmxPositionUtils.CreateOrderParamsNumbers({
-                        sizeDeltaUsd: request.sizeDelta,
-                        initialCollateralDeltaAmount: collateralDelta,
-                        triggerPrice: order.triggerPrice,
-                        acceptablePrice: order.acceptablePrice,
-                        executionFee: order.executionFee,
-                        callbackGasLimit: callbackGasLimit,
-                        minOutputAmount: 0
-                    }),
-                    orderType: orderType,
-                    decreasePositionSwapType: GmxPositionUtils.DecreasePositionSwapType.NoSwap,
-                    isLong: order.isLong,
-                    shouldUnwrapNativeToken: false,
-                    referralCode: config.referralCode
-                })
-            )
-        );
-
-        if (!orderSuccess) {
-            ErrorUtils.revertWithParsedMessage(orderReturnData);
-        }
-
-        requestKey = abi.decode(orderReturnData, (bytes32));
-    }
-
     function allocate(
         IERC20 _collateralToken,
         bytes32 _sourceRequestKey,
         bytes32 _matchKey,
         bytes32 _positionKey,
         address[] calldata _puppetList
-    ) external auth returns (bytes32 allocationKey) {
+    ) external auth returns (bytes32) {
         uint startGas = gasleft();
+        bytes32 _allocationKey = PositionUtils.getAllocationKey(_matchKey, _positionKey);
 
-        allocationKey = PositionUtils.getAllocationKey(_matchKey, _positionKey);
-
-        Allocation storage allocation = allocationMap[allocationKey];
-
+        Allocation storage allocation = allocationMap[_allocationKey];
         require(allocation.size == 0, Error.MirrorPosition__AllocationAlreadyExists());
-
-        uint puppetListLength = _puppetList.length;
-
-        require(puppetListLength <= config.limitAllocationListLength, Error.MirrorPosition__PuppetListLimit());
+        require(_puppetList.length <= config.limitAllocationListLength, Error.MirrorPosition__PuppetListLimit());
 
         if (allocation.matchKey == 0) {
             allocation.matchKey = _matchKey;
@@ -237,50 +111,41 @@ contract MirrorPosition is CoreContract {
 
         allocation.listHash = keccak256(abi.encode(_puppetList));
 
+        uint[] memory _balanceList = subaccountStore.getBalanceList(_collateralToken, _puppetList);
         MatchRule.Rule[] memory ruleList = matchRule.getRuleList(_matchKey, _puppetList);
-        uint[] memory _nextActivityThrottleList = new uint[](puppetListLength);
-        uint[] memory _nextBalanceList = subaccountStore.getBalanceList(_collateralToken, _puppetList);
 
-        for (uint i = 0; i < puppetListLength; i++) {
+        for (uint i = 0; i < _puppetList.length; i++) {
             MatchRule.Rule memory rule = ruleList[i];
 
-            uint _nextAtivityThrottle = block.timestamp + rule.throttleActivity;
-            _nextActivityThrottleList[i] = _nextAtivityThrottle;
+            activityThrottleMap[_matchKey][_puppetList[i]] = block.timestamp + rule.throttleActivity;
 
-            uint _nextAllocationDelta = _nextBalanceList[i];
-
-            activityThrottleMap[_matchKey][_puppetList[i]] = _nextAtivityThrottle;
-            // Throttle user allocation if the current time is between the rule's expiry and the activity throttle time
-            if (rule.expiry > block.timestamp && block.timestamp > _nextAtivityThrottle) {
-                _nextAllocationDelta += Precision.applyBasisPoints(rule.allowanceRate, _nextAllocationDelta);
-
-                _nextBalanceList[i] = _nextAllocationDelta;
-                allocation.allocated += _nextAllocationDelta;
+            // Only process if within time window
+            if (rule.expiry > block.timestamp && block.timestamp > activityThrottleMap[_matchKey][_puppetList[i]]) {
+                _balanceList[i] += Precision.applyBasisPoints(rule.allowanceRate, _balanceList[i]);
+                allocation.allocated += _balanceList[i];
             }
-
-            _nextBalanceList[i] = _nextAllocationDelta;
         }
 
-        subaccountStore.setBalanceList(_collateralToken, _puppetList, _nextBalanceList);
+        subaccountStore.setBalanceList(_collateralToken, _puppetList, _balanceList);
 
         allocation.transactionCost += (startGas - gasleft()) * tx.gasprice;
 
         _logEvent(
             "Allocate",
             abi.encode(
-                _collateralToken,
-                _sourceRequestKey,
+                _allocationKey,
                 _matchKey,
-                _positionKey,
-                allocationKey,
+                _sourceRequestKey,
+                _collateralToken,
+                _balanceList,
+                // _puppetList,
                 allocation.listHash,
-                _puppetList,
-                _nextActivityThrottleList,
-                _nextBalanceList,
                 allocation.allocated,
                 allocation.transactionCost
             )
         );
+
+        return _allocationKey;
     }
 
     function settle(bytes32 allocationKey, address[] calldata puppetList) external auth {
@@ -346,81 +211,6 @@ contract MirrorPosition is CoreContract {
         );
     }
 
-    function increase(
-        bytes32 requestKey,
-        GmxPositionUtils.Props calldata, /*order*/
-        bytes calldata /*eventData*/
-    ) external auth {
-        RequestAdjustment memory request = requestAdjustmentMap[requestKey];
-
-        require(request.matchKey != 0, Error.MirrorPosition__RequestDoesNotMatchExecution());
-
-        Allocation storage allocation = allocationMap[request.allocationKey];
-
-        allocation.size += request.sizeDelta;
-
-        delete requestAdjustmentMap[requestKey];
-
-        _logEvent(
-            "ExecuteIncrease",
-            abi.encode(
-                requestKey,
-                request.sourceRequestKey,
-                request.allocationKey,
-                request.matchKey,
-                request.sizeDelta,
-                request.transactionCost,
-                allocation.size
-            )
-        );
-    }
-
-    function decrease(
-        bytes32 requestKey,
-        GmxPositionUtils.Props calldata, /*order*/
-        bytes calldata /*eventData*/
-    ) external auth {
-        RequestAdjustment memory request = requestAdjustmentMap[requestKey];
-
-        require(request.matchKey != 0, Error.MirrorPosition__RequestDoesNotMatchExecution());
-
-        Allocation storage allocation = allocationMap[request.allocationKey];
-
-        require(allocation.size > 0, Error.MirrorPosition__PositionDoesNotExist());
-
-        uint recordedAmountIn = subaccountStore.recordTransferIn(allocation.collateralToken);
-        // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
-        if (request.sizeDelta < allocation.size) {
-            uint adjustedAllocation = allocation.allocated * request.sizeDelta / allocation.size;
-            uint profit = recordedAmountIn > adjustedAllocation ? recordedAmountIn - adjustedAllocation : 0;
-
-            allocation.profit += profit;
-            allocation.settled += recordedAmountIn;
-            allocation.size -= request.sizeDelta;
-        } else {
-            allocation.profit = recordedAmountIn > allocation.allocated ? recordedAmountIn - allocation.allocated : 0;
-            allocation.settled += recordedAmountIn;
-            allocation.size = 0;
-        }
-
-        delete requestAdjustmentMap[requestKey];
-        allocationMap[request.allocationKey] = allocation;
-
-        _logEvent(
-            "ExecuteDecrease",
-            abi.encode(
-                requestKey,
-                request.sourceRequestKey,
-                request.allocationKey,
-                request.matchKey,
-                request.sizeDelta,
-                request.transactionCost,
-                recordedAmountIn,
-                allocation.settled
-            )
-        );
-    }
-
     function mirror(
         MirrorPositionParams calldata params
     ) external payable auth returns (bytes32 requestKey) {
@@ -432,7 +222,7 @@ contract MirrorPosition is CoreContract {
         address subaccountAddress = address(subaccount);
 
         if (subaccountAddress == address(0)) {
-            subaccount = createSubaccount(allocation.matchKey, params.trader);
+            subaccount = routeSubaccountMap[allocation.matchKey] = new Subaccount(subaccountStore, params.trader);
         }
 
         RequestAdjustment memory request = RequestAdjustment({
@@ -518,6 +308,123 @@ contract MirrorPosition is CoreContract {
                 request.sizeDelta
             )
         );
+    }
+
+    function increase(
+        bytes32 requestKey
+    ) external auth {
+        RequestAdjustment memory request = requestAdjustmentMap[requestKey];
+
+        require(request.matchKey != 0, Error.MirrorPosition__RequestDoesNotMatchExecution());
+
+        Allocation storage allocation = allocationMap[request.allocationKey];
+
+        allocation.size += request.sizeDelta;
+
+        delete requestAdjustmentMap[requestKey];
+
+        _logEvent(
+            "ExecuteIncrease",
+            abi.encode(
+                requestKey,
+                request.sourceRequestKey,
+                request.allocationKey,
+                request.matchKey,
+                request.sizeDelta,
+                request.transactionCost,
+                allocation.size
+            )
+        );
+    }
+
+    function decrease(
+        bytes32 requestKey
+    ) external auth {
+        RequestAdjustment memory request = requestAdjustmentMap[requestKey];
+
+        require(request.matchKey != 0, Error.MirrorPosition__RequestDoesNotMatchExecution());
+
+        Allocation storage allocation = allocationMap[request.allocationKey];
+
+        require(allocation.size > 0, Error.MirrorPosition__PositionDoesNotExist());
+
+        uint recordedAmountIn = subaccountStore.recordTransferIn(allocation.collateralToken);
+        // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
+        if (request.sizeDelta < allocation.size) {
+            uint adjustedAllocation = allocation.allocated * request.sizeDelta / allocation.size;
+            uint profit = recordedAmountIn > adjustedAllocation ? recordedAmountIn - adjustedAllocation : 0;
+
+            allocation.profit += profit;
+            allocation.settled += recordedAmountIn;
+            allocation.size -= request.sizeDelta;
+        } else {
+            allocation.profit = recordedAmountIn > allocation.allocated ? recordedAmountIn - allocation.allocated : 0;
+            allocation.settled += recordedAmountIn;
+            allocation.size = 0;
+        }
+
+        delete requestAdjustmentMap[requestKey];
+        allocationMap[request.allocationKey] = allocation;
+
+        _logEvent(
+            "ExecuteDecrease",
+            abi.encode(
+                requestKey,
+                request.sourceRequestKey,
+                request.allocationKey,
+                request.matchKey,
+                request.sizeDelta,
+                request.transactionCost,
+                recordedAmountIn,
+                allocation.settled
+            )
+        );
+    }
+
+    function submitOrder(
+        MirrorPositionParams calldata order,
+        Subaccount subaccount,
+        RequestAdjustment memory request,
+        GmxPositionUtils.OrderType orderType,
+        uint collateralDelta,
+        uint callbackGasLimit
+    ) internal returns (bytes32 requestKey) {
+        (bool orderSuccess, bytes memory orderReturnData) = subaccount.execute(
+            address(config.gmxExchangeRouter),
+            abi.encodeWithSelector(
+                config.gmxExchangeRouter.createOrder.selector,
+                GmxPositionUtils.CreateOrderParams({
+                    addresses: GmxPositionUtils.CreateOrderParamsAddresses({
+                        receiver: address(this),
+                        callbackContract: config.callbackHandler,
+                        uiFeeReceiver: address(0),
+                        market: order.market,
+                        initialCollateralToken: order.collateralToken,
+                        swapPath: new address[](0)
+                    }),
+                    numbers: GmxPositionUtils.CreateOrderParamsNumbers({
+                        sizeDeltaUsd: request.sizeDelta,
+                        initialCollateralDeltaAmount: collateralDelta,
+                        triggerPrice: order.triggerPrice,
+                        acceptablePrice: order.acceptablePrice,
+                        executionFee: order.executionFee,
+                        callbackGasLimit: callbackGasLimit,
+                        minOutputAmount: 0
+                    }),
+                    orderType: orderType,
+                    decreasePositionSwapType: GmxPositionUtils.DecreasePositionSwapType.NoSwap,
+                    isLong: order.isLong,
+                    shouldUnwrapNativeToken: false,
+                    referralCode: config.referralCode
+                })
+            )
+        );
+
+        if (!orderSuccess) {
+            ErrorUtils.revertWithParsedMessage(orderReturnData);
+        }
+
+        requestKey = abi.decode(orderReturnData, (bytes32));
     }
 
     function _setConfig(

@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-import {ExecutionCallback} from "./position/ExecutionCallback.sol";
+import {GmxExecutionCallback} from "./position/GmxExecutionCallback.sol";
 import {MatchRule} from "./position/MatchRule.sol";
 import {MirrorPosition} from "./position/MirrorPosition.sol";
 import {FeeMarketplace} from "./tokenomics/FeeMarketplace.sol";
@@ -17,7 +17,7 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
     struct Config {
         MatchRule matchRule;
         MirrorPosition position;
-        ExecutionCallback executionCallback;
+        GmxExecutionCallback executionCallback;
         FeeMarketplace feeMarketplace;
     }
 
