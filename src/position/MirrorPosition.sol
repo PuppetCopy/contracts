@@ -14,7 +14,6 @@ import {SubaccountStore} from "./../shared/SubaccountStore.sol";
 import {TokenRouter} from "./../shared/TokenRouter.sol";
 import {ErrorUtils} from "./../utils/ErrorUtils.sol";
 import {Precision} from "./../utils/Precision.sol";
-import {IGmxDatastore} from "./interface/IGmxDatastore.sol";
 import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
@@ -22,7 +21,6 @@ import {PositionUtils} from "./utils/PositionUtils.sol";
 contract MirrorPosition is CoreContract {
     struct Config {
         IGmxExchangeRouter gmxExchangeRouter;
-        IGmxDatastore gmxDatastore;
         address callbackHandler;
         address gmxOrderVault;
         bytes32 referralCode;
@@ -97,7 +95,7 @@ contract MirrorPosition is CoreContract {
         bytes32 _positionKey,
         address[] calldata _puppetList
     ) external auth returns (bytes32) {
-        uint startGas = gasleft();
+        uint _startGas = gasleft();
         bytes32 _allocationKey = PositionUtils.getAllocationKey(_matchKey, _positionKey);
 
         Allocation storage allocation = allocationMap[_allocationKey];
@@ -112,23 +110,13 @@ contract MirrorPosition is CoreContract {
         allocation.listHash = keccak256(abi.encode(_puppetList));
 
         uint[] memory _balanceList = subaccountStore.getBalanceList(_collateralToken, _puppetList);
-        MatchRule.Rule[] memory ruleList = matchRule.getRuleList(_matchKey, _puppetList);
+        MatchRule.Rule[] memory _ruleList = matchRule.getRuleList(_matchKey, _puppetList);
 
-        for (uint i = 0; i < _puppetList.length; i++) {
-            MatchRule.Rule memory rule = ruleList[i];
-
-            activityThrottleMap[_matchKey][_puppetList[i]] = block.timestamp + rule.throttleActivity;
-
-            // Only process if within time window
-            if (rule.expiry > block.timestamp && block.timestamp > activityThrottleMap[_matchKey][_puppetList[i]]) {
-                _balanceList[i] += Precision.applyBasisPoints(rule.allowanceRate, _balanceList[i]);
-                allocation.allocated += _balanceList[i];
-            }
-        }
+        allocation.allocated = _processPuppetList(_matchKey, _puppetList, _balanceList, _ruleList);
 
         subaccountStore.setBalanceList(_collateralToken, _puppetList, _balanceList);
 
-        allocation.transactionCost += (startGas - gasleft()) * tx.gasprice;
+        allocation.transactionCost += (_startGas - gasleft()) * tx.gasprice;
 
         _logEvent(
             "Allocate",
@@ -137,15 +125,34 @@ contract MirrorPosition is CoreContract {
                 _matchKey,
                 _sourceRequestKey,
                 _collateralToken,
-                _balanceList,
-                // _puppetList,
                 allocation.listHash,
                 allocation.allocated,
-                allocation.transactionCost
+                allocation.transactionCost,
+                _puppetList,
+                _balanceList
             )
         );
 
         return _allocationKey;
+    }
+
+    function _processPuppetList(
+        bytes32 _matchKey,
+        address[] calldata _puppetList,
+        uint[] memory _balanceList,
+        MatchRule.Rule[] memory _ruleList
+    ) internal returns (uint allocated) {
+        for (uint i = 0; i < _puppetList.length; i++) {
+            MatchRule.Rule memory rule = _ruleList[i];
+
+            // Only process if within time window
+            if (rule.expiry > block.timestamp && block.timestamp > activityThrottleMap[_matchKey][_puppetList[i]]) {
+                _balanceList[i] += Precision.applyBasisPoints(rule.allowanceRate, _balanceList[i]);
+                allocated += _balanceList[i];
+            }
+
+            activityThrottleMap[_matchKey][_puppetList[i]] = block.timestamp + rule.throttleActivity;
+        }
     }
 
     function settle(bytes32 allocationKey, address[] calldata puppetList) external auth {
