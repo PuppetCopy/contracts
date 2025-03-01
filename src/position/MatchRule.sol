@@ -31,7 +31,7 @@ contract MatchRule is CoreContract {
     mapping(IERC20 token => uint) tokenAllowanceCapMap;
     mapping(bytes32 matchKey => mapping(address puppet => Rule)) public matchRuleMap;
 
-    SubaccountStore immutable store;
+    SubaccountStore immutable subaccountStore;
 
     function getRuleList(
         bytes32 _matchKey,
@@ -47,7 +47,7 @@ contract MatchRule is CoreContract {
     }
 
     constructor(IAuthority _authority, SubaccountStore _store) CoreContract("MatchRule", "1", _authority) {
-        store = _store;
+        subaccountStore = _store;
     }
 
     function deposit(IERC20 _collateralToken, address _user, uint _amount) external auth {
@@ -56,11 +56,11 @@ contract MatchRule is CoreContract {
         uint allowanceCap = tokenAllowanceCapMap[_collateralToken];
         require(allowanceCap > 0, Error.MatchRule__TokenNotAllowed());
 
-        uint nextBalance = store.userBalanceMap(_collateralToken, _user) + _amount;
+        uint nextBalance = subaccountStore.userBalanceMap(_collateralToken, _user) + _amount;
         require(nextBalance <= allowanceCap, Error.MatchRule__AllowanceAboveLimit(allowanceCap));
 
-        store.transferIn(_collateralToken, _user, _amount);
-        store.setUserBalance(_collateralToken, _user, nextBalance);
+        subaccountStore.transferIn(_collateralToken, _user, _amount);
+        subaccountStore.setUserBalance(_collateralToken, _user, nextBalance);
 
         _logEvent("Deposit", abi.encode(_collateralToken, _user, nextBalance, _amount));
     }
@@ -68,14 +68,14 @@ contract MatchRule is CoreContract {
     function withdraw(IERC20 _collateralToken, address _user, address _receiver, uint _amount) external auth {
         require(_amount > 0, Error.MatchRule__InvalidAmount());
 
-        uint balance = store.userBalanceMap(_collateralToken, _user);
+        uint balance = subaccountStore.userBalanceMap(_collateralToken, _user);
 
         require(_amount <= balance, Error.MatchRule__InsufficientBalance());
 
         uint nextBalance = balance - _amount;
 
-        store.setUserBalance(_collateralToken, _user, nextBalance);
-        store.transferOut(_collateralToken, _receiver, _amount);
+        subaccountStore.setUserBalance(_collateralToken, _user, nextBalance);
+        subaccountStore.transferOut(_collateralToken, _receiver, _amount);
 
         _logEvent("Withdraw", abi.encode(_collateralToken, _user, nextBalance, _amount));
     }

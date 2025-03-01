@@ -9,7 +9,6 @@
 // import {ExecutionLogic} from "src/position/ExecutionLogic.sol";
 // import {RequestLogic} from "src/position/RequestLogic.sol";
 // import {UnhandledCallbackLogic} from "src/position/UnhandledCallbackLogic.sol";
-// import {IGmxDatastore} from "src/position/interface/IGmxDatastore.sol";
 // import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 // import {PositionStore} from "src/position/store/PositionStore.sol";
 // import {PositionStore} from "src/position/store/PositionStore.sol";
@@ -76,7 +75,6 @@
 //             abi.encode(
 //                 RequestLogic.Config({
 //                     gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
-//                     gmxDatastore: IGmxDatastore(Address.gmxDatastore),
 //                     callbackHandler: getDeployedAddress("PositionRouter"),
 //                     gmxFundsReciever: getDeployedAddress("PuppetStore"),
 //                     gmxOrderVault: Address.gmxOrderVault,

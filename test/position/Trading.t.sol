@@ -12,7 +12,6 @@
 
 // import {RequestLogic} from "src/position/RequestLogic.sol";
 // import {UnhandledCallbackLogic} from "src/position/UnhandledCallbackLogic.sol";
-// import {IGmxDatastore} from "src/position/interface/IGmxDatastore.sol";
 // import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 // import {IGmxOracle} from "src/position/interface/IGmxOracle.sol";
 // import {PositionStore} from "src/position/store/PositionStore.sol";
@@ -108,7 +107,6 @@
 //             abi.encode(
 //                 RequestLogic.Config({
 //                     gmxExchangeRouter: mockGmxExchangeRouter,
-//                     gmxDatastore: IGmxDatastore(Address.gmxDatastore),
 //                     callbackHandler: address(positionRouter),
 //                     gmxFundsReciever: address(puppetStore),
 //                     gmxOrderVault: Address.gmxOrderVault,

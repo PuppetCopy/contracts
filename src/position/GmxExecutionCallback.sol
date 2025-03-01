@@ -12,7 +12,7 @@ import {IGmxOrderCallbackReceiver} from "./interface/IGmxOrderCallbackReceiver.s
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
 contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
-struct UnhandledCallback {
+    struct UnhandledCallback {
         GmxPositionUtils.Props order;
         address operator;
         bytes eventData;
