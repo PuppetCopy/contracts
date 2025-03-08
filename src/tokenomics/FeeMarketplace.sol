@@ -142,7 +142,7 @@ contract FeeMarketplace is CoreContract {
         protocolToken.burn(burnAmount);
 
         // Transfer the remaining tokens to the reward distributor.
-        if (rewardAmount > 0) {
+        if (rewardAmount > 0 && config.rewardDistributor != address(0)) {
             protocolToken.transfer(config.rewardDistributor, rewardAmount);
         }
 

@@ -57,6 +57,7 @@ library Error {
     error MatchRule__InsufficientBalance();
     error MatchRule__InvalidLength();
     error MatchRule__InvalidActivityThrottle(uint minAllocationActivity, uint maxAllocationActivity);
+    error MatchRule__InvalidExpiryDuration(uint minExpiryDuration);
 
     // MirrorPosition
     error MirrorPosition__AllocationAlreadyExists();

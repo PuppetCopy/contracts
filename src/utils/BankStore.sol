@@ -34,12 +34,12 @@ abstract contract BankStore is Access {
         tokenBalanceMap[_token] += _value;
     }
 
-    function transferOut(IERC20 _token, address _receiver, uint _value) external auth {
+    function transferOut(IERC20 _token, address _receiver, uint _value) public auth {
         _token.transfer(_receiver, _value);
         tokenBalanceMap[_token] -= _value;
     }
 
-    function transferIn(IERC20 _token, address _depositor, uint _value) external auth {
+    function transferIn(IERC20 _token, address _depositor, uint _value) public auth {
         router.transfer(_token, _depositor, address(this), _value);
         tokenBalanceMap[_token] += _value;
     }

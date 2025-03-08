@@ -73,12 +73,12 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
     /**
      * @notice Sets a list of match rules.
      */
-    function setMatchRuleList(
-        IERC20[] calldata collateralTokenList,
-        address[] calldata traderList,
-        MatchRule.Rule[] calldata ruleParams
+    function setMatchRule(
+        IERC20 collateralToken,
+        address trader,
+        MatchRule.Rule calldata ruleParams
     ) external nonReentrant {
-        config.matchRule.setMatchRuleList(collateralTokenList, traderList, ruleParams, msg.sender);
+        config.matchRule.setRule(collateralToken, msg.sender, trader, ruleParams);
     }
 
     /**

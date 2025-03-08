@@ -34,7 +34,7 @@ contract RewardDistributor is CoreContract {
     uint public cumulativeRewardPerToken;
     uint public totalUndistributed; // Total rewards deposited but not yet distributed
     uint public lastDistributionTime;
-    mapping(address => UserRewards) public userRewards;
+    mapping(address => UserRewards) public userRewardMap;
 
     constructor(
         IAuthority _authority,
@@ -49,97 +49,79 @@ contract RewardDistributor is CoreContract {
     }
 
     /// @notice Calculate currently available rewards for distribution.
-    function pendingDistribution() public view returns (uint distributable) {
-        uint elapsed = block.timestamp - lastDistributionTime;
-        if (config.distributionWindow == 0) {
-            // Distribution period must be nonzero; if misconfigured return 0.
-            return 0;
-        }
-        uint calculated = totalUndistributed * elapsed / config.distributionWindow;
-        distributable = Math.min(calculated, totalUndistributed);
+    function pendingDistribution() public view returns (uint) {
+        uint _elapsed = block.timestamp - lastDistributionTime;
+        uint _calculated = totalUndistributed * _elapsed / config.distributionWindow;
+
+        return Math.min(_calculated, totalUndistributed);
     }
 
     /// @notice Get claimable rewards for a user.
     function claimable(
-        address user
+        address _user
     ) external view returns (uint) {
-        UserRewards memory ur = userRewards[user];
-        uint pending = pendingDistribution();
-        uint totSupply = vToken.totalSupply();
-        uint pendingPerToken = totSupply > 0 ? Precision.toFactor(pending, totSupply) : 0;
-        uint currentCumulative = cumulativeRewardPerToken + pendingPerToken;
-        uint userBalance = vToken.balanceOf(user);
+        UserRewards memory ur = userRewardMap[_user];
+        uint _pending = pendingDistribution();
+        uint _totSupply = vToken.totalSupply();
+        uint _pendingPerToken = _totSupply > 0 ? Precision.toFactor(_pending, _totSupply) : 0;
+        uint _nextCumulativeCheckpoint = cumulativeRewardPerToken + _pendingPerToken;
+        uint _userBalance = vToken.balanceOf(_user);
+
         return
-            ur.accrued + _calculatePendingRewardPerToken(ur.cumulativeRewardCheckpoint, currentCumulative, userBalance);
+            ur.accrued + _calculatePendingRewardPerToken(ur.cumulativeRewardCheckpoint, _nextCumulativeCheckpoint, _userBalance);
     }
 
     /// @notice Deposit new rewards into the system.
-    /// @param depositor The address depositing rewards.
-    /// @param amount Amount of reward tokens to deposit.
-    function deposit(address depositor, uint amount) external auth {
-        require(amount > 0, Error.RewardDistributor__InvalidAmount());
+    /// @param _depositor The address depositing rewards.
+    /// @param _amount Amount of reward tokens to deposit.
+    function deposit(address _depositor, uint _amount) external auth {
+        require(_amount > 0, Error.RewardDistributor__InvalidAmount());
 
         _distribute();
-        totalUndistributed += amount;
+        totalUndistributed += _amount;
+        store.transferIn(rewardToken, _depositor, _amount);
 
-        store.transferIn(rewardToken, depositor, amount);
-        _logEvent("Deposit", abi.encode(depositor, amount));
+        _logEvent("Deposit", abi.encode(_depositor, _amount));
     }
 
     /// @notice Claim accrued rewards.
-    /// @param user The address whose rewards are claimed.
-    /// @param receiver The address receiving the rewards.
-    /// @param amount The amount of rewards to claim.
-    function claim(address user, address receiver, uint amount) external auth {
-        require(amount > 0, Error.RewardDistributor__InvalidAmount());
+    /// @param _user The address whose rewards are claimed.
+    /// @param _receiver The address receiving the rewards.
+    /// @param _amount The amount of rewards to claim.
+    function claim(address _user, address _receiver, uint _amount) external auth {
+        require(_amount > 0, Error.RewardDistributor__InvalidAmount());
 
-        uint currentCumulative = _distribute();
-        UserRewards storage ur = userRewards[user];
-        uint userBalance = vToken.balanceOf(user);
+        uint _currentCumulative = _distribute();
+        UserRewards memory _userReward = userRewardMap[_user];
+        uint _userBalance = vToken.balanceOf(_user);
+        uint _nextAccrued = _userReward.accrued + _calculatePendingRewardPerToken(_userReward.cumulativeRewardCheckpoint, _currentCumulative, _userBalance);
+
+        require(_amount <= _nextAccrued, Error.RewardDistributor__InsufficientRewards(_userReward.accrued));
 
         // Update the user's accrued rewards up to now.
-        ur.accrued += _calculatePendingRewardPerToken(ur.cumulativeRewardCheckpoint, currentCumulative, userBalance);
-        ur.cumulativeRewardCheckpoint = currentCumulative;
+        _userReward.cumulativeRewardCheckpoint = _currentCumulative;
+        _userReward.accrued -= _amount;
 
-        require(amount <= ur.accrued, Error.RewardDistributor__InsufficientRewards(ur.accrued));
+        userRewardMap[_user] = _userReward;
+        store.transferOut(rewardToken, _receiver, _amount);
 
-        ur.accrued -= amount;
-
-        store.transferOut(rewardToken, receiver, amount);
-        _logEvent("Claim", abi.encode(user, receiver, amount));
+        _logEvent("Claim", abi.encode(_user, _receiver, _amount));
     }
-
-    /// @notice Update reward accounting for a specific user.
-    /// @param user The user whose rewards are to be updated.
-    function updateUserRewards(
-        address user
-    ) external auth {
-        uint currentCumulative = _distribute();
-        UserRewards storage ur = userRewards[user];
-        uint userBalance = vToken.balanceOf(user);
-
-        ur.accrued += _calculatePendingRewardPerToken(ur.cumulativeRewardCheckpoint, currentCumulative, userBalance);
-        ur.cumulativeRewardCheckpoint = currentCumulative;
-    }
-
-    /// @notice Distribute pending rewards to the system.
-    function distribute() external auth returns (uint) {
-        return _distribute();
-    }
-
-    // --- Internal Functions --- //
 
     /// @dev Internal distribution handler.
     function _distribute() internal returns (uint) {
-        uint emission = pendingDistribution();
-        uint totalVTokens = vToken.totalSupply();
+        uint _emission = pendingDistribution();
+        uint _totalVTokens = vToken.totalSupply();
+
         lastDistributionTime = block.timestamp;
 
-        if (emission > 0 && totalVTokens > 0) {
-            totalUndistributed -= emission;
-            uint rewardIncrement = Precision.toFactor(emission, totalVTokens);
-            cumulativeRewardPerToken += rewardIncrement;
-            _logEvent("Distribute", abi.encode(emission, totalVTokens));
+        if (_emission > 0 && _totalVTokens > 0) {
+            totalUndistributed -= _emission;
+            uint _cumulativeRewardPerToken = cumulativeRewardPerToken + Precision.toFactor(_emission, _totalVTokens);
+            cumulativeRewardPerToken += _cumulativeRewardPerToken;
+            _logEvent("Distribute", abi.encode(_cumulativeRewardPerToken, _emission));
+
+            return _cumulativeRewardPerToken;
         }
 
         return cumulativeRewardPerToken;
@@ -147,30 +129,30 @@ contract RewardDistributor is CoreContract {
 
     /// @dev Calculate pending rewards between two checkpoints.
     function _calculatePendingRewardPerToken(
-        uint userCheckpoint,
-        uint currentCumulative,
-        uint userBalance
+        uint _userCheckpoint,
+        uint _currentCumulative,
+        uint _userBalance
     ) internal pure returns (uint) {
-        return userBalance * (currentCumulative - userCheckpoint) / Precision.FLOAT_PRECISION;
+        return _userBalance * (_currentCumulative - _userCheckpoint) / Precision.FLOAT_PRECISION;
     }
 
     // --- Governance Functions --- //
 
     /// @notice Update referral code ownership.
     function transferReferralOwnership(
-        IGmxReferralStorage referralStorage,
-        bytes32 code,
-        address newOwner
+        IGmxReferralStorage _referralStorage,
+        bytes32 _code,
+        address _newOwner
     ) external auth {
-        referralStorage.setCodeOwner(code, newOwner);
+        _referralStorage.setCodeOwner(_code, _newOwner);
     }
 
     /// @notice Update contract configuration.
     /// @dev Expects ABI-encoded data that decodes to a `Config` struct.
     function _setConfig(
-        bytes calldata data
+        bytes calldata _data
     ) internal override {
-        Config memory newConfig = abi.decode(data, (Config));
+        Config memory newConfig = abi.decode(_data, (Config));
         require(newConfig.distributionWindow > 0, "RewardDistributor: distribution period must be > 0");
         config = newConfig;
     }

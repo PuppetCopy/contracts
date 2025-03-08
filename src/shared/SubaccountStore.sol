@@ -4,20 +4,16 @@ pragma solidity 0.8.28;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Error} from "./Error.sol";
-import {TokenRouter} from "./TokenRouter.sol";
 import {BankStore} from "./../utils/BankStore.sol";
 import {Precision} from "./../utils/Precision.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
+import {Error} from "./Error.sol";
+import {TokenRouter} from "./TokenRouter.sol";
 
 contract SubaccountStore is BankStore {
     mapping(IERC20 token => mapping(address user => uint)) public userBalanceMap;
 
     constructor(IAuthority _authority, TokenRouter _router) BankStore(_authority, _router) {}
-
-    function getUserBalance(IERC20 _token, address _account) external view returns (uint) {
-        return userBalanceMap[_token][_account];
-    }
 
     function getBalanceList(IERC20 _token, address[] calldata _userList) external view returns (uint[] memory) {
         uint _accountListLength = _userList.length;

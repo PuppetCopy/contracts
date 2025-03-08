@@ -20,8 +20,8 @@ contract MatchRule is CoreContract {
         uint minExpiryDuration;
         uint minAllowanceRate;
         uint maxAllowanceRate;
-        uint minAllocationActivity;
-        uint maxAllocationActivity;
+        uint minActivityThrottle;
+        uint maxActivityThrottle;
         IERC20[] tokenAllowanceList;
         uint[] tokenAllowanceAmountList;
     }
@@ -80,66 +80,41 @@ contract MatchRule is CoreContract {
         _logEvent("Withdraw", abi.encode(_collateralToken, _user, nextBalance, _amount));
     }
 
-    function setMatchRuleList(
-        IERC20[] calldata _collateralTokenList,
-        address[] calldata _traderList,
-        Rule[] calldata _ruleParamList,
-        address _puppet
+    function setRule(
+        IERC20 _collateralToken,
+        address _user,
+        address _trader,
+        Rule calldata _ruleParams
     ) external auth {
-        uint _traderListCount = _traderList.length;
-        require(_traderListCount == _ruleParamList.length, Error.MatchRule__InvalidLength());
-
-        bytes32[] memory _matchKeyList = new bytes32[](_traderListCount);
-
-        for (uint i = 0; i < _traderListCount; i++) {
-            Rule memory _ruleParams = _ruleParamList[i];
-            IERC20 collateralToken = _collateralTokenList[i];
-
-            require(
-                _ruleParams.throttleActivity >= config.minAllocationActivity
-                    && _ruleParams.throttleActivity <= config.maxAllocationActivity,
-                Error.MatchRule__InvalidActivityThrottle(config.minAllocationActivity, config.maxAllocationActivity)
-            );
-
-            // require(
-            //     _ruleParams.expiry >= config.minExpiryDuration,
-            //     Error.MatchRule__InvalidExpiryDuration(config.minExpiryDuration)
-            // );
-
-            require(
-                _ruleParams.allowanceRate >= config.minAllowanceRate
-                    && _ruleParams.allowanceRate <= config.maxAllowanceRate,
-                Error.MatchRule__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate)
-            );
-
-            bytes32 key = PositionUtils.getMatchKey(collateralToken, _traderList[i]);
-            _matchKeyList[i] = key;
-        }
-
-        uint _keyListLength = _matchKeyList.length;
-        require(_keyListLength == _ruleParamList.length, Error.Store__InvalidLength());
-
-        for (uint i = 0; i < _keyListLength; i++) {
-            bytes32 _key = _matchKeyList[i];
-            matchRuleMap[_key][_puppet] = _ruleParamList[i];
-            // // pre-store to save gas during inital allocation or-and reset throttle activity
-            // if (activityThrottleMap[_key][_puppet] == 0) {
-            //     activityThrottleMap[_key][_puppet] = 1;
-            // }
-        }
-
-        _logEvent(
-            "SetMatchRuleList", abi.encode(_collateralTokenList, _puppet, _traderList, _matchKeyList, _ruleParamList)
+        require(
+            _ruleParams.throttleActivity >= config.minActivityThrottle
+                && _ruleParams.throttleActivity <= config.maxActivityThrottle,
+            Error.MatchRule__InvalidActivityThrottle(config.minActivityThrottle, config.maxActivityThrottle)
         );
+
+        require(
+            _ruleParams.expiry >= config.minExpiryDuration,
+            Error.MatchRule__InvalidExpiryDuration(config.minExpiryDuration)
+        );
+
+        require(
+            _ruleParams.allowanceRate >= config.minAllowanceRate && _ruleParams.allowanceRate <= config.maxAllowanceRate,
+            Error.MatchRule__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate)
+        );
+
+        bytes32 _matchKey = PositionUtils.getMatchKey(_collateralToken, _trader);
+        matchRuleMap[_matchKey][_user] = _ruleParams;
+
+        _logEvent("SetMatchRule", abi.encode(_collateralToken, _matchKey, _user, _trader, _ruleParams));
     }
 
     // governance
     /// @notice  Sets the configuration parameters for the PuppetLogic contract.
     /// @dev Emits a SetConfig event upon successful execution
     function _setConfig(
-        bytes calldata data
+        bytes calldata _data
     ) internal override {
-        config = abi.decode(data, (Config));
+        config = abi.decode(_data, (Config));
 
         require(
             config.tokenAllowanceList.length == config.tokenAllowanceAmountList.length, Error.MatchRule__InvalidLength()
