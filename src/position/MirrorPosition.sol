@@ -74,6 +74,7 @@ contract MirrorPosition is CoreContract {
 
     mapping(bytes32 matchKey => mapping(address puppet => uint)) public activityThrottleMap;
     mapping(bytes32 allocationKey => Allocation) public allocationMap;
+    mapping(bytes32 allocationKey => mapping(address puppet => uint)) public allocationPuppetMap;
     mapping(bytes32 matchKey => Subaccount) public matchKeySubaccountMap;
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
 
@@ -109,7 +110,8 @@ contract MirrorPosition is CoreContract {
 
         _allocation.listHash = keccak256(abi.encode(_puppetList));
 
-        (uint[] memory _balanceList, uint _allocated) = _processPuppetList(_collateralToken, _matchKey, _puppetList);
+        (uint[] memory _balanceList, uint _allocated) =
+            _processPuppetList(_collateralToken, _matchKey, _allocationKey, _puppetList);
 
         require(_allocated > 0, Error.MirrorPosition__NoPuppetAllocation());
 
@@ -139,6 +141,7 @@ contract MirrorPosition is CoreContract {
     function _processPuppetList(
         IERC20 _collateralToken,
         bytes32 _matchKey,
+        bytes32 _allocationKey,
         address[] calldata _puppetList
     ) internal returns (uint[] memory _balanceList, uint _allocated) {
         MatchRule.Rule[] memory _ruleList = matchRule.getRuleList(_matchKey, _puppetList);
@@ -149,7 +152,10 @@ contract MirrorPosition is CoreContract {
 
             // Only process if within time window
             if (rule.expiry > block.timestamp && block.timestamp > activityThrottleMap[_matchKey][_puppetList[i]]) {
-                _balanceList[i] -= Precision.applyBasisPoints(rule.allowanceRate, _balanceList[i]);
+                uint _allocation = Precision.applyBasisPoints(rule.allowanceRate, _balanceList[i]);
+
+                allocationPuppetMap[_allocationKey][_puppetList[i]] = _allocation;
+                _balanceList[i] -= _allocation;
                 _allocated += _balanceList[i];
             }
 
@@ -215,6 +221,8 @@ contract MirrorPosition is CoreContract {
 
             if (_targetLeverage >= _leverage) {
                 deltaLeverage = _targetLeverage - _leverage;
+                _request.sizeDelta = _allocation.size * deltaLeverage / _targetLeverage;
+
                 _requestKey = submitOrder(
                     _params,
                     _subaccount,
@@ -223,9 +231,10 @@ contract MirrorPosition is CoreContract {
                     0,
                     config.increaseCallbackGasLimit
                 );
-                _request.sizeDelta = _allocation.size * deltaLeverage / _targetLeverage;
             } else {
                 deltaLeverage = _leverage - _targetLeverage;
+                _request.sizeDelta = _allocation.size * deltaLeverage / _leverage;
+
                 _requestKey = submitOrder(
                     _params,
                     _subaccount,
@@ -234,7 +243,6 @@ contract MirrorPosition is CoreContract {
                     0,
                     config.decreaseCallbackGasLimit
                 );
-                _request.sizeDelta = _allocation.size * deltaLeverage / _leverage;
             }
         }
 
@@ -335,7 +343,7 @@ contract MirrorPosition is CoreContract {
         Allocation memory _allocation = allocationMap[_allocationKey];
 
         require(_allocation.matchKey != bytes32(0), Error.MirrorPosition__AllocationDoesNotExist());
-        require(_allocation.collateral == 0, Error.MirrorPosition__PendingSettlement());
+        // require(_allocation.collateral == 0, Error.MirrorPosition__PendingSettlement());
 
         bytes32 _puppetListHash = keccak256(abi.encode(_puppetList));
 
@@ -343,22 +351,20 @@ contract MirrorPosition is CoreContract {
 
         _allocation.listHash = _puppetListHash;
 
-        uint[] memory _nextBalanceList = new uint[](_puppetList.length);
-        uint[] memory _allocationList = new uint[](_puppetList.length);
+        uint[] memory _nextBalanceList = subaccountStore.getBalanceList(_allocation.collateralToken, _puppetList);
 
         uint _totalPuppetContribution = _allocation.settled;
 
         if (_allocation.profit > 0 && feeMarket.askPrice(_allocation.collateralToken) > 0) {
-            _totalPuppetContribution -= Precision.applyFactor(config.performanceContributionRate, _allocation.profit);
+            uint _contributeFeeAmount = Precision.applyFactor(config.performanceContributionRate, _allocation.profit);
+            _totalPuppetContribution -= _contributeFeeAmount;
 
-            feeMarket.deposit(
-                _allocation.collateralToken, address(this), _allocation.settled - _totalPuppetContribution
-            );
+            feeMarket.deposit(_allocation.collateralToken, address(this), _contributeFeeAmount);
         }
 
         if (_totalPuppetContribution > 0) {
-            for (uint i = 0; i < _allocationList.length; i++) {
-                uint puppetAllocation = _allocationList[i];
+            for (uint i = 0; i < _nextBalanceList.length; i++) {
+                uint puppetAllocation = allocationPuppetMap[_allocationKey][_puppetList[i]];
                 if (puppetAllocation == 0) continue;
 
                 _nextBalanceList[i] += puppetAllocation * _totalPuppetContribution / _allocation.allocated;
@@ -375,6 +381,8 @@ contract MirrorPosition is CoreContract {
             delete allocationMap[_allocationKey];
         }
 
+        subaccountStore.setBalanceList(_allocation.collateralToken, _puppetList, _nextBalanceList);
+
         _logEvent(
             "Settle",
             abi.encode(
@@ -382,8 +390,8 @@ contract MirrorPosition is CoreContract {
                 _allocation.matchKey,
                 _allocationKey,
                 _puppetListHash,
+                _nextBalanceList,
                 _puppetList,
-                _allocationList,
                 _totalPuppetContribution,
                 _allocation.allocated,
                 _allocation.settled,

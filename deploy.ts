@@ -45,7 +45,7 @@ if (!config.RPC_URL || !config.chainId) {
 
 const scriptFile = `${config.script}.s.sol`
 
-await $`forge script script/${scriptFile}:${config.script} --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL`
+await $`FOUNDRY_PROFILE=prod forge script script/${scriptFile}:${config.script} --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL`
 
 const deploymentsFilePath = "./deployments/addresses.json"
 const deploymentsFile = file(deploymentsFilePath)

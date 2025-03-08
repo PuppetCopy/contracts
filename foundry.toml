@@ -3,13 +3,15 @@
 [profile.default]
   src = 'src'
   out = 'forge-artifacts'
-  cache_path  = 'forge-cache'
   libs = ['node_modules']
   evm_version = 'cancun'
-  test = 'test'
-  optimizer = false
   solc_version = '0.8.28'
   via_ir = true
+  extra_output = ["storageLayout", "evm.bytecode.generatedSources", "evm.legacyAssembly", "evm.deployedBytecode.immutableReferences"]
+  bytecode_hash = "ipfs"
+  cbor_metadata = true
+  force = true
+  build_info = true
 
 [doc]
   ignore = ["**/interface/**/*.sol", "**/utils/**/*.sol", "**/shared/**/*.sol"]
@@ -19,6 +21,7 @@
   cache_path  = 'forge-cache-prod'
   optimizer = true
   optimizer_runs = 10000
+  verbosity = 4
 
 
 [profile.default.fuzz]

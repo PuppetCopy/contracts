@@ -134,6 +134,7 @@ contract TradingTest is BasicSetup {
         bytes32 mockSourceRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
         bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
         bytes32 positionKey = keccak256(abi.encodePacked("position-1"));
+
         bytes32 allocationKey = mirrorPosition.allocate(usdc, mockSourceRequestKey, matchKey, positionKey, puppetList);
 
         bytes32 increaseRequestKey = mirrorPosition.mirror{value: executionFee}(
@@ -176,7 +177,7 @@ contract TradingTest is BasicSetup {
 
         // Need to simulate some tokens coming back to the contract
         // In real environment, GMX would send funds back
-        deal(address(usdc), address(subaccountStore), 2e18); // Return more than collateral to simulate profit
+        deal(address(usdc), address(subaccountStore), 100e6); // Return more than collateral to simulate profit
 
         // Simulate position decrease callback
         mirrorPosition.decrease(decreaseRequestKey);
