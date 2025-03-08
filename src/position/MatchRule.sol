@@ -105,7 +105,7 @@ contract MatchRule is CoreContract {
         bytes32 _matchKey = PositionUtils.getMatchKey(_collateralToken, _trader);
         matchRuleMap[_matchKey][_user] = _ruleParams;
 
-        _logEvent("SetMatchRule", abi.encode(_collateralToken, _matchKey, _user, _trader, _ruleParams));
+        _logEvent("SetMatchRule", abi.encode(_collateralToken, _matchKey, _trader, _user, _ruleParams));
     }
 
     // governance

@@ -5,11 +5,11 @@
     "deployments/**/*"
   ],
   "scripts": {
-    "test": "forge test -vvvvv",
-    "test:dev": "FOUNDRY_PROFILE=dev forge test --match-contract TradingTest -vvvvv",
-    "test:dev:fork": "FOUNDRY_PROFILE=dev forge test --chain arbitrum --match-contract TradingTest -vvvvv --fork-block-number 192315592 --fork-url=$ARBITRUM_RPC_URL",
+    "test": "forge test --match-contract TradingTest -vvvvv",
+    "test:fork": "forge test --chain arbitrum --match-contract TradingTest -vvvvv --fork-block-number 192315592 --fork-url=$ARBITRUM_RPC_URL",
+    "test:prod": "FOUNDRY_PROFILE=prod forge test -vvvvv",
     "build": "forge build --sizes",
-    "build:dev": "FOUNDRY_PROFILE=dev forge build --sizes",
+    "build:prod": "FOUNDRY_PROFILE=prod forge build --sizes",
     "deploy": "CHAIN=42161 SCRIPT='DeployTokenomics' bun deploy.ts",
     "docgen": "forge doc --out '.docgen' --build",
     "gas-report": "forge test --match-contract TradingTest --gas-report",

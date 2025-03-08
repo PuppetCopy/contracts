@@ -10,6 +10,6 @@ broadcast
 
 # foundry files
 forge-artifacts
-forge-artifacts-dev
+forge-artifacts-prod
 forge-cache
-forge-cache-dev
+forge-cache-prod

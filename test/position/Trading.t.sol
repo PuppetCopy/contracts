@@ -136,7 +136,6 @@ contract TradingTest is BasicSetup {
         bytes32 positionKey = keccak256(abi.encodePacked("position-1"));
         bytes32 allocationKey = mirrorPosition.allocate(usdc, mockSourceRequestKey, matchKey, positionKey, puppetList);
 
-
         bytes32 increaseRequestKey = mirrorPosition.mirror{value: executionFee}(
             MirrorPosition.MirrorPositionParams({
                 trader: trader,

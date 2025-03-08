@@ -64,9 +64,7 @@ library Error {
     error MirrorPosition__PendingSettlement();
     error MirrorPosition__PuppetListLimit();
     error MirrorPosition__InvalidPuppetListIntegrity();
-    error MirrorPosition__InvalidListLength();
     error MirrorPosition__AllocationDoesNotExist();
-    error MirrorPosition__RequestDoesNotExist();
     error MirrorPosition__InvalidRequest(bytes32 positionKey, bytes32 key);
     error MirrorPosition__UnexpectedEventData();
     error MirrorPosition__MismatchedAmountIn(uint recordedAmountIn, uint amountIn);
@@ -74,6 +72,7 @@ library Error {
     error MirrorPosition__RequestDoesNotMatchExecution();
     error MirrorPosition__NoAllocation();
     error MirrorPosition__PendingExecution();
+    error MirrorPosition__NoPuppetAllocation();
 
     // PositionRouter
     error PositionRouter__InvalidOrderType(GmxPositionUtils.OrderType orderType);
