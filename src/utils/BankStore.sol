@@ -18,15 +18,20 @@ abstract contract BankStore is Access {
         router = _router;
     }
 
-    function getTokenBalance(IERC20 _token) external view returns (uint) {
+    function getTokenBalance(
+        IERC20 _token
+    ) external view returns (uint) {
         return tokenBalanceMap[_token];
     }
 
-    function recordTransferIn(IERC20 _token) external auth returns (uint) {
-        uint prevBalance = tokenBalanceMap[_token];
-        uint currentBalance = _syncTokenBalance(_token);
+    function recordTransferIn(
+        IERC20 _token
+    ) external auth returns (uint) {
+        uint _prevBalance = tokenBalanceMap[_token];
+        uint _currentBalance = _token.balanceOf(address(this));
+        tokenBalanceMap[_token] = _currentBalance;
 
-        return currentBalance - prevBalance;
+        return _currentBalance - _prevBalance;
     }
 
     function interTransferIn(IERC20 _token, BankStore _bank, uint _value) external auth {
@@ -44,13 +49,9 @@ abstract contract BankStore is Access {
         tokenBalanceMap[_token] += _value;
     }
 
-    function syncTokenBalance(IERC20 _token) external auth {
+    function syncTokenBalance(
+        IERC20 _token
+    ) external auth {
         tokenBalanceMap[_token] = _token.balanceOf(address(this));
-    }
-
-    function _syncTokenBalance(IERC20 _token) internal returns (uint) {
-        uint currentBalance = _token.balanceOf(address(this));
-        tokenBalanceMap[_token] = currentBalance;
-        return currentBalance;
     }
 }

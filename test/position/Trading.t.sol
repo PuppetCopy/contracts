@@ -129,7 +129,7 @@ contract TradingTest is BasicSetup {
         uint estimatedGasLimit = 5_000_000;
         uint executionFee = tx.gasprice * estimatedGasLimit;
 
-        address[] memory puppetList = getGeneratePuppetList(usdc, trader, 10);
+        address[] memory puppetList = generatePuppetList(usdc, trader, 10);
 
         bytes32 mockSourceRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
         bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
@@ -147,7 +147,7 @@ contract TradingTest is BasicSetup {
                 isIncrease: true,
                 isLong: true,
                 executionFee: executionFee,
-                collateralDelta: 1e18,
+                collateralDelta: 120e6,
                 sizeDeltaInUsd: 30e30,
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
@@ -168,7 +168,7 @@ contract TradingTest is BasicSetup {
                 isIncrease: false,
                 isLong: true,
                 executionFee: executionFee,
-                collateralDelta: 1e18,
+                collateralDelta: 120e6,
                 sizeDeltaInUsd: 30e30,
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
@@ -177,7 +177,9 @@ contract TradingTest is BasicSetup {
 
         // Need to simulate some tokens coming back to the contract
         // In real environment, GMX would send funds back
-        deal(address(usdc), address(subaccountStore), 100e6); // Return more than collateral to simulate profit
+        // usdc.balanceOf(address(subaccountStore));
+        deal(address(usdc), address(subaccountStore), usdc.balanceOf(address(subaccountStore)) + 10e6); // Return more than collateral to simulate profit
+        // usdc.balanceOf(address(subaccountStore));
 
         // Simulate position decrease callback
         mirrorPosition.decrease(decreaseRequestKey);
@@ -186,7 +188,7 @@ contract TradingTest is BasicSetup {
         mirrorPosition.settle(allocationKey, puppetList);
     }
 
-    function getGeneratePuppetList(
+    function generatePuppetList(
         IERC20 collateralToken,
         address trader,
         uint _length

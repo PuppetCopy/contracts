@@ -159,7 +159,7 @@ contract MirrorPosition is CoreContract {
 
                 allocationPuppetMap[_allocationKey][_puppetList[i]] = _allocation;
                 _balanceList[i] -= _allocation;
-                _allocated += _balanceList[i];
+                _allocated += _allocation;
             }
 
             activityThrottleMap[_matchKey][_puppetList[i]] = block.timestamp + rule.throttleActivity;
@@ -174,9 +174,11 @@ contract MirrorPosition is CoreContract {
         uint _startGas = gasleft();
         Allocation memory _allocation = allocationMap[_params.allocationKey];
 
+        address _subaccountAddress = _predictDeterministicAddress(_allocation.matchKey);
+
         Subaccount _subaccount = Subaccount(
-            CallUtils.isContract(_predictDeterministicAddress(_allocation.matchKey))
-                ? _predictDeterministicAddress(_allocation.matchKey)
+            CallUtils.isContract(_subaccountAddress)
+                ? _subaccountAddress
                 : Clones.cloneDeterministic(subaccountStoreImplementation, _allocation.matchKey)
         );
 
@@ -198,7 +200,6 @@ contract MirrorPosition is CoreContract {
             _allocation.collateral = _allocation.allocated;
 
             subaccountStore.transferOut(_params.collateralToken, config.gmxOrderVault, _allocation.allocated);
-            allocationMap[_params.allocationKey] = _allocation;
             _requestKey = _submitOrder(
                 _params,
                 _subaccount,
@@ -258,7 +259,7 @@ contract MirrorPosition is CoreContract {
         _logEvent(
             _targetLeverage >= _leverage ? "RequestIncrease" : "RequestDecrease",
             abi.encode(
-                _subaccount,
+                _subaccountAddress,
                 _params.trader,
                 _params.allocationKey,
                 _params.sourceRequestKey,
@@ -278,7 +279,6 @@ contract MirrorPosition is CoreContract {
 
         Allocation memory _allocation = allocationMap[_request.allocationKey];
         _allocation.size += _request.sizeDelta;
-
         delete requestAdjustmentMap[_requestKey];
         allocationMap[_request.allocationKey] = _allocation;
 
