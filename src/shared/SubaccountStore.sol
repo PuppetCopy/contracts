@@ -2,15 +2,14 @@
 pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {BankStore} from "./../utils/BankStore.sol";
-import {Precision} from "./../utils/Precision.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
-import {Error} from "./Error.sol";
+import {Subaccount} from "./Subaccount.sol";
 import {TokenRouter} from "./TokenRouter.sol";
 
 contract SubaccountStore is BankStore {
+    address public immutable implementation = address(new Subaccount(this));
     mapping(IERC20 token => mapping(address user => uint)) public userBalanceMap;
 
     constructor(IAuthority _authority, TokenRouter _router) BankStore(_authority, _router) {}

@@ -4,15 +4,35 @@ pragma solidity ^0.8.28;
 import {IAccess} from "../utils/interfaces/IAccess.sol";
 import {Error} from "./Error.sol";
 
+/**
+ * @title Subaccount
+ * @author Puppet Protocol
+ * @notice A minimal proxy contract that enables identity-preserving delegated execution
+ * @dev This contract has been directed to work with EIP-1167 minimal proxies.
+ */
 contract Subaccount {
-    IAccess store;
-    address public account;
+    IAccess internal immutable store;
 
-    constructor(IAccess _store, address _account) {
+    /**
+     * @notice Constructor for the implementation contract only
+     * @dev This is only used for the implementation contract and not for proxies
+     */
+    constructor(
+        IAccess _store
+    ) {
         store = _store;
-        account = _account;
     }
 
+    /**
+     * @notice Executes a call to a target contract if the sender is authorized
+     * @dev This function only verifies that the caller has permission via store.canCall().
+     * All additional security checks, input validation, and event logging must be
+     * implemented by the authorized contracts themselves.
+     * @param _contract Target contract to call
+     * @param _data The calldata to send to the target contract
+     * @return _success Whether the call was successful
+     * @return _returnData The data returned from the call
+     */
     function execute(
         address _contract,
         bytes calldata _data

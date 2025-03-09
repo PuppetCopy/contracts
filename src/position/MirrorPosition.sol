@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -12,6 +13,7 @@ import {Error} from "./../shared/Error.sol";
 import {Subaccount} from "./../shared/Subaccount.sol";
 import {SubaccountStore} from "./../shared/SubaccountStore.sol";
 import {TokenRouter} from "./../shared/TokenRouter.sol";
+import {CallUtils} from "./../utils/CallUtils.sol";
 import {ErrorUtils} from "./../utils/ErrorUtils.sol";
 import {Precision} from "./../utils/Precision.sol";
 import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
@@ -71,11 +73,11 @@ contract MirrorPosition is CoreContract {
     SubaccountStore immutable subaccountStore;
     MatchRule immutable matchRule;
     FeeMarketplace immutable feeMarket;
+    address immutable subaccountStoreImplementation;
 
     mapping(bytes32 matchKey => mapping(address puppet => uint)) public activityThrottleMap;
     mapping(bytes32 allocationKey => Allocation) public allocationMap;
     mapping(bytes32 allocationKey => mapping(address puppet => uint)) public allocationPuppetMap;
-    mapping(bytes32 matchKey => Subaccount) public matchKeySubaccountMap;
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
 
     constructor(
@@ -85,6 +87,7 @@ contract MirrorPosition is CoreContract {
         FeeMarketplace _feeMarket
     ) CoreContract("MirrorPosition", "1", _authority) {
         subaccountStore = _puppetStore;
+        subaccountStoreImplementation = subaccountStore.implementation();
         matchRule = _matchRule;
         feeMarket = _feeMarket;
     }
@@ -170,11 +173,12 @@ contract MirrorPosition is CoreContract {
     ) external payable auth returns (bytes32 _requestKey) {
         uint _startGas = gasleft();
         Allocation memory _allocation = allocationMap[_params.allocationKey];
-        Subaccount _subaccount = matchKeySubaccountMap[_allocation.matchKey];
 
-        if (address(_subaccount) == address(0)) {
-            _subaccount = matchKeySubaccountMap[_allocation.matchKey] = new Subaccount(subaccountStore, _params.trader);
-        }
+        Subaccount _subaccount = Subaccount(
+            CallUtils.isContract(_predictDeterministicAddress(_allocation.matchKey))
+                ? _predictDeterministicAddress(_allocation.matchKey)
+                : Clones.cloneDeterministic(subaccountStoreImplementation, _allocation.matchKey)
+        );
 
         RequestAdjustment memory _request = RequestAdjustment({
             matchKey: _allocation.matchKey,
@@ -195,7 +199,7 @@ contract MirrorPosition is CoreContract {
 
             subaccountStore.transferOut(_params.collateralToken, config.gmxOrderVault, _allocation.allocated);
             allocationMap[_params.allocationKey] = _allocation;
-            _requestKey = submitOrder(
+            _requestKey = _submitOrder(
                 _params,
                 _subaccount,
                 _request,
@@ -223,7 +227,7 @@ contract MirrorPosition is CoreContract {
                 deltaLeverage = _targetLeverage - _leverage;
                 _request.sizeDelta = _allocation.size * deltaLeverage / _targetLeverage;
 
-                _requestKey = submitOrder(
+                _requestKey = _submitOrder(
                     _params,
                     _subaccount,
                     _request,
@@ -235,7 +239,7 @@ contract MirrorPosition is CoreContract {
                 deltaLeverage = _leverage - _targetLeverage;
                 _request.sizeDelta = _allocation.size * deltaLeverage / _leverage;
 
-                _requestKey = submitOrder(
+                _requestKey = _submitOrder(
                     _params,
                     _subaccount,
                     _request,
@@ -401,7 +405,7 @@ contract MirrorPosition is CoreContract {
         );
     }
 
-    function submitOrder(
+    function _submitOrder(
         MirrorPositionParams calldata _order,
         Subaccount _subaccount,
         RequestAdjustment memory _request,
@@ -445,6 +449,12 @@ contract MirrorPosition is CoreContract {
         }
 
         return abi.decode(_orderReturnData, (bytes32));
+    }
+
+    function _predictDeterministicAddress(
+        bytes32 _salt
+    ) internal view returns (address) {
+        return Clones.predictDeterministicAddress(subaccountStoreImplementation, _salt, address(this));
     }
 
     function _setConfig(
