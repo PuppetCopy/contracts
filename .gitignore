@@ -1,4 +1,4 @@
-node_modules
+node_modules/
 .DS_Store
 .docgen
 
@@ -7,9 +7,10 @@ dist
 coverage
 coverage.json
 broadcast
+cache/
 
 # foundry files
-forge-artifacts
-forge-artifacts-prod
-forge-cache
-forge-cache-prod
+forge-artifacts/
+forge-artifacts-prod/
+forge-cache/
+forge-cache-prod/
