@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Error} from "../shared/Error.sol";
 import {ErrorUtils} from "./ErrorUtils.sol";
-import {ExternalCallUtils} from "./ExternalCallUtils.sol";
+import {CallUtils} from "./CallUtils.sol";
 import {IWNT} from "./interfaces/IWNT.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -25,7 +25,7 @@ library TransferUtils {
      */
     function sendNativeToken(IWNT wnt, address holdingAddress, uint gasLimit, address receiver, uint amount) internal {
         if (amount == 0) return;
-        ExternalCallUtils.validateDestination(receiver);
+        CallUtils.validateDestination(receiver);
 
         bool success;
         // use an assembly call to avoid loading large data into memory
@@ -69,7 +69,7 @@ library TransferUtils {
         uint amount
     ) internal {
         if (amount == 0) return;
-        ExternalCallUtils.validateDestination(receiver);
+        CallUtils.validateDestination(receiver);
 
         wnt.deposit{value: amount}();
 
@@ -99,7 +99,7 @@ library TransferUtils {
         uint amount
     ) internal {
         if (amount == 0) return;
-        ExternalCallUtils.validateDestination(receiver);
+        CallUtils.validateDestination(receiver);
 
         wnt.withdraw(amount);
 
@@ -141,7 +141,7 @@ library TransferUtils {
      */
     function transfer(uint gasLimit, address holdingAddress, IERC20 token, address receiver, uint amount) internal {
         if (amount == 0) return;
-        ExternalCallUtils.validateDestination(receiver);
+        CallUtils.validateDestination(receiver);
 
         require(gasLimit > 0, Error.TransferUtils__EmptyTokenTranferGasLimit(token));
 
@@ -195,7 +195,7 @@ library TransferUtils {
             if (returndata.length == 0) {
                 // only check isContract if the call was successful and the return data is empty
                 // otherwise we already know that it was a contract
-                if (ExternalCallUtils.isContract(address(token)) == false) {
+                if (CallUtils.isContract(address(token)) == false) {
                     return (false, "Call to non-contract");
                 }
             }

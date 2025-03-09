@@ -10,7 +10,6 @@
   extra_output = ["storageLayout", "evm.bytecode.generatedSources", "evm.legacyAssembly", "evm.deployedBytecode.immutableReferences"]
   bytecode_hash = "ipfs"
   cbor_metadata = true
-  force = true
   build_info = true
 
 [doc]

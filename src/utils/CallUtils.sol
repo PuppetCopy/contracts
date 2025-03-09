@@ -4,11 +4,11 @@ pragma solidity ^0.8.28;
 import {Error} from "../shared/Error.sol";
 
 /**
- * @title ExternalCallUtils
+ * @title CallUtils
  * @dev Various utility functions for external calls, including checks for contract existence and call success
  * native token functions
  */
-library ExternalCallUtils {
+library CallUtils {
     /**
      * @dev Checks if the specified address is a contract.
      *
@@ -36,7 +36,7 @@ library ExternalCallUtils {
     function validateDestination(
         address destination
     ) internal pure {
-        require(destination != address(0), Error.ExternalCallUtils__EmptyReceiver());
+        require(destination != address(0), Error.CallUtils__EmptyReceiver());
     }
 
     /**
@@ -49,11 +49,11 @@ library ExternalCallUtils {
 
         require(
             returndata.length != 0 && abi.decode(returndata, (bool)),
-            Error.ExternalCallUtils__SafeERC20FailedOperation(target)
+            Error.CallUtils__SafeERC20FailedOperation(target)
         );
 
         if (success) {
-            require(returndata.length > 0 && target.code.length > 0, Error.ExternalCallUtils__AddressEmptyCode(target));
+            require(returndata.length > 0 && target.code.length > 0, Error.CallUtils__AddressEmptyCode(target));
 
             return returndata;
         } else {
@@ -76,7 +76,7 @@ library ExternalCallUtils {
                 revert(add(32, returndata), returndata_size)
             }
         } else {
-            revert Error.ExternalCallUtils__FailedInnerCall();
+            revert Error.CallUtils__FailedInnerCall();
         }
     }
 }

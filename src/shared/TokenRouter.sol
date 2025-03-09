@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {ExternalCallUtils} from "../utils/ExternalCallUtils.sol";
+import {CallUtils} from "../utils/CallUtils.sol";
 import {Permission} from "./../utils/auth/Permission.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 
@@ -28,7 +28,7 @@ contract TokenRouter is Permission {
      * @param amount the amount to transfer
      */
     function transfer(IERC20 token, address from, address to, uint amount) external auth {
-        ExternalCallUtils.callTarget(
+        CallUtils.callTarget(
             transferGasLimit, address(token), abi.encodeCall(token.transferFrom, (from, to, amount))
         );
     }

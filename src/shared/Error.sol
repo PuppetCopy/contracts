@@ -6,11 +6,11 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {GmxPositionUtils} from "../position/utils/GmxPositionUtils.sol";
 
 library Error {
-    // ExternalCallUtils
-    error ExternalCallUtils__EmptyReceiver();
-    error ExternalCallUtils__AddressEmptyCode(address target);
-    error ExternalCallUtils__FailedInnerCall();
-    error ExternalCallUtils__SafeERC20FailedOperation(address token);
+    // CallUtils
+    error CallUtils__EmptyReceiver();
+    error CallUtils__AddressEmptyCode(address target);
+    error CallUtils__FailedInnerCall();
+    error CallUtils__SafeERC20FailedOperation(address token);
 
     // TransferUtils
     error TransferUtils__EmptyTokenTranferGasLimit(IERC20 token);
@@ -79,6 +79,9 @@ library Error {
 
     // Subaccount
     error Subaccount__UnauthorizedOperator();
+    error Subaccount__UnauthorizedCreator();
+    error Subaccount__AlreadyInitialized();
+    error Subaccount__OnlyFactory();
 
     // FeeMarketplace
     error FeeMarketplace__NotAuctionableToken();
