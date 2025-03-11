@@ -359,11 +359,11 @@ contract MirrorPosition is CoreContract {
 
         uint _totalPuppetContribution = _allocation.settled;
 
-        if (_allocation.profit > 0 && feeMarket.askPrice(_allocation.collateralToken) > 0) {
+        if (_allocation.profit > 0 && feeMarket.askAmount(_allocation.collateralToken) > 0) {
             uint _contributeFeeAmount = Precision.applyFactor(config.performanceContributionRate, _allocation.profit);
             _totalPuppetContribution -= _contributeFeeAmount;
 
-            feeMarket.deposit(_allocation.collateralToken, address(this), _contributeFeeAmount);
+            feeMarket.deposit(_allocation.collateralToken, subaccountStore, _contributeFeeAmount);
         }
 
         if (_totalPuppetContribution > 0) {

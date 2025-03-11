@@ -10,8 +10,9 @@ import {BankStore} from "../utils/BankStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
+
+import {FeeMarketplaceStore} from "./FeeMarketplaceStore.sol";
 import {PuppetToken} from "./PuppetToken.sol";
-import {FeeMarketplaceStore} from "./store/FeeMarketplaceStore.sol";
 
 /**
  * @title Protocol Public Fee Marketplace
@@ -38,15 +39,15 @@ contract FeeMarketplace is CoreContract {
     struct Config {
         uint distributionTimeframe;
         uint burnBasisPoints;
-        address rewardDistributor;
+        BankStore feeDistributor;
     }
 
     TokenRouter public immutable tokenRouter;
-    BankStore public immutable store;
+    FeeMarketplaceStore public immutable store;
     PuppetToken public immutable protocolToken;
 
     // Mapping for each fee token to its redemption cost in protocol tokens.
-    mapping(IERC20 => uint) public askPrice;
+    mapping(IERC20 => uint) public askAmount;
     // Mapping for each fee token to the accrued (i.e., unlocked) fee balance.
     mapping(IERC20 => uint) public accruedFee;
     // Mapping to track the last timestamp when the fee unlock calculation occurred.
@@ -96,101 +97,107 @@ contract FeeMarketplace is CoreContract {
     }
 
     /**
-     * @notice Deposits fees into the system and updates the unlocked fee balance.
-     * @param feeToken The fee token being deposited.
-     * @param depositor The address making the deposit.
-     * @param amount The deposit amount.
+     * @notice Deposits fee tokens into the marketplace.
+     * @param _feeToken The fee token to deposit.
+     * @param _bank The BankStore to deposit the fee tokens into.
+     * @param _amount The amount of fee tokens to deposit.
      */
-    function deposit(IERC20 feeToken, address depositor, uint amount) external auth {
-        require(amount > 0, Error.FeeMarketplace__ZeroDeposit());
+    function deposit(IERC20 _feeToken, BankStore _bank, uint _amount) external auth {
+        require(_amount > 0, Error.FeeMarketplace__ZeroDeposit());
 
         // Update the fee token's unlocked balance before processing the deposit.
-        _updateUnlockedBalance(feeToken);
+        _updateUnlockedBalance(_feeToken);
 
         // Transfer fee tokens into the BankStore.
-        store.transferIn(feeToken, depositor, amount);
+        store.interTransferIn(_feeToken, _bank, _amount);
 
-        _logEvent("Deposit", abi.encode(feeToken, depositor, amount));
+        _logEvent("Deposit", abi.encode(_feeToken, _bank, _amount));
     }
 
     /**
      * @notice Executes a fee redemption offer.
-     * @param feeToken The fee token to be redeemed.
-     * @param depositor The address making the redemption.
-     * @param receiver The address receiving the fee tokens.
-     * @param purchaseAmount The amount of fee tokens to redeem.
+     * @param _feeToken The fee token to be redeemed.
+     * @param _depositor The address making the redemption.
+     * @param _receiver The address receiving the fee tokens.
+     * @param _purchaseAmount The amount of fee tokens to redeem.
      */
-    function acceptOffer(IERC20 feeToken, address depositor, address receiver, uint purchaseAmount) external auth {
-        uint currentAskPrice = askPrice[feeToken];
+    function acceptOffer(IERC20 _feeToken, address _depositor, address _receiver, uint _purchaseAmount) external auth {
+        uint _currentAskAmount = askAmount[_feeToken];
 
-        require(currentAskPrice > 0, Error.FeeMarketplace__NotAuctionableToken());
+        require(_currentAskAmount > 0, Error.FeeMarketplace__NotAuctionableToken());
 
         // Update the fee token's unlocked balance before redemption.
-        _updateUnlockedBalance(feeToken);
+        _updateUnlockedBalance(_feeToken);
 
-        uint available = accruedFee[feeToken];
-        require(available >= purchaseAmount, Error.FeeMarketplace__InsufficientUnlockedBalance(available));
+        uint _accuredFees = accruedFee[_feeToken];
+        require(_accuredFees >= _purchaseAmount, Error.FeeMarketplace__InsufficientUnlockedBalance(_accuredFees));
 
         // Calculate protocol token burn and reward amounts.
-        uint burnAmount = Precision.applyBasisPoints(config.burnBasisPoints, currentAskPrice);
-        uint rewardAmount = currentAskPrice - burnAmount;
-
-        // Transfer protocol tokens from the user to the contract.
-        tokenRouter.transfer(protocolToken, depositor, address(this), currentAskPrice);
+        uint _distributeAmount = _currentAskAmount;
+        uint _burnAmount;
 
         // Burn the designated portion of protocol tokens.
-        protocolToken.burn(burnAmount);
+
+        if (config.burnBasisPoints > 0) {
+            _burnAmount = Precision.applyBasisPoints(config.burnBasisPoints, _currentAskAmount);
+            store.transferIn(protocolToken, _depositor, _currentAskAmount);
+            store.burn(_burnAmount);
+            _distributeAmount -= _burnAmount;
+        }
 
         // Transfer the remaining tokens to the reward distributor.
-        if (rewardAmount > 0 && config.rewardDistributor != address(0)) {
-            protocolToken.transfer(config.rewardDistributor, rewardAmount);
+        if (_distributeAmount > 0 && address(config.feeDistributor) != address(0)) {
+            config.feeDistributor.interTransferIn(protocolToken, store, _distributeAmount);
         }
 
         // Deduct the redeemed fee tokens from the unlocked balance.
-        accruedFee[feeToken] = available - purchaseAmount;
-        lastDistributionTimestamp[feeToken] = block.timestamp;
+        accruedFee[_feeToken] = _accuredFees - _purchaseAmount;
+        lastDistributionTimestamp[_feeToken] = block.timestamp;
 
         // Transfer fee tokens out to the receiver.
-        store.transferOut(feeToken, receiver, purchaseAmount);
+        store.transferOut(_feeToken, _receiver, _purchaseAmount);
 
-        _logEvent("AcceptOffer", abi.encode(feeToken, receiver, purchaseAmount, burnAmount, rewardAmount));
+        _logEvent("AcceptOffer", abi.encode(_feeToken, _receiver, _purchaseAmount, _burnAmount, _distributeAmount));
     }
 
     /**
      * @notice Sets the redemption cost (price in protocol tokens) for a fee token.
-     * @param feeToken The fee token.
-     * @param newCost The new cost in protocol tokens.
+     * @param _feeToken The fee token.
+     * @param _newCost The new cost in protocol tokens.
      */
-    function setAskPrice(IERC20 feeToken, uint newCost) external auth {
-        askPrice[feeToken] = newCost;
-        _logEvent("SetRedemptionCost", abi.encode(feeToken, newCost));
+    function setAskPrice(IERC20 _feeToken, uint _newCost) external auth {
+        askAmount[_feeToken] = _newCost;
+        _logEvent("SetRedemptionCost", abi.encode(_feeToken, _newCost));
     }
 
     /**
      * @notice Internal function to update the unlocked balance for fee tokens.
-     * @param feeToken The fee token to update.
+     * @param _feeToken The fee token to update.
      */
     function _updateUnlockedBalance(
-        IERC20 feeToken
+        IERC20 _feeToken
     ) internal {
-        uint pendingUnlock = getPendingUnlock(feeToken);
+        uint pendingUnlock = getPendingUnlock(_feeToken);
         if (pendingUnlock > 0) {
-            accruedFee[feeToken] += pendingUnlock;
+            accruedFee[_feeToken] += pendingUnlock;
         }
-        lastDistributionTimestamp[feeToken] = block.timestamp;
+        lastDistributionTimestamp[_feeToken] = block.timestamp;
     }
 
     /**
      * @dev Updates the configuration of the fee marketplace.
-     * @param data The abi-encoded Config struct.
+     * @param _data The abi-encoded Config struct.
      */
     function _setConfig(
-        bytes calldata data
+        bytes calldata _data
     ) internal override {
-        Config memory newConfig = abi.decode(data, (Config));
-        require(newConfig.burnBasisPoints <= 10000, "FeeMarketplace: burn basis points exceeds 100%");
+        Config memory newConfig = abi.decode(_data, (Config));
         require(
-            newConfig.burnBasisPoints == 10000 || newConfig.rewardDistributor != address(0),
+            newConfig.burnBasisPoints <= Precision.BASIS_POINT_DIVISOR, "FeeMarketplace: burn basis points exceeds 100%"
+        );
+        require(
+            newConfig.burnBasisPoints == Precision.BASIS_POINT_DIVISOR
+                || address(newConfig.feeDistributor) != address(0),
             "FeeMarketplace: reward distributor required when burn < 100%"
         );
 
@@ -198,7 +205,7 @@ contract FeeMarketplace is CoreContract {
 
         _logEvent(
             "SetConfig",
-            abi.encode(newConfig.distributionTimeframe, newConfig.burnBasisPoints, newConfig.rewardDistributor)
+            abi.encode(newConfig.distributionTimeframe, newConfig.burnBasisPoints, newConfig.feeDistributor)
         );
     }
 }
