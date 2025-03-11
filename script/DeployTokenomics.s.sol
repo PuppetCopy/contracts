@@ -11,9 +11,9 @@
 // import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
 // import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
 // import {VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
-// import {ContributeStore} from "src/tokenomics/store/ContributeStore.sol";
-// import {RewardStore} from "src/tokenomics/store/RewardStore.sol";
-// import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
+// import {ContributeStore} from "src/tokenomics/ContributeStore.sol";
+// import {RewardStore} from "src/tokenomics/RewardStore.sol";
+// import {VotingEscrowStore} from "src/tokenomics/VotingEscrowStore.sol";
 
 // import {BaseScript} from "./BaseScript.s.sol";
 // import {Address} from "./Const.sol";

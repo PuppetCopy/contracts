@@ -9,9 +9,9 @@
 // import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 // import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
 // import {VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
-// import {ContributeStore} from "src/tokenomics/store/ContributeStore.sol";
-// import {RewardStore} from "src/tokenomics/store/RewardStore.sol";
-// import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
+// import {ContributeStore} from "src/tokenomics/ContributeStore.sol";
+// import {RewardStore} from "src/tokenomics/RewardStore.sol";
+// import {VotingEscrowStore} from "src/tokenomics/VotingEscrowStore.sol";
 // import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
 // contract TokenomicsTest is BasicSetup {
@@ -130,7 +130,7 @@
 
 //         // Alice selles her PUPPET tokens for the revenue in WNT tokens
 //         vm.startPrank(users.alice);
-//         _dealERC20(address(puppetToken), users.alice, quote);
+//         _dealERC20(puppetToken, users.alice, quote);
 //         puppetToken.approve(address(router), type(uint).max - 1);
 //         vm.expectRevert();
 //         tokenomicsRouter.buyback(usdc, users.alice, contributionAmount + 1);
@@ -151,7 +151,7 @@
 //         contribute(usdc, address(0), 20e6);
 
 //         vm.startPrank(users.alice);
-//         _dealERC20(address(puppetToken), users.alice, quote);
+//         _dealERC20(puppetToken, users.alice, quote);
 //         tokenomicsRouter.buyback(usdc, users.alice, contributionAmount);
 
 //         // rewardRouter.updateCursor(usdc, users.yossi);
@@ -161,7 +161,7 @@
 
 //         contribute(usdc, address(0), 123e6);
 //         vm.startPrank(users.alice);
-//         _dealERC20(address(puppetToken), users.alice, quote);
+//         _dealERC20(puppetToken, users.alice, quote);
 //         tokenomicsRouter.buyback(usdc, users.alice, 50e6);
 
 //         // possible case where contribution is lower in market value than the buyback amount
@@ -171,7 +171,7 @@
 //         contribute(usdc, users.owner, 40e6);
 
 //         vm.startPrank(users.alice);
-//         _dealERC20(address(puppetToken), users.alice, quote);
+//         _dealERC20(puppetToken, users.alice, quote);
 //         tokenomicsRouter.buyback(usdc, users.alice, 50e6);
 
 //         assertEq(contributeLogic.getClaimable(claimableTokenList, users.yossi), 100e18);
@@ -272,13 +272,13 @@
 
 //     function buyback(IERC20 token, uint contribution) public {
 //         uint quote = contributeStore.getBuybackQuote(token);
-//         _dealERC20(address(token), users.owner, quote);
+//         _dealERC20(token, users.owner, quote);
 //         tokenomicsRouter.buyback(token, users.owner, contribution);
 //     }
 
 //     function contribute(IERC20 token, address user, uint amount) public {
 //         vm.startPrank(users.owner);
-//         _dealERC20(address(token), users.owner, amount);
+//         _dealERC20(token, users.owner, amount);
 //         contributeStore.transferIn(token, users.owner, amount);
 //         contributeStore.contribute(token, user, amount);
 //     }

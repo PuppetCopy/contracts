@@ -11,11 +11,11 @@ import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol"
 import {IGmxOracle} from "src/position/interface/IGmxOracle.sol";
 import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
-
 import {Subaccount} from "src/shared/Subaccount.sol";
 import {SubaccountStore} from "src/shared/SubaccountStore.sol";
 import {FeeMarketplace} from "src/tokenomics/FeeMarketplace.sol";
-import {FeeMarketplaceStore} from "src/tokenomics/store/FeeMarketplaceStore.sol";
+import {FeeMarketplaceStore} from "src/tokenomics/FeeMarketplaceStore.sol";
+import {BankStore} from "src/utils/BankStore.sol";
 
 import {Address} from "script/Const.sol";
 
@@ -41,7 +41,10 @@ contract TradingTest is BasicSetup {
         // Deploy core contracts
         subaccountStore = new SubaccountStore(dictator, tokenRouter);
         matchRule = new MatchRule(dictator, subaccountStore);
+
+        feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
         feeMarketplace = new FeeMarketplace(dictator, tokenRouter, feeMarketplaceStore, puppetToken);
+
         mirrorPosition = new MirrorPosition(dictator, subaccountStore, matchRule, feeMarketplace);
 
         // Config
@@ -74,7 +77,7 @@ contract TradingTest is BasicSetup {
                 FeeMarketplace.Config({
                     distributionTimeframe: 1 days,
                     burnBasisPoints: 10000,
-                    rewardDistributor: address(0)
+                    feeDistributor: BankStore(address(0))
                 })
             )
         );
@@ -99,6 +102,7 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(subaccountStore));
         dictator.setAccess(subaccountStore, address(matchRule));
         dictator.setAccess(subaccountStore, address(mirrorPosition));
+        dictator.setAccess(subaccountStore, address(feeMarketplace));
 
         // Set permissions
         dictator.setPermission(mirrorPosition, mirrorPosition.allocate.selector, users.owner);
@@ -106,6 +110,13 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, users.owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.increase.selector, users.owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.decrease.selector, users.owner);
+
+        dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
+        dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, users.owner);
+        dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, users.owner);
+        dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
+        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
+        feeMarketplace.setAskPrice(usdc, 100e18);
 
         // Ensure owner has permissions to act on behalf of users
         dictator.setPermission(matchRule, matchRule.setRule.selector, users.owner);
@@ -178,11 +189,14 @@ contract TradingTest is BasicSetup {
         // Need to simulate some tokens coming back to the contract
         // In real environment, GMX would send funds back
         // usdc.balanceOf(address(subaccountStore));
-        deal(address(usdc), address(subaccountStore), usdc.balanceOf(address(subaccountStore)) + 10e6); // Return more than collateral to simulate profit
+        deal(address(usdc), address(subaccountStore), usdc.balanceOf(address(subaccountStore)) + 11e6 * 10); // Return
+            // more than collateral to simulate profit
         // usdc.balanceOf(address(subaccountStore));
 
         // Simulate position decrease callback
         mirrorPosition.decrease(decreaseRequestKey);
+
+        mirrorPosition.allocationMap(allocationKey);
 
         // Settle the allocation
         mirrorPosition.settle(allocationKey, puppetList);
@@ -208,7 +222,7 @@ contract TradingTest is BasicSetup {
         uint fundValue
     ) internal returns (address payable) {
         address payable user = payable(makeAddr(name));
-        _dealERC20(address(collateralToken), user, fundValue);
+        _dealERC20(collateralToken, user, fundValue);
 
         vm.startPrank(user);
         collateralToken.approve(address(tokenRouter), type(uint).max);

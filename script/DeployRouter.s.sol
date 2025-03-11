@@ -8,7 +8,7 @@
 // import {ExecutionLogic} from "src/position/ExecutionLogic.sol";
 // import {RequestLogic} from "src/position/RequestLogic.sol";
 // import {PuppetLogic} from "src/position/PuppetLogic.sol";
-// import {PuppetStore} from "src/position/store/PuppetStore.sol";
+// import {PuppetStore} from "src/position/PuppetStore.sol";
 // import {Dictator} from "src/shared/Dictator.sol";
 // import {TokenRouter} from "src/shared/TokenRouter.sol";
 // import {FeeMarketplace} from "src/tokenomics/FeeMarketplace.sol";

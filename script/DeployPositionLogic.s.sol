@@ -10,15 +10,15 @@
 // import {RequestLogic} from "src/position/RequestLogic.sol";
 // import {UnhandledCallbackLogic} from "src/position/UnhandledCallbackLogic.sol";
 // import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
-// import {PositionStore} from "src/position/store/PositionStore.sol";
-// import {PositionStore} from "src/position/store/PositionStore.sol";
+// import {PositionStore} from "src/position/PositionStore.sol";
+// import {PositionStore} from "src/position/PositionStore.sol";
 // import {PuppetLogic} from "src/position/PuppetLogic.sol";
-// import {PuppetStore} from "src/position/store/PuppetStore.sol";
+// import {PuppetStore} from "src/position/PuppetStore.sol";
 // import {Dictator} from "src/shared/Dictator.sol";
 // import {TokenRouter} from "src/shared/TokenRouter.sol";
 // import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 // import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
-// import {ContributeStore} from "src/tokenomics/store/ContributeStore.sol";
+// import {ContributeStore} from "src/tokenomics/ContributeStore.sol";
 
 // import {BaseScript} from "./BaseScript.s.sol";
 // import {Address} from "./Const.sol";

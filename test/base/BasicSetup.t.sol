@@ -70,8 +70,8 @@ contract BasicSetup is Test {
         return _user;
     }
 
-    function _dealERC20(address _token, address _user, uint _amount) internal {
-        _amount = IERC20(_token).balanceOf(_user) + _amount;
-        deal({token: _token, to: _user, give: _amount});
+    function _dealERC20(IERC20 _token, address _user, uint _amount) internal {
+        _amount = _token.balanceOf(_user) + _amount;
+        deal({token: address(_token), to: _user, give: _amount});
     }
 }

@@ -4,6 +4,8 @@ pragma solidity ^0.8.28;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {TokenRouter} from "../shared/TokenRouter.sol";
+
+import {Error} from "./../shared/Error.sol";
 import {Access} from "./../utils/auth/Access.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 
@@ -41,6 +43,7 @@ abstract contract BankStore is Access {
 
     function transferOut(IERC20 _token, address _receiver, uint _value) public auth {
         _token.transfer(_receiver, _value);
+        require(tokenBalanceMap[_token] >= _value, Error.BankStore__InsufficientBalance());
         tokenBalanceMap[_token] -= _value;
     }
 

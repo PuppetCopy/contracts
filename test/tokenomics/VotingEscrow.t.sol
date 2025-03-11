@@ -4,7 +4,7 @@
 // import {Error} from "src/shared/Error.sol";
 // import {TokenRouter} from "src/shared/TokenRouter.sol";
 // import {VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
-// import {VotingEscrowStore} from "src/tokenomics/store/VotingEscrowStore.sol";
+// import {VotingEscrowStore} from "src/tokenomics/VotingEscrowStore.sol";
 
 // import {BasicSetup} from "test/base/BasicSetup.t.sol";
 

@@ -9,7 +9,7 @@ import {CoreContract} from "../utils/CoreContract.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {PuppetVoteToken} from "./PuppetVoteToken.sol";
-import {VotingEscrowStore} from "./store/VotingEscrowStore.sol";
+import {VotingEscrowStore} from "./VotingEscrowStore.sol";
 
 contract VotingEscrowLogic is CoreContract {
     struct Vested {

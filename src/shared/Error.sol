@@ -24,6 +24,9 @@ library Error {
     error Dictator__ContractNotInitialized();
     error Dictator__ContractAlreadyInitialized();
 
+    // BankStore
+    error BankStore__InsufficientBalance();
+
     // VotingEscrow
     error VotingEscrow__Unsupported();
 

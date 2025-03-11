@@ -10,7 +10,7 @@ import {BankStore} from "../utils/BankStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {RewardStore} from "./store/RewardStore.sol";
+import {RewardStore} from "./RewardStore.sol";
 
 contract RewardDistributor is CoreContract {
     /// @notice Configuration parameters
