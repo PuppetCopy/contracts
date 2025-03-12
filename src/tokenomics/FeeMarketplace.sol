@@ -14,26 +14,31 @@ import {FeeMarketplaceStore} from "./FeeMarketplaceStore.sol";
 import {PuppetToken} from "./PuppetToken.sol";
 
 /**
- * @title Protocol Public Fee Marketplace
- * @notice Exchange protocol tokens for protocol-collected fees at governance-set rates.
- * @dev Implements a fixed-rate redemption system with:
- *  - Gradual fee availability (linear unlock over a configured timeframe)
- *  - Fixed protocol token cost per fee type, set by governance
- *  - Permanent burn of a portion of protocol tokens on redemption
- *  - Remaining protocol tokens sent to rewards pool
+ * @title Protocol Fee Redemption Marketplace
+ * @notice A marketplace where users exchange protocol tokens for accumulated fee tokens at fixed rates.
  *
- * Flow:
- * 1. Fees accumulate in the system through protocol operations.
- * 2. Deposited fees gradually unlock over time based on a distributionTimeframe.
- * 3. Users exchange protocol tokens for available fees at fixed rates.
- * 4. Exchanged protocol tokens are burned with the remaining sent to rewards.
+ * @dev Key features of this redemption system:
+ *      - Time-based linear unlocking of deposited fees
+ *      - Fixed-rate exchange between protocol tokens and fee tokens
+ *      - Configurable burning of received protocol tokens
+ *      - Distribution of non-burned protocol tokens to a rewards contract
+ *
+ * @dev Operation process:
+ *      1. Protocol fees are deposited and accumulate in the marketplace
+ *      2. Fees unlock gradually over time based on the configured timeframe
+ *      3. Users can redeem unlocked fees by providing protocol tokens at the set rate
+ *      4. A portion of received protocol tokens are burned according to configuration
+ *      5. Remaining protocol tokens are sent to the fee distributor contract
  */
 contract FeeMarketplace is CoreContract {
     /**
-     * @dev Controls market parameters.
-     * @param feeDistributor BankStore to receive protocol tokens for distribution.
-     * @param distributionTimeframe Time window for new fee deposits to fully unlock.
-     * @param burnBasisPoints Percentage of protocol tokens to burn on exchange (10000 = 100%).
+     * @dev Marketplace configuration parameters
+     * @param feeDistributor The BankStore contract that receives non-burned protocol tokens
+     *        for distribution as rewards
+     * @param distributionTimeframe Duration in seconds over which new fee deposits
+     *        become fully unlocked (linear release)
+     * @param burnBasisPoints Percentage of exchanged protocol tokens to burn, expressed in
+     *        basis points (100 = 1%, 10000 = 100%)
      */
     struct Config {
         BankStore feeDistributor;
@@ -41,17 +46,25 @@ contract FeeMarketplace is CoreContract {
         uint burnBasisPoints;
     }
 
+    /// @notice Router contract for token transfers
     TokenRouter public immutable tokenRouter;
+
+    /// @notice Store contract that holds the fee tokens
     FeeMarketplaceStore public immutable store;
+
+    /// @notice The protocol's native governance token used for redemptions
     PuppetToken public immutable protocolToken;
 
-    // Mapping for each fee token to its redemption cost in protocol tokens.
+    /// @notice Maps fee tokens to their redemption cost in protocol tokens
     mapping(IERC20 => uint) public askAmount;
-    // Mapping for each fee token to the accrued (i.e., unlocked) fee balance.
+
+    /// @notice Maps fee tokens to their unlocked (available) balance
     mapping(IERC20 => uint) public accruedFee;
-    // Mapping to track the last timestamp when the fee unlock calculation occurred.
+
+    /// @notice Tracks the last time unlocked balances were calculated for each fee token
     mapping(IERC20 => uint) public lastDistributionTimestamp;
 
+    /// @notice Current marketplace configuration parameters
     Config public config;
 
     constructor(

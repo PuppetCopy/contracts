@@ -23,9 +23,8 @@ contract BasicSetup is Test {
 
     Users users;
 
-    IWNT wnt = IWNT(address(new MockERC20("Wrapped Native", "WNT", 18)));
-    // IERC20 usdc = IERC20(address(deployMockERC20("USDC", "USDC", 6)));
-    IERC20 usdc = new MockERC20("USDC", "USDC", 6);
+    MockERC20 wnt = new MockERC20("Wrapped Native", "WNT", 18);
+    MockERC20 usdc = new MockERC20("USDC", "USDC", 6);
 
     Dictator dictator;
     PuppetToken puppetToken;
@@ -70,8 +69,8 @@ contract BasicSetup is Test {
         return _user;
     }
 
-    function _dealERC20(IERC20 _token, address _user, uint _amount) internal {
+    function _dealERC20(MockERC20 _token, address _user, uint _amount) internal {
         _amount = _token.balanceOf(_user) + _amount;
-        deal({token: address(_token), to: _user, give: _amount});
+        _token.mint(_user, _amount);
     }
 }

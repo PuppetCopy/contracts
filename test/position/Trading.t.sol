@@ -21,6 +21,7 @@ import {Address} from "script/Const.sol";
 
 import {BasicSetup} from "../base/BasicSetup.t.sol";
 import {MockGmxExchangeRouter} from "../mock/MockGmxExchangeRouter.sol";
+import {MockERC20} from "test/mock/MockERC20.sol";
 
 contract TradingTest is BasicSetup {
     SubaccountStore subaccountStore;
@@ -94,7 +95,7 @@ contract TradingTest is BasicSetup {
                     decreaseCallbackGasLimit: 2_000_000,
                     limitAllocationListLength: 100,
                     performanceContributionRate: 0.1e30,
-                    traderPerformanceContributionShare: 0
+                    traderPerformanceFee: 0
                 })
             )
         );
@@ -190,21 +191,19 @@ contract TradingTest is BasicSetup {
         // Need to simulate some tokens coming back to the contract
         // In real environment, GMX would send funds back
         // usdc.balanceOf(address(subaccountStore));
-        deal(address(usdc), address(subaccountStore), usdc.balanceOf(address(subaccountStore)) + 11e6 * 10); // Return
-            // more than collateral to simulate profit
+        deal(address(usdc), address(subaccountStore), usdc.balanceOf(address(subaccountStore)) + 11e6 * 10);
+        // Return more than collateral to simulate profit
         // usdc.balanceOf(address(subaccountStore));
 
         // Simulate position decrease callback
         mirrorPosition.decrease(decreaseRequestKey);
-
-        mirrorPosition.allocationMap(allocationKey);
 
         // Settle the allocation
         mirrorPosition.settle(allocationKey, puppetList);
     }
 
     function generatePuppetList(
-        IERC20 collateralToken,
+        MockERC20 collateralToken,
         address trader,
         uint _length
     ) internal returns (address[] memory) {
@@ -217,13 +216,14 @@ contract TradingTest is BasicSetup {
     }
 
     function createPuppet(
-        IERC20 collateralToken,
+        MockERC20 collateralToken,
         address trader,
         string memory name,
         uint fundValue
     ) internal returns (address payable) {
         address payable user = payable(makeAddr(name));
-        _dealERC20(collateralToken, user, fundValue);
+        // _dealERC20(collateralToken, user, fundValue);
+        collateralToken.mint(user, fundValue);
 
         vm.startPrank(user);
         collateralToken.approve(address(tokenRouter), type(uint).max);

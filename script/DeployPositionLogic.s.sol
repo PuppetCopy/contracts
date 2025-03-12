@@ -66,7 +66,7 @@
 //                 AllocationLogic.Config({
 //                     limitAllocationListLength: 50,
 //                     performanceContributionRate: 0.1e30,
-//                     traderPerformanceContributionShare: 0
+//                     traderPerformanceFee: 0
 //                 })
 //             )
 //         );

@@ -30,7 +30,7 @@ contract MirrorPosition is CoreContract {
         uint decreaseCallbackGasLimit;
         uint limitAllocationListLength;
         uint performanceContributionRate;
-        uint traderPerformanceContributionShare;
+        uint traderPerformanceFee;
     }
 
     struct Allocation {
@@ -309,7 +309,7 @@ contract MirrorPosition is CoreContract {
 
         uint _recordedAmountIn = subaccountStore.recordTransferIn(_allocation.collateralToken);
         // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
-        if (_request.sizeDelta < _allocation.size) {
+        if (_allocation.size > _request.sizeDelta) {
             uint adjustedAllocation = _allocation.allocated * _request.sizeDelta / _allocation.size;
             uint profit = _recordedAmountIn > adjustedAllocation ? _recordedAmountIn - adjustedAllocation : 0;
 
