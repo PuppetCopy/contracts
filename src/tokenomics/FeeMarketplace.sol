@@ -10,7 +10,6 @@ import {BankStore} from "../utils/BankStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-
 import {FeeMarketplaceStore} from "./FeeMarketplaceStore.sol";
 import {PuppetToken} from "./PuppetToken.sol";
 
@@ -32,14 +31,14 @@ import {PuppetToken} from "./PuppetToken.sol";
 contract FeeMarketplace is CoreContract {
     /**
      * @dev Controls market parameters.
+     * @param feeDistributor BankStore to receive protocol tokens for distribution.
      * @param distributionTimeframe Time window for new fee deposits to fully unlock.
      * @param burnBasisPoints Percentage of protocol tokens to burn on exchange (10000 = 100%).
-     * @param rewardDistributor Address receiving the remaining protocol tokens.
      */
     struct Config {
+        BankStore feeDistributor;
         uint distributionTimeframe;
         uint burnBasisPoints;
-        BankStore feeDistributor;
     }
 
     TokenRouter public immutable tokenRouter;

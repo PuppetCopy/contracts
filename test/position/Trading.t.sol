@@ -115,6 +115,7 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, users.owner);
         dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, users.owner);
         dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
+        dictator.setAccess(subaccountStore, address(feeMarketplaceStore));
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
         feeMarketplace.setAskPrice(usdc, 100e18);
 
