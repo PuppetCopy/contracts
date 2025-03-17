@@ -2,5 +2,5 @@
 pragma solidity ^0.8.28;
 
 interface IAuthority {
-    function logEvent(string memory method, string memory name, string memory version, bytes memory data) external;
+    function logEvent(string memory method, string memory name, bytes memory data) external;
 }

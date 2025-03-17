@@ -72,7 +72,7 @@ contract FeeMarketplace is CoreContract {
         TokenRouter _tokenRouter,
         FeeMarketplaceStore _store,
         PuppetToken _protocolToken
-    ) CoreContract("BuyAndBurn", "1", _authority) {
+    ) CoreContract("BuyAndBurn", _authority) {
         tokenRouter = _tokenRouter;
         store = _store;
         protocolToken = _protocolToken;

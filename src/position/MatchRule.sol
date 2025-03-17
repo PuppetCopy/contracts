@@ -46,7 +46,7 @@ contract MatchRule is CoreContract {
         }
     }
 
-    constructor(IAuthority _authority, SubaccountStore _store) CoreContract("MatchRule", "1", _authority) {
+    constructor(IAuthority _authority, SubaccountStore _store) CoreContract("MatchRule", _authority) {
         subaccountStore = _store;
     }
 

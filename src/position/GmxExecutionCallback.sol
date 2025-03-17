@@ -27,7 +27,7 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
     constructor(
         IAuthority _authority,
         MirrorPosition _position
-    ) CoreContract("GmxExecutionCallback", "1", _authority) {
+    ) CoreContract("GmxExecutionCallback", _authority) {
         position = _position;
     }
 

@@ -39,7 +39,7 @@ contract VotingEscrowLogic is CoreContract {
         VotingEscrowStore _store,
         PuppetToken _token,
         PuppetVoteToken _vToken
-    ) CoreContract("VotingEscrowLogic", "1", _authority) {
+    ) CoreContract("VotingEscrowLogic", _authority) {
         store = _store;
         token = _token;
         vToken = _vToken;

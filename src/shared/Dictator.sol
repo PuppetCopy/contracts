@@ -26,7 +26,7 @@ contract Dictator is Ownable, IAuthority {
     event UpdateAccess(address target, bool enabled);
     event UpdatePermission(address target, bytes4 functionSig, bool enabled);
     event SetConfig(address target, bytes config);
-    event LogEvent(address operator, string method, string name, string version, bytes data);
+    event LogEvent(address operator, string method, string name, bytes data);
     event AddContractAccess(address target);
     event RemoveContractAccess(address target);
 
@@ -68,10 +68,10 @@ contract Dictator is Ownable, IAuthority {
         emit UpdatePermission(address(target), functionSig, false);
     }
 
-    function logEvent(string memory method, string memory name, string memory version, bytes memory data) external {
+    function logEvent(string memory method, string memory name, bytes memory data) external {
         require(contractAccessMap[msg.sender], Error.Dictator__ContractNotInitialized());
 
-        emit LogEvent(msg.sender, method, name, version, data);
+        emit LogEvent(msg.sender, method, name, data);
     }
 
     function initContract(CoreContract target, bytes calldata config) public onlyOwner {

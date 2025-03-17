@@ -41,7 +41,7 @@ contract RewardDistributor is CoreContract {
         IERC20 _rewardToken,
         IERC20 _vToken,
         RewardStore _store
-    ) CoreContract("RewardDistributor", "1", _authority) {
+    ) CoreContract("RewardDistributor", _authority) {
         rewardToken = _rewardToken;
         vToken = _vToken;
         store = _store;

@@ -7,17 +7,15 @@ import {Error} from "../shared/Error.sol";
 import {Permission} from "./auth/Permission.sol";
 import {IAuthority} from "./interfaces/IAuthority.sol";
 
-abstract contract CoreContract is Permission, EIP712 {
+abstract contract CoreContract is Permission {
     string private name;
     string private version;
 
     constructor(
         string memory _name,
-        string memory _version,
         IAuthority _authority
-    ) Permission(_authority) EIP712(_name, _version) {
+    ) Permission(_authority) {
         name = _name;
-        version = _version;
     }
 
     function setConfig(
@@ -28,7 +26,7 @@ abstract contract CoreContract is Permission, EIP712 {
     }
 
     function _logEvent(string memory method, bytes memory data) internal {
-        authority.logEvent(method, name, version, data);
+        authority.logEvent(method, name, data);
     }
 
     function _setConfig(
