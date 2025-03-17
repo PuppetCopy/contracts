@@ -9,12 +9,8 @@ import {IAuthority} from "./interfaces/IAuthority.sol";
 
 abstract contract CoreContract is Permission {
     string private name;
-    string private version;
 
-    constructor(
-        string memory _name,
-        IAuthority _authority
-    ) Permission(_authority) {
+    constructor(string memory _name, IAuthority _authority) Permission(_authority) {
         name = _name;
     }
 
