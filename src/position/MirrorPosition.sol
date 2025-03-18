@@ -200,6 +200,7 @@ contract MirrorPosition is CoreContract {
 
         uint _leverage;
         uint _targetLeverage;
+        string memory _targetLeverageType = "Increase";
 
         if (_position.size == 0) {
             require(_allocation.allocated > 0, Error.MirrorPosition__NoAllocation());
@@ -243,6 +244,7 @@ contract MirrorPosition is CoreContract {
                     config.increaseCallbackGasLimit
                 );
             } else {
+                _targetLeverageType = "Decrease";
                 deltaLeverage = _leverage - _targetLeverage;
                 _request.sizeDelta = _position.size * deltaLeverage / _leverage;
 
@@ -262,7 +264,7 @@ contract MirrorPosition is CoreContract {
         allocationMap[_params.allocationKey] = _allocation;
 
         _logEvent(
-            _targetLeverage >= _leverage ? "RequestIncrease" : "RequestDecrease",
+            _targetLeverageType,
             abi.encode(
                 _subaccountAddress,
                 _params.trader,
@@ -275,10 +277,6 @@ contract MirrorPosition is CoreContract {
             )
         );
     }
-
-    function requestIncrease(
-        MirrorPositionParams calldata _params
-    ) external payable auth returns (bytes32 _requestKey) {}
 
     function increase(
         bytes32 _requestKey
@@ -320,6 +318,7 @@ contract MirrorPosition is CoreContract {
         if (_position.size > _request.sizeDelta) {
             _position.size -= _request.sizeDelta;
             _allocation.settled += _recordedAmountIn;
+            positionMap[_request.allocationKey] = _position;
         } else {
             _allocation.settled = _recordedAmountIn;
             delete positionMap[_request.allocationKey];
