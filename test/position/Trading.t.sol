@@ -30,7 +30,7 @@ import {MockERC20} from "test/mock/MockERC20.sol";
 // MirrorPosition__NoPuppetAllocation - nothing has been allocated while processing puppet list
 // MirrorPosition__ExecutionRequestMissing - Trying to process a request that doesn't exist
 // MirrorPosition__PositionDoesNotExist - Trying to decrease a non-existent position
-// MirrorPosition__AllocationDoesNotExist - Trying to settle a non-existent allocation
+// MirrorPosition__NoSettledFunds - Trying to settle an allocation that has no funds
 // MirrorPosition__InvalidPuppetListIntegrity - Settlement puppet list doesn't match allocation's list
 // TODO: Test edge cases for allocation distribution calculation
 // TODO: Test gas fee tracking and accounting

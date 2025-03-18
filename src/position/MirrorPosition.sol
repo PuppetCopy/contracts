@@ -37,6 +37,7 @@ contract MirrorPosition is CoreContract {
         bytes32 matchKey;
         bytes32 listHash;
         IERC20 collateralToken;
+        address trader;
         uint allocated;
         uint settled;
         uint allocationGasFee;
@@ -111,6 +112,8 @@ contract MirrorPosition is CoreContract {
         require(_puppetList.length <= config.limitAllocationListLength, Error.MirrorPosition__PuppetListLimit());
 
         if (_allocation.matchKey == 0) {
+            _allocation.trader = _trader;
+            _allocation.collateralToken = _collateralToken;
             _allocation.matchKey = _matchKey;
             _allocation.collateralToken = _collateralToken;
         }
@@ -346,7 +349,8 @@ contract MirrorPosition is CoreContract {
 
         Allocation memory _allocation = allocationMap[_allocationKey];
 
-        require(_allocation.settled > 0, Error.MirrorPosition__AllocationDoesNotExist());
+        require(_allocation.settled > 0, Error.MirrorPosition__NoSettledFunds());
+        require(_allocation.allocated > 0, Error.MirrorPosition__InvalidAllocation());
 
         bytes32 _puppetListHash = keccak256(abi.encode(_puppetList));
 
@@ -374,20 +378,23 @@ contract MirrorPosition is CoreContract {
             if (config.traderPerformanceFee > 0) {
                 _traderFee = Precision.applyFactor(config.traderPerformanceFee, _profit);
                 _distributionAmount -= _traderFee;
-                // Transfer trader fee (implementation depends on your architecture)
-                // Example: subaccountStore.transfer(_allocation.collateralToken, _trader, _traderFee);
+                subaccountStore.transferOut(_allocation.collateralToken, _allocation.trader, _traderFee);
             }
         }
 
         // Distribute the remaining amount proportionally
+        uint _totalAllocated = _allocation.allocated; // Cache to avoid multiple storage reads
         for (uint i = 0; i < _nextBalanceList.length; i++) {
-            uint puppetAllocation = allocationPuppetMap[_allocationKey][_puppetList[i]];
+            address puppet = _puppetList[i];
+            uint puppetAllocation = allocationPuppetMap[_allocationKey][puppet];
             if (puppetAllocation == 0) continue;
 
-            _nextBalanceList[i] += _distributionAmount * puppetAllocation / _allocation.allocated;
+            unchecked {
+                _nextBalanceList[i] += (_distributionAmount * puppetAllocation) / _totalAllocated;
+            }
 
             // Clear allocation records
-            delete allocationPuppetMap[_allocationKey][_puppetList[i]];
+            delete allocationPuppetMap[_allocationKey][puppet];
         }
 
         // Update allocation state

@@ -63,7 +63,8 @@ library Error {
     error MatchRule__InvalidExpiryDuration(uint minExpiryDuration);
 
     // MirrorPosition
-    error MirrorPosition__AllocationDoesNotExist();
+    error MirrorPosition__NoSettledFunds();
+    error MirrorPosition__InvalidAllocation();
     error MirrorPosition__PendingAllocation();
     error MirrorPosition__PuppetListLimit();
     error MirrorPosition__InvalidPuppetListIntegrity();
