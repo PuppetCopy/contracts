@@ -29,7 +29,7 @@ contract MirrorPosition is CoreContract {
         uint increaseCallbackGasLimit;
         uint decreaseCallbackGasLimit;
         uint limitAllocationListLength;
-        uint performanceContributionRate;
+        uint performanceFee;
         uint traderPerformanceFee;
     }
 
@@ -38,11 +38,14 @@ contract MirrorPosition is CoreContract {
         bytes32 listHash;
         IERC20 collateralToken;
         uint allocated;
-        uint collateral;
-        uint size;
         uint settled;
-        uint profit;
-        uint transactionCost;
+        uint allocationGasFee;
+        uint executionGasFee;
+    }
+
+    struct Position {
+        // uint collateral;
+        uint size;
     }
 
     struct MirrorPositionParams {
@@ -65,7 +68,6 @@ contract MirrorPosition is CoreContract {
         bytes32 sourceRequestKey;
         bytes32 matchKey;
         uint sizeDelta;
-        uint transactionCost;
     }
 
     Config public config;
@@ -75,9 +77,10 @@ contract MirrorPosition is CoreContract {
     FeeMarketplace immutable feeMarket;
     address immutable subaccountStoreImplementation;
 
-    mapping(bytes32 matchKey => mapping(address puppet => uint)) public activityThrottleMap;
+    mapping(address trader => mapping(address puppet => uint)) public activityThrottleMap;
     mapping(bytes32 allocationKey => Allocation) public allocationMap;
     mapping(bytes32 allocationKey => mapping(address puppet => uint)) public allocationPuppetMap;
+    mapping(bytes32 positionKey => Position) public positionMap;
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
 
     constructor(
@@ -85,7 +88,7 @@ contract MirrorPosition is CoreContract {
         SubaccountStore _puppetStore,
         MatchRule _matchRule,
         FeeMarketplace _feeMarket
-    ) CoreContract("MirrorPosition", "1", _authority) {
+    ) CoreContract("MirrorPosition", _authority) {
         subaccountStore = _puppetStore;
         subaccountStoreImplementation = subaccountStore.implementation();
         matchRule = _matchRule;
@@ -97,13 +100,14 @@ contract MirrorPosition is CoreContract {
         bytes32 _sourceRequestKey,
         bytes32 _matchKey,
         bytes32 _positionKey,
+        address _trader,
         address[] calldata _puppetList
     ) external auth returns (bytes32) {
-        uint _startGas = gasleft();
         bytes32 _allocationKey = PositionUtils.getAllocationKey(_matchKey, _positionKey);
-
+        uint _startGas = gasleft();
         Allocation memory _allocation = allocationMap[_allocationKey];
-        require(_allocation.size == 0, Error.MirrorPosition__AllocationAlreadyExists());
+
+        require(_allocation.allocated == 0, Error.MirrorPosition__PendingAllocation());
         require(_puppetList.length <= config.limitAllocationListLength, Error.MirrorPosition__PuppetListLimit());
 
         if (_allocation.matchKey == 0) {
@@ -114,12 +118,12 @@ contract MirrorPosition is CoreContract {
         _allocation.listHash = keccak256(abi.encode(_puppetList));
 
         (uint[] memory _balanceList, uint _allocated) =
-            _processPuppetList(_collateralToken, _matchKey, _allocationKey, _puppetList);
+            _processPuppetList(_collateralToken, _matchKey, _allocationKey, _trader, _puppetList);
 
         require(_allocated > 0, Error.MirrorPosition__NoPuppetAllocation());
 
         _allocation.allocated = _allocated;
-        _allocation.transactionCost += (_startGas - gasleft()) * tx.gasprice;
+        _allocation.allocationGasFee += (_startGas - gasleft()) * tx.gasprice;
 
         allocationMap[_allocationKey] = _allocation;
 
@@ -133,7 +137,7 @@ contract MirrorPosition is CoreContract {
                 _allocation.listHash,
                 _puppetList,
                 _balanceList,
-                _allocation.transactionCost,
+                _allocation.allocationGasFee,
                 _allocated
             )
         );
@@ -145,6 +149,7 @@ contract MirrorPosition is CoreContract {
         IERC20 _collateralToken,
         bytes32 _matchKey,
         bytes32 _allocationKey,
+        address _trader,
         address[] calldata _puppetList
     ) internal returns (uint[] memory _balanceList, uint _allocated) {
         MatchRule.Rule[] memory _ruleList = matchRule.getRuleList(_matchKey, _puppetList);
@@ -154,7 +159,7 @@ contract MirrorPosition is CoreContract {
             MatchRule.Rule memory rule = _ruleList[i];
 
             // Only process if within time window
-            if (rule.expiry > block.timestamp && block.timestamp > activityThrottleMap[_matchKey][_puppetList[i]]) {
+            if (rule.expiry > block.timestamp && block.timestamp > activityThrottleMap[_trader][_puppetList[i]]) {
                 uint _allocation = Precision.applyBasisPoints(rule.allowanceRate, _balanceList[i]);
 
                 allocationPuppetMap[_allocationKey][_puppetList[i]] = _allocation;
@@ -162,7 +167,7 @@ contract MirrorPosition is CoreContract {
                 _allocated += _allocation;
             }
 
-            activityThrottleMap[_matchKey][_puppetList[i]] = block.timestamp + rule.throttleActivity;
+            activityThrottleMap[_trader][_puppetList[i]] = block.timestamp + rule.throttleActivity;
         }
 
         subaccountStore.setBalanceList(_collateralToken, _puppetList, _balanceList);
@@ -173,6 +178,7 @@ contract MirrorPosition is CoreContract {
     ) external payable auth returns (bytes32 _requestKey) {
         uint _startGas = gasleft();
         Allocation memory _allocation = allocationMap[_params.allocationKey];
+        Position memory _position = positionMap[_params.allocationKey];
 
         address _subaccountAddress = _predictDeterministicAddress(_allocation.matchKey);
 
@@ -186,18 +192,15 @@ contract MirrorPosition is CoreContract {
             matchKey: _allocation.matchKey,
             allocationKey: _params.allocationKey,
             sourceRequestKey: _params.sourceRequestKey,
-            sizeDelta: 0,
-            transactionCost: _startGas
+            sizeDelta: 0
         });
 
         uint _leverage;
         uint _targetLeverage;
 
-        if (_allocation.size == 0) {
+        if (_position.size == 0) {
             require(_allocation.allocated > 0, Error.MirrorPosition__NoAllocation());
-            require(_allocation.collateral == 0, Error.MirrorPosition__PendingExecution());
-
-            _allocation.collateral = _allocation.allocated;
+            require(_allocation.executionGasFee == 0, Error.MirrorPosition__PendingAllocationExecution());
 
             subaccountStore.transferOut(_params.collateralToken, config.gmxOrderVault, _allocation.allocated);
             _requestKey = _submitOrder(
@@ -211,14 +214,14 @@ contract MirrorPosition is CoreContract {
 
             _request.sizeDelta = _params.sizeDeltaInUsd;
         } else {
-            _leverage = Precision.toBasisPoints(_allocation.size, _allocation.collateral);
+            _leverage = Precision.toBasisPoints(_position.size, _allocation.allocated);
             _targetLeverage = _params.isIncrease
                 ? Precision.toBasisPoints(
-                    _allocation.size + _params.sizeDeltaInUsd, _allocation.collateral + _params.collateralDelta
+                    _position.size + _params.sizeDeltaInUsd, _allocation.allocated + _params.collateralDelta
                 )
-                : _params.sizeDeltaInUsd < _allocation.size
+                : _params.sizeDeltaInUsd < _position.size
                     ? Precision.toBasisPoints(
-                        _allocation.size - _params.sizeDeltaInUsd, _allocation.collateral - _params.collateralDelta
+                        _position.size - _params.sizeDeltaInUsd, _allocation.allocated - _params.collateralDelta
                     )
                     : 0;
 
@@ -226,7 +229,7 @@ contract MirrorPosition is CoreContract {
 
             if (_targetLeverage >= _leverage) {
                 deltaLeverage = _targetLeverage - _leverage;
-                _request.sizeDelta = _allocation.size * deltaLeverage / _targetLeverage;
+                _request.sizeDelta = _position.size * deltaLeverage / _targetLeverage;
 
                 _requestKey = _submitOrder(
                     _params,
@@ -238,7 +241,7 @@ contract MirrorPosition is CoreContract {
                 );
             } else {
                 deltaLeverage = _leverage - _targetLeverage;
-                _request.sizeDelta = _allocation.size * deltaLeverage / _leverage;
+                _request.sizeDelta = _position.size * deltaLeverage / _leverage;
 
                 _requestKey = _submitOrder(
                     _params,
@@ -251,8 +254,7 @@ contract MirrorPosition is CoreContract {
             }
         }
 
-        _request.transactionCost += (_startGas - gasleft()) * tx.gasprice + _params.executionFee;
-
+        _allocation.executionGasFee += (_startGas - gasleft()) * tx.gasprice + _params.executionFee;
         requestAdjustmentMap[_requestKey] = _request;
         allocationMap[_params.allocationKey] = _allocation;
 
@@ -265,33 +267,33 @@ contract MirrorPosition is CoreContract {
                 _params.sourceRequestKey,
                 _requestKey,
                 _request.matchKey,
+                _allocation.executionGasFee,
                 _request.sizeDelta
             )
         );
     }
 
+    function requestIncrease(
+        MirrorPositionParams calldata _params
+    ) external payable auth returns (bytes32 _requestKey) {}
+
     function increase(
         bytes32 _requestKey
     ) external auth {
         RequestAdjustment memory _request = requestAdjustmentMap[_requestKey];
+        Position memory _position = positionMap[_request.allocationKey];
 
-        require(_request.matchKey != 0, Error.MirrorPosition__RequestDoesNotMatchExecution());
+        require(_request.matchKey != 0, Error.MirrorPosition__ExecutionRequestMissing());
 
-        Allocation memory _allocation = allocationMap[_request.allocationKey];
-        _allocation.size += _request.sizeDelta;
+        _position.size += _request.sizeDelta;
+
+        positionMap[_request.allocationKey] = _position;
         delete requestAdjustmentMap[_requestKey];
-        allocationMap[_request.allocationKey] = _allocation;
 
         _logEvent(
             "ExecuteIncrease",
             abi.encode(
-                _requestKey,
-                _request.sourceRequestKey,
-                _request.allocationKey,
-                _request.matchKey,
-                _request.sizeDelta,
-                _request.transactionCost,
-                _allocation.size
+                _requestKey, _request.sourceRequestKey, _request.allocationKey, _request.matchKey, _position.size
             )
         );
     }
@@ -301,26 +303,23 @@ contract MirrorPosition is CoreContract {
     ) external auth {
         RequestAdjustment memory _request = requestAdjustmentMap[_requestKey];
 
-        require(_request.matchKey != 0, Error.MirrorPosition__RequestDoesNotMatchExecution());
+        require(_request.matchKey != 0, Error.MirrorPosition__ExecutionRequestMissing());
 
+        Position memory _position = positionMap[_request.allocationKey];
         Allocation memory _allocation = allocationMap[_request.allocationKey];
 
-        require(_allocation.size > 0, Error.MirrorPosition__PositionDoesNotExist());
+        require(_position.size > 0, Error.MirrorPosition__PositionDoesNotExist());
 
         uint _recordedAmountIn = subaccountStore.recordTransferIn(_allocation.collateralToken);
-        // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
-        if (_allocation.size > _request.sizeDelta) {
-            uint adjustedAllocation = _allocation.allocated * _request.sizeDelta / _allocation.size;
-            uint profit = _recordedAmountIn > adjustedAllocation ? _recordedAmountIn - adjustedAllocation : 0;
 
-            _allocation.profit += profit;
+        // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
+        // Partial decrease - calculate based on the adjusted portion
+        if (_position.size > _request.sizeDelta) {
+            _position.size -= _request.sizeDelta;
             _allocation.settled += _recordedAmountIn;
-            _allocation.size -= _request.sizeDelta;
         } else {
-            _allocation.profit =
-                _recordedAmountIn > _allocation.allocated ? _recordedAmountIn - _allocation.allocated : 0;
-            _allocation.settled += _recordedAmountIn;
-            _allocation.size = 0;
+            _allocation.settled = _recordedAmountIn;
+            delete positionMap[_request.allocationKey];
         }
 
         delete requestAdjustmentMap[_requestKey];
@@ -334,8 +333,9 @@ contract MirrorPosition is CoreContract {
                 _request.allocationKey,
                 _request.matchKey,
                 _request.sizeDelta,
-                _request.transactionCost,
                 _recordedAmountIn,
+                _allocation.allocated,
+                _position.size,
                 _allocation.settled
             )
         );
@@ -346,40 +346,54 @@ contract MirrorPosition is CoreContract {
 
         Allocation memory _allocation = allocationMap[_allocationKey];
 
-        require(_allocation.matchKey != bytes32(0), Error.MirrorPosition__AllocationDoesNotExist());
-        // require(_allocation.collateral == 0, Error.MirrorPosition__PendingSettlement());
+        require(_allocation.settled > 0, Error.MirrorPosition__AllocationDoesNotExist());
 
         bytes32 _puppetListHash = keccak256(abi.encode(_puppetList));
 
         require(_allocation.listHash == _puppetListHash, Error.MirrorPosition__InvalidPuppetListIntegrity());
 
-        _allocation.listHash = _puppetListHash;
-
         uint[] memory _nextBalanceList = subaccountStore.getBalanceList(_allocation.collateralToken, _puppetList);
 
-        uint _totalPuppetContribution = _allocation.settled;
+        uint _feeAmount;
+        uint _traderFee;
+        uint _allocationGasFee = (_startGas - gasleft()) * tx.gasprice;
+        int _pnl = int(_allocation.settled) - int(_allocation.allocated);
+        uint _distributionAmount = _allocation.settled;
 
-        if (_allocation.profit > 0 && feeMarket.askAmount(_allocation.collateralToken) > 0) {
-            uint _contributeFeeAmount = Precision.applyFactor(config.performanceContributionRate, _allocation.profit);
-            _totalPuppetContribution -= _contributeFeeAmount;
+        if (_pnl > 0) {
+            uint _profit = uint(_pnl);
 
-            feeMarket.deposit(_allocation.collateralToken, subaccountStore, _contributeFeeAmount);
-        }
+            // Calculate platform fee
+            if (feeMarket.askAmount(_allocation.collateralToken) > 0) {
+                _feeAmount = Precision.applyFactor(config.performanceFee, _profit);
+                _distributionAmount -= _feeAmount;
+                feeMarket.deposit(_allocation.collateralToken, subaccountStore, _feeAmount);
+            }
 
-        if (_totalPuppetContribution > 0) {
-            for (uint i = 0; i < _nextBalanceList.length; i++) {
-                uint puppetAllocation = allocationPuppetMap[_allocationKey][_puppetList[i]];
-                if (puppetAllocation == 0) continue;
-
-                _nextBalanceList[i] += puppetAllocation * _totalPuppetContribution / _allocation.allocated;
+            // Calculate trader fee
+            if (config.traderPerformanceFee > 0) {
+                _traderFee = Precision.applyFactor(config.traderPerformanceFee, _profit);
+                _distributionAmount -= _traderFee;
+                // Transfer trader fee (implementation depends on your architecture)
+                // Example: subaccountStore.transfer(_allocation.collateralToken, _trader, _traderFee);
             }
         }
 
-        if (_allocation.size > 0) {
-            _allocation.profit = 0;
-            _allocation.allocated -= _allocation.settled;
-            _allocation.transactionCost += (_startGas - gasleft()) * tx.gasprice;
+        // Distribute the remaining amount proportionally
+        for (uint i = 0; i < _nextBalanceList.length; i++) {
+            uint puppetAllocation = allocationPuppetMap[_allocationKey][_puppetList[i]];
+            if (puppetAllocation == 0) continue;
 
+            _nextBalanceList[i] += _distributionAmount * puppetAllocation / _allocation.allocated;
+
+            // Clear allocation records
+            delete allocationPuppetMap[_allocationKey][_puppetList[i]];
+        }
+
+        // Update allocation state
+        if (_allocation.allocated > 0) {
+            _allocation.allocationGasFee += _allocationGasFee;
+            _allocation.settled = 0;
             allocationMap[_allocationKey] = _allocation;
         } else {
             delete allocationMap[_allocationKey];
@@ -396,11 +410,10 @@ contract MirrorPosition is CoreContract {
                 _puppetListHash,
                 _nextBalanceList,
                 _puppetList,
-                _totalPuppetContribution,
-                _allocation.allocated,
-                _allocation.settled,
-                _allocation.profit,
-                _allocation.transactionCost
+                _feeAmount + _traderFee,
+                _pnl,
+                _allocationGasFee,
+                _distributionAmount
             )
         );
     }

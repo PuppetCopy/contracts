@@ -63,22 +63,18 @@ library Error {
     error MatchRule__InvalidExpiryDuration(uint minExpiryDuration);
 
     // MirrorPosition
-    error MirrorPosition__AllocationAlreadyExists();
-    error MirrorPosition__PendingSettlement();
+    error MirrorPosition__AllocationDoesNotExist();
+    error MirrorPosition__PendingAllocation();
     error MirrorPosition__PuppetListLimit();
     error MirrorPosition__InvalidPuppetListIntegrity();
-    error MirrorPosition__AllocationDoesNotExist();
-    error MirrorPosition__InvalidRequest(bytes32 positionKey, bytes32 key);
-    error MirrorPosition__UnexpectedEventData();
-    error MirrorPosition__MismatchedAmountIn(uint recordedAmountIn, uint amountIn);
     error MirrorPosition__PositionDoesNotExist();
-    error MirrorPosition__RequestDoesNotMatchExecution();
+    error MirrorPosition__ExecutionRequestMissing();
     error MirrorPosition__NoAllocation();
-    error MirrorPosition__PendingExecution();
+    error MirrorPosition__PendingAllocationExecution();
     error MirrorPosition__NoPuppetAllocation();
 
-    // PositionRouter
-    error PositionRouter__InvalidOrderType(GmxPositionUtils.OrderType orderType);
+    // GmxExecutionCallback
+    error GmxExecutionCallback__InvalidOrderType(GmxPositionUtils.OrderType orderType);
 
     // Subaccount
     error Subaccount__UnauthorizedOperator();

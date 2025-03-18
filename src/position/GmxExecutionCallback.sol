@@ -24,10 +24,7 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
     uint public unhandledCallbackListId = 0;
     mapping(uint unhandledCallbackListSequenceId => UnhandledCallback) public unhandledCallbackMap;
 
-    constructor(
-        IAuthority _authority,
-        MirrorPosition _position
-    ) CoreContract("GmxExecutionCallback", _authority) {
+    constructor(IAuthority _authority, MirrorPosition _position) CoreContract("GmxExecutionCallback", _authority) {
         position = _position;
     }
 
@@ -58,7 +55,7 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
         } else if (GmxPositionUtils.isDecreaseOrder(order.numbers.orderType)) {
             position.decrease(key);
         } else {
-            revert Error.PositionRouter__InvalidOrderType(order.numbers.orderType);
+            revert Error.GmxExecutionCallback__InvalidOrderType(order.numbers.orderType);
         }
     }
 

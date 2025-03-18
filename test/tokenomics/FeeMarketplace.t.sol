@@ -39,7 +39,7 @@ contract FeeMarketplaceTest is BasicSetup {
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
         dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
         dictator.setAccess(testFundingStore, address(feeMarketplaceStore));
-
+ 
         // Initialize with a 1-day distribution timeframe, 100% burn, no distributor.
         dictator.initContract(
             feeMarketplace,

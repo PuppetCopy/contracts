@@ -7,7 +7,6 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {MatchRule} from "src/position/MatchRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
-import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxOracle} from "src/position/interface/IGmxOracle.sol";
 import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
@@ -23,12 +22,28 @@ import {BasicSetup} from "../base/BasicSetup.t.sol";
 import {MockGmxExchangeRouter} from "../mock/MockGmxExchangeRouter.sol";
 import {MockERC20} from "test/mock/MockERC20.sol";
 
+// TODO: Add tests for the Trading contract
+// MirrorPosition__NoAllocation - Increase request without allocation
+// MirrorPosition__PendingAllocationExecution - Cannot allow additional requests during pending initial allocation
+// MirrorPosition__PendingAllocation - Trying to allocate when there's already a pending allocation
+// MirrorPosition__PuppetListLimit - Exceed the maximum allowed puppet list length
+// MirrorPosition__NoPuppetAllocation - nothing has been allocated while processing puppet list
+// MirrorPosition__ExecutionRequestMissing - Trying to process a request that doesn't exist
+// MirrorPosition__PositionDoesNotExist - Trying to decrease a non-existent position
+// MirrorPosition__AllocationDoesNotExist - Trying to settle a non-existent allocation
+// MirrorPosition__InvalidPuppetListIntegrity - Settlement puppet list doesn't match allocation's list
+// TODO: Test edge cases for allocation distribution calculation
+// TODO: Test gas fee tracking and accounting
+// TODO: Test partial decrease vs full decrease position differences
+// TODO: Test performance contribution fees to the fee marketplace
+// TODO: Test throttling mechanism between puppets and traders
+// TODO: Test allocation expiry handling
+
 contract TradingTest is BasicSetup {
     SubaccountStore subaccountStore;
     MatchRule matchRule;
     FeeMarketplace feeMarketplace;
     MirrorPosition mirrorPosition;
-    IGmxExchangeRouter gmxExchangeRouter;
     MockGmxExchangeRouter mockGmxExchangeRouter;
     FeeMarketplaceStore feeMarketplaceStore;
 
@@ -94,7 +109,7 @@ contract TradingTest is BasicSetup {
                     increaseCallbackGasLimit: 2_000_000,
                     decreaseCallbackGasLimit: 2_000_000,
                     limitAllocationListLength: 100,
-                    performanceContributionRate: 0.1e30,
+                    performanceFee: 0.1e30,
                     traderPerformanceFee: 0
                 })
             )
@@ -148,7 +163,8 @@ contract TradingTest is BasicSetup {
         bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
         bytes32 positionKey = keccak256(abi.encodePacked("position-1"));
 
-        bytes32 allocationKey = mirrorPosition.allocate(usdc, mockSourceRequestKey, matchKey, positionKey, puppetList);
+        bytes32 allocationKey =
+            mirrorPosition.allocate(usdc, mockSourceRequestKey, matchKey, positionKey, trader, puppetList);
 
         bytes32 increaseRequestKey = mirrorPosition.mirror{value: executionFee}(
             MirrorPosition.MirrorPositionParams({
@@ -197,6 +213,9 @@ contract TradingTest is BasicSetup {
 
         // Simulate position decrease callback
         mirrorPosition.decrease(decreaseRequestKey);
+
+        // log allocation
+        mirrorPosition.allocationMap(allocationKey);
 
         // Settle the allocation
         mirrorPosition.settle(allocationKey, puppetList);

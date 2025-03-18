@@ -25,7 +25,7 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
 
     constructor(
         IAuthority _authority
-    ) CoreContract("Router", "1", _authority) {}
+    ) CoreContract("Router", _authority) {}
 
     /**
      * @notice Allocates collateral for a position.
@@ -35,9 +35,11 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
         bytes32 sourceRequestKey,
         bytes32 positionKey,
         bytes32 matchKey,
+        address trader,
         address[] calldata puppetList
     ) external nonReentrant auth returns (bytes32 allocationKey) {
-        allocationKey = config.position.allocate(collateralToken, sourceRequestKey, positionKey, matchKey, puppetList);
+        allocationKey =
+            config.position.allocate(collateralToken, sourceRequestKey, matchKey, positionKey, trader, puppetList);
     }
 
     /**
