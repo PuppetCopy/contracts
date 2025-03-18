@@ -26,5 +26,5 @@
     "forge-std": "github:foundry-rs/forge-std#v1.9.6",
     "solhint": "5.0.5"
   },
-  "packageManager": "bun@1.2.0"
+  "packageManager": "bun@1.2.5"
 }
