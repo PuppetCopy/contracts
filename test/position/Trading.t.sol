@@ -19,6 +19,7 @@ import {SubaccountStore} from "src/shared/SubaccountStore.sol";
 import {FeeMarketplace} from "src/tokenomics/FeeMarketplace.sol";
 import {FeeMarketplaceStore} from "src/tokenomics/FeeMarketplaceStore.sol";
 import {BankStore} from "src/utils/BankStore.sol";
+import {Precision} from "src/utils/Precision.sol";
 
 import {BasicSetup} from "../base/BasicSetup.t.sol";
 import {MockGmxExchangeRouter} from "../mock/MockGmxExchangeRouter.sol";
@@ -477,12 +478,12 @@ contract TradingTest is BasicSetup {
     }
 
     // Functional tests
-    function testPartialVsFullDecreasePosition() public {
+    function testAdjustmentsMatchMirrorPostion() public {
         address trader = users.bob;
         uint estimatedGasLimit = 5_000_000;
         uint executionFee = tx.gasprice * estimatedGasLimit;
 
-        address[] memory puppetList = generatePuppetList(usdc, trader, 10);
+        address[] memory puppetList = generatePuppetList(usdc, trader, 2);
 
         bytes32 mockSourceRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
         bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
@@ -502,20 +503,41 @@ contract TradingTest is BasicSetup {
                 isIncrease: true,
                 isLong: true,
                 executionFee: executionFee,
-                collateralDelta: 120e6,
-                sizeDeltaInUsd: 100e30,
+                collateralDelta: 100e6,
+                sizeDeltaInUsd: 1000e30,
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
             })
         );
 
+        // make sure request includes the propotional size and collateral to the puppet
+
+        // test case has 2 puppets. trader initial target ratio is 1000e30 / 100e6 = 10x
+        // each collateral delta should be 10 USDC due to 10% allocation rule
+        // the combined collateral delta should be 20 USDC
+        // size should be 200e30 to match trader 10x target ratio
+        assertEq(
+            mirrorPosition.getRequestAdjustment(increaseRequestKey).puppetSizeDelta,
+            200e30,
+            "Initial size delta should be 200e30 as each puppet"
+        );
+
         mirrorPosition.increase(increaseRequestKey);
 
-        // Check position size after increase
-        (uint size) = mirrorPosition.positionMap(allocationKey);
-        assertEq(size, 100e30, "Position size should be 100e30 after increase");
+        MirrorPosition.Position memory _position1 = mirrorPosition.getPosition(allocationKey);
 
-        // Partial decrease (50%)
+        assertEq(_position1.traderSize, 1000e30, "Trader size should be 1000e30");
+        assertEq(_position1.tradercollateral, 100e6, "Trader collateral should be 100e6");
+        assertEq(_position1.mpSize, 200e30, "MirrorPosition size should be 200e30");
+        assertEq(_position1.mpCollateral, 20e6, "MirrorPosition collateral should be 20e6");
+
+        assertEq(
+            Precision.toBasisPoints(_position1.traderSize, _position1.tradercollateral),
+            Precision.toBasisPoints(_position1.mpSize, _position1.mpCollateral),
+            "Trader and MirrorPosition size should be equal"
+        );
+
+        // // Partial decrease (50%)
         bytes32 partialDecreaseRequestKey = mirrorPosition.mirror{value: executionFee}(
             MirrorPosition.MirrorPositionParams({
                 trader: trader,
@@ -527,27 +549,66 @@ contract TradingTest is BasicSetup {
                 isLong: true,
                 executionFee: executionFee,
                 collateralDelta: 0, // No collateral change
-                sizeDeltaInUsd: 50e30, // 50% of size
+                sizeDeltaInUsd: 500e30, // 50% of size
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
             })
         );
 
-        // Simulate funds coming back for the partial decrease
-        deal(address(usdc), address(subaccountStore), usdc.balanceOf(address(subaccountStore)) + 65e6); // Return
-            // slightly more
+        assertEq(
+            mirrorPosition.getRequestAdjustment(partialDecreaseRequestKey).puppetSizeDelta,
+            100e30,
+            "For a 50% position decrease, puppet size delta should be 100e30 (50% of total)"
+        );
 
         mirrorPosition.decrease(partialDecreaseRequestKey);
 
-        // Position should still exist with reduced size
-        (size) = mirrorPosition.positionMap(allocationKey);
-        assertEq(size, 50e30, "Position size should be reduced to 50e30 after partial decrease");
+        MirrorPosition.Position memory _position2 = mirrorPosition.getPosition(allocationKey);
 
-        // Get allocation state
-        (,,,, uint allocated, uint settled,,) = mirrorPosition.allocationMap(allocationKey);
-        assertGt(settled, 0, "Settled amount should be positive after partial decrease");
+        assertEq(_position2.traderSize, 500e30, "Trader size should be 500e30");
+        assertEq(_position2.tradercollateral, 100e6, "Trader collateral should remain 100e6");
 
-        // Full decrease (remaining position)
+        assertEq(
+            Precision.toBasisPoints(_position2.traderSize, _position2.tradercollateral),
+            Precision.toBasisPoints(_position2.mpSize, _position2.mpCollateral),
+            "Trader and MirrorPosition size should be equal"
+        );
+
+        // Partial increase (50%)
+        bytes32 partialIncreaseRequestKey = mirrorPosition.mirror{value: executionFee}(
+            MirrorPosition.MirrorPositionParams({
+                trader: trader,
+                market: Address.gmxEthUsdcMarket,
+                collateralToken: usdc,
+                allocationKey: allocationKey,
+                sourceRequestKey: mockSourceRequestKey,
+                isIncrease: true,
+                isLong: true,
+                executionFee: executionFee,
+                collateralDelta: 0, // No collateral change
+                sizeDeltaInUsd: 500e30, // 50% of size
+                acceptablePrice: 1000e12,
+                triggerPrice: 1000e12
+            })
+        );
+
+        mirrorPosition.increase(partialIncreaseRequestKey);
+
+        MirrorPosition.Position memory _position3 = mirrorPosition.getPosition(allocationKey);
+
+        assertEq(_position3.traderSize, 1000e30, "Trader size should be 1000e30 after partial increase");
+        assertEq(_position3.tradercollateral, 100e6, "Trader collateral should remain 100e6 after partial increase");
+        assertEq(_position3.mpSize, 200e30, "MirrorPosition size should get back to 200e30 after partial increase");
+
+        assertEq(
+            Precision.toBasisPoints(_position3.traderSize, _position3.tradercollateral),
+            Precision.toBasisPoints(_position3.mpSize, _position3.mpCollateral),
+            "Trader and MirrorPosition size should be equal"
+        );
+
+        // add more tests with collateral adjustments in testAdjustmentsMatchMirrorPostion()
+
+        // Full decrease
         bytes32 fullDecreaseRequestKey = mirrorPosition.mirror{value: executionFee}(
             MirrorPosition.MirrorPositionParams({
                 trader: trader,
@@ -558,25 +619,19 @@ contract TradingTest is BasicSetup {
                 isIncrease: false,
                 isLong: true,
                 executionFee: executionFee,
-                collateralDelta: 60e6, // Remaining collateral
-                sizeDeltaInUsd: 50e30, // Remaining size
+                collateralDelta: 0, // No collateral change
+                sizeDeltaInUsd: 1000e30, // Full size
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
             })
         );
-
-        // Simulate funds coming back for the full decrease
-        deal(address(usdc), address(subaccountStore), usdc.balanceOf(address(subaccountStore)) + 65e6); // Return
-            // slightly more
-
         mirrorPosition.decrease(fullDecreaseRequestKey);
+        MirrorPosition.Position memory _position4 = mirrorPosition.getPosition(allocationKey);
+        assertEq(_position4.traderSize, 0, "Trader size should be 0 after full decrease");
+        assertEq(_position4.tradercollateral, 0, "Trader collateral should be 0 after full decrease");
+        assertEq(_position4.mpSize, 0, "MirrorPosition size should be 0 after full decrease");
+        assertEq(_position4.mpCollateral, 0, "MirrorPosition collateral should be 0 after full decrease");
 
-        // Position should be completely closed (deleted)
-        (size) = mirrorPosition.positionMap(allocationKey);
-        assertEq(size, 0, "Position should be completely closed after full decrease");
-
-        // Settle the allocation
-        mirrorPosition.settle(allocationKey, puppetList);
     }
 
     function testGasFeeTracking() public {

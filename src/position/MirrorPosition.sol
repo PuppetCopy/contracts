@@ -45,8 +45,10 @@ contract MirrorPosition is CoreContract {
     }
 
     struct Position {
-        // uint collateral;
-        uint size;
+        uint mpSize;
+        uint mpCollateral;
+        uint traderSize;
+        uint tradercollateral;
     }
 
     struct MirrorPositionParams {
@@ -68,7 +70,10 @@ contract MirrorPosition is CoreContract {
         bytes32 allocationKey;
         bytes32 sourceRequestKey;
         bytes32 matchKey;
-        uint sizeDelta;
+        uint puppetSizeDelta;
+        uint puppetCollateralDelta;
+        uint traderSizeDelta;
+        uint traderCollateralDelta;
     }
 
     Config public config;
@@ -83,6 +88,24 @@ contract MirrorPosition is CoreContract {
     mapping(bytes32 allocationKey => mapping(address puppet => uint)) public allocationPuppetMap;
     mapping(bytes32 positionKey => Position) public positionMap;
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
+
+    function getAllocation(
+        bytes32 _allocationKey
+    ) external view returns (Allocation memory) {
+        return allocationMap[_allocationKey];
+    }
+
+    function getPosition(
+        bytes32 _positionKey
+    ) external view returns (Position memory) {
+        return positionMap[_positionKey];
+    }
+
+    function getRequestAdjustment(
+        bytes32 _requestKey
+    ) external view returns (RequestAdjustment memory) {
+        return requestAdjustmentMap[_requestKey];
+    }
 
     constructor(
         IAuthority _authority,
@@ -183,7 +206,8 @@ contract MirrorPosition is CoreContract {
         Allocation memory _allocation = allocationMap[_params.allocationKey];
         Position memory _position = positionMap[_params.allocationKey];
 
-        address _subaccountAddress = _predictDeterministicAddress(_allocation.matchKey);
+        address _subaccountAddress =
+            Clones.predictDeterministicAddress(subaccountStoreImplementation, _allocation.matchKey, address(this));
 
         Subaccount _subaccount = Subaccount(
             CallUtils.isContract(_subaccountAddress)
@@ -195,18 +219,22 @@ contract MirrorPosition is CoreContract {
             matchKey: _allocation.matchKey,
             allocationKey: _params.allocationKey,
             sourceRequestKey: _params.sourceRequestKey,
-            sizeDelta: 0
+            traderSizeDelta: _params.sizeDeltaInUsd,
+            traderCollateralDelta: _params.collateralDelta,
+            puppetSizeDelta: 0,
+            puppetCollateralDelta: 0
         });
 
-        uint _leverage;
-        uint _targetLeverage;
         string memory _targetLeverageType = "Increase";
 
-        if (_position.size == 0) {
+        if (_position.mpSize == 0) {
             require(_allocation.allocated > 0, Error.MirrorPosition__NoAllocation());
             require(_allocation.executionGasFee == 0, Error.MirrorPosition__PendingAllocationExecution());
 
+            _request.puppetSizeDelta = _params.sizeDeltaInUsd * _allocation.allocated / _params.collateralDelta;
+            _request.puppetCollateralDelta = _allocation.allocated;
             subaccountStore.transferOut(_params.collateralToken, config.gmxOrderVault, _allocation.allocated);
+
             _requestKey = _submitOrder(
                 _params,
                 _subaccount,
@@ -215,26 +243,20 @@ contract MirrorPosition is CoreContract {
                 _allocation.allocated,
                 config.increaseCallbackGasLimit
             );
-
-            _request.sizeDelta = _params.sizeDeltaInUsd;
         } else {
-            _leverage = Precision.toBasisPoints(_position.size, _allocation.allocated);
-            _targetLeverage = _params.isIncrease
+            uint _currentLeverage = Precision.toBasisPoints(_position.traderSize, _position.tradercollateral);
+            uint _targetLeverage = _params.isIncrease
                 ? Precision.toBasisPoints(
-                    _position.size + _params.sizeDeltaInUsd, _allocation.allocated + _params.collateralDelta
+                    _position.traderSize + _params.sizeDeltaInUsd, _position.tradercollateral + _params.collateralDelta
                 )
-                : _params.sizeDeltaInUsd < _position.size
+                : _position.traderSize > _params.sizeDeltaInUsd
                     ? Precision.toBasisPoints(
-                        _position.size - _params.sizeDeltaInUsd, _allocation.allocated - _params.collateralDelta
+                        _position.traderSize - _params.sizeDeltaInUsd, _position.tradercollateral - _params.collateralDelta
                     )
                     : 0;
 
-            uint deltaLeverage;
-
-            if (_targetLeverage >= _leverage) {
-                deltaLeverage = _targetLeverage - _leverage;
-                _request.sizeDelta = _position.size * deltaLeverage / _targetLeverage;
-
+            if (_targetLeverage >= _currentLeverage) {
+                _request.puppetSizeDelta = _position.mpSize * (_targetLeverage - _currentLeverage) / _currentLeverage;
                 _requestKey = _submitOrder(
                     _params,
                     _subaccount,
@@ -245,8 +267,7 @@ contract MirrorPosition is CoreContract {
                 );
             } else {
                 _targetLeverageType = "Decrease";
-                deltaLeverage = _leverage - _targetLeverage;
-                _request.sizeDelta = _position.size * deltaLeverage / _leverage;
+                _request.puppetSizeDelta = _position.mpSize * (_currentLeverage - _targetLeverage) / _currentLeverage;
 
                 _requestKey = _submitOrder(
                     _params,
@@ -260,8 +281,8 @@ contract MirrorPosition is CoreContract {
         }
 
         _allocation.executionGasFee += (_startGas - gasleft()) * tx.gasprice + _params.executionFee;
-        requestAdjustmentMap[_requestKey] = _request;
         allocationMap[_params.allocationKey] = _allocation;
+        requestAdjustmentMap[_requestKey] = _request;
 
         _logEvent(
             _targetLeverageType,
@@ -273,7 +294,7 @@ contract MirrorPosition is CoreContract {
                 _requestKey,
                 _request.matchKey,
                 _allocation.executionGasFee,
-                _request.sizeDelta
+                _request.traderSizeDelta
             )
         );
     }
@@ -286,15 +307,18 @@ contract MirrorPosition is CoreContract {
 
         require(_request.matchKey != 0, Error.MirrorPosition__ExecutionRequestMissing());
 
-        _position.size += _request.sizeDelta;
-
+        _position.traderSize += _request.traderSizeDelta;
+        _position.tradercollateral += _request.traderCollateralDelta;
+        _position.mpSize += _request.puppetSizeDelta;
+        _position.mpCollateral += _request.puppetCollateralDelta;
         positionMap[_request.allocationKey] = _position;
+
         delete requestAdjustmentMap[_requestKey];
 
         _logEvent(
             "ExecuteIncrease",
             abi.encode(
-                _requestKey, _request.sourceRequestKey, _request.allocationKey, _request.matchKey, _position.size
+                _requestKey, _request.sourceRequestKey, _request.allocationKey, _request.matchKey, _position.mpSize
             )
         );
     }
@@ -309,22 +333,23 @@ contract MirrorPosition is CoreContract {
         Position memory _position = positionMap[_request.allocationKey];
         Allocation memory _allocation = allocationMap[_request.allocationKey];
 
-        require(_position.size > 0, Error.MirrorPosition__PositionDoesNotExist());
+        require(_position.mpSize > 0, Error.MirrorPosition__PositionDoesNotExist());
 
-        uint _recordedAmountIn = subaccountStore.recordTransferIn(_allocation.collateralToken);
-
-        // https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/position/DecreasePositionUtils.sol#L91
         // Partial decrease - calculate based on the adjusted portion
-        if (_position.size > _request.sizeDelta) {
-            _position.size -= _request.sizeDelta;
-            _allocation.settled += _recordedAmountIn;
+        if (_position.mpSize > _request.puppetSizeDelta) {
+            _position.traderSize -= _request.traderSizeDelta;
+            _position.tradercollateral -= _request.traderCollateralDelta;
+            _position.mpSize -= _request.puppetSizeDelta;
+            _position.mpCollateral -= _request.puppetCollateralDelta;
             positionMap[_request.allocationKey] = _position;
         } else {
-            _allocation.settled = _recordedAmountIn;
             delete positionMap[_request.allocationKey];
         }
 
         delete requestAdjustmentMap[_requestKey];
+
+        uint _recordedAmountIn = subaccountStore.recordTransferIn(_allocation.collateralToken);
+        _allocation.settled = _recordedAmountIn;
         allocationMap[_request.allocationKey] = _allocation;
 
         _logEvent(
@@ -334,10 +359,10 @@ contract MirrorPosition is CoreContract {
                 _request.sourceRequestKey,
                 _request.allocationKey,
                 _request.matchKey,
-                _request.sizeDelta,
+                _request.traderSizeDelta,
                 _recordedAmountIn,
                 _allocation.allocated,
-                _position.size,
+                _position.mpSize,
                 _allocation.settled
             )
         );
@@ -446,7 +471,7 @@ contract MirrorPosition is CoreContract {
                         swapPath: new address[](0)
                     }),
                     numbers: GmxPositionUtils.CreateOrderParamsNumbers({
-                        sizeDeltaUsd: _request.sizeDelta,
+                        sizeDeltaUsd: _request.traderSizeDelta,
                         initialCollateralDeltaAmount: _collateralDelta,
                         triggerPrice: _order.triggerPrice,
                         acceptablePrice: _order.acceptablePrice,
@@ -468,12 +493,6 @@ contract MirrorPosition is CoreContract {
         }
 
         return abi.decode(_orderReturnData, (bytes32));
-    }
-
-    function _predictDeterministicAddress(
-        bytes32 _salt
-    ) internal view returns (address) {
-        return Clones.predictDeterministicAddress(subaccountStoreImplementation, _salt, address(this));
     }
 
     function _setConfig(
