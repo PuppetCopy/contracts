@@ -48,7 +48,7 @@ contract MirrorPosition is CoreContract {
         uint mpSize;
         uint mpCollateral;
         uint traderSize;
-        uint tradercollateral;
+        uint traderCollateral;
     }
 
     struct MirrorPositionParams {
@@ -70,6 +70,7 @@ contract MirrorPosition is CoreContract {
         bytes32 allocationKey;
         bytes32 sourceRequestKey;
         bytes32 matchKey;
+        bool isIncrease;
         uint puppetSizeDelta;
         uint puppetCollateralDelta;
         uint traderSizeDelta;
@@ -219,6 +220,7 @@ contract MirrorPosition is CoreContract {
             matchKey: _allocation.matchKey,
             allocationKey: _params.allocationKey,
             sourceRequestKey: _params.sourceRequestKey,
+            isIncrease: _params.isIncrease,
             traderSizeDelta: _params.sizeDeltaInUsd,
             traderCollateralDelta: _params.collateralDelta,
             puppetSizeDelta: 0,
@@ -233,6 +235,7 @@ contract MirrorPosition is CoreContract {
 
             _request.puppetSizeDelta = _params.sizeDeltaInUsd * _allocation.allocated / _params.collateralDelta;
             _request.puppetCollateralDelta = _allocation.allocated;
+
             subaccountStore.transferOut(_params.collateralToken, config.gmxOrderVault, _allocation.allocated);
 
             _requestKey = _submitOrder(
@@ -244,14 +247,14 @@ contract MirrorPosition is CoreContract {
                 config.increaseCallbackGasLimit
             );
         } else {
-            uint _currentLeverage = Precision.toBasisPoints(_position.traderSize, _position.tradercollateral);
+            uint _currentLeverage = Precision.toBasisPoints(_position.traderSize, _position.traderCollateral);
             uint _targetLeverage = _params.isIncrease
                 ? Precision.toBasisPoints(
-                    _position.traderSize + _params.sizeDeltaInUsd, _position.tradercollateral + _params.collateralDelta
+                    _position.traderSize + _params.sizeDeltaInUsd, _position.traderCollateral + _params.collateralDelta
                 )
                 : _position.traderSize > _params.sizeDeltaInUsd
                     ? Precision.toBasisPoints(
-                        _position.traderSize - _params.sizeDeltaInUsd, _position.tradercollateral - _params.collateralDelta
+                        _position.traderSize - _params.sizeDeltaInUsd, _position.traderCollateral - _params.collateralDelta
                     )
                     : 0;
 
@@ -308,7 +311,7 @@ contract MirrorPosition is CoreContract {
         require(_request.matchKey != 0, Error.MirrorPosition__ExecutionRequestMissing());
 
         _position.traderSize += _request.traderSizeDelta;
-        _position.tradercollateral += _request.traderCollateralDelta;
+        _position.traderCollateral += _request.traderCollateralDelta;
         _position.mpSize += _request.puppetSizeDelta;
         _position.mpCollateral += _request.puppetCollateralDelta;
         positionMap[_request.allocationKey] = _position;
@@ -337,8 +340,13 @@ contract MirrorPosition is CoreContract {
 
         // Partial decrease - calculate based on the adjusted portion
         if (_position.mpSize > _request.puppetSizeDelta) {
-            _position.traderSize -= _request.traderSizeDelta;
-            _position.tradercollateral -= _request.traderCollateralDelta;
+            if (_request.isIncrease) {
+                _position.traderSize += _request.traderSizeDelta;
+                _position.traderCollateral += _request.traderCollateralDelta;
+            } else {
+                _position.traderSize -= _request.traderSizeDelta;
+                _position.traderCollateral -= _request.traderCollateralDelta;
+            }
             _position.mpSize -= _request.puppetSizeDelta;
             _position.mpCollateral -= _request.puppetCollateralDelta;
             positionMap[_request.allocationKey] = _position;
@@ -349,7 +357,7 @@ contract MirrorPosition is CoreContract {
         delete requestAdjustmentMap[_requestKey];
 
         uint _recordedAmountIn = subaccountStore.recordTransferIn(_allocation.collateralToken);
-        _allocation.settled = _recordedAmountIn;
+        _allocation.settled += _recordedAmountIn;
         allocationMap[_request.allocationKey] = _allocation;
 
         _logEvent(
