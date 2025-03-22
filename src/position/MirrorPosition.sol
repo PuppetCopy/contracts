@@ -70,7 +70,7 @@ contract MirrorPosition is CoreContract {
         bytes32 allocationKey;
         bytes32 sourceRequestKey;
         bytes32 matchKey;
-        bool isIncrease;
+        PositionUtils.AjustmentType targetLeverageType;
         uint puppetSizeDelta;
         uint puppetCollateralDelta;
         uint traderSizeDelta;
@@ -220,14 +220,12 @@ contract MirrorPosition is CoreContract {
             matchKey: _allocation.matchKey,
             allocationKey: _params.allocationKey,
             sourceRequestKey: _params.sourceRequestKey,
-            isIncrease: _params.isIncrease,
+            targetLeverageType: PositionUtils.AjustmentType.INCREASE,
             traderSizeDelta: _params.sizeDeltaInUsd,
             traderCollateralDelta: _params.collateralDelta,
             puppetSizeDelta: 0,
             puppetCollateralDelta: 0
         });
-
-        string memory _targetLeverageType = "Increase";
 
         if (_position.mpSize == 0) {
             require(_allocation.allocated > 0, Error.MirrorPosition__NoAllocation());
@@ -247,6 +245,7 @@ contract MirrorPosition is CoreContract {
                 config.increaseCallbackGasLimit
             );
         } else {
+            _request.targetLeverageType = PositionUtils.AjustmentType.DECREASE;
             uint _currentLeverage = Precision.toBasisPoints(_position.traderSize, _position.traderCollateral);
             uint _targetLeverage = _params.isIncrease
                 ? Precision.toBasisPoints(
@@ -269,7 +268,8 @@ contract MirrorPosition is CoreContract {
                     config.increaseCallbackGasLimit
                 );
             } else {
-                _targetLeverageType = "Decrease";
+                _request.targetLeverageType =
+                    _params.isIncrease ? PositionUtils.AjustmentType.LIQUIDATE : PositionUtils.AjustmentType.DECREASE;
                 _request.puppetSizeDelta = _position.mpSize * (_currentLeverage - _targetLeverage) / _currentLeverage;
 
                 _requestKey = _submitOrder(
@@ -288,7 +288,7 @@ contract MirrorPosition is CoreContract {
         requestAdjustmentMap[_requestKey] = _request;
 
         _logEvent(
-            _targetLeverageType,
+            "Mirror",
             abi.encode(
                 _subaccountAddress,
                 _params.trader,
@@ -340,7 +340,7 @@ contract MirrorPosition is CoreContract {
 
         // Partial decrease - calculate based on the adjusted portion
         if (_position.mpSize > _request.puppetSizeDelta) {
-            if (_request.isIncrease) {
+            if (_request.targetLeverageType == PositionUtils.AjustmentType.LIQUIDATE) {
                 _position.traderSize += _request.traderSizeDelta;
                 _position.traderCollateral += _request.traderCollateralDelta;
             } else {
@@ -348,7 +348,7 @@ contract MirrorPosition is CoreContract {
                 _position.traderCollateral -= _request.traderCollateralDelta;
             }
             _position.mpSize -= _request.puppetSizeDelta;
-            _position.mpCollateral -= _request.puppetCollateralDelta;
+            // _position.mpCollateral -= _request.puppetCollateralDelta;
             positionMap[_request.allocationKey] = _position;
         } else {
             delete positionMap[_request.allocationKey];
