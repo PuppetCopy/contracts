@@ -6,8 +6,10 @@ import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {GmxExecutionCallback} from "./position/GmxExecutionCallback.sol";
+
 import {MatchRule} from "./position/MatchRule.sol";
 import {MirrorPosition} from "./position/MirrorPosition.sol";
+import {AllocationAccount} from "./shared/AllocationAccount.sol";
 import {FeeMarketplace} from "./tokenomics/FeeMarketplace.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
@@ -27,54 +29,39 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
         IAuthority _authority
     ) CoreContract("Router", _authority) {}
 
-    /**
-     * @notice Allocates collateral for a position.
-     */
     function allocate(
         IERC20 collateralToken,
-        bytes32 sourceRequestKey,
-        bytes32 positionKey,
-        bytes32 matchKey,
         address trader,
         address[] calldata puppetList
-    ) external nonReentrant auth returns (bytes32 allocationKey) {
-        allocationKey =
-            config.position.allocate(collateralToken, sourceRequestKey, matchKey, positionKey, trader, puppetList);
+    ) external nonReentrant auth returns (uint) {
+        return config.position.allocate(collateralToken, trader, puppetList);
     }
 
-    /**
-     * @notice Mirrors a position.
-     */
     function mirror(
-        MirrorPosition.MirrorPositionParams calldata params
+        MirrorPosition.PositionParams calldata params,
+        address[] calldata puppetList,
+        uint allocationId
     ) external payable nonReentrant auth returns (bytes32 requestKey) {
-        requestKey = config.position.mirror(params);
+        requestKey = config.position.mirror(params, puppetList, allocationId);
     }
 
-    /**
-     * @notice Settles an allocated position.
-     */
-    function settle(bytes32 key, address[] calldata puppetList) external nonReentrant auth {
-        config.position.settle(key, puppetList);
+    function settle(
+        IERC20 token, //
+        address trader,
+        address[] calldata puppetList,
+        uint allocationId
+    ) external nonReentrant auth {
+        config.position.settle(token, trader, puppetList, allocationId);
     }
 
-    /**
-     * @notice Deposits tokens.
-     */
     function deposit(IERC20 token, uint amount) external nonReentrant {
         config.matchRule.deposit(token, msg.sender, amount);
     }
 
-    /**
-     * @notice Withdraws tokens.
-     */
     function withdraw(IERC20 token, address receiver, uint amount) external nonReentrant {
         config.matchRule.withdraw(token, msg.sender, receiver, amount);
     }
 
-    /**
-     * @notice Sets a list of match rules.
-     */
     function setMatchRule(
         IERC20 collateralToken,
         address trader,
@@ -83,10 +70,6 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
         config.matchRule.setRule(collateralToken, msg.sender, trader, ruleParams);
     }
 
-    /**
-     * @notice Sets the configuration for both modules.
-     * @dev Receives a single bytes-encoded CombinedConfig.
-     */
     function _setConfig(
         bytes calldata data
     ) internal override {

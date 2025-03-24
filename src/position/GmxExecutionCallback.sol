@@ -50,10 +50,11 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
         GmxPositionUtils.Props calldata order,
         bytes calldata eventData
     ) external auth {
-        if (GmxPositionUtils.isIncreaseOrder(order.numbers.orderType)) {
-            position.increase(key);
-        } else if (GmxPositionUtils.isDecreaseOrder(order.numbers.orderType)) {
-            position.decrease(key);
+        if (
+            GmxPositionUtils.isIncreaseOrder(order.numbers.orderType)
+                || GmxPositionUtils.isDecreaseOrder(order.numbers.orderType)
+        ) {
+            position.execute(key);
         } else {
             revert Error.GmxExecutionCallback__InvalidOrderType(order.numbers.orderType);
         }

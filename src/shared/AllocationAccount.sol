@@ -10,7 +10,7 @@ import {Error} from "./Error.sol";
  * @notice A minimal proxy contract that enables identity-preserving delegated execution
  * @dev This contract has been directed to work with EIP-1167 minimal proxies.
  */
-contract Subaccount {
+contract AllocationAccount {
     IAccess internal immutable store;
 
     /**

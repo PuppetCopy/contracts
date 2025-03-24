@@ -64,6 +64,16 @@ library GmxPositionUtils {
         bool isFrozen;
     }
 
+    // @dev CreateOrderParams struct used in createOrder to avoid stack
+    // too deep errors
+    //
+    // @param addresses address values
+    // @param numbers number values
+    // @param orderType for order.orderType
+    // @param decreasePositionSwapType for order.decreasePositionSwapType
+    // @param isLong for order.isLong
+    // @param shouldUnwrapNativeToken for order.shouldUnwrapNativeToken
+    // @note all params except should be part of the corresponding struct hash in all relay contracts
     struct CreateOrderParams {
         CreateOrderParamsAddresses addresses;
         CreateOrderParamsNumbers numbers;
@@ -71,11 +81,14 @@ library GmxPositionUtils {
         DecreasePositionSwapType decreasePositionSwapType;
         bool isLong;
         bool shouldUnwrapNativeToken;
+        bool autoCancel;
         bytes32 referralCode;
     }
 
+    // @note all params except should be part of the corresponding struct hash in all relay contracts
     struct CreateOrderParamsAddresses {
         address receiver;
+        address cancellationReceiver;
         address callbackContract;
         address uiFeeReceiver;
         address market;
@@ -83,14 +96,23 @@ library GmxPositionUtils {
         address[] swapPath;
     }
 
+    // @param sizeDeltaUsd for order.sizeDeltaUsd
+    // @param triggerPrice for order.triggerPrice
+    // @param acceptablePrice for order.acceptablePrice
+    // @param executionFee for order.executionFee
+    // @param callbackGasLimit for order.callbackGasLimit
+    // @param minOutputAmount for order.minOutputAmount
+    // @param validFromTime for order.validFromTime
+    // @note all params except should be part of the corresponding struct hash in all relay contracts
     struct CreateOrderParamsNumbers {
-        uint initialCollateralDeltaAmount;
         uint sizeDeltaUsd;
+        uint initialCollateralDeltaAmount;
         uint triggerPrice;
         uint acceptablePrice;
         uint executionFee;
         uint callbackGasLimit;
         uint minOutputAmount;
+        uint validFromTime;
     }
 
     function isIncreaseOrder(

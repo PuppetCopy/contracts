@@ -5,11 +5,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {BankStore} from "./../utils/BankStore.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
-import {Subaccount} from "./Subaccount.sol";
+import {AllocationAccount} from "./AllocationAccount.sol";
 import {TokenRouter} from "./TokenRouter.sol";
 
-contract SubaccountStore is BankStore {
-    address public immutable implementation = address(new Subaccount(this));
+contract AllocationStore is BankStore {
     mapping(IERC20 token => mapping(address user => uint)) public userBalanceMap;
 
     constructor(IAuthority _authority, TokenRouter _router) BankStore(_authority, _router) {}

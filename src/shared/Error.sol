@@ -64,13 +64,15 @@ library Error {
 
     // MirrorPosition
     error MirrorPosition__NoSettledFunds();
+    error MirrorPosition__AllocationAccountNotFound();
     error MirrorPosition__InvalidAllocation();
+    error MirrorPosition__AllocationNotSettled();
     error MirrorPosition__PendingAllocation();
     error MirrorPosition__PuppetListLimit();
     error MirrorPosition__InvalidPuppetListIntegrity();
     error MirrorPosition__PositionDoesNotExist();
     error MirrorPosition__ExecutionRequestMissing();
-    error MirrorPosition__NoAllocation();
+    error MirrorPosition__InvalidIncrease();
     error MirrorPosition__PendingAllocationExecution();
     error MirrorPosition__NoPuppetAllocation();
 

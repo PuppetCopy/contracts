@@ -11,11 +11,12 @@ import {MatchRule} from "src/position/MatchRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxOracle} from "src/position/interface/IGmxOracle.sol";
+import {AllocationAccountUtils} from "src/position/utils/AllocationAccountUtils.sol";
 import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
+import {AllocationAccount} from "src/shared/AllocationAccount.sol";
 import {Error} from "src/shared/Error.sol";
-import {Subaccount} from "src/shared/Subaccount.sol";
-import {SubaccountStore} from "src/shared/SubaccountStore.sol";
+import {AllocationStore} from "src/shared/AllocationStore.sol";
 import {FeeMarketplace} from "src/tokenomics/FeeMarketplace.sol";
 import {FeeMarketplaceStore} from "src/tokenomics/FeeMarketplaceStore.sol";
 import {BankStore} from "src/utils/BankStore.sol";
@@ -45,7 +46,7 @@ import {MockERC20} from "test/mock/MockERC20.sol";
 // TODO: Test allocation expiry handling
 
 contract TradingTest is BasicSetup {
-    SubaccountStore subaccountStore;
+    AllocationStore allocationStore;
     MatchRule matchRule;
     FeeMarketplace feeMarketplace;
     MirrorPosition mirrorPosition;
@@ -60,13 +61,13 @@ contract TradingTest is BasicSetup {
         mockGmxExchangeRouter = new MockGmxExchangeRouter();
 
         // Deploy core contracts
-        subaccountStore = new SubaccountStore(dictator, tokenRouter);
-        matchRule = new MatchRule(dictator, subaccountStore);
+        allocationStore = new AllocationStore(dictator, tokenRouter);
+        matchRule = new MatchRule(dictator, allocationStore, MirrorPosition(_getNextContractAddress(3)));
 
         feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
         feeMarketplace = new FeeMarketplace(dictator, tokenRouter, feeMarketplaceStore, puppetToken);
 
-        mirrorPosition = new MirrorPosition(dictator, subaccountStore, matchRule, feeMarketplace);
+        mirrorPosition = new MirrorPosition(dictator, allocationStore, matchRule, feeMarketplace);
 
         // Config
         IERC20[] memory tokenAllowanceCapList = new IERC20[](2);
@@ -114,29 +115,30 @@ contract TradingTest is BasicSetup {
                     increaseCallbackGasLimit: 2_000_000,
                     decreaseCallbackGasLimit: 2_000_000,
                     limitAllocationListLength: 100,
-                    performanceFee: 0.1e30,
-                    traderPerformanceFee: 0
+                    platformFee: 0.001e30
                 })
             )
         );
 
-        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(subaccountStore));
-        dictator.setAccess(subaccountStore, address(matchRule));
-        dictator.setAccess(subaccountStore, address(mirrorPosition));
-        dictator.setAccess(subaccountStore, address(feeMarketplace));
+        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
+        dictator.setAccess(allocationStore, address(matchRule));
+        dictator.setAccess(allocationStore, address(mirrorPosition));
+        dictator.setAccess(allocationStore, address(feeMarketplace));
 
         // Set permissions
         dictator.setPermission(mirrorPosition, mirrorPosition.allocate.selector, users.owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.mirror.selector, users.owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, users.owner);
-        dictator.setPermission(mirrorPosition, mirrorPosition.increase.selector, users.owner);
-        dictator.setPermission(mirrorPosition, mirrorPosition.decrease.selector, users.owner);
+        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, users.owner);
+        dictator.setPermission(
+            mirrorPosition, mirrorPosition.initializeTraderAcitityThrottle.selector, address(matchRule)
+        );
 
         dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
         dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, users.owner);
         dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, users.owner);
         dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
-        dictator.setAccess(subaccountStore, address(feeMarketplaceStore));
+        dictator.setAccess(allocationStore, address(feeMarketplaceStore));
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
         feeMarketplace.setAskPrice(usdc, 100e18);
 
@@ -146,17 +148,17 @@ contract TradingTest is BasicSetup {
 
         // Pre-approve token allowances for users
         vm.startPrank(users.alice);
-        usdc.approve(address(subaccountStore), type(uint).max);
-        wnt.approve(address(subaccountStore), type(uint).max);
+        usdc.approve(address(allocationStore), type(uint).max);
+        wnt.approve(address(allocationStore), type(uint).max);
 
         vm.startPrank(users.bob);
-        usdc.approve(address(subaccountStore), type(uint).max);
-        wnt.approve(address(subaccountStore), type(uint).max);
+        usdc.approve(address(allocationStore), type(uint).max);
+        wnt.approve(address(allocationStore), type(uint).max);
 
         vm.startPrank(users.owner);
     }
 
-    function simpleE2eExecution() public {
+    function testSimpleE2eExecution() public {
         address trader = users.bob;
 
         uint estimatedGasLimit = 5_000_000;
@@ -164,20 +166,19 @@ contract TradingTest is BasicSetup {
 
         address[] memory puppetList = generatePuppetList(usdc, trader, 10);
 
-        bytes32 mockSourceRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
         bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
-        bytes32 positionKey = keccak256(abi.encodePacked("position-1"));
 
-        bytes32 allocationKey =
-            mirrorPosition.allocate(usdc, mockSourceRequestKey, matchKey, positionKey, trader, puppetList);
+        uint allocationId = mirrorPosition.allocate(usdc, trader, puppetList);
+        bytes32 allocationKey = getAllocationKey(puppetList, matchKey, allocationId);
+        address allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
+            mirrorPosition.allocationStoreImplementation(), allocationKey, address(mirrorPosition)
+        );
 
         bytes32 increaseRequestKey = mirrorPosition.mirror{value: executionFee}(
-            MirrorPosition.MirrorPositionParams({
+            MirrorPosition.PositionParams({
+                collateralToken: usdc,
                 trader: trader,
                 market: Address.gmxEthUsdcMarket,
-                collateralToken: usdc,
-                allocationKey: allocationKey,
-                sourceRequestKey: mockSourceRequestKey,
                 isIncrease: true,
                 isLong: true,
                 executionFee: executionFee,
@@ -185,20 +186,22 @@ contract TradingTest is BasicSetup {
                 sizeDeltaInUsd: 30e30,
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
-            })
+            }),
+            puppetList,
+            allocationId
         );
 
-        // Simulate position increase callback
-        mirrorPosition.increase(increaseRequestKey);
+        assertGt(mirrorPosition.getAllocation(allocationKey), 0, "Allocation should be greater than 0");
 
-        // Now simulate decrease position
+        // Simulate position increase callback
+        mirrorPosition.execute(increaseRequestKey);
+
+        // Now simulate decrease position 122677
         bytes32 decreaseRequestKey = mirrorPosition.mirror{value: executionFee}(
-            MirrorPosition.MirrorPositionParams({
+            MirrorPosition.PositionParams({
+                collateralToken: usdc,
                 trader: trader,
                 market: Address.gmxEthUsdcMarket,
-                collateralToken: usdc,
-                allocationKey: allocationKey,
-                sourceRequestKey: mockSourceRequestKey,
                 isIncrease: false,
                 isLong: true,
                 executionFee: executionFee,
@@ -206,108 +209,30 @@ contract TradingTest is BasicSetup {
                 sizeDeltaInUsd: 30e30,
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
-            })
+            }),
+            puppetList,
+            allocationId
         );
 
         // Need to simulate some tokens coming back to the contract
         // In real environment, GMX would send funds back
-        // usdc.balanceOf(address(subaccountStore));
-        deal(address(usdc), address(subaccountStore), usdc.balanceOf(address(subaccountStore)) + 11e6 * 10);
+        deal(address(usdc), allocationAddress, 11e6 * 10);
         // Return more than collateral to simulate profit
-        // usdc.balanceOf(address(subaccountStore));
 
         // Simulate position decrease callback
-        mirrorPosition.decrease(decreaseRequestKey);
-
-        // log allocation
-        mirrorPosition.allocationMap(allocationKey);
+        mirrorPosition.execute(decreaseRequestKey);
 
         // Settle the allocation
-        mirrorPosition.settle(allocationKey, puppetList);
+        mirrorPosition.settle(usdc, trader, puppetList, allocationId);
     }
 
     // Tests for error conditions
     function testNoAllocationError() public {
         address trader = users.bob;
-        uint estimatedGasLimit = 5_000_000;
-        uint executionFee = tx.gasprice * estimatedGasLimit;
-
-        // Try to mirror without allocation
-        bytes32 mockAllocationKey = keccak256(abi.encodePacked("non-existent-allocation"));
-        bytes32 mockSourceRequestKey = keccak256(abi.encodePacked("mock-source-request"));
-
-        vm.expectRevert(Error.MirrorPosition__NoAllocation.selector);
-        mirrorPosition.mirror{value: executionFee}(
-            MirrorPosition.MirrorPositionParams({
-                trader: trader,
-                market: Address.gmxEthUsdcMarket,
-                collateralToken: usdc,
-                allocationKey: mockAllocationKey,
-                sourceRequestKey: mockSourceRequestKey,
-                isIncrease: true,
-                isLong: true,
-                executionFee: executionFee,
-                collateralDelta: 100e6,
-                sizeDeltaInUsd: 10e30,
-                acceptablePrice: 1000e12,
-                triggerPrice: 1000e12
-            })
-        );
-    }
-
-    function testPendingAllocationError() public {
-        address trader = users.bob;
-        bytes32 mockSourceRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
-        bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
-        bytes32 positionKey = keccak256(abi.encodePacked("position-1"));
-
-        address[] memory puppetList = generatePuppetList(usdc, trader, 10);
-
-        // Create first allocation
-        bytes32 allocationKey =
-            mirrorPosition.allocate(usdc, mockSourceRequestKey, matchKey, positionKey, trader, puppetList);
-
-        // Try to allocate again with the same keys - should fail
-        vm.expectRevert(Error.MirrorPosition__PendingAllocation.selector);
-        mirrorPosition.allocate(usdc, mockSourceRequestKey, matchKey, positionKey, trader, puppetList);
-    }
-
-    function testPuppetListLimitError() public {
-        address trader = users.bob;
-        bytes32 mockSourceRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
-        bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
-        bytes32 positionKey = keccak256(abi.encodePacked("position-1"));
-
-        // Use a hardcoded test value of 100 puppets for the limit
-        // This matches the limitAllocationListLength we set in setUp()
-        uint limitAllocationListLength = 100;
-
-        // Generate a list with just 1 more than the limit
-        // This is enough to trigger the error but avoids memory issues
-        uint testListLength = limitAllocationListLength + 1;
-
-        // Create a puppet list with the test length
-        address[] memory tooManyPuppets = new address[](testListLength);
-        for (uint i = 0; i < testListLength; i++) {
-            tooManyPuppets[i] = address(uint160(i + 1)); // Simple deterministic addresses
-        }
-
-        // This should fail due to exceeding the puppet list limit
-        vm.expectRevert(Error.MirrorPosition__PuppetListLimit.selector);
-        mirrorPosition.allocate(usdc, mockSourceRequestKey, matchKey, positionKey, trader, tooManyPuppets);
-    }
-
-    function testNoPuppetAllocationError() public {
-        address trader = users.bob;
-        bytes32 mockSourceRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
-        bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
-        bytes32 positionKey = keccak256(abi.encodePacked("position-1"));
-
-        // Create empty puppet list - should fail as no puppets to allocate from
-        address[] memory emptyPuppetList = new address[](0);
+        address[] memory puppetList = new address[](0);
 
         vm.expectRevert(Error.MirrorPosition__NoPuppetAllocation.selector);
-        mirrorPosition.allocate(usdc, mockSourceRequestKey, matchKey, positionKey, trader, emptyPuppetList);
+        mirrorPosition.allocate(usdc, trader, puppetList);
     }
 
     function testExecutionRequestMissingError() public {
@@ -315,10 +240,10 @@ contract TradingTest is BasicSetup {
         bytes32 nonExistentRequestKey = keccak256(abi.encodePacked("non-existent-request"));
 
         vm.expectRevert(Error.MirrorPosition__ExecutionRequestMissing.selector);
-        mirrorPosition.increase(nonExistentRequestKey);
+        mirrorPosition.execute(nonExistentRequestKey);
 
         vm.expectRevert(Error.MirrorPosition__ExecutionRequestMissing.selector);
-        mirrorPosition.decrease(nonExistentRequestKey);
+        mirrorPosition.execute(nonExistentRequestKey);
     }
 
     function testPositionDoesNotExistError() public {
@@ -327,21 +252,16 @@ contract TradingTest is BasicSetup {
         uint executionFee = tx.gasprice * estimatedGasLimit;
 
         // Create valid allocation first
-        bytes32 mockSourceRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
-        bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
-        bytes32 positionKey = keccak256(abi.encodePacked("position-1"));
-        address[] memory puppetList = generatePuppetList(usdc, trader, 10);
-        bytes32 allocationKey =
-            mirrorPosition.allocate(usdc, mockSourceRequestKey, matchKey, positionKey, trader, puppetList);
+
+        address[] memory puppetList = generatePuppetList(usdc, trader, 2);
 
         // Create a decrease order without having a position first
-        bytes32 decreaseRequestKey = mirrorPosition.mirror{value: executionFee}(
-            MirrorPosition.MirrorPositionParams({
+        vm.expectRevert(Error.MirrorPosition__AllocationAccountNotFound.selector);
+        bytes32 nonExistingKey = mirrorPosition.mirror{value: executionFee}(
+            MirrorPosition.PositionParams({
                 trader: trader,
                 market: Address.gmxEthUsdcMarket,
                 collateralToken: usdc,
-                allocationKey: allocationKey,
-                sourceRequestKey: mockSourceRequestKey,
                 isIncrease: false, // Decrease
                 isLong: true,
                 executionFee: executionFee,
@@ -349,92 +269,25 @@ contract TradingTest is BasicSetup {
                 sizeDeltaInUsd: 10e30,
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
-            })
+            }),
+            puppetList,
+            123
         );
 
         // This should fail when trying to decrease a non-existent position
-        vm.expectRevert(Error.MirrorPosition__PositionDoesNotExist.selector);
-        mirrorPosition.decrease(decreaseRequestKey);
+        vm.expectRevert(Error.MirrorPosition__ExecutionRequestMissing.selector);
+        mirrorPosition.execute(nonExistingKey);
     }
 
     function testNoSettledFundsError() public {
         address trader = users.bob;
-        bytes32 mockSourceRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
-        bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
-        bytes32 positionKey = keccak256(abi.encodePacked("position-1"));
 
         address[] memory puppetList = generatePuppetList(usdc, trader, 10);
-        bytes32 allocationKey =
-            mirrorPosition.allocate(usdc, mockSourceRequestKey, matchKey, positionKey, trader, puppetList);
+        uint allocationId = mirrorPosition.allocate(usdc, trader, puppetList);
 
         // Try to settle without any funds being settled
         vm.expectRevert(Error.MirrorPosition__NoSettledFunds.selector);
-        mirrorPosition.settle(allocationKey, puppetList);
-    }
-
-    function testInvalidPuppetListIntegrityError() public {
-        // Run the full flow up to the point where we have settled funds
-        address trader = users.bob;
-        uint estimatedGasLimit = 5_000_000;
-        uint executionFee = tx.gasprice * estimatedGasLimit;
-
-        address[] memory puppetList = generatePuppetList(usdc, trader, 10);
-        address[] memory differentPuppetList = generatePuppetList(usdc, trader, 8); // Different list
-
-        bytes32 mockSourceRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
-        bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
-        bytes32 positionKey = keccak256(abi.encodePacked("position-1"));
-
-        bytes32 allocationKey =
-            mirrorPosition.allocate(usdc, mockSourceRequestKey, matchKey, positionKey, trader, puppetList);
-
-        bytes32 increaseRequestKey = mirrorPosition.mirror{value: executionFee}(
-            MirrorPosition.MirrorPositionParams({
-                trader: trader,
-                market: Address.gmxEthUsdcMarket,
-                collateralToken: usdc,
-                allocationKey: allocationKey,
-                sourceRequestKey: mockSourceRequestKey,
-                isIncrease: true,
-                isLong: true,
-                executionFee: executionFee,
-                collateralDelta: 120e6,
-                sizeDeltaInUsd: 30e30,
-                acceptablePrice: 1000e12,
-                triggerPrice: 1000e12
-            })
-        );
-
-        // Simulate position increase callback
-        mirrorPosition.increase(increaseRequestKey);
-
-        // Create decrease request
-        bytes32 decreaseRequestKey = mirrorPosition.mirror{value: executionFee}(
-            MirrorPosition.MirrorPositionParams({
-                trader: trader,
-                market: Address.gmxEthUsdcMarket,
-                collateralToken: usdc,
-                allocationKey: allocationKey,
-                sourceRequestKey: mockSourceRequestKey,
-                isIncrease: false,
-                isLong: true,
-                executionFee: executionFee,
-                collateralDelta: 120e6,
-                sizeDeltaInUsd: 30e30,
-                acceptablePrice: 1000e12,
-                triggerPrice: 1000e12
-            })
-        );
-
-        // Simulate funds coming back
-        deal(address(usdc), address(subaccountStore), usdc.balanceOf(address(subaccountStore)) + 11e6 * 10);
-
-        // Simulate position decrease callback
-        mirrorPosition.decrease(decreaseRequestKey);
-
-        // Now try to settle with a different puppet list than the one used for allocation
-        vm.expectRevert(Error.MirrorPosition__InvalidPuppetListIntegrity.selector);
-        mirrorPosition.settle(allocationKey, differentPuppetList);
+        mirrorPosition.settle(usdc, trader, puppetList, allocationId);
     }
 
     // Functional tests
@@ -445,21 +298,17 @@ contract TradingTest is BasicSetup {
 
         address[] memory puppetList = generatePuppetList(usdc, trader, 2);
 
-        bytes32 mockSourceRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
         bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
-        bytes32 positionKey = keccak256(abi.encodePacked("position-1"));
 
-        bytes32 allocationKey =
-            mirrorPosition.allocate(usdc, mockSourceRequestKey, matchKey, positionKey, trader, puppetList);
+        uint allocationId = mirrorPosition.allocate(usdc, trader, puppetList);
+        bytes32 allocationKey = getAllocationKey(puppetList, matchKey, allocationId);
 
         // Open position
         bytes32 increaseRequestKey = mirrorPosition.mirror{value: executionFee}(
-            MirrorPosition.MirrorPositionParams({
+            MirrorPosition.PositionParams({
                 trader: trader,
                 market: Address.gmxEthUsdcMarket,
                 collateralToken: usdc,
-                allocationKey: allocationKey,
-                sourceRequestKey: mockSourceRequestKey,
                 isIncrease: true,
                 isLong: true,
                 executionFee: executionFee,
@@ -467,7 +316,9 @@ contract TradingTest is BasicSetup {
                 sizeDeltaInUsd: 1000e30,
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
-            })
+            }),
+            puppetList,
+            allocationId
         );
 
         // make sure request includes the propotional size and collateral to the puppet
@@ -482,7 +333,7 @@ contract TradingTest is BasicSetup {
             "Initial size delta should be 200e30 as each puppet"
         );
 
-        mirrorPosition.increase(increaseRequestKey);
+        mirrorPosition.execute(increaseRequestKey);
 
         MirrorPosition.Position memory _position1 = mirrorPosition.getPosition(allocationKey);
 
@@ -499,12 +350,10 @@ contract TradingTest is BasicSetup {
 
         // Partial decrease (50%)
         bytes32 partialDecreaseRequestKey = mirrorPosition.mirror{value: executionFee}(
-            MirrorPosition.MirrorPositionParams({
+            MirrorPosition.PositionParams({
+                collateralToken: usdc,
                 trader: trader,
                 market: Address.gmxEthUsdcMarket,
-                collateralToken: usdc,
-                allocationKey: allocationKey,
-                sourceRequestKey: mockSourceRequestKey,
                 isIncrease: false, // Decrease
                 isLong: true,
                 executionFee: executionFee,
@@ -512,7 +361,9 @@ contract TradingTest is BasicSetup {
                 sizeDeltaInUsd: 500e30, // 50% of size
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
-            })
+            }),
+            puppetList,
+            allocationId
         );
 
         assertEq(
@@ -521,7 +372,7 @@ contract TradingTest is BasicSetup {
             "For a 50% position decrease, puppet size delta should be 100e30 (50% of total)"
         );
 
-        mirrorPosition.decrease(partialDecreaseRequestKey);
+        mirrorPosition.execute(partialDecreaseRequestKey);
 
         MirrorPosition.Position memory _position2 = mirrorPosition.getPosition(allocationKey);
 
@@ -536,12 +387,10 @@ contract TradingTest is BasicSetup {
 
         // Partial increase (50%)
         bytes32 partialIncreaseRequestKey = mirrorPosition.mirror{value: executionFee}(
-            MirrorPosition.MirrorPositionParams({
+            MirrorPosition.PositionParams({
                 trader: trader,
                 market: Address.gmxEthUsdcMarket,
                 collateralToken: usdc,
-                allocationKey: allocationKey,
-                sourceRequestKey: mockSourceRequestKey,
                 isIncrease: true,
                 isLong: true,
                 executionFee: executionFee,
@@ -549,10 +398,17 @@ contract TradingTest is BasicSetup {
                 sizeDeltaInUsd: 500e30, // 50% of size
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
-            })
+            }),
+            puppetList,
+            allocationId
         );
 
-        mirrorPosition.increase(partialIncreaseRequestKey);
+        PositionUtils.AjustmentType adjustmentType =
+            mirrorPosition.getRequestAdjustment(partialIncreaseRequestKey).targetLeverageType;
+
+        assert(adjustmentType == PositionUtils.AjustmentType.INCREASE);
+
+        mirrorPosition.execute(partialIncreaseRequestKey);
 
         MirrorPosition.Position memory _position3 = mirrorPosition.getPosition(allocationKey);
 
@@ -570,12 +426,10 @@ contract TradingTest is BasicSetup {
 
         // Full decrease
         bytes32 fullDecreaseRequestKey = mirrorPosition.mirror{value: executionFee}(
-            MirrorPosition.MirrorPositionParams({
+            MirrorPosition.PositionParams({
                 trader: trader,
                 market: Address.gmxEthUsdcMarket,
                 collateralToken: usdc,
-                allocationKey: allocationKey,
-                sourceRequestKey: mockSourceRequestKey,
                 isIncrease: false,
                 isLong: true,
                 executionFee: executionFee,
@@ -583,9 +437,11 @@ contract TradingTest is BasicSetup {
                 sizeDeltaInUsd: 1000e30, // Full size
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
-            })
+            }),
+            puppetList,
+            allocationId
         );
-        mirrorPosition.decrease(fullDecreaseRequestKey);
+        mirrorPosition.execute(fullDecreaseRequestKey);
         MirrorPosition.Position memory _position4 = mirrorPosition.getPosition(allocationKey);
         assertEq(_position4.traderSize, 0, "Trader size should be 0 after full decrease");
         assertEq(_position4.traderCollateral, 0, "Trader collateral should be 0 after full decrease");
@@ -600,21 +456,17 @@ contract TradingTest is BasicSetup {
 
         address[] memory puppetList = generatePuppetList(usdc, trader, 2);
 
-        bytes32 mockSourceRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
         bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
-        bytes32 positionKey = keccak256(abi.encodePacked("position-1"));
 
-        bytes32 allocationKey =
-            mirrorPosition.allocate(usdc, mockSourceRequestKey, matchKey, positionKey, trader, puppetList);
+        uint allocationId = mirrorPosition.allocate(usdc, trader, puppetList);
+        bytes32 allocationKey = getAllocationKey(puppetList, matchKey, allocationId);
 
         // Open position
         bytes32 increaseRequestKey = mirrorPosition.mirror{value: executionFee}(
-            MirrorPosition.MirrorPositionParams({
+            MirrorPosition.PositionParams({
                 trader: trader,
                 market: Address.gmxEthUsdcMarket,
                 collateralToken: usdc,
-                allocationKey: allocationKey,
-                sourceRequestKey: mockSourceRequestKey,
                 isIncrease: true,
                 isLong: true,
                 executionFee: executionFee,
@@ -622,7 +474,9 @@ contract TradingTest is BasicSetup {
                 sizeDeltaInUsd: 1000e30,
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
-            })
+            }),
+            puppetList,
+            allocationId
         );
 
         // make sure request includes the propotional size and collateral to the puppet
@@ -637,7 +491,7 @@ contract TradingTest is BasicSetup {
             "Initial size delta should be 20e6 as each puppet"
         );
 
-        mirrorPosition.increase(increaseRequestKey);
+        mirrorPosition.execute(increaseRequestKey);
 
         MirrorPosition.Position memory _position1 = mirrorPosition.getPosition(allocationKey);
 
@@ -652,12 +506,10 @@ contract TradingTest is BasicSetup {
         );
         // // Partial Increase (50%)
         bytes32 partialIncreaseRequestKey = mirrorPosition.mirror{value: executionFee}(
-            MirrorPosition.MirrorPositionParams({
+            MirrorPosition.PositionParams({
                 trader: trader,
                 market: Address.gmxEthUsdcMarket,
                 collateralToken: usdc,
-                allocationKey: allocationKey,
-                sourceRequestKey: mockSourceRequestKey,
                 isIncrease: true,
                 isLong: true,
                 executionFee: executionFee,
@@ -665,7 +517,9 @@ contract TradingTest is BasicSetup {
                 sizeDeltaInUsd: 0, // No size change
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
-            })
+            }),
+            puppetList,
+            allocationId
         );
 
         assertEq(
@@ -673,7 +527,7 @@ contract TradingTest is BasicSetup {
             100e30,
             "For a 50% collateral decrease, puppet size delta should adjust by 100e30 (50% of total)"
         );
-        mirrorPosition.decrease(partialIncreaseRequestKey);
+        mirrorPosition.execute(partialIncreaseRequestKey);
         MirrorPosition.Position memory _position2 = mirrorPosition.getPosition(allocationKey);
         assertEq(_position2.traderSize, 1000e30, "Trader size should be 1000e30");
         assertEq(_position2.traderCollateral, 200e6, "Trader collateral should be 200e6");
@@ -684,7 +538,6 @@ contract TradingTest is BasicSetup {
             Precision.toBasisPoints(_position2.mpSize, _position2.mpCollateral),
             "Trader and MirrorPosition size should be equal"
         );
-
     }
 
     function testComplexAdjustmentsAndEdgeCases() public {
@@ -695,22 +548,20 @@ contract TradingTest is BasicSetup {
         // Create 3 puppets for this test to examine more complex distributions
         address[] memory puppetList = generatePuppetList(usdc, trader, 3);
 
-        bytes32 mockSourceRequestKey = keccak256(abi.encodePacked(users.bob, uint(0)));
         bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
-        bytes32 positionKey = keccak256(abi.encodePacked("position-1"));
 
-        bytes32 allocationKey =
-            mirrorPosition.allocate(usdc, mockSourceRequestKey, matchKey, positionKey, trader, puppetList);
-
+        uint allocationId = mirrorPosition.allocate(usdc, trader, puppetList);
+        bytes32 allocationKey = getAllocationKey(puppetList, matchKey, allocationId);
+        address allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
+            mirrorPosition.allocationStoreImplementation(), allocationKey, address(mirrorPosition)
+        );
         // Test Case 1: Initial position with small size but high leverage
         // Open a small position with very high leverage (50x)
         bytes32 initialRequestKey = mirrorPosition.mirror{value: executionFee}(
-            MirrorPosition.MirrorPositionParams({
+            MirrorPosition.PositionParams({
                 trader: trader,
                 market: Address.gmxEthUsdcMarket,
                 collateralToken: usdc,
-                allocationKey: allocationKey,
-                sourceRequestKey: mockSourceRequestKey,
                 isIncrease: true,
                 isLong: true,
                 executionFee: executionFee,
@@ -718,10 +569,12 @@ contract TradingTest is BasicSetup {
                 sizeDeltaInUsd: 100e30,
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
-            })
+            }),
+            puppetList,
+            allocationId
         );
 
-        mirrorPosition.increase(initialRequestKey);
+        mirrorPosition.execute(initialRequestKey);
 
         MirrorPosition.Position memory position1 = mirrorPosition.getPosition(allocationKey);
 
@@ -740,12 +593,10 @@ contract TradingTest is BasicSetup {
 
         // Test Case 2: Drastically reduce leverage by adding collateral without changing size
         bytes32 reduceRiskRequestKey = mirrorPosition.mirror{value: executionFee}(
-            MirrorPosition.MirrorPositionParams({
+            MirrorPosition.PositionParams({
                 trader: trader,
                 market: Address.gmxEthUsdcMarket,
                 collateralToken: usdc,
-                allocationKey: allocationKey,
-                sourceRequestKey: mockSourceRequestKey,
                 isIncrease: true,
                 isLong: true,
                 executionFee: executionFee,
@@ -753,10 +604,12 @@ contract TradingTest is BasicSetup {
                 sizeDeltaInUsd: 0,
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
-            })
+            }),
+            puppetList,
+            allocationId
         );
 
-        mirrorPosition.decrease(reduceRiskRequestKey);
+        mirrorPosition.execute(reduceRiskRequestKey);
 
         MirrorPosition.Position memory position2 = mirrorPosition.getPosition(allocationKey);
 
@@ -778,12 +631,10 @@ contract TradingTest is BasicSetup {
         // Test Case 3: Edge case - increase both size and collateral without changing leverage
         // This should not change the leverage ratio
         bytes32 smallAdjustmentKey = mirrorPosition.mirror{value: executionFee}(
-            MirrorPosition.MirrorPositionParams({
+            MirrorPosition.PositionParams({
                 trader: trader,
                 market: Address.gmxEthUsdcMarket,
                 collateralToken: usdc,
-                allocationKey: allocationKey,
-                sourceRequestKey: mockSourceRequestKey,
                 isIncrease: true,
                 isLong: true,
                 executionFee: executionFee,
@@ -791,7 +642,9 @@ contract TradingTest is BasicSetup {
                 sizeDeltaInUsd: 100e30,
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
-            })
+            }),
+            puppetList,
+            allocationId
         );
 
         assertEq(
@@ -805,7 +658,7 @@ contract TradingTest is BasicSetup {
             "Leverage ratio remains unchanged"
         );
 
-        mirrorPosition.increase(smallAdjustmentKey);
+        mirrorPosition.execute(smallAdjustmentKey);
 
         MirrorPosition.Position memory position3 = mirrorPosition.getPosition(allocationKey);
 
@@ -826,12 +679,10 @@ contract TradingTest is BasicSetup {
 
         // // Test Case 4: Complex adjustment - increase size and decrease collateral simultaneously
         bytes32 complexAdjustmentKey = mirrorPosition.mirror{value: executionFee}(
-            MirrorPosition.MirrorPositionParams({
+            MirrorPosition.PositionParams({
                 trader: trader,
                 market: Address.gmxEthUsdcMarket,
                 collateralToken: usdc,
-                allocationKey: allocationKey,
-                sourceRequestKey: mockSourceRequestKey,
                 isIncrease: true,
                 isLong: true,
                 executionFee: executionFee,
@@ -839,24 +690,32 @@ contract TradingTest is BasicSetup {
                 sizeDeltaInUsd: 50e30,
                 acceptablePrice: 1000e12,
                 triggerPrice: 1000e12
-            })
+            }),
+            puppetList,
+            allocationId
         );
 
-
-        mirrorPosition.increase(complexAdjustmentKey);
+        mirrorPosition.execute(complexAdjustmentKey);
 
         assertEq(
             Precision.toBasisPoints(position3.traderSize, position3.traderCollateral),
             Precision.toBasisPoints(position3.mpSize, position3.mpCollateral),
             "Leverage ratios should match after tiny adjustment"
         );
-
     }
 
     // Helper functions for tests
-    function getPerformanceFee() internal returns (uint) {
-        (,,,,,, uint performanceFee, uint traderPerformanceFee,) = mirrorPosition.config();
-        return performanceFee;
+    function getAllocationKey(
+        address[] memory _puppetList,
+        bytes32 _matchKey,
+        uint allocationId
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encode(_puppetList, _matchKey, allocationId));
+    }
+
+    function getPlatformFee() internal view returns (uint) {
+        (,,,,,,, uint platformFee) = mirrorPosition.config();
+        return platformFee;
     }
 
     function generatePuppetList(
@@ -910,8 +769,7 @@ contract TradingTest is BasicSetup {
             uint increaseCallbackGasLimit,
             uint decreaseCallbackGasLimit,
             uint limitAllocationListLength,
-            ,
-            uint traderPerformanceFee
+            // uint platformFee
         ) = mirrorPosition.config();
 
         dictator.setConfig(
@@ -925,8 +783,7 @@ contract TradingTest is BasicSetup {
                     increaseCallbackGasLimit: increaseCallbackGasLimit,
                     decreaseCallbackGasLimit: decreaseCallbackGasLimit,
                     limitAllocationListLength: limitAllocationListLength,
-                    performanceFee: newFee,
-                    traderPerformanceFee: traderPerformanceFee
+                    platformFee: newFee
                 })
             )
         );

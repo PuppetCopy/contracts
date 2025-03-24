@@ -5,9 +5,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {PositionUtils} from "../position/utils/PositionUtils.sol";
 import {Error} from "../shared/Error.sol";
-import {SubaccountStore} from "../shared/SubaccountStore.sol";
+import {AllocationStore} from "../shared/AllocationStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
+import {MirrorPosition} from "./MirrorPosition.sol";
 
 contract MatchRule is CoreContract {
     struct Rule {
@@ -31,7 +32,8 @@ contract MatchRule is CoreContract {
     mapping(IERC20 token => uint) tokenAllowanceCapMap;
     mapping(bytes32 matchKey => mapping(address puppet => Rule)) public matchRuleMap;
 
-    SubaccountStore immutable subaccountStore;
+    MirrorPosition immutable mirrorPosition;
+    AllocationStore immutable allocationStore;
 
     function getRuleList(
         bytes32 _matchKey,
@@ -46,8 +48,13 @@ contract MatchRule is CoreContract {
         }
     }
 
-    constructor(IAuthority _authority, SubaccountStore _store) CoreContract("MatchRule", _authority) {
-        subaccountStore = _store;
+    constructor(
+        IAuthority _authority,
+        AllocationStore _store,
+        MirrorPosition _mirrorPosition
+    ) CoreContract("MatchRule", _authority) {
+        allocationStore = _store;
+        mirrorPosition = _mirrorPosition;
     }
 
     function deposit(IERC20 _collateralToken, address _user, uint _amount) external auth {
@@ -56,11 +63,11 @@ contract MatchRule is CoreContract {
         uint allowanceCap = tokenAllowanceCapMap[_collateralToken];
         require(allowanceCap > 0, Error.MatchRule__TokenNotAllowed());
 
-        uint nextBalance = subaccountStore.userBalanceMap(_collateralToken, _user) + _amount;
+        uint nextBalance = allocationStore.userBalanceMap(_collateralToken, _user) + _amount;
         require(nextBalance <= allowanceCap, Error.MatchRule__AllowanceAboveLimit(allowanceCap));
 
-        subaccountStore.transferIn(_collateralToken, _user, _amount);
-        subaccountStore.setUserBalance(_collateralToken, _user, nextBalance);
+        allocationStore.transferIn(_collateralToken, _user, _amount);
+        allocationStore.setUserBalance(_collateralToken, _user, nextBalance);
 
         _logEvent("Deposit", abi.encode(_collateralToken, _user, nextBalance, _amount));
     }
@@ -68,14 +75,14 @@ contract MatchRule is CoreContract {
     function withdraw(IERC20 _collateralToken, address _user, address _receiver, uint _amount) external auth {
         require(_amount > 0, Error.MatchRule__InvalidAmount());
 
-        uint balance = subaccountStore.userBalanceMap(_collateralToken, _user);
+        uint balance = allocationStore.userBalanceMap(_collateralToken, _user);
 
         require(_amount <= balance, Error.MatchRule__InsufficientBalance());
 
         uint nextBalance = balance - _amount;
 
-        subaccountStore.setUserBalance(_collateralToken, _user, nextBalance);
-        subaccountStore.transferOut(_collateralToken, _receiver, _amount);
+        allocationStore.setUserBalance(_collateralToken, _user, nextBalance);
+        allocationStore.transferOut(_collateralToken, _receiver, _amount);
 
         _logEvent("Withdraw", abi.encode(_collateralToken, _user, nextBalance, _amount));
     }
@@ -104,6 +111,8 @@ contract MatchRule is CoreContract {
 
         bytes32 _matchKey = PositionUtils.getMatchKey(_collateralToken, _trader);
         matchRuleMap[_matchKey][_user] = _ruleParams;
+
+        mirrorPosition.initializeTraderAcitityThrottle(_trader, _user);
 
         _logEvent("SetMatchRule", abi.encode(_collateralToken, _matchKey, _user, _trader, _ruleParams));
     }

@@ -54,8 +54,14 @@ contract BasicSetup is Test {
         skip(1 hours);
     }
 
-    function getNextContractAddress() internal view returns (address) {
+    function _getNextContractAddress() internal view returns (address) {
         return vm.computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1);
+    }
+
+    function _getNextContractAddress(
+        uint count
+    ) internal view returns (address) {
+        return vm.computeCreateAddress(users.owner, vm.getNonce(users.owner) + count);
     }
 
     /// @dev Generates a user, labels its address, and funds it with test assets
