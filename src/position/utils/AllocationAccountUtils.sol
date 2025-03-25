@@ -28,21 +28,6 @@ library AllocationAccountUtils {
         }
     }
 
-    /// @dev Returns the initialization code of the clone of `implementation`.
-    function initCode(
-        address implementation
-    ) internal pure returns (bytes memory c) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            c := mload(0x40)
-            mstore(add(c, 0x40), 0x5af43d3d93803e602a57fd5bf30000000000000000000000)
-            mstore(add(c, 0x28), implementation)
-            mstore(add(c, 0x14), 0x602c3d8160093d39f33d3d3d3d363d3d37363d73)
-            mstore(c, 0x35) // Store the length.
-            mstore(0x40, add(c, 0x60)) // Allocate memory.
-        }
-    }
-
     /// @dev Returns the initialization code hash of the clone of `implementation`.
     function initCodeHash(
         address implementation
