@@ -112,7 +112,7 @@ contract MatchRule is CoreContract {
         bytes32 _matchKey = PositionUtils.getMatchKey(_collateralToken, _trader);
         matchRuleMap[_matchKey][_user] = _ruleParams;
 
-        mirrorPosition.initializeTraderAcitityThrottle(_trader, _user);
+        mirrorPosition.initializeTraderActivityThrottle(_trader, _user);
 
         _logEvent("SetMatchRule", abi.encode(_collateralToken, _matchKey, _user, _trader, _ruleParams));
     }
