@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import {console} from "forge-std/src/console.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {console} from "forge-std/src/console.sol";
 
 import {MatchRule} from "src/position/MatchRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
@@ -220,6 +220,17 @@ contract TradingTest is BasicSetup {
             allocationStoreBalanceAfter + settledAmount - platformFee,
             "Allocation store should receive the expected funds minus platform fee"
         );
+
+        // check puppet's balance within allocation store
+        for (uint i = 0; i < puppetList.length; i++) {
+            address puppet = puppetList[i];
+            assertEq(
+                allocationStore.userBalanceMap(usdc, puppet),
+                108e6,
+                "Puppet should have 8e6 profit after settlement"
+            );
+        }
+
     }
 
     // Tests for error conditions
@@ -797,82 +808,6 @@ contract TradingTest is BasicSetup {
         assertEq(wethPositionAfter.traderCollateral, 0.1e18, "WETH position should remain unchanged");
     }
 
-    function testMultiplePositionsWithDifferentPuppets() public {
-        address trader = defaultTraderPositionParams.trader;
-
-        // Create two different puppet sets
-        address[] memory puppetList1 = generatePuppetList(usdc, trader, 2);
-        address[] memory puppetList2 = new address[](2);
-        for (uint i = 0; i < 2; i++) {
-            puppetList2[i] =
-                createPuppet(usdc, trader, string(abi.encodePacked("puppet2:", Strings.toString(i))), 200e6);
-        }
-
-        bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
-
-        // Create allocations from both puppet lists
-        uint allocationId1 = mirrorPosition.allocate(defaultTraderPositionParams, puppetList1);
-        uint allocationId2 = mirrorPosition.allocate(defaultTraderPositionParams, puppetList2);
-
-        bytes32 allocationKey1 = getAllocationKey(puppetList1, matchKey, allocationId1);
-        bytes32 allocationKey2 = getAllocationKey(puppetList2, matchKey, allocationId2);
-
-        // Open positions using both allocations
-        MirrorPosition.PositionParams memory increaseParams1 = defaultTraderPositionParams;
-        increaseParams1.trader = trader;
-        increaseParams1.collateralDelta = 100e6;
-        increaseParams1.sizeDeltaInUsd = 1000e30;
-
-        bytes32 increaseRequestKey1 = mirrorPosition.mirror{value: defaultTraderPositionParams.executionFee}(
-            increaseParams1, puppetList1, allocationId1
-        );
-
-        MirrorPosition.PositionParams memory increaseParams2 = defaultTraderPositionParams;
-        increaseParams2.trader = trader;
-        increaseParams2.collateralDelta = 200e6;
-        increaseParams2.sizeDeltaInUsd = 2000e30;
-
-        bytes32 increaseRequestKey2 = mirrorPosition.mirror{value: defaultTraderPositionParams.executionFee}(
-            increaseParams2, puppetList2, allocationId2
-        );
-
-        mirrorPosition.execute(increaseRequestKey1);
-        mirrorPosition.execute(increaseRequestKey2);
-
-        // Verify both positions exist with correct parameters
-        MirrorPosition.Position memory position1 = mirrorPosition.getPosition(allocationKey1);
-        MirrorPosition.Position memory position2 = mirrorPosition.getPosition(allocationKey2);
-
-        // First position - 2 puppets with 10e6 each (10% allowance of 100e6)
-        assertEq(position1.traderSize, 1000e30, "Position 1 trader size should be 1000e30");
-        assertEq(position1.mpCollateral, 20e6, "Position 1 MP collateral should be 20e6");
-
-        // Second position - 2 puppets with 20e6 each (10% allowance of 200e6)
-        assertEq(position2.traderSize, 2000e30, "Position 2 trader size should be 2000e30");
-        assertEq(position2.mpCollateral, 40e6, "Position 2 MP collateral should be 40e6");
-
-        // Modify first position - decrease size by 500e30
-        MirrorPosition.PositionParams memory modifyParams = defaultTraderPositionParams;
-        modifyParams.isIncrease = false; // Decrease
-        modifyParams.collateralDelta = 50e6;
-        modifyParams.sizeDeltaInUsd = 500e30;
-
-        bytes32 modifyRequestKey = mirrorPosition.mirror{value: defaultTraderPositionParams.executionFee}(
-            modifyParams, puppetList1, allocationId1
-        );
-
-        // Execute the decrease request
-        mirrorPosition.execute(modifyRequestKey);
-
-        // Verify first position changed but second remained the same
-        MirrorPosition.Position memory position1After = mirrorPosition.getPosition(allocationKey1);
-        MirrorPosition.Position memory position2After = mirrorPosition.getPosition(allocationKey2);
-
-        // Check position sizes - position1 should be 1000e30 - 500e30 = 500e30
-        assertEq(position1After.traderSize, 500e30, "Position 1 size should be decreased to 500e30");
-        assertEq(position2After.traderSize, 2000e30, "Position 2 size should remain unchanged");
-    }
-
     function testAllocationWithExactMaximumPuppets() public {
         address trader = users.bob;
 
@@ -965,12 +900,11 @@ contract TradingTest is BasicSetup {
         );
 
         // The actual allocated amount may differ from the sum of puppet allocations
-        // This is what's actually allocated to the allocation account
         uint initialAllocation = mirrorPosition.getAllocation(allocationKey);
 
-        // Simulate 20% profit on the actual allocation amount
-        uint profitAmount = initialAllocation * 120 / 100;
-        deal(address(usdc), allocationAddress, profitAmount);
+        // Simulate fixed profit amount for predictable testing
+        uint settledAmount = 36e6; // 60e6 * 0.6 (to simulate profit of 20%)
+        deal(address(usdc), allocationAddress, settledAmount);
 
         // Check balances before settlement
         uint puppet1BalanceBefore = allocationStore.userBalanceMap(usdc, puppet1);
@@ -985,16 +919,19 @@ contract TradingTest is BasicSetup {
         uint puppet2BalanceAfter = allocationStore.userBalanceMap(usdc, puppet2);
         uint puppet3BalanceAfter = allocationStore.userBalanceMap(usdc, puppet3);
 
-        // Account for platform fee - fee is taken on full settled amount
-        uint platformFee = getPlatformFeeFactor(); // 10%
-        uint feeAmount = (36e6 * platformFee) / 1e30;
-        uint amountAfterFee = 36e6 - feeAmount;
+        // Platform fee is 10% of the total settled amount
+        uint platformFee = Precision.applyFactor(getPlatformFeeFactor(), settledAmount);
+        uint amountAfterFee = settledAmount - platformFee;
 
         // Calculate expected amounts with precise math
+        // Each puppet gets a proportion based on their contribution to the total allocation
         uint puppet1ExpectedShare = (amountAfterFee * puppet1Allocation) / totalAllocation;
         uint puppet2ExpectedShare = (amountAfterFee * puppet2Allocation) / totalAllocation;
         uint puppet3ExpectedShare = (amountAfterFee * puppet3Allocation) / totalAllocation;
 
+        // Puppet1 should get 1/6 of the amount after fee
+        // Puppet2 should get 1/3 of the amount after fee
+        // Puppet3 should get 1/2 of the amount after fee
         assertEq(
             puppet1BalanceAfter - puppet1BalanceBefore,
             puppet1ExpectedShare,

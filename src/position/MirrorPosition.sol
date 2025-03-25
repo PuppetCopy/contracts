@@ -336,6 +336,7 @@ contract MirrorPosition is CoreContract {
         AllocationAccount(_allocationAddress).execute(
             address(_token), abi.encodeWithSelector(_token.transfer.selector, address(allocationStore), _settled)
         );
+        allocationStore.recordTransferIn(_token);
 
         uint[] memory _nextBalanceList = allocationStore.getBalanceList(_token, _puppetList);
 
@@ -365,7 +366,6 @@ contract MirrorPosition is CoreContract {
             delete allocationPuppetMap[_allocationKey][puppet];
         }
 
-        allocationStore.recordTransferIn(_token);
         allocationStore.setBalanceList(_token, _puppetList, _nextBalanceList);
 
         _logEvent(
