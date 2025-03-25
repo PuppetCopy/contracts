@@ -30,11 +30,10 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
     ) CoreContract("Router", _authority) {}
 
     function allocate(
-        IERC20 collateralToken,
-        address trader,
+        MirrorPosition.PositionParams calldata params,
         address[] calldata puppetList
     ) external nonReentrant auth returns (uint) {
-        return config.position.allocate(collateralToken, trader, puppetList);
+        return config.position.allocate(params, puppetList);
     }
 
     function mirror(
