@@ -45,12 +45,13 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
     }
 
     function settle(
-        IERC20 token, //
+        IERC20 allocationToken, //
         address trader,
         address[] calldata puppetList,
-        uint allocationId
+        uint allocationId,
+        IERC20 distributeToken
     ) external nonReentrant auth {
-        config.position.settle(token, trader, puppetList, allocationId);
+        config.position.settle(allocationToken, distributeToken, trader, puppetList, allocationId);
     }
 
     function deposit(IERC20 token, uint amount) external nonReentrant {
