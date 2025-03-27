@@ -63,14 +63,19 @@ library Error {
     error MatchRule__InvalidExpiryDuration(uint minExpiryDuration);
 
     // MirrorPosition
-    error MirrorPosition__NoSettledFunds();
     error MirrorPosition__AllocationAccountNotFound();
+    error MirrorPosition__InvalidFeeReceiver();
     error MirrorPosition__InvalidAllocation();
+    error MirrorPosition__InvalidInitialCollateral();
+    error MirrorPosition__InvalidPositionState();
+    error MirrorPosition__TargetMatchesCurrentPosition();
+    error MirrorPosition__InvalidPuppetList();
+    error MirrorPosition__SettlementTransferFailed();
+    error MirrorPosition__OrderCreationFailed();
+    error MirrorPosition__ExecutionCostExceedsAllocationValue();
     error MirrorPosition__ExecutionRequestMissing();
-
-    error MirrorPosition__MaxTraderAllocation();
-    error MirrorPosition__MaxPuppetList();
-    error MirrorPosition__MinMirrorAllocation();
+    error MirrorPosition__MaxPuppetList(); // Exceeded max puppet list size
+    error MirrorPosition__NoSettledFunds();
 
     // GmxExecutionCallback
     error GmxExecutionCallback__InvalidOrderType(GmxPositionUtils.OrderType orderType);
