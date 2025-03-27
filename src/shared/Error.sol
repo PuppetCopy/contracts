@@ -64,15 +64,12 @@ library Error {
 
     // MirrorPosition
     error MirrorPosition__AllocationAccountNotFound();
-    error MirrorPosition__InvalidFeeReceiver();
     error MirrorPosition__InvalidAllocation();
-    error MirrorPosition__InvalidInitialCollateral();
-    error MirrorPosition__InvalidPositionState();
-    error MirrorPosition__TargetMatchesCurrentPosition();
+    error MirrorPosition__InitialMustBeIncrease();
+    error MirrorPosition__InvalidRequest();
     error MirrorPosition__InvalidPuppetList();
     error MirrorPosition__SettlementTransferFailed();
     error MirrorPosition__OrderCreationFailed();
-    error MirrorPosition__ExecutionCostExceedsAllocationValue();
     error MirrorPosition__ExecutionRequestMissing();
     error MirrorPosition__MaxPuppetList(); // Exceeded max puppet list size
     error MirrorPosition__NoSettledFunds();
