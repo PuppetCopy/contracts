@@ -8,8 +8,8 @@ import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/Reentrancy
 import {GmxExecutionCallback} from "./position/GmxExecutionCallback.sol";
 
 import {MatchRule} from "./position/MatchRule.sol";
-import {MirrorPosition} from "./position/MirrorPosition.sol";
-import {AllocationAccount} from "./shared/AllocationAccount.sol";
+import {MirrorPosition} from "./position/MirrorPosition.sol"; // Imports MirrorPosition and its structs
+// import {AllocationAccount} from "./shared/AllocationAccount.sol"; // AllocationAccount not directly used here
 import {FeeMarketplace} from "./tokenomics/FeeMarketplace.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
@@ -29,50 +29,99 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
         IAuthority _authority
     ) CoreContract("Router", _authority) {}
 
+    // --- MirrorPosition Interaction ---
+
+    /**
+     * @notice Allocates capital from puppets for a trader.
+     * @param params Allocation parameters including collateral token and trader.
+     * @param puppetList List of puppet addresses (owners) to allocate from.
+     * @return allocationId The unique ID for this allocation instance.
+     */
     function allocate(
-        MirrorPosition.PositionParams calldata params,
+        MirrorPosition.CallAllocation calldata params,
         address[] calldata puppetList
-    ) external nonReentrant auth returns (uint) {
-        return config.position.allocate(params, puppetList);
+    ) external nonReentrant auth returns (uint allocationId) {
+        // Signature already matches MirrorPosition.allocate
+        allocationId = config.position.allocate(params, puppetList);
     }
 
+    /**
+     * @notice Mirrors a trader's position action (increase or decrease).
+     * @param params Position parameters including deltas, market, direction, and allocationId.
+     * @param puppetList List of puppet addresses involved in the allocation.
+     * @return requestKey The key associated with the GMX order request.
+     */
     function mirror(
-        MirrorPosition.PositionParams calldata params,
-        address[] calldata puppetList,
-        uint allocationId
+        MirrorPosition.CallPosition calldata params, // allocationId is inside params
+        address[] calldata puppetList
     ) external payable nonReentrant auth returns (bytes32 requestKey) {
-        requestKey = config.position.mirror(params, puppetList, allocationId);
+        // Added payable
+        // Updated call: pass value, remove separate allocationId argument
+        requestKey = config.position.mirror{value: msg.value}(params, puppetList);
     }
 
+    /**
+     * @notice Settles funds back to puppets after a position is closed or adjusted.
+     * @param params Settlement parameters including allocation details and token to distribute.
+     * @param puppetList List of puppet addresses involved in the allocation.
+     */
     function settle(
-        IERC20 allocationToken, //
-        address trader,
-        address[] calldata puppetList,
-        uint allocationId,
-        IERC20 distributeToken
+        MirrorPosition.CallSettle calldata params, // Use CallSettle struct
+        address[] calldata puppetList
     ) external nonReentrant auth {
-        config.position.settle(allocationToken, distributeToken, trader, puppetList, allocationId);
+        // Updated call: pass the struct and puppetList
+        config.position.settle(params, puppetList);
     }
 
+    // --- MatchRule Interaction ---
+
+    /**
+     * @notice Deposits tokens into the system for a user (potential puppet).
+     * @param token The token being deposited.
+     * @param amount The amount being deposited.
+     */
     function deposit(IERC20 token, uint amount) external nonReentrant {
+        // Calls MatchRule, which interacts with AllocationStore using msg.sender
         config.matchRule.deposit(token, msg.sender, amount);
     }
 
+    /**
+     * @notice Withdraws tokens from the system for a user.
+     * @param token The token being withdrawn.
+     * @param receiver The address to receive the withdrawn tokens.
+     * @param amount The amount being withdrawn.
+     */
     function withdraw(IERC20 token, address receiver, uint amount) external nonReentrant {
+        // Calls MatchRule, which interacts with AllocationStore using msg.sender
         config.matchRule.withdraw(token, msg.sender, receiver, amount);
     }
 
+    /**
+     * @notice Sets or updates the matching rule for the caller (puppet) regarding a specific trader.
+     * @param collateralToken The token context for this rule.
+     * @param trader The trader the caller wishes to potentially mirror.
+     * @param ruleParams The parameters for the rule (allowance rate, throttle, expiry).
+     */
     function setMatchRule(
         IERC20 collateralToken,
         address trader,
         MatchRule.Rule calldata ruleParams
     ) external nonReentrant {
+        // Calls MatchRule, associating msg.sender with the trader rule
         config.matchRule.setRule(collateralToken, msg.sender, trader, ruleParams);
     }
+
+    // --- Configuration ---
 
     function _setConfig(
         bytes calldata data
     ) internal override {
         config = abi.decode(data, (Config));
+        // Add checks for valid addresses if needed
+        require(address(config.matchRule) != address(0), "Router: Invalid MatchRule");
+        require(address(config.position) != address(0), "Router: Invalid MirrorPosition");
+        // require(address(config.executionCallback) != address(0), "Router: Invalid ExecutionCallback"); // Callback
+        // might be optional depending on flow
+        require(address(config.feeMarketplace) != address(0), "Router: Invalid FeeMarketplace");
     }
 }

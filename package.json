@@ -6,7 +6,7 @@
   ],
   "scripts": {
     "test": "forge test --match-contract TradingTest -vvvvv",
-    "test:target": "bun run test --match-test testTinyPositionAdjustments",
+    "test:target": "bun run test --match-test testSimpleExecutionResult",
     "test:fork": "forge test --chain arbitrum --match-contract TradingTest -vvvvv --fork-block-number 192315592 --fork-url=$ARBITRUM_RPC_URL",
     "test:prod": "FOUNDRY_PROFILE=prod forge test -vvvvv",
     "build": "forge build --sizes",

@@ -66,12 +66,14 @@ library Error {
     error MirrorPosition__AllocationAccountNotFound();
     error MirrorPosition__InvalidAllocation();
     error MirrorPosition__InitialMustBeIncrease();
-    error MirrorPosition__InvalidRequest();
+    error MirrorPosition__InvalidCollateralDelta();
+    error MirrorPosition__InvalidSizeDelta();
     error MirrorPosition__InvalidPuppetList();
     error MirrorPosition__SettlementTransferFailed();
     error MirrorPosition__OrderCreationFailed();
     error MirrorPosition__ExecutionRequestMissing();
-    error MirrorPosition__MaxPuppetList(); // Exceeded max puppet list size
+    error MirrorPosition__ExecutionFeeExceedsFactorLimit();
+    error MirrorPosition__MaxPuppetList();
     error MirrorPosition__NoSettledFunds();
 
     // GmxExecutionCallback
