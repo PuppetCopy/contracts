@@ -65,6 +65,7 @@ library Error {
     // MirrorPosition
     error MirrorPosition__AllocationAccountNotFound();
     error MirrorPosition__InvalidAllocation();
+    error MirrorPosition__PositionNotFound();
     error MirrorPosition__InitialMustBeIncrease();
     error MirrorPosition__InvalidCollateralDelta();
     error MirrorPosition__InvalidSizeDelta();

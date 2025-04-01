@@ -43,12 +43,6 @@ contract MirrorPosition is CoreContract {
         uint traderCollateral;
     }
 
-    struct CallAllocation {
-        IERC20 collateralToken;
-        address trader;
-        uint executionFee;
-    }
-
     struct CallPosition {
         IERC20 collateralToken;
         address trader;
@@ -60,7 +54,7 @@ contract MirrorPosition is CoreContract {
         uint sizeDeltaInUsd;
         uint acceptablePrice;
         uint triggerPrice;
-        uint allocationId;
+        uint mirrorExecutionFee;
     }
 
     struct CallSettle {
@@ -89,6 +83,8 @@ contract MirrorPosition is CoreContract {
     uint public nextAllocationId = 0;
 
     mapping(address => mapping(address => uint)) public activityThrottleMap;
+    // allocation is the amount allocated during matching, it should be used as a denominator but not be used to measure
+    // a position collateral because fees are deducted from the allocation
     mapping(bytes32 => uint) public allocationMap;
     mapping(bytes32 => mapping(address => uint)) public allocationPuppetMap;
     mapping(bytes32 => Position) public positionMap;
@@ -132,11 +128,12 @@ contract MirrorPosition is CoreContract {
         activityThrottleMap[_trader][_puppet] = 0;
     }
 
-    function allocate(
-        CallAllocation calldata _callParams, //
+    function mirror(
+        CallPosition calldata _callParams,
         address[] calldata _puppetList
-    ) external auth returns (uint) {
-        uint _nextAllocationId = ++nextAllocationId;
+    ) external payable auth returns (uint _nextAllocationId, bytes32 _requestKey) {
+        _nextAllocationId = ++nextAllocationId;
+
         bytes32 _matchKey = PositionUtils.getMatchKey(_callParams.collateralToken, _callParams.trader);
         bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _matchKey, _nextAllocationId);
         address _allocationAddress =
@@ -146,13 +143,11 @@ contract MirrorPosition is CoreContract {
         require(_puppetListLength > 0, Error.MirrorPosition__InvalidPuppetList());
         require(_puppetListLength <= config.maxPuppetList, Error.MirrorPosition__MaxPuppetList());
 
-        uint _allocated;
-
         MatchRule.Rule[] memory _ruleList = matchRule.getRuleList(_matchKey, _puppetList);
         uint[] memory _nextBalanceList = allocationStore.getBalanceList(_callParams.collateralToken, _puppetList);
 
-        uint _estimatedExecutionFeePerPuppet = _callParams.executionFee / _puppetListLength;
-
+        uint _estimatedExecutionFeePerPuppet = _callParams.mirrorExecutionFee / _puppetListLength;
+        uint _allocated;
         for (uint i = 0; i < _puppetListLength; i++) {
             MatchRule.Rule memory rule = _ruleList[i];
             address _puppet = _puppetList[i];
@@ -175,28 +170,69 @@ contract MirrorPosition is CoreContract {
             }
         }
 
-        allocationStore.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
-
-        require(_allocated > 0, Error.MirrorPosition__InvalidAllocation());
-
-        allocationMap[_allocationKey] = _allocated;
-
-        _logEvent(
-            "Allocate",
-            abi.encode(_matchKey, _allocationKey, _allocationAddress, _nextAllocationId, _allocated, _puppetListLength)
+        require(
+            Precision.applyFactor(config.minExecutionCostFactor, _allocated) > _callParams.mirrorExecutionFee,
+            Error.MirrorPosition__ExecutionFeeExceedsFactorLimit()
         );
 
-        return _nextAllocationId;
+        allocationStore.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
+        allocationMap[_allocationKey] = _allocated;
+
+        uint _targetLeverage;
+        uint _sizeDelta;
+        uint _netAllocated = _allocated - _callParams.mirrorExecutionFee;
+
+        require(_callParams.isIncrease, Error.MirrorPosition__InitialMustBeIncrease());
+        require(_callParams.collateralDelta > 0, Error.MirrorPosition__InvalidCollateralDelta());
+        require(_callParams.sizeDeltaInUsd > 0, Error.MirrorPosition__InvalidSizeDelta());
+
+        _targetLeverage = Precision.toBasisPoints(_callParams.sizeDeltaInUsd, _callParams.collateralDelta);
+        _sizeDelta = _callParams.sizeDeltaInUsd * _netAllocated / _callParams.collateralDelta;
+        allocationStore.transferOut(_callParams.collateralToken, config.gmxOrderVault, _netAllocated);
+
+        _requestKey = _submitOrder(
+            _callParams,
+            _allocationAddress,
+            GmxPositionUtils.OrderType.MarketIncrease,
+            config.increaseCallbackGasLimit,
+            _allocated,
+            _sizeDelta
+        );
+
+        requestAdjustmentMap[_requestKey] = RequestAdjustment({
+            allocationKey: _allocationKey,
+            traderIsIncrease: true,
+            targetLeverage: _targetLeverage,
+            traderSizeDelta: _callParams.sizeDeltaInUsd,
+            traderCollateralDelta: _callParams.collateralDelta,
+            sizeDelta: _sizeDelta
+        });
+
+        _logEvent(
+            "Mirror",
+            abi.encode(
+                _matchKey,
+                _allocationKey,
+                _allocationAddress,
+                _allocated,
+                _netAllocated,
+                _sizeDelta,
+                _targetLeverage,
+                _requestKey
+            )
+        );
     }
 
-    function mirror(
+    function adjust(
         CallPosition calldata _callParams,
-        address[] calldata _puppetList
+        address[] calldata _puppetList,
+        uint _allocationId
     ) external payable auth returns (bytes32 _requestKey) {
         bytes32 _matchKey = PositionUtils.getMatchKey(_callParams.collateralToken, _callParams.trader);
-        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _matchKey, _callParams.allocationId);
+        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _matchKey, _allocationId);
 
         Position memory _position = positionMap[_allocationKey];
+        require(_position.size > 0, Error.MirrorPosition__PositionNotFound());
 
         address _allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
             allocationStoreImplementation, _allocationKey, address(this)
@@ -204,64 +240,39 @@ contract MirrorPosition is CoreContract {
 
         require(CallUtils.isContract(_allocationAddress), Error.MirrorPosition__AllocationAccountNotFound());
 
-        uint _targetLeverage;
+        uint _currentLeverage = Precision.toBasisPoints(_position.traderSize, _position.traderCollateral);
+        uint _targetLeverage = _callParams.isIncrease
+            ? Precision.toBasisPoints(
+                _position.traderSize + _callParams.sizeDeltaInUsd, _position.traderCollateral + _callParams.collateralDelta
+            )
+            : _position.traderSize > _callParams.sizeDeltaInUsd
+                ? Precision.toBasisPoints(
+                    _position.traderSize - _callParams.sizeDeltaInUsd, _position.traderCollateral - _callParams.collateralDelta
+                )
+                : 0;
         uint _sizeDelta;
 
-        if (_position.size == 0) {
-            require(_callParams.isIncrease, Error.MirrorPosition__InitialMustBeIncrease());
-            require(_callParams.collateralDelta > 0, Error.MirrorPosition__InvalidCollateralDelta());
-            require(_callParams.sizeDeltaInUsd > 0, Error.MirrorPosition__InvalidSizeDelta());
-
-            uint _allocated = allocationMap[_allocationKey];
-
-            _targetLeverage = Precision.toBasisPoints(_callParams.sizeDeltaInUsd, _callParams.collateralDelta);
-            _sizeDelta = _callParams.sizeDeltaInUsd * _allocated / _callParams.collateralDelta;
-            allocationStore.transferOut(_callParams.collateralToken, config.gmxOrderVault, _allocated);
+        if (_targetLeverage > _currentLeverage) {
+            _sizeDelta = _position.size * (_targetLeverage - _currentLeverage) / _currentLeverage;
 
             _requestKey = _submitOrder(
                 _callParams,
                 _allocationAddress,
                 GmxPositionUtils.OrderType.MarketIncrease,
                 config.increaseCallbackGasLimit,
-                _allocated,
-                _sizeDelta
+                _sizeDelta,
+                0
             );
         } else {
-            uint _currentLeverage = Precision.toBasisPoints(_position.traderSize, _position.traderCollateral);
-            _targetLeverage = _callParams.isIncrease
-                ? Precision.toBasisPoints(
-                    _position.traderSize + _callParams.sizeDeltaInUsd,
-                    _position.traderCollateral + _callParams.collateralDelta
-                )
-                : _position.traderSize > _callParams.sizeDeltaInUsd
-                    ? Precision.toBasisPoints(
-                        _position.traderSize - _callParams.sizeDeltaInUsd,
-                        _position.traderCollateral - _callParams.collateralDelta
-                    )
-                    : 0;
-
-            if (_targetLeverage > _currentLeverage) {
-                _sizeDelta = _position.size * (_targetLeverage - _currentLeverage) / _currentLeverage;
-
-                _requestKey = _submitOrder(
-                    _callParams,
-                    _allocationAddress,
-                    GmxPositionUtils.OrderType.MarketIncrease,
-                    config.increaseCallbackGasLimit,
-                    _sizeDelta,
-                    0
-                );
-            } else {
-                _sizeDelta = _position.size * (_currentLeverage - _targetLeverage) / _currentLeverage;
-                _requestKey = _submitOrder(
-                    _callParams,
-                    _allocationAddress,
-                    GmxPositionUtils.OrderType.MarketDecrease,
-                    config.decreaseCallbackGasLimit,
-                    _sizeDelta,
-                    0
-                );
-            }
+            _sizeDelta = _position.size * (_currentLeverage - _targetLeverage) / _currentLeverage;
+            _requestKey = _submitOrder(
+                _callParams,
+                _allocationAddress,
+                GmxPositionUtils.OrderType.MarketDecrease,
+                config.decreaseCallbackGasLimit,
+                _sizeDelta,
+                0
+            );
         }
 
         requestAdjustmentMap[_requestKey] = RequestAdjustment({
@@ -274,7 +285,7 @@ contract MirrorPosition is CoreContract {
         });
 
         _logEvent(
-            "Mirror",
+            "Adjust",
             abi.encode(_matchKey, _allocationKey, _allocationAddress, _sizeDelta, _targetLeverage, _requestKey)
         );
     }

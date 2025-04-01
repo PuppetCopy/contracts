@@ -31,33 +31,31 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
 
     // --- MirrorPosition Interaction ---
 
-    /**
-     * @notice Allocates capital from puppets for a trader.
-     * @param params Allocation parameters including collateral token and trader.
-     * @param puppetList List of puppet addresses (owners) to allocate from.
-     * @return allocationId The unique ID for this allocation instance.
-     */
+    // /**
+    //  * @notice Allocates capital from puppets for a trader.
+    //  * @param params Allocation parameters including collateral token and trader.
+    //  * @param puppetList List of puppet addresses (owners) to allocate from.
+    //  * @return allocationId The unique ID for this allocation instance.
+    //  */
     function allocate(
-        MirrorPosition.CallAllocation calldata params,
+        MirrorPosition.CallPosition calldata params,
         address[] calldata puppetList
-    ) external nonReentrant auth returns (uint allocationId) {
-        // Signature already matches MirrorPosition.allocate
-        allocationId = config.position.allocate(params, puppetList);
+    ) external nonReentrant auth returns (uint _nextAllocationId, bytes32 _requestKey) {
+        return config.position.mirror(params, puppetList);
     }
 
     /**
      * @notice Mirrors a trader's position action (increase or decrease).
      * @param params Position parameters including deltas, market, direction, and allocationId.
      * @param puppetList List of puppet addresses involved in the allocation.
-     * @return requestKey The key associated with the GMX order request.
+     * @return nextAllocationId The next allocation ID for the position.
+     * @return requestKey The unique key for this request.
      */
-    function mirror(
-        MirrorPosition.CallPosition calldata params, // allocationId is inside params
+    function adjust(
+        MirrorPosition.CallPosition calldata params,
         address[] calldata puppetList
-    ) external payable nonReentrant auth returns (bytes32 requestKey) {
-        // Added payable
-        // Updated call: pass value, remove separate allocationId argument
-        requestKey = config.position.mirror{value: msg.value}(params, puppetList);
+    ) external payable nonReentrant auth returns (uint nextAllocationId, bytes32 requestKey) {
+        return config.position.mirror{value: msg.value}(params, puppetList);
     }
 
     /**
@@ -66,7 +64,7 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
      * @param puppetList List of puppet addresses involved in the allocation.
      */
     function settle(
-        MirrorPosition.CallSettle calldata params, // Use CallSettle struct
+        MirrorPosition.CallSettle calldata params,
         address[] calldata puppetList
     ) external nonReentrant auth {
         // Updated call: pass the struct and puppetList
