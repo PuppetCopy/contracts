@@ -12,7 +12,7 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {MatchRule} from "./../position/MatchRule.sol";
 import {AllocationAccount} from "./../shared/AllocationAccount.sol";
 import {AllocationStore} from "./../shared/AllocationStore.sol";
-import {Error} from "./../shared/Error.sol";
+import {Error} from "./../utils/Error.sol";
 import {TokenRouter} from "./../shared/TokenRouter.sol";
 import {CallUtils} from "./../utils/CallUtils.sol";
 import {ErrorUtils} from "./../utils/ErrorUtils.sol";

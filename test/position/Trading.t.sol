@@ -16,7 +16,7 @@ import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol"; // Add
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 
 import {AllocationStore} from "src/shared/AllocationStore.sol";
-import {Error} from "src/shared/Error.sol";
+import {Error} from "src/utils/Error.sol";
 import {FeeMarketplace} from "src/tokenomics/FeeMarketplace.sol";
 import {FeeMarketplaceStore} from "src/tokenomics/FeeMarketplaceStore.sol";
 import {BankStore} from "src/utils/BankStore.sol";

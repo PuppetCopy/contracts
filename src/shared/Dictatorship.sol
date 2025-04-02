@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+
+import {Error} from "../utils/Error.sol";
 import {CoreContract} from "./../utils/CoreContract.sol";
 import {Access} from "./../utils/auth/Access.sol";
 import {Permission} from "./../utils/auth/Permission.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
-import {Error} from "./Error.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @title Dictatorship Authority Contract
 /// @notice Central authority for managing CoreContract permissions, configuration, lifecycle, and unified event
@@ -48,7 +49,7 @@ contract Dictatorship is Ownable, IAuthority {
         return target.canCall(functionSig, user);
     }
 
-    /// @param initialOwner The address of the DAO/Governance contract that will own this Dictatorship.
+    /// @param initialOwner The address of the Governance contract that will own this Dictatorship.
     constructor(
         address initialOwner
     ) Ownable(initialOwner) {}

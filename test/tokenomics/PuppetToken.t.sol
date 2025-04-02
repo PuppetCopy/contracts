@@ -3,7 +3,7 @@
 
 // import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-// import {Error} from "src/shared/Error.sol";
+// import {Error} from "src/utils/Error.sol";
 // import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 // import {Precision} from "src/utils/Precision.sol";
 // import {BasicSetup} from "test/base/BasicSetup.t.sol";

@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Error} from "src/shared/Error.sol";
+import {Error} from "src/utils/Error.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
 import {FeeMarketplace} from "src/tokenomics/FeeMarketplace.sol";
 import {FeeMarketplaceStore} from "src/tokenomics/FeeMarketplaceStore.sol";

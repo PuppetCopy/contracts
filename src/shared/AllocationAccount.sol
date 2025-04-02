@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {Access} from "./../utils/auth/Access.sol";
-import {Error} from "./Error.sol";
+import {Error} from "../utils/Error.sol";
 
 /**
  * @title Subaccount

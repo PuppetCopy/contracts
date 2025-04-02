@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import {Error} from "../shared/Error.sol";
+import {Error} from "../utils/Error.sol";
 import {ErrorUtils} from "./ErrorUtils.sol";
 import {CallUtils} from "./CallUtils.sol";
 import {IWNT} from "./interfaces/IWNT.sol";
