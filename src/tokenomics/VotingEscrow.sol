@@ -11,7 +11,7 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {PuppetVoteToken} from "./PuppetVoteToken.sol";
 import {VotingEscrowStore} from "./VotingEscrowStore.sol";
 
-contract VotingEscrowLogic is CoreContract {
+contract VotingEscrow is CoreContract {
     struct Vested {
         uint amount;
         uint remainingDuration;
@@ -39,7 +39,7 @@ contract VotingEscrowLogic is CoreContract {
         VotingEscrowStore _store,
         PuppetToken _token,
         PuppetVoteToken _vToken
-    ) CoreContract("VotingEscrowLogic", _authority) {
+    ) CoreContract(_authority) {
         store = _store;
         token = _token;
         vToken = _vToken;

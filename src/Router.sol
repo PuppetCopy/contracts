@@ -27,7 +27,7 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
 
     constructor(
         IAuthority _authority
-    ) CoreContract("Router", _authority) {}
+    ) CoreContract(_authority) {}
 
     // --- MirrorPosition Interaction ---
 

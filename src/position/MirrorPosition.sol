@@ -117,7 +117,7 @@ contract MirrorPosition is CoreContract {
         AllocationStore _puppetStore,
         MatchRule _matchRule,
         FeeMarketplace _feeMarket
-    ) CoreContract("MirrorPosition", _authority) {
+    ) CoreContract(_authority) {
         allocationStore = _puppetStore;
         matchRule = _matchRule;
         feeMarket = _feeMarket;

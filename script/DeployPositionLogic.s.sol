@@ -14,7 +14,7 @@
 // import {PositionStore} from "src/position/PositionStore.sol";
 // import {PuppetLogic} from "src/position/PuppetLogic.sol";
 // import {PuppetStore} from "src/position/PuppetStore.sol";
-// import {Dictator} from "src/shared/Dictator.sol";
+// import {Dictatorship} from "src/shared/Dictatorship.sol";
 // import {TokenRouter} from "src/shared/TokenRouter.sol";
 // import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 // import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
@@ -24,7 +24,7 @@
 // import {Address} from "./Const.sol";
 
 // contract DeployPosition is BaseScript {
-//     Dictator dictator = Dictator(getDeployedAddress("Dictator"));
+//     Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
 
 //     function run() public {
 //         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);

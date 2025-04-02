@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import {IAccess} from "../utils/interfaces/IAccess.sol";
+import {Access} from "./../utils/auth/Access.sol";
 import {Error} from "./Error.sol";
 
 /**
@@ -11,14 +11,14 @@ import {Error} from "./Error.sol";
  * @dev This contract has been directed to work with EIP-1167 minimal proxies.
  */
 contract AllocationAccount {
-    IAccess internal immutable store;
+    Access internal immutable store;
 
     /**
      * @notice Constructor for the implementation contract only
      * @dev This is only used for the implementation contract and not for proxies
      */
     constructor(
-        IAccess _store
+        Access _store
     ) {
         store = _store;
     }

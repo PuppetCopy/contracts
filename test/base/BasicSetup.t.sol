@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test} from "forge-std/src/Test.sol";
 import {MockERC20} from "test/mock/MockERC20.sol";
 
-import {Dictator} from "src/shared/Dictator.sol";
+import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
@@ -26,7 +26,7 @@ contract BasicSetup is Test {
     MockERC20 wnt = new MockERC20("Wrapped Native", "WNT", 18);
     MockERC20 usdc = new MockERC20("USDC", "USDC", 6);
 
-    Dictator dictator;
+    Dictatorship dictator;
     PuppetToken puppetToken;
     TokenRouter tokenRouter;
     PuppetVoteToken vPuppetToken;
@@ -43,7 +43,7 @@ contract BasicSetup is Test {
 
         vm.startPrank(users.owner);
 
-        dictator = new Dictator(users.owner);
+        dictator = new Dictatorship(users.owner);
         tokenRouter = new TokenRouter(dictator);
         puppetToken = new PuppetToken();
         vPuppetToken = new PuppetVoteToken(dictator);

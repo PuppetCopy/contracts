@@ -9,7 +9,7 @@
 // import {RequestLogic} from "src/position/RequestLogic.sol";
 // import {PuppetLogic} from "src/position/PuppetLogic.sol";
 // import {PuppetStore} from "src/position/PuppetStore.sol";
-// import {Dictator} from "src/shared/Dictator.sol";
+// import {Dictatorship} from "src/shared/Dictatorship.sol";
 // import {TokenRouter} from "src/shared/TokenRouter.sol";
 // import {FeeMarketplace} from "src/tokenomics/FeeMarketplace.sol";
 
@@ -24,7 +24,7 @@
 //     }
 
 //     function deployContracts() internal {
-//         Dictator dictator = Dictator(getDeployedAddress("RequestLogic"));
+//         Dictatorship dictator = Dictatorship(getDeployedAddress("RequestLogic"));
 
 //         Router puppetRouter = new Router(dictator);
 //         // dictator.setPermission(puppetLogic, puppetLogic.deposit.selector, address(puppetRouter));

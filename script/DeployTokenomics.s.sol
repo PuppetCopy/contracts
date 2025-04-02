@@ -4,7 +4,7 @@
 // import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // import {TokenomicsRouter} from "src/TokenomicsRouter.sol";
-// import {Dictator} from "src/shared/Dictator.sol";
+// import {Dictatorship} from "src/shared/Dictatorship.sol";
 // import {TokenRouter} from "src/shared/TokenRouter.sol";
 // import {ContributeLogic} from "src/tokenomics/ContributeLogic.sol";
 // import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
@@ -19,7 +19,7 @@
 // import {Address} from "./Const.sol";
 
 // contract DeployTokenomics is BaseScript {
-//     Dictator dictator = Dictator(getDeployedAddress("Dictator"));
+//     Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
 //     PuppetToken puppetToken = PuppetToken(getDeployedAddress("PuppetToken"));
 //     PuppetVoteToken puppetVoteToken = PuppetVoteToken(getDeployedAddress("PuppetVoteToken"));
 //     Router router = Router(getDeployedAddress("Router"));

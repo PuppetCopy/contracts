@@ -52,7 +52,7 @@ contract MatchRule is CoreContract {
         IAuthority _authority,
         AllocationStore _store,
         MirrorPosition _mirrorPosition
-    ) CoreContract("MatchRule", _authority) {
+    ) CoreContract(_authority) {
         allocationStore = _store;
         mirrorPosition = _mirrorPosition;
     }

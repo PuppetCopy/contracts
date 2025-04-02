@@ -19,10 +19,10 @@ library Error {
 
     event TransferUtils__TokenTransferReverted(string reason, bytes returndata);
 
-    // Dictator
-    error Dictator__ConfigurationUpdateFailed();
-    error Dictator__ContractNotInitialized();
-    error Dictator__ContractAlreadyInitialized();
+    // Dictatorship
+    error Dictatorship__ContractNotInitialized();
+    error Dictatorship__ContractAlreadyInitialized();
+    error Dictatorship__ConfigurationUpdateFailed();
 
     // BankStore
     error BankStore__InsufficientBalance();
@@ -42,9 +42,10 @@ library Error {
     error VotingEscrowLogic__ExceedMaxTime();
     error VotingEscrowLogic__ExceedingAccruedAmount(uint accured);
 
-    // Access Control
+    error Access__CallerNotAuthority();
     error Access__Unauthorized();
-    error Permission__Unauthorized(address user);
+    error Permission__Unauthorized();
+    error Permission__CallerNotAuthority();
 
     // Stores
     error Store__InvalidLength();

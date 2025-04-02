@@ -6,7 +6,7 @@
 // import {Router} from "src/Router.sol";
 // import {PuppetLogic} from "src/position/PuppetLogic.sol";
 // import {PuppetStore} from "src/position/PuppetStore.sol";
-// import {Dictator} from "src/shared/Dictator.sol";
+// import {Dictatorship} from "src/shared/Dictatorship.sol";
 // import {TokenRouter} from "src/shared/TokenRouter.sol";
 
 // import {BaseScript} from "./BaseScript.s.sol";
@@ -20,7 +20,7 @@
 //     }
 
 //     function deployContracts() internal {
-//         Dictator dictator = Dictator(getDeployedAddress("Dictator"));
+//         Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
 //         TokenRouter router = TokenRouter(getDeployedAddress("Router"));
 
 //         PuppetStore puppetStore = new PuppetStore(dictator, router);

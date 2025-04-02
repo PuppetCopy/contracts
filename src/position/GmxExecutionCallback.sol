@@ -24,7 +24,7 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
     uint public unhandledCallbackListId = 0;
     mapping(uint unhandledCallbackListSequenceId => UnhandledCallback) public unhandledCallbackMap;
 
-    constructor(IAuthority _authority, MirrorPosition _position) CoreContract("GmxExecutionCallback", _authority) {
+    constructor(IAuthority _authority, MirrorPosition _position) CoreContract(_authority) {
         position = _position;
     }
 

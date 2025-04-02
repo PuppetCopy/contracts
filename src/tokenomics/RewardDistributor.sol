@@ -41,7 +41,7 @@ contract RewardDistributor is CoreContract {
         IERC20 _rewardToken,
         IERC20 _vToken,
         RewardStore _store
-    ) CoreContract("RewardDistributor", _authority) {
+    ) CoreContract(_authority) {
         rewardToken = _rewardToken;
         vToken = _vToken;
         store = _store;
@@ -67,8 +67,8 @@ contract RewardDistributor is CoreContract {
         uint _nextCumulativeCheckpoint = cumulativeRewardPerToken + _pendingPerToken;
         uint _userBalance = vToken.balanceOf(_user);
 
-        return
-            ur.accrued + _calculatePendingRewardPerToken(ur.cumulativeRewardCheckpoint, _nextCumulativeCheckpoint, _userBalance);
+        return ur.accrued
+            + _calculatePendingRewardPerToken(ur.cumulativeRewardCheckpoint, _nextCumulativeCheckpoint, _userBalance);
     }
 
     /// @notice Deposit new rewards into the system.
@@ -94,7 +94,8 @@ contract RewardDistributor is CoreContract {
         uint _currentCumulative = _distribute();
         UserRewards memory _userReward = userRewardMap[_user];
         uint _userBalance = vToken.balanceOf(_user);
-        uint _nextAccrued = _userReward.accrued + _calculatePendingRewardPerToken(_userReward.cumulativeRewardCheckpoint, _currentCumulative, _userBalance);
+        uint _nextAccrued = _userReward.accrued
+            + _calculatePendingRewardPerToken(_userReward.cumulativeRewardCheckpoint, _currentCumulative, _userBalance);
 
         require(_amount <= _nextAccrued, Error.RewardDistributor__InsufficientRewards(_userReward.accrued));
 

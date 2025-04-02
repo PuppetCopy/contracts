@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {TokenRouter} from "../shared/TokenRouter.sol";
 import {Error} from "./../shared/Error.sol";
-import {Access} from "./../utils/auth/Access.sol";
+import {Access} from "./auth/Access.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 
 /**

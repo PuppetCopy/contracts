@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import {Dictator} from "src/shared/Dictator.sol";
+import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
@@ -17,8 +17,8 @@ contract DeployPuppetToken is BaseScript {
     }
 
     function deployContracts() internal {
-        Dictator dictator = new Dictator(Address.dao);
-        // Dictator dictator = Dictator(getDeployedAddress("Dictator"));
+        Dictatorship dictator = new Dictatorship(Address.dao);
+        // Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
 
         PuppetToken puppetToken = new PuppetToken();
         // PuppetToken puppetToken = PuppetToken(getDeployedAddress("PuppetToken"));

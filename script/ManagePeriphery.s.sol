@@ -8,7 +8,7 @@ import {IAsset, IVault} from "@balancer-labs/v2-interfaces/contracts/vault/IVaul
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {Dictator} from "src/shared/Dictator.sol";
+import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {IWNT} from "src/utils/interfaces/IWNT.sol";
 
@@ -17,7 +17,7 @@ import {Address} from "script/Const.sol";
 
 contract ManagePeriphery is BaseScript {
     IWNT wnt;
-    Dictator dictator = Dictator(getDeployedAddress("Dictator"));
+    Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
     PuppetToken puppetToken = PuppetToken(getDeployedAddress("PuppetToken"));
     IERC20 weth = IERC20(Address.wnt);
 
