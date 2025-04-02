@@ -4,31 +4,44 @@ pragma solidity ^0.8.28;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Error} from "../utils/Error.sol";
 import {TokenRouter} from "../shared/TokenRouter.sol";
 import {BankStore} from "../utils/BankStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
+import {Error} from "../utils/Error.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {FeeMarketplaceStore} from "./FeeMarketplaceStore.sol";
 import {PuppetToken} from "./PuppetToken.sol";
 
 /**
- * @title Protocol Fee Redemption Marketplace
- * @notice A marketplace where users exchange protocol tokens for accumulated fee tokens at fixed rates.
+ * @title Oracle-less Gradual Fee Marketplace
+ * @notice Offers various accumulated protocol fee tokens (e.g., stablecoins, ETH) for public purchase
+ * using the protocol's native token. Fees deposited by the protocol unlock linearly over time,
+ * smoothing availability and mitigating redemption volatility often seen with instant large deposits.
+ * This marketplace uniquely operates without external price oracles; fixed redemption rates
+ * (`askAmount`) are set administratively, ensuring predictable exchange terms.
  *
- * @dev Key features of this redemption system:
- *      - Time-based linear unlocking of deposited fees
- *      - Fixed-rate exchange between protocol tokens and fee tokens
- *      - Configurable burning of received protocol tokens
- *      - Distribution of non-burned protocol tokens to a rewards contract
+ * @dev This contract facilitates a public market where the protocol effectively offers its accrued fees
+ * in exchange for the native protocol token. Anyone providing the required protocol token (via an
+ * authorized router) can participate in this exchange. The time-based linear unlocking (`distributionTimeframe`)
+ * is a deliberate mechanism to prevent momentary supply shocks and ensure fairer access to fees as
+ * they accumulate, rather than allowing immediate capture which could lead to unfavorable slippage.
  *
- * @dev Operation process:
- *      1. Protocol fees are deposited and accumulate in the marketplace
- *      2. Fees unlock gradually over time based on the configured timeframe
- *      3. Users can redeem unlocked fees by providing protocol tokens at the set rate
- *      4. A portion of received protocol tokens are burned according to configuration
- *      5. Remaining protocol tokens are sent to the fee distributor contract
+ * @dev Key advantages and characteristics:
+ * - **Oracle-less Operation:** By avoiding external price feeds, the system gains simplicity, robustness
+ * against oracle manipulation or failure, and predictable gas costs. Exchange rates are deterministic
+ * based on protocol governance (`setAskPrice`) rather than volatile market data.
+ * - **Volatility Mitigation:** The gradual release of fees prevents scenarios where large, sudden fee
+ * deposits can be instantly acquired, potentially destabilizing redemption dynamics or enabling arbitrage
+ * solely based on deposit timing.
+ * - **Fixed, Predictable Rates:** Participants (including bots or arbitrageurs) know exactly how much
+ * protocol token is required per unit of fee token (`askAmount`), simplifying the redemption logic.
+ * - **Controlled Interaction:** While offering fees publicly, the core redemption function (`acceptOffer`)
+ * typically requires calls from authorized router contracts (`auth` modifier). This allows for protocol-level
+ * checks or features before executing the redemption. Participants grant `protocolToken` approval to the
+ * `FeeMarketplaceStore` to enable these mediated redemptions.
+ *
+ * @dev Tokenomics (burning/distribution of received protocol tokens) are configurable via `_setConfig`.
  */
 contract FeeMarketplace is CoreContract {
     /**
@@ -164,7 +177,6 @@ contract FeeMarketplace is CoreContract {
 
         // Deduct the redeemed fee tokens from the unlocked balance.
         accruedFee[_feeToken] = _accuredFees - _purchaseAmount;
-        lastDistributionTimestamp[_feeToken] = block.timestamp;
 
         // Transfer fee tokens out to the receiver.
         store.transferOut(_feeToken, _receiver, _purchaseAmount);
@@ -204,6 +216,8 @@ contract FeeMarketplace is CoreContract {
         bytes calldata _data
     ) internal override {
         Config memory newConfig = abi.decode(_data, (Config));
+
+        require(newConfig.distributionTimeframe > 0, "FeeMarketplace: timeframe cannot be zero");
         require(
             newConfig.burnBasisPoints <= Precision.BASIS_POINT_DIVISOR, "FeeMarketplace: burn basis points exceeds 100%"
         );
