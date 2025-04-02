@@ -34,7 +34,7 @@ contract MirrorPosition is CoreContract {
         uint decreaseCallbackGasLimit;
         uint platformSettleFeeFactor;
         uint maxPuppetList;
-        uint minExecutionCostFactor;
+        uint minExecutionCostRate;
     }
 
     struct Position {
@@ -157,8 +157,8 @@ contract MirrorPosition is CoreContract {
 
                 // Skip if the allocated balance is less than the minimum estimated execution cost required
                 if (
-                    Precision.applyFactor(config.minExecutionCostFactor, _balanceAllocation)
-                        > _estimatedExecutionFeePerPuppet
+                    _estimatedExecutionFeePerPuppet
+                        > Precision.applyBasisPoints(config.minExecutionCostRate, _balanceAllocation)
                 ) {
                     continue;
                 }
@@ -170,14 +170,13 @@ contract MirrorPosition is CoreContract {
             }
         }
 
-        require(
-            Precision.applyFactor(config.minExecutionCostFactor, _allocated) > _callParams.mirrorExecutionFee,
-            Error.MirrorPosition__ExecutionFeeExceedsFactorLimit()
-        );
-
         allocationStore.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
         allocationMap[_allocationKey] = _allocated;
 
+        require(
+            Precision.applyBasisPoints(config.minExecutionCostRate, _allocated) > _callParams.mirrorExecutionFee,
+            Error.MirrorPosition__ExecutionFeeExceedsFactorLimit()
+        );
         uint _targetLeverage;
         uint _sizeDelta;
         uint _netAllocated = _allocated - _callParams.mirrorExecutionFee;
