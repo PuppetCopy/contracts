@@ -65,11 +65,13 @@ library Error {
 
     // MirrorPosition
     error MirrorPosition__AllocationAccountNotFound();
-    error MirrorPosition__NoFundsAllocated();
+    error MirrorPosition__NoNetFundsAllocated();
     error MirrorPosition__InvalidAllocation();
     error MirrorPosition__PositionNotFound();
     error MirrorPosition__InitialMustBeIncrease();
     error MirrorPosition__InvalidCollateralDelta();
+    error MirrorPosition__TraderCollateralZero();
+    error MirrorPosition__ZeroCollateralOnIncrease();
     error MirrorPosition__InvalidSizeDelta();
     error MirrorPosition__InvalidCurrentLeverage();
     error MirrorPosition__PuppetListEmpty();
@@ -78,8 +80,16 @@ library Error {
     error MirrorPosition__ExecutionRequestMissing();
     error MirrorPosition__InvalidKeeperExeuctionFeeReceiver();
     error MirrorPosition__InvalidKeeperExeuctionFeeAmount();
+    error MirrorPosition__ExecuteOnZeroCollateralPosition();
+    error MirrorPosition__InvalidAllocationOrFullyReduced();
+    error MirrorPosition__InsufficientSettledBalanceForKeeperFee();
     error MirrorPosition__KeeperExecutionFeeExceedsFactorLimit();
+    error MirrorPosition__InvalidGmxRouter();
+    error MirrorPosition__InvalidCallbackHandler();
+    error MirrorPosition__InvalidGmxOrderVault();
+    error MirrorPosition__InvalidMaxPuppetList();
     error MirrorPosition__KeeperAdjustmentExecutionFeeExceedsAllocatedAmount();
+    error MirrorPosition__AllocationZeroAfterKeeperExecutionFeeReduction();
     error MirrorPosition__KeeperFeeCollectionMismatch();
     error MirrorPosition__InsufficientBalanceForKeeperFee();
     error MirrorPosition__InsufficientCollectiveBalanceForKeeperFee();

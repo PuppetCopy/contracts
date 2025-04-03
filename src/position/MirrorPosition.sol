@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -22,28 +21,10 @@ import {AllocationAccountUtils} from "./utils/AllocationAccountUtils.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
-/**
- * @title MirrorPosition
- * @notice This contract acts as the core engine for the Puppet copy trading platform's GMX integration.
- * @dev It enables "Puppets" (investors) to automatically mirror the positions initiated or adjusted
- * by chosen "Traders" on the GMX derivatives exchange. The contract manages the allocation
- * of funds from multiple Puppets for a single mirrored trade, interacts with the GMX protocol
- * to submit market orders (increase/decrease), and tracks the state of these mirrored positions.
- * It relies on matching rules (`MatchRule`) to determine Puppet participation and allocation amounts,
- * and integrates with the `FeeMarketplace` for platform fee handling during settlement.
- *
- * Interaction with GMX involves asynchronous order creation. Authorized external actors ("Keepers")
- * are responsible for monitoring the GMX order flow and providing necessary execution fees. Upon confirmation
- * of an order's execution on GMX, Keepers call the `execute` function on this contract to update
- * the mirrored position's state. Keepers also trigger the `settle` function to distribute funds
- * back to Puppets via the `AllocationStore` when the corresponding GMX position is closed or settled.
- * Settlement may occur in stages involving different tokens, requiring state persistence until final resolution.
- * Keeper compensation fees are deducted from Puppet funds during `mirror`, `adjust`, and `settle` operations.
- *
- * The contract utilizes deterministic clones (`AllocationAccount`) to hold funds and interact with GMX
- * for each specific mirrored trade instance (allocation).
- */
 contract MirrorPosition is CoreContract {
+    event KeeperFeePaid( // Assuming this event exists or is added
+    bytes32 indexed allocationKey, address indexed receiver, address indexed token, uint amount, string action);
+
     struct Config {
         IGmxExchangeRouter gmxExchangeRouter;
         address callbackHandler;
@@ -105,8 +86,6 @@ contract MirrorPosition is CoreContract {
     uint public nextAllocationId = 0;
 
     mapping(address => mapping(address => uint)) public activityThrottleMap;
-    // allocation is the amount allocated during matching, it should be used as a denominator but not be used to measure
-    // a position collateral because fees are deducted from the allocation
     mapping(bytes32 => uint) public allocationMap;
     mapping(bytes32 => mapping(address => uint)) public allocationPuppetMap;
     mapping(bytes32 => Position) public positionMap;
@@ -202,11 +181,15 @@ contract MirrorPosition is CoreContract {
         uint _keeperFee = _callParams.keeperExecutionFee;
         address _keeperFeeReceiver = _callParams.keeperExecutionFeeReceiver;
         require(_keeperFeeReceiver != address(0), Error.MirrorPosition__InvalidKeeperExeuctionFeeReceiver());
+        // Keep check if mirror always requires a fee, otherwise remove
         require(_keeperFee > 0, Error.MirrorPosition__InvalidKeeperExeuctionFeeAmount());
 
         MatchRule.Rule[] memory _ruleList = matchRule.getRuleList(_matchKey, _puppetList);
         uint[] memory _nextBalanceList = allocationStore.getBalanceList(_callParams.collateralToken, _puppetList);
-        uint _estimatedExecutionFeePerPuppet = _callParams.keeperExecutionFee / _puppetListLength;
+        uint _estimatedExecutionFeePerPuppet = 0;
+        if (_puppetListLength > 0) {
+            _estimatedExecutionFeePerPuppet = _keeperFee / _puppetListLength;
+        }
         uint _allocated = 0;
 
         for (uint i = 0; i < _puppetListLength; i++) {
@@ -218,11 +201,8 @@ contract MirrorPosition is CoreContract {
 
                 if (
                     _balanceAllocation == 0
-                        || (
-                            _callParams.keeperExecutionFee > 0
-                                && _estimatedExecutionFeePerPuppet
-                                    > Precision.applyBasisPoints(config.minExecutionCostRate, _balanceAllocation)
-                        )
+                        || _estimatedExecutionFeePerPuppet
+                            > Precision.applyBasisPoints(config.minExecutionCostRate, _balanceAllocation)
                 ) {
                     continue;
                 }
@@ -236,31 +216,20 @@ contract MirrorPosition is CoreContract {
 
         allocationStore.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
 
-        if (_callParams.keeperExecutionFee > 0) {
-            require(
-                Precision.applyBasisPoints(config.minExecutionCostRate, _allocated) > _callParams.keeperExecutionFee,
-                Error.MirrorPosition__KeeperExecutionFeeExceedsFactorLimit()
-            );
-            require(
-                _allocated >= _callParams.keeperExecutionFee, Error.MirrorPosition__InsufficientKeeperExecutionFee()
-            );
-        }
+        require(
+            Precision.applyBasisPoints(config.minExecutionCostRate, _allocated) > _keeperFee,
+            Error.MirrorPosition__KeeperExecutionFeeExceedsFactorLimit()
+        );
+        require(_allocated >= _keeperFee, Error.MirrorPosition__InsufficientKeeperExecutionFee());
 
-        uint _netAllocated = _allocated - _callParams.keeperExecutionFee;
-
-        require(_netAllocated > 0, Error.MirrorPosition__NoFundsAllocated());
+        uint _netAllocated = _allocated - _keeperFee;
+        require(_netAllocated > 0, Error.MirrorPosition__NoNetFundsAllocated());
 
         uint _targetLeverage = Precision.toBasisPoints(_callParams.sizeDeltaInUsd, _callParams.collateralDelta);
         uint _sizeDelta = (_callParams.sizeDeltaInUsd * _netAllocated) / _callParams.collateralDelta;
 
         allocationStore.transferOut(_callParams.collateralToken, address(this), _allocated);
-
-        if (_callParams.keeperExecutionFee > 0) {
-            SafeERC20.safeTransfer(
-                _callParams.collateralToken, _callParams.keeperExecutionFeeReceiver, _callParams.keeperExecutionFee
-            );
-        }
-
+        SafeERC20.safeTransfer(_callParams.collateralToken, _keeperFeeReceiver, _keeperFee);
         SafeERC20.safeTransfer(_callParams.collateralToken, config.gmxOrderVault, _netAllocated);
 
         _requestKey = _submitOrder(
@@ -288,10 +257,10 @@ contract MirrorPosition is CoreContract {
                 _matchKey,
                 _allocationKey,
                 _allocationAddress,
-                _callParams.keeperExecutionFeeReceiver,
+                _keeperFeeReceiver,
                 _allocated,
                 _netAllocated,
-                _callParams.keeperExecutionFee,
+                _keeperFee,
                 _sizeDelta,
                 _targetLeverage,
                 _requestKey
@@ -314,7 +283,7 @@ contract MirrorPosition is CoreContract {
 
         Position memory _position = positionMap[_allocationKey];
         require(_position.size > 0, Error.MirrorPosition__PositionNotFound());
-        require(_position.traderCollateral > 0, Error.MirrorPosition__PositionNotFound());
+        require(_position.traderCollateral > 0, Error.MirrorPosition__TraderCollateralZero());
 
         address _allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
             allocationStoreImplementation, _allocationKey, address(this)
@@ -324,44 +293,69 @@ contract MirrorPosition is CoreContract {
         uint _keeperFee = _callParams.keeperExecutionFee;
         address _keeperFeeReceiver = _callParams.keeperExecutionFeeReceiver;
         require(_keeperFeeReceiver != address(0), Error.MirrorPosition__InvalidKeeperExeuctionFeeReceiver());
+        // Allow _keeperFee = 0? If so remove check below. Assuming > 0 required for adjust for now.
         require(_keeperFee > 0, Error.MirrorPosition__InvalidKeeperExeuctionFeeAmount());
 
         uint _puppetListLength = _puppetList.length;
         require(_puppetListLength > 0, Error.MirrorPosition__PuppetListEmpty());
 
-        uint _executionDebt;
-        uint _puppetExecutionInsolvencyAmount;
-        uint _allocated = allocationMap[_allocationKey];
+        uint _originalTotalAllocation = allocationMap[_allocationKey];
+        require(_originalTotalAllocation > 0, Error.MirrorPosition__InvalidAllocation());
 
-        require(_allocated > _keeperFee, Error.MirrorPosition__KeeperAdjustmentExecutionFeeExceedsAllocatedAmount());
-
+        uint _feeCollectedFromBalance = 0;
+        uint _totalMapReduction = 0;
         uint[] memory _currentBalances = allocationStore.getBalanceList(_callParams.collateralToken, _puppetList);
-        uint _feeCollected = 0;
+        // Create copy for modification
+        uint[] memory _nextBalances = new uint[](_puppetListLength);
+        for (uint i = 0; i < _puppetListLength; i++) {
+            _nextBalances[i] = _currentBalances[i];
+        }
+
+        require( // Check fee doesn't exceed total allocation *before* detailed checks
+            _originalTotalAllocation > _keeperFee,
+            Error.MirrorPosition__KeeperAdjustmentExecutionFeeExceedsAllocatedAmount()
+        );
 
         for (uint i = 0; i < _puppetListLength; i++) {
-            uint _puppetAllocationShare = allocationPuppetMap[_allocationKey][_puppetList[i]];
-            if (_puppetAllocationShare == 0) continue;
-            uint _puppetFeePortion = (_keeperFee * _puppetAllocationShare) / _allocated;
+            address _puppet = _puppetList[i];
+            uint _puppetOriginalShare = allocationPuppetMap[_allocationKey][_puppet];
+            if (_puppetOriginalShare == 0) continue;
+
+            uint _puppetFeePortion = (_keeperFee * _puppetOriginalShare) / _originalTotalAllocation; // Use original
+                // total for portion calc
 
             if (_currentBalances[i] >= _puppetFeePortion) {
-                _currentBalances[i] -= _puppetFeePortion;
-                _feeCollected += _puppetFeePortion;
-            } else if (_puppetAllocationShare > _puppetFeePortion) {
-                allocationPuppetMap[_allocationKey][_puppetList[i]] = _puppetAllocationShare - _puppetFeePortion;
-                _executionDebt += _puppetFeePortion;
-                _puppetExecutionInsolvencyAmount += _puppetFeePortion;
+                _nextBalances[i] -= _puppetFeePortion;
+                _feeCollectedFromBalance += _puppetFeePortion;
+            } else {
+                uint _deductionFromShare;
+                if (_puppetOriginalShare >= _puppetFeePortion) {
+                    _deductionFromShare = _puppetFeePortion;
+                    allocationPuppetMap[_allocationKey][_puppet] = _puppetOriginalShare - _deductionFromShare;
+                } else {
+                    _deductionFromShare = _puppetOriginalShare;
+                    allocationPuppetMap[_allocationKey][_puppet] = 0;
+                }
+                _totalMapReduction += _deductionFromShare;
             }
         }
 
-        require(_feeCollected == _keeperFee, Error.MirrorPosition__KeeperFeeCollectionMismatch());
-
-        allocationStore.setBalanceList(_callParams.collateralToken, _puppetList, _currentBalances);
+        allocationStore.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalances);
         allocationStore.transferOut(_callParams.collateralToken, _keeperFeeReceiver, _keeperFee);
 
-        uint _currentPuppetLeverage = Precision.toBasisPoints(_position.size, _allocated);
-        uint _traderTargetLeverage;
+        uint _newTotalAllocation = _originalTotalAllocation - _totalMapReduction;
+        require(_newTotalAllocation > 0, Error.MirrorPosition__AllocationZeroAfterKeeperExecutionFeeReduction());
 
+        allocationMap[_allocationKey] = _newTotalAllocation;
+
+        uint _currentPuppetLeverage = Precision.toBasisPoints(_position.size, _newTotalAllocation);
+
+        uint _traderTargetLeverage;
         if (_callParams.isIncrease) {
+            require(
+                _position.traderCollateral + _callParams.collateralDelta > 0,
+                Error.MirrorPosition__ZeroCollateralOnIncrease()
+            );
             _traderTargetLeverage = Precision.toBasisPoints(
                 _position.traderSize + _callParams.sizeDeltaInUsd,
                 _position.traderCollateral + _callParams.collateralDelta
@@ -371,22 +365,22 @@ contract MirrorPosition is CoreContract {
                 _position.traderSize > _callParams.sizeDeltaInUsd
                     && _position.traderCollateral > _callParams.collateralDelta
             ) {
-                _traderTargetLeverage = Precision.toBasisPoints(
-                    _position.traderSize - _callParams.sizeDeltaInUsd,
-                    _position.traderCollateral - _callParams.collateralDelta
-                );
+                uint _nextTraderCollateral = _position.traderCollateral - _callParams.collateralDelta;
+                // Denominator _nextTraderCollateral > 0 is guaranteed by the && condition
+                _traderTargetLeverage =
+                    Precision.toBasisPoints(_position.traderSize - _callParams.sizeDeltaInUsd, _nextTraderCollateral);
             } else {
                 _traderTargetLeverage = 0;
             }
         }
 
-        uint _sizeDelta;
-
         require(_traderTargetLeverage != _currentPuppetLeverage, Error.MirrorPosition__NoAdjustmentRequired());
-        require(_currentPuppetLeverage > 0, Error.MirrorPosition__NoAdjustmentRequired());
+        require(_currentPuppetLeverage > 0, Error.MirrorPosition__InvalidCurrentLeverage());
 
+        uint _sizeDelta;
         if (_traderTargetLeverage > _currentPuppetLeverage) {
-            _sizeDelta = (_position.size * (_traderTargetLeverage - _currentPuppetLeverage)) / _currentPuppetLeverage;
+            _sizeDelta = _position.size * (_traderTargetLeverage - _currentPuppetLeverage) / _currentPuppetLeverage;
+
             _requestKey = _submitOrder(
                 _callParams,
                 _allocationAddress,
@@ -398,7 +392,7 @@ contract MirrorPosition is CoreContract {
         } else {
             _sizeDelta = (_traderTargetLeverage == 0)
                 ? _position.size
-                : (_position.size * (_currentPuppetLeverage - _traderTargetLeverage)) / _currentPuppetLeverage;
+                : _position.size * (_currentPuppetLeverage - _traderTargetLeverage) / _currentPuppetLeverage;
             _requestKey = _submitOrder(
                 _callParams,
                 _allocationAddress,
@@ -433,72 +427,68 @@ contract MirrorPosition is CoreContract {
         );
     }
 
+    // Corrected execute function
     function execute(
         bytes32 _requestKey
     ) external auth {
         RequestAdjustment memory _request = requestAdjustmentMap[_requestKey];
         require(_request.allocationKey != bytes32(0), Error.MirrorPosition__ExecutionRequestMissing());
 
-        // Fetch position state *before* modification/deletion
-        Position memory _position = positionMap[_request.allocationKey];
+        Position memory _position = positionMap[_request.allocationKey]; // Fetch state BEFORE changes
 
         delete requestAdjustmentMap[_requestKey];
 
-        if (_request.traderTargetLeverage > 0) {
-            // Calculate current leverage before update
-            uint _currentLeverage = (_position.traderCollateral > 0)
-                ? Precision.toBasisPoints(_position.traderSize, _position.traderCollateral)
-                : 0;
+        if (_request.traderTargetLeverage == 0) {
+            delete positionMap[_request.allocationKey];
+            _logEvent("Execute", abi.encode(_request.allocationKey, _requestKey, 0, 0, 0, 0));
+            return;
+        }
 
-            // Apply trader's deltas first to reflect their intended state
-            if (_request.traderIsIncrease) {
-                _position.traderSize += _request.traderSizeDelta;
-                _position.traderCollateral += _request.traderCollateralDelta;
-            } else {
-                _position.traderSize = (_position.traderSize > _request.traderSizeDelta)
-                    ? _position.traderSize - _request.traderSizeDelta
-                    : 0;
-                _position.traderCollateral = (_position.traderCollateral > _request.traderCollateralDelta)
-                    ? _position.traderCollateral - _request.traderCollateralDelta
-                    : 0;
-            }
+        require(_position.traderCollateral > 0, Error.MirrorPosition__ExecuteOnZeroCollateralPosition());
+        uint _originalLeverage = Precision.toBasisPoints(_position.traderSize, _position.traderCollateral);
 
-            // Apply mirrored size delta based on whether leverage increased or decreased
-            if (_request.traderTargetLeverage > _currentLeverage) {
-                // Leverage increased
-                _position.size += _request.sizeDelta;
-            } else {
-                // Leverage decreased or position closed (_request.sizeDelta would be calculated accordingly in adjust)
-                _position.size = (_position.size > _request.sizeDelta) ? _position.size - _request.sizeDelta : 0;
-            }
+        if (_request.traderIsIncrease) {
+            _position.traderSize += _request.traderSizeDelta;
+            _position.traderCollateral += _request.traderCollateralDelta;
+        } else {
+            _position.traderSize = _position.traderSize - _request.traderSizeDelta;
+            _position.traderCollateral = _position.traderCollateral - _request.traderCollateralDelta;
+        }
 
-            // If size becomes 0, ensure collateral also reflects 0 (or handle dust)
-            if (_position.size == 0) {
-                _position.traderCollateral = 0;
-                _position.traderSize = 0;
-                delete positionMap[_request.allocationKey];
-            } else {
-                positionMap[_request.allocationKey] = _position;
-            }
+        if (_request.traderTargetLeverage > _originalLeverage) {
+            _position.size += _request.sizeDelta;
+        } else if (_request.traderTargetLeverage < _originalLeverage) {
+            _position.size = _position.size - _request.sizeDelta;
+        }
 
+        if (_position.size == 0) {
+            delete positionMap[_request.allocationKey];
             _logEvent(
                 "Execute",
                 abi.encode(
                     _request.allocationKey,
                     _requestKey,
-                    _position.traderSize, // Log state *after* applying deltas
+                    _position.traderSize,
                     _position.traderCollateral,
-                    _position.size,
-                    _request.traderTargetLeverage // Log the target leverage for this execution
+                    0,
+                    _request.traderTargetLeverage
                 )
             );
         } else {
-            delete positionMap[_request.allocationKey];
-
-            _logEvent("Execute", abi.encode(_request.allocationKey, _requestKey, 0, 0, 0, 0));
+            positionMap[_request.allocationKey] = _position;
+            _logEvent(
+                "Execute",
+                abi.encode(
+                    _request.allocationKey,
+                    _requestKey,
+                    _position.traderSize,
+                    _position.traderCollateral,
+                    _position.size,
+                    _request.traderTargetLeverage
+                )
+            );
         }
     }
-
     /**
      * @notice Settles and distributes funds received for a specific allocation instance.
      * @dev This function is called by a Keeper when funds related to a closed or partially closed
@@ -534,78 +524,65 @@ contract MirrorPosition is CoreContract {
         require(_puppetListLength > 0, Error.MirrorPosition__PuppetListEmpty());
 
         uint _allocated = allocationMap[_allocationKey];
-        require(_allocated > 0, Error.MirrorPosition__InvalidAllocation()); // Original allocation must exist
+        require(_allocated > 0, Error.MirrorPosition__InvalidAllocationOrFullyReduced());
 
         uint _keeperFee = _callParams.keeperExecutionFee;
         address _keeperFeeReceiver = _callParams.keeperExecutionFeeReceiver;
         require(_keeperFeeReceiver != address(0), Error.MirrorPosition__InvalidKeeperExeuctionFeeReceiver());
         require(_keeperFee > 0, Error.MirrorPosition__InvalidKeeperExeuctionFeeAmount());
 
-        // --- Fund Retrieval ---
         uint _settledBalance = _callParams.distributeToken.balanceOf(_allocationAddress);
-        // Allow settlement even if balance is 0 (e.g., liquidated position, nothing to recover)
-        // require(_settledBalance > 0, Error.MirrorPosition__NoSettledFunds());
 
-        // Transfer the *entire* settled balance from AllocationAccount to AllocationStore first
         if (_settledBalance > 0) {
             (bool success,) = AllocationAccount(_allocationAddress).execute(
                 address(_callParams.distributeToken),
-                abi.encodeWithSelector(
-                    _callParams.distributeToken.transfer.selector, address(allocationStore), _settledBalance
-                )
+                abi.encodeWithSelector(IERC20.transfer.selector, address(allocationStore), _settledBalance)
             );
             require(success, Error.MirrorPosition__SettlementTransferFailed());
 
-            // Notify AllocationStore about the incoming funds
             allocationStore.recordTransferIn(_callParams.distributeToken);
         }
 
-        uint _amountAvailableForDistribution = _settledBalance; // Start with the full settled amount
+        uint _amountToDistribute = _settledBalance;
 
-        require(_amountAvailableForDistribution >= _keeperFee, Error.MirrorPosition__InsufficientKeeperExecutionFee());
+        require(_amountToDistribute >= _keeperFee, Error.MirrorPosition__InsufficientSettledBalanceForKeeperFee());
 
-        // Deduct keeper fee
-        _amountAvailableForDistribution -= _keeperFee;
+        _amountToDistribute -= _keeperFee;
 
-        // Transfer fee to Keeper from AllocationStore
-        allocationStore.transferOut(_callParams.distributeToken, _callParams.keeperExecutionFeeReceiver, _keeperFee);
+        allocationStore.transferOut(_callParams.distributeToken, _keeperFeeReceiver, _keeperFee);
 
         uint _platformFeeAmount = 0;
         if (
-            config.platformSettleFeeFactor > 0 && _amountAvailableForDistribution > 0
+            config.platformSettleFeeFactor > 0 && _amountToDistribute > 0
                 && feeMarket.askAmount(_callParams.distributeToken) > 0
         ) {
-            // Calculate platform fee based on remaining amount *after* keeper fee
-            _platformFeeAmount = Precision.applyFactor(config.platformSettleFeeFactor, _amountAvailableForDistribution);
+            _platformFeeAmount = Precision.applyFactor(config.platformSettleFeeFactor, _amountToDistribute);
 
             if (_platformFeeAmount > 0) {
-                // Ensure fee doesn't exceed available amount
-                if (_platformFeeAmount > _amountAvailableForDistribution) {
-                    _platformFeeAmount = _amountAvailableForDistribution;
+                if (_platformFeeAmount > _amountToDistribute) {
+                    _platformFeeAmount = _amountToDistribute;
                 }
-
-                _amountAvailableForDistribution -= _platformFeeAmount;
-                // Deposit platform fee (from AllocationStore)
+                _amountToDistribute -= _platformFeeAmount;
                 feeMarket.deposit(_callParams.distributeToken, allocationStore, _platformFeeAmount);
             }
         }
 
-        // Distribute the final remaining amount
-        uint _finalAmountToDistribute = _amountAvailableForDistribution;
-
-        if (_finalAmountToDistribute > 0) {
+        if (_amountToDistribute > 0) {
             uint[] memory _nextBalanceList = allocationStore.getBalanceList(_callParams.distributeToken, _puppetList);
-            uint _distributedTotal = 0;
+            uint _distributedTotal = 0; // For potential dust check later if needed
 
             for (uint i = 0; i < _puppetListLength; i++) {
+                // Reads potentially reduced/zeroed share
                 uint _puppetAllocationShare = allocationPuppetMap[_allocationKey][_puppetList[i]];
                 if (_puppetAllocationShare == 0) continue;
 
-                uint _puppetDistribution = (_finalAmountToDistribute * _puppetAllocationShare) / _allocated;
+                uint _puppetDistribution = (_amountToDistribute * _puppetAllocationShare) / _allocated;
+
                 _nextBalanceList[i] += _puppetDistribution;
                 _distributedTotal += _puppetDistribution;
             }
             allocationStore.setBalanceList(_callParams.distributeToken, _puppetList, _nextBalanceList);
+            // Potential dust (_finalAmountToDistribute - _distributedTotal) remains in AllocationStore pool
         }
 
         _logEvent(
@@ -615,7 +592,8 @@ contract MirrorPosition is CoreContract {
                 _allocationKey,
                 _allocationAddress,
                 _keeperFeeReceiver,
-                _finalAmountToDistribute,
+                _settledBalance,
+                _amountToDistribute,
                 _platformFeeAmount,
                 _keeperFee
             )
@@ -627,12 +605,11 @@ contract MirrorPosition is CoreContract {
         address _allocationAddress,
         GmxPositionUtils.OrderType _orderType,
         uint _callbackGasLimit,
-        uint _sizeDeltaUsd, // Use clearer parameter names
-        uint _initialCollateralDeltaAmount // Use clearer parameter names
+        uint _sizeDeltaUsd,
+        uint _initialCollateralDeltaAmount
     ) internal returns (bytes32 gmxRequestKey) {
         require(msg.value >= _order.executionFee, Error.MirrorPosition__InsufficientGmxExecutionFee());
 
-        // Encode the call data for GMX Router's createOrder function
         bytes memory gmxCallData = abi.encodeWithSelector(
             config.gmxExchangeRouter.createOrder.selector,
             GmxPositionUtils.CreateOrderParams({
@@ -672,10 +649,7 @@ contract MirrorPosition is CoreContract {
             ErrorUtils.revertWithParsedMessage(returnData);
         }
 
-        // --- Process Result ---
-        // Decode the GMX request key from the returned data
         gmxRequestKey = abi.decode(returnData, (bytes32));
-        // Ensure GMX returned a valid request key
         require(gmxRequestKey != bytes32(0), Error.MirrorPosition__OrderCreationFailed());
     }
 
@@ -683,9 +657,14 @@ contract MirrorPosition is CoreContract {
         bytes calldata _data
     ) internal override {
         config = abi.decode(_data, (Config));
-        require(config.gmxExchangeRouter != IGmxExchangeRouter(address(0)), "Invalid GMX Router");
-        require(config.callbackHandler != address(0), "Invalid Callback Handler");
-        require(config.gmxOrderVault != address(0), "Invalid GMX Vault");
+        require(config.gmxExchangeRouter != IGmxExchangeRouter(address(0)), "Invalid GMX Router address");
+        require(config.callbackHandler != address(0), "Invalid Callback Handler address");
+        require(config.gmxOrderVault != address(0), "Invalid GMX Order Vault address");
+        require(config.referralCode != bytes32(0), "Invalid Referral Code");
         require(config.maxPuppetList > 0, "Invalid Max Puppet List");
+        require(config.increaseCallbackGasLimit > 0, "Invalid Increase Callback Gas Limit");
+        require(config.decreaseCallbackGasLimit > 0, "Invalid Decrease Callback Gas Limit");
+        require(config.platformSettleFeeFactor > 0, "Invalid Platform Settle Fee Factor");
+        require(config.minExecutionCostRate > 0, "Invalid Min Execution Cost Rate");
     }
 }
