@@ -79,6 +79,7 @@ library Error {
     error MirrorPosition__OrderCreationFailed();
     error MirrorPosition__ExecutionRequestMissing();
     error MirrorPosition__InvalidKeeperExeuctionFeeReceiver();
+    error MirrorPosition__ZeroCollateralDeltaForLeverage();
     error MirrorPosition__InvalidKeeperExeuctionFeeAmount();
     error MirrorPosition__ExecuteOnZeroCollateralPosition();
     error MirrorPosition__InvalidAllocationOrFullyReduced();
