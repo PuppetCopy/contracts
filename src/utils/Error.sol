@@ -64,41 +64,40 @@ library Error {
     error MatchRule__InvalidExpiryDuration(uint minExpiryDuration);
 
     // MirrorPosition
-    error MirrorPosition__AllocationAccountNotFound();
-    error MirrorPosition__NoNetFundsAllocated();
+    // --- Validation ---
     error MirrorPosition__InvalidAllocation();
-    error MirrorPosition__PositionNotFound();
-    error MirrorPosition__InitialMustBeIncrease();
-    error MirrorPosition__InvalidCollateralDelta();
-    error MirrorPosition__TraderCollateralZero();
-    error MirrorPosition__ZeroCollateralOnIncrease();
-    error MirrorPosition__InvalidSizeDelta();
-    error MirrorPosition__InvalidCurrentLeverage();
-    error MirrorPosition__PuppetListEmpty();
-    error MirrorPosition__SettlementTransferFailed();
-    error MirrorPosition__OrderCreationFailed();
-    error MirrorPosition__ExecutionRequestMissing();
-    error MirrorPosition__InvalidKeeperExeuctionFeeReceiver();
-    error MirrorPosition__ZeroCollateralDeltaForLeverage();
-    error MirrorPosition__InvalidKeeperExeuctionFeeAmount();
-    error MirrorPosition__ExecuteOnZeroCollateralPosition();
     error MirrorPosition__InvalidAllocationOrFullyReduced();
-    error MirrorPosition__InsufficientSettledBalanceForKeeperFee();
-    error MirrorPosition__KeeperExecutionFeeExceedsFactorLimit();
-    error MirrorPosition__InvalidGmxRouter();
-    error MirrorPosition__InvalidCallbackHandler();
-    error MirrorPosition__InvalidGmxOrderVault();
-    error MirrorPosition__InvalidMaxPuppetList();
-    error MirrorPosition__KeeperAdjustmentExecutionFeeExceedsAllocatedAmount();
-    error MirrorPosition__AllocationZeroAfterKeeperExecutionFeeReduction();
-    error MirrorPosition__KeeperFeeCollectionMismatch();
-    error MirrorPosition__InsufficientBalanceForKeeperFee();
-    error MirrorPosition__InsufficientCollectiveBalanceForKeeperFee();
-    error MirrorPosition__InsufficientKeeperExecutionFee();
-    error MirrorPosition__InsufficientGmxExecutionFee();
-    error MirrorPosition__NoAdjustmentRequired();
+    error MirrorPosition__InvalidCollateralDelta();
+    error MirrorPosition__InvalidCurrentLeverage();
+    error MirrorPosition__InvalidKeeperExeuctionFeeAmount();
+    error MirrorPosition__InvalidKeeperExeuctionFeeReceiver();
+    error MirrorPosition__InvalidSizeDelta();
+    error MirrorPosition__PuppetListEmpty();
     error MirrorPosition__MaxPuppetList();
-    error MirrorPosition__NoSettledFunds();
+
+    // --- State/Condition ---
+    error MirrorPosition__AllocationAccountNotFound();
+    error MirrorPosition__ExecuteOnZeroCollateralPosition();
+    error MirrorPosition__ExecutionRequestMissing();
+    error MirrorPosition__InitialMustBeIncrease();
+    error MirrorPosition__NoAdjustmentRequired();
+    error MirrorPosition__PositionNotFound();
+    error MirrorPosition__TraderCollateralZero();
+    error MirrorPosition__ZeroCollateralDeltaForLeverage();
+    error MirrorPosition__ZeroCollateralOnIncrease();
+
+    // --- Fee/Fund ---
+    error MirrorPosition__InsufficientBalanceForKeeperFee();
+    error MirrorPosition__InsufficientGmxExecutionFee();
+    error MirrorPosition__InsufficientKeeperExecutionFee();
+    error MirrorPosition__InsufficientSettledBalanceForKeeperFee();
+    error MirrorPosition__KeeperAdjustmentExecutionFeeExceedsAllocatedAmount();
+    error MirrorPosition__MinAllocationKeeperExecutionCostRate();
+    error MirrorPosition__MinAdjustmentKeeperExecutionCostRate();
+    error MirrorPosition__NoNetFundsAllocated();
+    // --- External Interaction ---
+    error MirrorPosition__OrderCreationFailed();
+    error MirrorPosition__SettlementTransferFailed();
 
     // GmxExecutionCallback
     error GmxExecutionCallback__InvalidOrderType(GmxPositionUtils.OrderType orderType);
