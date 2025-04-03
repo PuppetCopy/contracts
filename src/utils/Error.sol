@@ -92,8 +92,8 @@ library Error {
     error MirrorPosition__InsufficientKeeperExecutionFee();
     error MirrorPosition__InsufficientSettledBalanceForKeeperFee();
     error MirrorPosition__KeeperAdjustmentExecutionFeeExceedsAllocatedAmount();
-    error MirrorPosition__MinAllocationKeeperExecutionCostRate();
-    error MirrorPosition__MinAdjustmentKeeperExecutionCostRate();
+    error MirrorPosition__MinAllocationKeeperExecutionCostFactor();
+    error MirrorPosition__MinAdjustmentKeeperExecutionCostFactor();
     error MirrorPosition__NoNetFundsAllocated();
     // --- External Interaction ---
     error MirrorPosition__OrderCreationFailed();

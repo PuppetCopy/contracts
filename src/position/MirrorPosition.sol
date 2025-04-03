@@ -30,8 +30,8 @@ contract MirrorPosition is CoreContract {
         uint decreaseCallbackGasLimit;
         uint platformSettleFeeFactor;
         uint maxPuppetList;
-        uint minAllocationKeeperExecutionCostRate;
-        uint minAdjustmentKeeperExecutionCostRate;
+        uint minAllocationKeeperExecutionCostFactor;
+        uint minAdjustmentKeeperExecutionCostFactor;
     }
 
     struct Position {
@@ -197,7 +197,7 @@ contract MirrorPosition is CoreContract {
                 if (
                     _puppetBalance == 0
                         || _estimatedExecutionFeePerPuppet
-                            > Precision.applyBasisPoints(config.minAllocationKeeperExecutionCostRate, _puppetBalance)
+                            > Precision.applyFactor(config.minAllocationKeeperExecutionCostFactor, _puppetBalance)
                 ) {
                     continue;
                 }
@@ -212,8 +212,8 @@ contract MirrorPosition is CoreContract {
         allocationStore.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
 
         require(
-            Precision.applyBasisPoints(config.minAllocationKeeperExecutionCostRate, _allocation) > _keeperFee,
-            Error.MirrorPosition__MinAllocationKeeperExecutionCostRate()
+            Precision.applyFactor(config.minAllocationKeeperExecutionCostFactor, _allocation) > _keeperFee,
+            Error.MirrorPosition__MinAllocationKeeperExecutionCostFactor()
         );
         require(_allocation >= _keeperFee, Error.MirrorPosition__InsufficientKeeperExecutionFee());
 
@@ -364,15 +364,15 @@ contract MirrorPosition is CoreContract {
         uint _nextAllocation = _allocation - _puppetKeeperExecutionFeeInsolvency;
 
         require(
-            Precision.applyBasisPoints(config.minAdjustmentKeeperExecutionCostRate, _nextAllocation) > _keeperFee,
-            Error.MirrorPosition__MinAdjustmentKeeperExecutionCostRate()
+            Precision.applyFactor(config.minAdjustmentKeeperExecutionCostFactor, _nextAllocation) > _keeperFee,
+            Error.MirrorPosition__MinAdjustmentKeeperExecutionCostFactor()
         );
 
         allocationMap[_allocationKey] = _nextAllocation;
 
         uint _currentPuppetLeverage = Precision.toBasisPoints(_position.size, _nextAllocation);
-
         uint _traderTargetLeverage;
+
         if (_callParams.isIncrease) {
             _traderTargetLeverage = Precision.toBasisPoints(
                 _position.traderSize + _callParams.sizeDeltaInUsd,
@@ -461,10 +461,9 @@ contract MirrorPosition is CoreContract {
             return;
         }
 
-        // require(_position.traderCollateral > 0, Error.MirrorPosition__ExecuteOnZeroCollateralPosition());
         uint _allocation = allocationMap[_request.allocationKey];
         uint _currentPuppetLeverage =
-            _position.collateral > 0 ? Precision.toBasisPoints(_position.size, _position.collateral) : 0;
+            _position.collateral > 0 ? Precision.toBasisPoints(_position.size, _allocation) : 0;
 
         if (_request.traderTargetLeverage > _currentPuppetLeverage) {
             if (_request.traderIsIncrease) {
@@ -481,9 +480,7 @@ contract MirrorPosition is CoreContract {
 
             _position.size += _request.sizeDelta;
         }
-        // else if (_request.traderTargetLeverage < _originalLeverage) {
-        //     _position.size = (_position.size > _request.sizeDelta) ? _position.size - _request.sizeDelta : 0;
-        // }
+
 
         if (_position.size == 0) {
             delete positionMap[_request.allocationKey];
@@ -688,6 +685,6 @@ contract MirrorPosition is CoreContract {
         require(config.increaseCallbackGasLimit > 0, "Invalid Increase Callback Gas Limit");
         require(config.decreaseCallbackGasLimit > 0, "Invalid Decrease Callback Gas Limit");
         require(config.platformSettleFeeFactor > 0, "Invalid Platform Settle Fee Factor");
-        require(config.minAllocationKeeperExecutionCostRate > 0, "Invalid Min Execution Cost Rate");
+        require(config.minAllocationKeeperExecutionCostFactor > 0, "Invalid Min Execution Cost Rate");
     }
 }
