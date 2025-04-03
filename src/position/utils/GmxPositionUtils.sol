@@ -87,13 +87,13 @@ library GmxPositionUtils {
 
     // @note all params except should be part of the corresponding struct hash in all relay contracts
     struct CreateOrderParamsAddresses {
-        address receiver;
-        address cancellationReceiver;
-        address callbackContract;
-        address uiFeeReceiver;
-        address market;
-        IERC20 initialCollateralToken;
-        address[] swapPath;
+        address receiver; // The AllocationAccount contract owns the position on GMX
+        address cancellationReceiver; // Where funds go if order is cancelled before execution
+        address callbackContract; // Contract GMX calls after execution/failure
+        address uiFeeReceiver; // Optional: Address for UI referral fees
+        address market; // The market identifier on GMX
+        IERC20 initialCollateralToken; // The collateral token address
+        address[] swapPath; // Path for potential collateral swap (not used here)
     }
 
     // @param sizeDeltaUsd for order.sizeDeltaUsd

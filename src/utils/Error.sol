@@ -65,16 +65,27 @@ library Error {
 
     // MirrorPosition
     error MirrorPosition__AllocationAccountNotFound();
+    error MirrorPosition__NoFundsAllocated();
     error MirrorPosition__InvalidAllocation();
     error MirrorPosition__PositionNotFound();
     error MirrorPosition__InitialMustBeIncrease();
     error MirrorPosition__InvalidCollateralDelta();
     error MirrorPosition__InvalidSizeDelta();
-    error MirrorPosition__InvalidPuppetList();
+    error MirrorPosition__InvalidCurrentLeverage();
+    error MirrorPosition__PuppetListEmpty();
     error MirrorPosition__SettlementTransferFailed();
     error MirrorPosition__OrderCreationFailed();
     error MirrorPosition__ExecutionRequestMissing();
-    error MirrorPosition__ExecutionFeeExceedsFactorLimit();
+    error MirrorPosition__InvalidKeeperExeuctionFeeReceiver();
+    error MirrorPosition__InvalidKeeperExeuctionFeeAmount();
+    error MirrorPosition__KeeperExecutionFeeExceedsFactorLimit();
+    error MirrorPosition__KeeperAdjustmentExecutionFeeExceedsAllocatedAmount();
+    error MirrorPosition__KeeperFeeCollectionMismatch();
+    error MirrorPosition__InsufficientBalanceForKeeperFee();
+    error MirrorPosition__InsufficientCollectiveBalanceForKeeperFee();
+    error MirrorPosition__InsufficientKeeperExecutionFee();
+    error MirrorPosition__InsufficientGmxExecutionFee();
+    error MirrorPosition__NoAdjustmentRequired();
     error MirrorPosition__MaxPuppetList();
     error MirrorPosition__NoSettledFunds();
 
