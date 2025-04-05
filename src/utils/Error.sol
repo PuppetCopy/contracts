@@ -83,17 +83,14 @@ library Error {
     error MirrorPosition__NoAdjustmentRequired();
     error MirrorPosition__PositionNotFound();
     error MirrorPosition__TraderCollateralZero();
-    error MirrorPosition__ZeroCollateralDeltaForLeverage();
     error MirrorPosition__ZeroCollateralOnIncrease();
 
     // --- Fee/Fund ---
     error MirrorPosition__InsufficientBalanceForKeeperFee();
     error MirrorPosition__InsufficientGmxExecutionFee();
-    error MirrorPosition__InsufficientKeeperExecutionFee();
     error MirrorPosition__InsufficientSettledBalanceForKeeperFee();
     error MirrorPosition__KeeperAdjustmentExecutionFeeExceedsAllocatedAmount();
-    error MirrorPosition__MinAllocationKeeperExecutionCostFactor();
-    error MirrorPosition__MinAdjustmentKeeperExecutionCostFactor();
+    error MirrorPosition__KeeperFeeExceedsCostFactor();
     error MirrorPosition__NoNetFundsAllocated();
     // --- External Interaction ---
     error MirrorPosition__OrderCreationFailed();
