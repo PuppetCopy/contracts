@@ -64,7 +64,7 @@ library Error {
     error MatchRule__InvalidExpiryDuration(uint minExpiryDuration);
 
     // MirrorPosition
-    // --- Validation ---
+    // --- Call Validation ---
     error MirrorPosition__InvalidAllocation();
     error MirrorPosition__InvalidAllocationOrFullyReduced();
     error MirrorPosition__InvalidCollateralDelta();
@@ -74,6 +74,10 @@ library Error {
     error MirrorPosition__InvalidSizeDelta();
     error MirrorPosition__PuppetListEmpty();
     error MirrorPosition__MaxPuppetList();
+    error MirrorPosition__InvalidReceiver();
+    error MirrorPosition__DustThresholdNotSet();
+    error MirrorPosition__NoDustToCollect();
+    error MirrorPosition__AmountExceedsDustThreshold();
 
     // --- State/Condition ---
     error MirrorPosition__AllocationAccountNotFound();
@@ -84,11 +88,11 @@ library Error {
     error MirrorPosition__PositionNotFound();
     error MirrorPosition__TraderCollateralZero();
     error MirrorPosition__ZeroCollateralOnIncrease();
+    error MirrorPosition__DustTransferFailed();
 
     // --- Fee/Fund ---
-    error MirrorPosition__InsufficientBalanceForKeeperFee();
-    error MirrorPosition__InsufficientGmxExecutionFee();
     error MirrorPosition__InsufficientSettledBalanceForKeeperFee();
+    error MirrorPosition__InsufficientGmxExecutionFee();
     error MirrorPosition__KeeperAdjustmentExecutionFeeExceedsAllocatedAmount();
     error MirrorPosition__KeeperFeeExceedsCostFactor();
     error MirrorPosition__NoNetFundsAllocated();

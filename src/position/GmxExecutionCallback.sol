@@ -48,7 +48,7 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
     function afterOrderExecution(
         bytes32 key,
         GmxPositionUtils.Props calldata order,
-        bytes calldata eventData
+        bytes calldata /*eventData*/
     ) external auth {
         if (
             GmxPositionUtils.isIncreaseOrder(order.numbers.orderType)

@@ -30,8 +30,9 @@ contract MirrorPosition is CoreContract {
         uint decreaseCallbackGasLimit;
         uint platformSettleFeeFactor;
         uint maxPuppetList;
-        uint minAllocationKeeperExecutionCostFactor;
-        uint minAdjustmentKeeperExecutionCostFactor;
+        uint maxKeeperFeeToAllocationRatio;
+        uint maxKeeperFeeToAdjustmentRatio;
+        uint maxKeeperFeeToCollectDustRatio;
     }
 
     struct Position {
@@ -73,6 +74,14 @@ contract MirrorPosition is CoreContract {
         uint sizeDelta;
     }
 
+    struct CollectDustParams {
+        IERC20 dustToken;
+        address keeperExecutionFeeReceiver;
+        address trader;
+        uint allocationId;
+        uint keeperExecutionFee;
+    }
+
     Config public config;
 
     AllocationStore immutable allocationStore;
@@ -87,6 +96,7 @@ contract MirrorPosition is CoreContract {
     mapping(bytes32 => uint) public allocationMap; // used as a denominator
     mapping(bytes32 => Position) public positionMap;
     mapping(bytes32 => RequestAdjustment) public requestAdjustmentMap;
+    mapping(IERC20 => uint) public tokenDustThresholdAmountMap;
 
     function getConfig() external view returns (Config memory) {
         return config;
@@ -127,33 +137,35 @@ contract MirrorPosition is CoreContract {
     }
 
     /**
-     * @notice Initiates the mirroring of a new trader position increase on GMX for a specified list of puppets.
-     * @dev Called by an authorized Keeper (`auth`) to start the copy-trading process for a new position.
-     * This function calculates how much capital each eligible puppet allocates based on matching rules (`MatchRule`),
-     * available balances (`AllocationStore`), activity throttles, and minimum required allocation relative to the
-     * provided keeper execution fee (`_callParams.keeperExecutionFee`). It updates the puppets' balances in the
-     * `AllocationStore` via `setBalanceList`, deducts the keeper fee from the total allocated amount (`_allocated`)
-     * to get the net allocation (`_netAllocation`), and then explicitly moves funds using the confirmed mechanism:
-     * 1. The total gross allocated amount (`_allocated`) is transferred from `AllocationStore` *to* this
-     * `MirrorPosition` contract
-     * (using the confirmed `allocationStore.transferOut(..., address(this), _allocated)` method).
-     * 2. The internal helper `_disburseFunds` is called, which uses `SafeERC20.safeTransfer` to send funds *from* this
-     * contract:
-     * - The `keeperExecutionFee` (if > 0) is sent to the `_callParams.keeperExecutionFeeReceiver`.
-     * - The `_netAllocation` amount is sent to the GMX order vault (`config.gmxOrderVault`).
-     * It then calculates the proportional size delta (`_sizeDelta`) for the mirrored position based on the
-     * `_netAllocation` capital
-     * and submits a `MarketIncrease` order to the GMX Router via `_submitOrder`. The `_submitOrder` function
-     * forwards the `msg.value` (provided by the Keeper) to cover the GMX network execution fee
-     * (`_callParams.executionFee`).
-     * Finally, it stores the total gross allocation in `allocationMap` (for settlement calculations) and records
-     * request details in `requestAdjustmentMap` (for processing by the `execute` function upon GMX callback).
-     * Emits a `KeeperFeePaid` event (if applicable via `_disburseFunds`) and logs a `Mirror` event.
-     * Requires `_callParams.isIncrease` to be true as this function only handles initial position opening.
-     * @param _callParams Structure containing details of the trader's action (must be `isIncrease=true`),
+     * @notice Starts copying a trader's new position opening (increase) for a selected group of followers (puppets).
+     * @dev Called by an authorized Keeper (`auth`) to initiate the copy-trading process when a followed trader opens a
+     * new position.
+     * This function determines how much capital each eligible puppet allocates based on their individual matching rules
+     * (`MatchRule`),
+     * available funds (`AllocationStore`), and activity limits. It ensures the total allocated amount is sufficient to
+     * cover the
+     * provided keeper execution fee (`_callParams.keeperExecutionFee`).
+     *
+     * The function orchestrates the fund movements:
+     * 1. It reserves the calculated allocation amounts from each puppet's balance in the `AllocationStore`.
+     * 2. It transfers the total collected capital from the `AllocationStore`.
+     * 3. It pays the `keeperExecutionFee` to the designated `_keeperFeeReceiver`.
+     * 4. It sends the remaining net capital (`_netAllocation`) to the GMX order vault (`config.gmxOrderVault`) to
+     * collateralize the position.
+     *
+     * It then calculates the appropriate size (`_sizeDelta`) for the combined puppet position, proportional to the net
+     * capital provided,
+     * and submits a `MarketIncrease` order to the GMX Router. The Keeper must provide `msg.value` to cover the GMX
+     * network execution fee (`_callParams.executionFee`).
+     *
+     * Finally, it records details about this specific mirror action, including the total capital committed
+     * (`allocationMap`) and the GMX request details (`requestAdjustmentMap`),
+     * which are necessary for future adjustments or settlement via the `execute` function upon GMX callback.
+     * Emits a `Mirror` event with key details.
+     * @param _callParams Structure containing details of the trader's initial action (must be `isIncrease=true`),
      * market, collateral, size/collateral deltas, GMX execution fee, keeper fee, and keeper fee receiver.
      * @param _puppetList An array of puppet addresses to potentially participate in mirroring this position.
-     * @return _nextAllocationId A unique ID for this allocation instance, incremented for each call.
+     * @return _nextAllocationId A unique ID generated for this specific allocation instance.
      * @return _requestKey The unique key returned by GMX identifying the created order request, used for callbacks.
      */
     function mirror(
@@ -195,7 +207,7 @@ contract MirrorPosition is CoreContract {
                 if (
                     _puppetBalance == 0
                         || _estimatedExecutionFeePerPuppet
-                            > Precision.applyFactor(config.minAllocationKeeperExecutionCostFactor, _puppetBalance)
+                            > Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _puppetBalance)
                 ) {
                     continue;
                 }
@@ -210,7 +222,7 @@ contract MirrorPosition is CoreContract {
         allocationStore.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
 
         require(
-            Precision.applyFactor(config.minAllocationKeeperExecutionCostFactor, _allocation) >= _keeperFee,
+            _keeperFee < Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _allocation),
             Error.MirrorPosition__KeeperFeeExceedsCostFactor()
         );
 
@@ -260,29 +272,25 @@ contract MirrorPosition is CoreContract {
     }
 
     /**
-     * @notice Adjusts an existing mirrored GMX position based on a subsequent action by the trader.
-     * @dev Called by an authorized Keeper (`auth`) to modify an active mirrored position (increase/decrease size or
-     * collateral),
-     * reflecting the trader's latest action. Requires `msg.value` to cover the GMX execution fee
-     * (`_callParams.executionFee`).
-     * This function implements a non-blocking fee mechanism: if a puppet lacks sufficient free balance in
-     * `AllocationStore`
-     * to cover their share of the `_callParams.keeperExecutionFee`, their allocation share for this specific position
-     * (`allocationPuppetMap`) is permanently reduced by the fee amount (potentially to zero), and the total allocation
-     * (`allocationMap`) is updated. This allows the adjustment to proceed for solvent puppets but affects the insolvent
-     * puppet's final settlement. The *full* `_keeperFee` is paid immediately to the `_keeperFeeReceiver` via
-     * `AllocationStore`.
-     * The function calculates the position's current effective leverage (`_currentPuppetLeverage`) using the GMX
-     * position size
-     * relative to the *potentially reduced* total allocation. It determines the trader's new target leverage
-     * (`_traderTargetLeverage`)
-     * from the call parameters. It then computes the required mirrored size change (`_sizeDelta`) to shift the
-     * effective leverage
-     * towards the trader's target and submits the corresponding GMX `MarketIncrease` or `MarketDecrease` order via
-     * `_submitOrder`,
-     * forwarding the GMX fee. Stores request details in `requestAdjustmentMap` for the `execute` callback. Updates
-     * state maps
-     * (`allocationMap`, `allocationPuppetMap`) if modified by fee insolvency. Logs an `Adjust` event.
+     * @notice Adjusts an existing mirrored position to follow a trader's action (increase/decrease).
+     * @dev Called by an authorized Keeper when the trader being copied modifies their GMX position. This function
+     * ensures the combined puppet position reflects the trader's change. It requires `msg.value` from the Keeper
+     * to cover the GMX network fee for submitting the adjustment order.
+     *
+     * This function handles the Keeper's execution fee (`_callParams.keeperExecutionFee`) in a way that doesn't block
+     * the adjustment for all puppets if one cannot pay. It attempts to deduct each puppet's share of the fee from
+     * their available balance in the `AllocationStore`. If a puppet lacks sufficient funds, their invested amount
+     * (`allocationPuppetMap`) in *this specific position* is reduced by the unpaid fee amount. The *full* keeper fee
+     * is paid immediately using funds from the `AllocationStore`.
+     *
+     * The core logic calculates the trader's new target leverage based on their latest action. It compares this to the
+     * current leverage of the mirrored position (considering any reductions due to fee insolvency). It then determines
+     * the required size change (`_sizeDelta`) for the mirrored position to match the trader's target leverage and
+     * submits the corresponding `MarketIncrease` or `MarketDecrease` order to GMX.
+     *
+     * Details about the adjustment request are stored (`requestAdjustmentMap`) for processing when GMX confirms the
+     * order execution via the `execute` function callback. If puppet allocations were reduced due to fee handling,
+     * the total allocation (`allocationMap`) is updated. Emits an `Adjust` event.
      * @param _callParams Structure containing details of the trader's adjustment action (deltas must be > 0),
      * market, collateral, GMX execution fee, keeper fee, and keeper fee receiver.
      * @param _puppetList The list of puppet addresses associated with this specific allocation instance.
@@ -353,7 +361,7 @@ contract MirrorPosition is CoreContract {
         uint _nextAllocation = _allocation - _puppetKeeperExecutionFeeInsolvency;
 
         require(
-            Precision.applyFactor(config.minAdjustmentKeeperExecutionCostFactor, _allocation) >= _keeperFee,
+            _keeperFee < Precision.applyFactor(config.maxKeeperFeeToAdjustmentRatio, _allocation),
             Error.MirrorPosition__KeeperFeeExceedsCostFactor()
         );
 
@@ -423,8 +431,8 @@ contract MirrorPosition is CoreContract {
             abi.encode(
                 _matchKey,
                 _allocationKey,
-                _requestKey,
                 _allocationAddress,
+                _requestKey,
                 _keeperFeeReceiver,
                 _keeperFee,
                 _nextAllocation,
@@ -435,6 +443,18 @@ contract MirrorPosition is CoreContract {
         );
     }
 
+    /**
+     * @notice Finalizes the state update after a GMX order execution.
+     * @dev This function is called by the `GmxExecutionCallback` contract via its `afterOrderExecution` function,
+     * which is triggered by GMX's callback mechanism upon successful order execution (increase or decrease).
+     * It uses the GMX request key (`_requestKey`) to retrieve the details of the intended adjustment stored
+     * during the `mirror` or `adjust` call. It updates the internal position state (`positionMap`) to reflect
+     * the executed changes in size and collateral, based on the stored `RequestAdjustment` data.
+     * If the adjustment results in closing the position (target leverage becomes zero or size becomes zero),
+     * it cleans up the position data. Finally, it removes the processed `RequestAdjustment` record and emits
+     * an `Execute` event.
+     * @param _requestKey The unique key provided by GMX identifying the executed order request.
+     */
     function execute(
         bytes32 _requestKey
     ) external auth {
@@ -549,13 +569,15 @@ contract MirrorPosition is CoreContract {
                 abi.encodeWithSelector(IERC20.transfer.selector, address(allocationStore), _settledBalance)
             );
             require(success, Error.MirrorPosition__SettlementTransferFailed());
+            require(
+                _keeperFee < Precision.applyFactor(config.maxKeeperFeeToCollectDustRatio, _settledBalance),
+                Error.MirrorPosition__SettlementTransferFailed()
+            );
 
             allocationStore.recordTransferIn(_callParams.distributeToken);
         }
 
-        uint _distributionAmount = _settledBalance;
-        require(_distributionAmount >= _keeperFee, Error.MirrorPosition__InsufficientSettledBalanceForKeeperFee());
-        _distributionAmount -= _keeperFee;
+        uint _distributionAmount = _settledBalance - _keeperFee;
 
         allocationStore.transferOut(_callParams.distributeToken, _keeperFeeReceiver, _keeperFee);
 
@@ -598,12 +620,33 @@ contract MirrorPosition is CoreContract {
                 _allocationKey,
                 _allocationAddress,
                 _keeperFeeReceiver,
+                _keeperFee,
                 _settledBalance,
                 _distributionAmount,
-                _platformFeeAmount,
-                _keeperFee
+                _platformFeeAmount
             )
         );
+    }
+
+    function collectDust(AllocationAccount _allocationAccount, IERC20 _dustToken, address _receiver) external auth {
+        require(_receiver != address(0), Error.MirrorPosition__InvalidReceiver());
+
+        uint _dustAmount = _dustToken.balanceOf(address(_allocationAccount));
+        uint _dustThreshold = tokenDustThresholdAmountMap[_dustToken];
+
+        require(_dustThreshold > 0, Error.MirrorPosition__DustThresholdNotSet());
+        require(_dustAmount > 0, Error.MirrorPosition__NoDustToCollect());
+        require(_dustAmount <= _dustThreshold, Error.MirrorPosition__AmountExceedsDustThreshold());
+
+        (bool success,) = _allocationAccount.execute(
+            address(_dustToken), abi.encodeWithSelector(IERC20.transfer.selector, address(allocationStore), _dustAmount)
+        );
+
+        require(success, Error.MirrorPosition__DustTransferFailed());
+
+        allocationStore.transferOut(_dustToken, _receiver, _dustAmount);
+
+        _logEvent("CollectDust", abi.encode(_allocationAccount, _dustToken, _receiver, _dustAmount));
     }
 
     function _submitOrder(
@@ -671,6 +714,20 @@ contract MirrorPosition is CoreContract {
         require(config.increaseCallbackGasLimit > 0, "Invalid Increase Callback Gas Limit");
         require(config.decreaseCallbackGasLimit > 0, "Invalid Decrease Callback Gas Limit");
         require(config.platformSettleFeeFactor > 0, "Invalid Platform Settle Fee Factor");
-        require(config.minAllocationKeeperExecutionCostFactor > 0, "Invalid Min Execution Cost Rate");
+        require(config.maxKeeperFeeToAllocationRatio > 0, "Invalid Min Execution Cost Rate");
+        require(config.maxKeeperFeeToAdjustmentRatio > 0, "Invalid Min Adjustment Execution Cost Rate");
+        require(config.maxKeeperFeeToCollectDustRatio > 0, "Invalid Min Collect Dust Execution Cost Rate");
+    }
+
+    /**
+     * @notice Sets the dust threshold for a specific token
+     * @dev Only callable by governance through the authority system
+     * @param _token The token address to set the threshold for
+     * @param _dustThreshold The maximum amount considered "dust" for this token
+     */
+    function setTokenDustThreshold(IERC20 _token, uint _dustThreshold) external auth {
+        tokenDustThresholdAmountMap[_token] = _dustThreshold;
+
+        _logEvent("SetTokenDustThreshold", abi.encode(_token, _dustThreshold));
     }
 }
