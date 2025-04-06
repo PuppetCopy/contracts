@@ -14,21 +14,14 @@ import {IAuthority} from "./utils/interfaces/IAuthority.sol";
  *         to manage the implementation address.
  */
 contract RouterProxy is Proxy, Access {
-    /**
-     * @notice Sets the initial router implementation.
-     * @param _authority The authority contract for access control.
-     * @param _impl The address of the initial router contract.
-     */
-    constructor(IAuthority _authority, address _impl, bytes memory _data) payable Access(_authority) {
-        ERC1967Utils.upgradeToAndCall(_impl, _data);
-    }
+    constructor(
+        IAuthority _authority
+    ) payable Access(_authority) {}
 
-    /**
-     * @notice Upgrades the router implementation to a new contract.
-     * @param _impl The address of the new router contract.
-     */
-    function upgrade(address _impl, bytes memory _data) external auth {
-        ERC1967Utils.upgradeToAndCall(_impl, _data);
+    function updateRouter(
+        address _impl
+    ) external auth {
+        ERC1967Utils.upgradeToAndCall(_impl, "");
     }
 
     /**

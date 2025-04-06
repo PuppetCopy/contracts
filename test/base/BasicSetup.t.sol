@@ -44,12 +44,9 @@ contract BasicSetup is Test {
         vm.startPrank(users.owner);
 
         dictator = new Dictatorship(users.owner);
-        tokenRouter = new TokenRouter(dictator);
+        tokenRouter = new TokenRouter(dictator, 200_000);
         puppetToken = new PuppetToken();
         vPuppetToken = new PuppetVoteToken(dictator);
-
-        dictator.setPermission(tokenRouter, tokenRouter.setTransferGasLimit.selector, users.owner);
-        tokenRouter.setTransferGasLimit(200_000);
 
         skip(1 hours);
     }

@@ -5,73 +5,17 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-import {GmxExecutionCallback} from "./position/GmxExecutionCallback.sol";
-
 import {MatchRule} from "./position/MatchRule.sol";
-import {MirrorPosition} from "./position/MirrorPosition.sol"; // Imports MirrorPosition and its structs
-// import {AllocationAccount} from "./shared/AllocationAccount.sol"; // AllocationAccount not directly used here
-import {FeeMarketplace} from "./tokenomics/FeeMarketplace.sol";
-import {CoreContract} from "./utils/CoreContract.sol";
-import {IAuthority} from "./utils/interfaces/IAuthority.sol";
+import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
 
-contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
-    // Position module configuration.
-    struct Config {
-        MatchRule matchRule;
-        MirrorPosition position;
-        GmxExecutionCallback executionCallback;
-        FeeMarketplace feeMarketplace;
+contract Router is ReentrancyGuardTransient, Multicall {
+    MatchRule public immutable matchRule;
+    FeeMarketplace public immutable feeMarketplace;
+
+    constructor(MatchRule _matchRule, FeeMarketplace _feeMarketplace) {
+        matchRule = _matchRule;
+        feeMarketplace = _feeMarketplace;
     }
-
-    Config public config;
-
-    constructor(
-        IAuthority _authority
-    ) CoreContract(_authority) {}
-
-    // --- MirrorPosition Interaction ---
-
-    // /**
-    //  * @notice Allocates capital from puppets for a trader.
-    //  * @param params Allocation parameters including collateral token and trader.
-    //  * @param puppetList List of puppet addresses (owners) to allocate from.
-    //  * @return allocationId The unique ID for this allocation instance.
-    //  */
-    function allocate(
-        MirrorPosition.CallPosition calldata params,
-        address[] calldata puppetList
-    ) external nonReentrant auth returns (uint _nextAllocationId, bytes32 _requestKey) {
-        return config.position.mirror(params, puppetList);
-    }
-
-    /**
-     * @notice Mirrors a trader's position action (increase or decrease).
-     * @param params Position parameters including deltas, market, direction, and allocationId.
-     * @param puppetList List of puppet addresses involved in the allocation.
-     * @return nextAllocationId The next allocation ID for the position.
-     * @return requestKey The unique key for this request.
-     */
-    function adjust(
-        MirrorPosition.CallPosition calldata params,
-        address[] calldata puppetList
-    ) external payable nonReentrant auth returns (uint nextAllocationId, bytes32 requestKey) {
-        return config.position.mirror{value: msg.value}(params, puppetList);
-    }
-
-    /**
-     * @notice Settles funds back to puppets after a position is closed or adjusted.
-     * @param params Settlement parameters including allocation details and token to distribute.
-     * @param puppetList List of puppet addresses involved in the allocation.
-     */
-    function settle(
-        MirrorPosition.CallSettle calldata params,
-        address[] calldata puppetList
-    ) external nonReentrant auth {
-        // Updated call: pass the struct and puppetList
-        config.position.settle(params, puppetList);
-    }
-
-    // --- MatchRule Interaction ---
 
     /**
      * @notice Deposits tokens into the system for a user (potential puppet).
@@ -79,8 +23,7 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
      * @param amount The amount being deposited.
      */
     function deposit(IERC20 token, uint amount) external nonReentrant {
-        // Calls MatchRule, which interacts with AllocationStore using msg.sender
-        config.matchRule.deposit(token, msg.sender, amount);
+        matchRule.deposit(token, msg.sender, amount);
     }
 
     /**
@@ -90,8 +33,7 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
      * @param amount The amount being withdrawn.
      */
     function withdraw(IERC20 token, address receiver, uint amount) external nonReentrant {
-        // Calls MatchRule, which interacts with AllocationStore using msg.sender
-        config.matchRule.withdraw(token, msg.sender, receiver, amount);
+        matchRule.withdraw(token, msg.sender, receiver, amount);
     }
 
     /**
@@ -105,21 +47,16 @@ contract Router is CoreContract, ReentrancyGuardTransient, Multicall {
         address trader,
         MatchRule.Rule calldata ruleParams
     ) external nonReentrant {
-        // Calls MatchRule, associating msg.sender with the trader rule
-        config.matchRule.setRule(collateralToken, msg.sender, trader, ruleParams);
+        matchRule.setRule(collateralToken, msg.sender, trader, ruleParams);
     }
 
-    // --- Configuration ---
-
-    function _setConfig(
-        bytes calldata data
-    ) internal override {
-        config = abi.decode(data, (Config));
-        // Add checks for valid addresses if needed
-        require(address(config.matchRule) != address(0), "Router: Invalid MatchRule");
-        require(address(config.position) != address(0), "Router: Invalid MirrorPosition");
-        // require(address(config.executionCallback) != address(0), "Router: Invalid ExecutionCallback"); // Callback
-        // might be optional depending on flow
-        require(address(config.feeMarketplace) != address(0), "Router: Invalid FeeMarketplace");
+    /**
+     * @notice Executes a fee redemption offer.
+     * @param feeToken The fee token to be redeemed.
+     * @param receiver The address receiving the fee tokens.
+     * @param purchaseAmount The amount of fee tokens to redeem.
+     */
+    function acceptOffer(IERC20 feeToken, address receiver, uint purchaseAmount) external nonReentrant {
+        feeMarketplace.acceptOffer(feeToken, msg.sender, receiver, purchaseAmount);
     }
 }
