@@ -4,20 +4,19 @@ pragma solidity ^0.8.28;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {CallUtils} from "../utils/CallUtils.sol";
-import {Permission} from "./../utils/auth/Permission.sol";
+import {Access} from "./../utils/auth/Access.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 
 /**
- * @title Router
- * @dev Users will approve this router for token spenditures
+ * @title TokenRouter
+ * @dev Central token router and spending approval for transferring tokens
  */
-contract TokenRouter is Permission {
+contract TokenRouter is Access {
     uint transferGasLimit;
 
-    constructor(
-        IAuthority _authority
-    ) Permission(_authority) {
+    constructor(IAuthority _authority, uint _initialTransferGasLimit) Access(_authority) {
         authority = _authority;
+        transferGasLimit = _initialTransferGasLimit;
     }
 
     /**
@@ -28,9 +27,7 @@ contract TokenRouter is Permission {
      * @param amount the amount to transfer
      */
     function transfer(IERC20 token, address from, address to, uint amount) external auth {
-        CallUtils.callTarget(
-            transferGasLimit, address(token), abi.encodeCall(token.transferFrom, (from, to, amount))
-        );
+        CallUtils.callTarget(transferGasLimit, address(token), abi.encodeCall(token.transferFrom, (from, to, amount)));
     }
 
     function setTransferGasLimit(
