@@ -3,12 +3,12 @@ pragma solidity ^0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Error} from "src/utils/Error.sol";
+import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
+import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
-import {FeeMarketplace} from "src/tokenomics/FeeMarketplace.sol";
-import {FeeMarketplaceStore} from "src/tokenomics/FeeMarketplaceStore.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {BankStore} from "src/utils/BankStore.sol";
+import {Error} from "src/utils/Error.sol";
 import {IAuthority} from "src/utils/interfaces/IAuthority.sol";
 
 import {BasicSetup} from "../base/BasicSetup.t.sol";
@@ -36,10 +36,10 @@ contract FeeMarketplaceTest is BasicSetup {
         dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, users.owner);
         dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, users.owner);
 
-        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
+        dictator.setAccess(tokenRouter, address(feeMarketplaceStore));
         dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
         dictator.setAccess(testFundingStore, address(feeMarketplaceStore));
- 
+
         // Initialize with a 1-day distribution timeframe, 100% burn, no distributor.
         dictator.initContract(
             feeMarketplace,

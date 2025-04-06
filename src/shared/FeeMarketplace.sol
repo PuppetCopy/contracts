@@ -5,13 +5,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {TokenRouter} from "../shared/TokenRouter.sol";
+import {PuppetToken} from "../tokenomics/PuppetToken.sol";
 import {BankStore} from "../utils/BankStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {FeeMarketplaceStore} from "./FeeMarketplaceStore.sol";
-import {PuppetToken} from "./PuppetToken.sol";
 
 /**
  * @title Oracle-less Gradual Fee Marketplace
@@ -187,11 +187,11 @@ contract FeeMarketplace is CoreContract {
     /**
      * @notice Sets the redemption cost (price in protocol tokens) for a fee token.
      * @param _feeToken The fee token.
-     * @param _newCost The new cost in protocol tokens.
+     * @param _amount The new cost in protocol tokens.
      */
-    function setAskPrice(IERC20 _feeToken, uint _newCost) external auth {
-        askAmount[_feeToken] = _newCost;
-        _logEvent("SetRedemptionCost", abi.encode(_feeToken, _newCost));
+    function setAskPrice(IERC20 _feeToken, uint _amount) external auth {
+        askAmount[_feeToken] = _amount;
+        _logEvent("SetAskAmount", abi.encode(_feeToken, _amount));
     }
 
     /**
