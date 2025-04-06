@@ -4,9 +4,9 @@ pragma solidity ^0.8.28;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {PositionUtils} from "../position/utils/PositionUtils.sol";
-import {Error} from "../utils/Error.sol";
 import {AllocationStore} from "../shared/AllocationStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
+import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {MirrorPosition} from "./MirrorPosition.sol";
 
@@ -18,13 +18,13 @@ contract MatchRule is CoreContract {
     }
 
     struct Config {
+        IERC20[] tokenAllowanceList;
+        uint[] tokenAllowanceCapList;
         uint minExpiryDuration;
         uint minAllowanceRate;
         uint maxAllowanceRate;
         uint minActivityThrottle;
         uint maxActivityThrottle;
-        IERC20[] tokenAllowanceList;
-        uint[] tokenAllowanceAmountList;
     }
 
     Config public config;
@@ -111,26 +111,33 @@ contract MatchRule is CoreContract {
 
         bytes32 _matchKey = PositionUtils.getMatchKey(_collateralToken, _trader);
         matchRuleMap[_matchKey][_user] = _ruleParams;
-
         mirrorPosition.initializeTraderActivityThrottle(_trader, _user);
 
         _logEvent("SetMatchRule", abi.encode(_collateralToken, _matchKey, _user, _trader, _ruleParams));
     }
 
-    // governance
-    /// @notice  Sets the configuration parameters for the PuppetLogic contract.
+    /// @notice  Sets the configuration parameters via governance
+    /// @param _data The encoded configuration data
     /// @dev Emits a SetConfig event upon successful execution
     function _setConfig(
         bytes calldata _data
     ) internal override {
+        for (uint i; i < config.tokenAllowanceList.length; i++) {
+            delete tokenAllowanceCapMap[config.tokenAllowanceList[i]];
+        }
+
         config = abi.decode(_data, (Config));
 
-        require(
-            config.tokenAllowanceList.length == config.tokenAllowanceAmountList.length, Error.MatchRule__InvalidLength()
-        );
-
+        require(config.tokenAllowanceList.length == config.tokenAllowanceCapList.length, "Invalid token allowance list");
+        require(config.tokenAllowanceList.length > 0, "Empty token allowance list");
+        require(config.minExpiryDuration > 0, "Invalid min expiry duration");
+        require(config.minAllowanceRate > 0, "Invalid min allowance rate");
+        require(config.maxAllowanceRate > config.minAllowanceRate, "Invalid max allowance rate");
+        require(config.minActivityThrottle > 0, "Invalid min activity throttle");
+        require(config.maxActivityThrottle > config.minActivityThrottle, "Invalid max activity throttle");
+    
         for (uint i; i < config.tokenAllowanceList.length; i++) {
-            tokenAllowanceCapMap[config.tokenAllowanceList[i]] = config.tokenAllowanceAmountList[i];
+            tokenAllowanceCapMap[config.tokenAllowanceList[i]] = config.tokenAllowanceCapList[i];
         }
     }
 }

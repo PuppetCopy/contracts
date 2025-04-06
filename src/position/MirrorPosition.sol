@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {FeeMarketplace} from "../tokenomics/FeeMarketplace.sol";
+import {FeeMarketplace} from "../shared/FeeMarketplace.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {MatchRule} from "./../position/MatchRule.sol";
@@ -22,6 +22,8 @@ import {PositionUtils} from "./utils/PositionUtils.sol";
 
 contract MirrorPosition is CoreContract {
     struct Config {
+        IERC20[] tokenDustThresholdList;
+        uint[] tokenDustThresholdCapList;
         IGmxExchangeRouter gmxExchangeRouter;
         address callbackHandler;
         address gmxOrderVault;
@@ -72,14 +74,6 @@ contract MirrorPosition is CoreContract {
         uint traderCollateralDelta;
         uint traderSizeDelta;
         uint sizeDelta;
-    }
-
-    struct CollectDustParams {
-        IERC20 dustToken;
-        address keeperExecutionFeeReceiver;
-        address trader;
-        uint allocationId;
-        uint keeperExecutionFee;
     }
 
     Config public config;
@@ -702,10 +696,23 @@ contract MirrorPosition is CoreContract {
         require(gmxRequestKey != bytes32(0), Error.MirrorPosition__OrderCreationFailed());
     }
 
+    /// @notice  Sets the configuration parameters via governance
+    /// @param _data The encoded configuration data
+    /// @dev Emits a SetConfig event upon successful execution
     function _setConfig(
         bytes calldata _data
     ) internal override {
+        for (uint i = 0; i < config.tokenDustThresholdList.length; i++) {
+            delete tokenDustThresholdAmountMap[config.tokenDustThresholdList[i]];
+        }
+
         config = abi.decode(_data, (Config));
+
+        require(config.tokenDustThresholdList.length > 0, "Invalid token dust threshold list");
+        require(
+            config.tokenDustThresholdList.length == config.tokenDustThresholdCapList.length,
+            "Invalid token dust threshold list"
+        );
         require(config.gmxExchangeRouter != IGmxExchangeRouter(address(0)), "Invalid GMX Router address");
         require(config.callbackHandler != address(0), "Invalid Callback Handler address");
         require(config.gmxOrderVault != address(0), "Invalid GMX Order Vault address");
@@ -717,17 +724,9 @@ contract MirrorPosition is CoreContract {
         require(config.maxKeeperFeeToAllocationRatio > 0, "Invalid Min Execution Cost Rate");
         require(config.maxKeeperFeeToAdjustmentRatio > 0, "Invalid Min Adjustment Execution Cost Rate");
         require(config.maxKeeperFeeToCollectDustRatio > 0, "Invalid Min Collect Dust Execution Cost Rate");
-    }
 
-    /**
-     * @notice Sets the dust threshold for a specific token
-     * @dev Only callable by governance through the authority system
-     * @param _token The token address to set the threshold for
-     * @param _dustThreshold The maximum amount considered "dust" for this token
-     */
-    function setTokenDustThreshold(IERC20 _token, uint _dustThreshold) external auth {
-        tokenDustThresholdAmountMap[_token] = _dustThreshold;
-
-        _logEvent("SetTokenDustThreshold", abi.encode(_token, _dustThreshold));
+        for (uint i = 0; i < config.tokenDustThresholdList.length; i++) {
+            tokenDustThresholdAmountMap[config.tokenDustThresholdList[i]] = config.tokenDustThresholdCapList[i];
+        }
     }
 }
