@@ -16,8 +16,8 @@ import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol"; // Add
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {AllocationAccount} from "src/shared/AllocationAccount.sol";
 import {AllocationStore} from "src/shared/AllocationStore.sol";
-import {FeeMarketplace} from "src/tokenomics/FeeMarketplace.sol";
-import {FeeMarketplaceStore} from "src/tokenomics/FeeMarketplaceStore.sol";
+import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
+import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
 import {BankStore} from "src/utils/BankStore.sol";
 import {Error} from "src/utils/Error.sol";
 import {Precision} from "src/utils/Precision.sol";
@@ -70,19 +70,22 @@ contract TradingTest is BasicSetup {
 
         mockGmxExchangeRouter = new MockGmxExchangeRouter();
         allocationStore = new AllocationStore(dictator, tokenRouter);
-        // Pass the predicted MirrorPosition address to MatchRule constructor
         matchRule = new MatchRule(dictator, allocationStore, MirrorPosition(_getNextContractAddress(3)));
         feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
         feeMarketplace = new FeeMarketplace(dictator, tokenRouter, feeMarketplaceStore, puppetToken);
         mirrorPosition = new MirrorPosition(dictator, allocationStore, matchRule, feeMarketplace);
 
         // Config
-        IERC20[] memory tokenAllowanceCapList = new IERC20[](2);
-        tokenAllowanceCapList[0] = wnt;
-        tokenAllowanceCapList[1] = usdc;
+        IERC20[] memory allowedTokenList = new IERC20[](2);
+        allowedTokenList[0] = wnt;
+        allowedTokenList[1] = usdc;
         uint[] memory tokenAllowanceCapAmountList = new uint[](2);
         tokenAllowanceCapAmountList[0] = 0.2e18;
         tokenAllowanceCapAmountList[1] = 500e30;
+
+        uint[] memory tokenDustThresholdCapList = new uint[](2);
+        tokenDustThresholdCapList[0] = 0.01e18;
+        tokenDustThresholdCapList[1] = 1e6;
 
         // Configure contracts
         dictator.initContract(
@@ -94,8 +97,8 @@ contract TradingTest is BasicSetup {
                     maxAllowanceRate: 10000, // 100%
                     minActivityThrottle: 1 hours,
                     maxActivityThrottle: 30 days,
-                    tokenAllowanceList: tokenAllowanceCapList,
-                    tokenAllowanceAmountList: tokenAllowanceCapAmountList
+                    tokenAllowanceList: allowedTokenList,
+                    tokenAllowanceCapList: tokenAllowanceCapAmountList
                 })
             )
         );
@@ -115,6 +118,8 @@ contract TradingTest is BasicSetup {
             mirrorPosition,
             abi.encode(
                 MirrorPosition.Config({
+                    tokenDustThresholdList: allowedTokenList,
+                    tokenDustThresholdCapList: tokenDustThresholdCapList,
                     gmxExchangeRouter: mockGmxExchangeRouter,
                     callbackHandler: address(mirrorPosition), // Self-callback for tests
                     gmxOrderVault: Address.gmxOrderVault,
@@ -130,7 +135,7 @@ contract TradingTest is BasicSetup {
             )
         );
 
-        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
+        dictator.setAccess(tokenRouter, address(allocationStore));
         dictator.setAccess(allocationStore, address(matchRule));
         dictator.setAccess(allocationStore, address(mirrorPosition));
         dictator.setAccess(allocationStore, address(feeMarketplace));
@@ -147,15 +152,12 @@ contract TradingTest is BasicSetup {
             address(matchRule) // MatchRule initializes throttle
         );
 
-        dictator.setPermission(mirrorPosition, mirrorPosition.setTokenDustThreshold.selector, users.owner);
-        mirrorPosition.setTokenDustThreshold(usdc, 0.1e6);
-
         dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
         dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, users.owner);
         dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, users.owner);
         dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
         dictator.setAccess(allocationStore, address(feeMarketplaceStore));
-        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
+        dictator.setAccess(tokenRouter, address(feeMarketplaceStore));
         feeMarketplace.setAskPrice(usdc, 100e18);
 
         dictator.setPermission(matchRule, matchRule.setRule.selector, users.owner);

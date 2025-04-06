@@ -11,7 +11,7 @@
 // import {PuppetStore} from "src/position/PuppetStore.sol";
 // import {Dictatorship} from "src/shared/Dictatorship.sol";
 // import {TokenRouter} from "src/shared/TokenRouter.sol";
-// import {FeeMarketplace} from "src/tokenomics/FeeMarketplace.sol";
+// import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 
 // import {BaseScript} from "./BaseScript.s.sol";
 // import {Address} from "./Const.sol";

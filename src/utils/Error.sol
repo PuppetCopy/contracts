@@ -59,7 +59,6 @@ library Error {
     error MatchRule__AllowanceAboveLimit(uint allowanceCap);
     error MatchRule__InvalidAmount();
     error MatchRule__InsufficientBalance();
-    error MatchRule__InvalidLength();
     error MatchRule__InvalidActivityThrottle(uint minAllocationActivity, uint maxAllocationActivity);
     error MatchRule__InvalidExpiryDuration(uint minExpiryDuration);
 

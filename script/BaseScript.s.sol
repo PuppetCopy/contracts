@@ -17,4 +17,14 @@ abstract contract BaseScript is Script {
         string memory chainIdStr = vm.toString(block.chainid);
         return stdJson.readAddress(ADDRESSES, string.concat(".", chainIdStr, ".", name));
     }
+
+    function getNextCreateAddress(
+        uint count
+    ) public view returns (address) {
+        return vm.computeCreateAddress(DEPLOYER_ADDRESS, vm.getNonce(DEPLOYER_ADDRESS) + count);
+    }
+
+    function getNextCreateAddress() public view returns (address) {
+        return getNextCreateAddress(1);
+    }
 }
