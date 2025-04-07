@@ -22,7 +22,7 @@ contract DeployPuppetBase is BaseScript {
         Dictatorship dictatorship = new Dictatorship(Address.dao);
 
         new PuppetToken();
-        new PuppetVoteToken(dictatorship);
+        // new PuppetVoteToken(dictatorship);
         new TokenRouter(dictatorship, 200_000);
         new RouterProxy(dictatorship);
     }

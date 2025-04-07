@@ -20,8 +20,6 @@ import {BaseScript} from "./BaseScript.s.sol";
 import {Address} from "./Const.sol";
 
 contract DeployPosition is BaseScript {
-    Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
-
     function run() public {
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
         deployContracts();
@@ -29,6 +27,7 @@ contract DeployPosition is BaseScript {
     }
 
     function deployContracts() internal {
+        Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
         PuppetToken puppetToken = PuppetToken(getDeployedAddress("PuppetToken"));
         TokenRouter tokenRouter = TokenRouter(getDeployedAddress("TokenRouter"));
 
@@ -38,6 +37,32 @@ contract DeployPosition is BaseScript {
         FeeMarketplace feeMarketplace = new FeeMarketplace(dictator, tokenRouter, feeMarketplaceStore, puppetToken);
         MirrorPosition mirrorPosition = new MirrorPosition(dictator, allocationStore, matchRule, feeMarketplace);
         GmxExecutionCallback gmxCallbackHandler = new GmxExecutionCallback(dictator, mirrorPosition);
+
+        dictator.setAccess(tokenRouter, address(allocationStore));
+        dictator.setAccess(allocationStore, address(matchRule));
+        dictator.setAccess(allocationStore, address(mirrorPosition));
+        dictator.setAccess(allocationStore, address(feeMarketplace));
+
+        // mirrorPosition permissions (owner for most actions in tests)
+        dictator.setPermission(mirrorPosition, mirrorPosition.mirror.selector, Address.orderflowHandler);
+        dictator.setPermission(mirrorPosition, mirrorPosition.adjust.selector, Address.orderflowHandler);
+        dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, Address.orderflowHandler);
+        dictator.setPermission(mirrorPosition, mirrorPosition.collectDust.selector, Address.orderflowHandler);
+        dictator.setPermission(mirrorPosition, mirrorPosition.setTokenDustThreshold.selector, Address.orderflowHandler);
+        dictator.setPermission(
+            mirrorPosition,
+            mirrorPosition.initializeTraderActivityThrottle.selector,
+            address(matchRule) // MatchRule initializes throttle
+        );
+        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(gmxCallbackHandler));
+
+        dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
+        dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, getDeployedAddress("Router"));
+        dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, Address.dao);
+        dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
+        dictator.setAccess(allocationStore, address(feeMarketplaceStore));
+        dictator.setAccess(tokenRouter, address(feeMarketplaceStore));
+        
 
         // Config
         IERC20[] memory allowedTokenList = new IERC20[](2);
@@ -82,8 +107,6 @@ contract DeployPosition is BaseScript {
             mirrorPosition,
             abi.encode(
                 MirrorPosition.Config({
-                    tokenDustThresholdList: allowedTokenList,
-                    tokenDustThresholdCapList: tokenDustThresholdCapList,
                     gmxExchangeRouter: IGmxExchangeRouter(Address.gmxExchangeRouter),
                     callbackHandler: address(mirrorPosition), // Self-callback for tests
                     gmxOrderVault: Address.gmxOrderVault,
@@ -99,33 +122,7 @@ contract DeployPosition is BaseScript {
             )
         );
 
-        dictator.setAccess(tokenRouter, address(allocationStore));
-        dictator.setAccess(allocationStore, address(matchRule));
-        dictator.setAccess(allocationStore, address(mirrorPosition));
-        dictator.setAccess(allocationStore, address(feeMarketplace));
-
-        // mirrorPosition permissions (owner for most actions in tests)
-        dictator.setPermission(mirrorPosition, mirrorPosition.mirror.selector, Address.orderflowHandler);
-        dictator.setPermission(mirrorPosition, mirrorPosition.adjust.selector, Address.orderflowHandler); // Added
-            // adjust permission
-        dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, Address.orderflowHandler);
-        dictator.setPermission(mirrorPosition, mirrorPosition.collectDust.selector, Address.orderflowHandler);
-        dictator.setPermission(
-            mirrorPosition,
-            mirrorPosition.initializeTraderActivityThrottle.selector,
-            address(matchRule) // MatchRule initializes throttle
-        );
-        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(gmxCallbackHandler));
-
-        dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
-        dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, getDeployedAddress("Router"));
-        dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, Address.dao);
-        dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
-        dictator.setAccess(allocationStore, address(feeMarketplaceStore));
-        dictator.setAccess(tokenRouter, address(feeMarketplaceStore));
-        // feeMarketplace.setAskPrice(usdc, 100e18);
-
-        // dictator.setPermission(matchRule, matchRule.setRule.selector, users.owner);
-        // dictator.setPermission(matchRule, matchRule.deposit.selector, users.owner);
+        mirrorPosition.setTokenDustThreshold(allowedTokenList, tokenDustThresholdCapList);
+        feeMarketplace.setAskPrice(IERC20(Address.usdc), 100e18);
     }
 }
