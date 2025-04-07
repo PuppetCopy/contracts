@@ -3,8 +3,8 @@ pragma solidity ^0.8.28;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Error} from "../utils/Error.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
+import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "./../utils/Precision.sol";
 import {MirrorPosition} from "./MirrorPosition.sol";
@@ -13,10 +13,9 @@ import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
 contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
     struct UnhandledCallback {
-        GmxPositionUtils.Props order;
         address operator;
-        bytes eventData;
         bytes32 key;
+        bytes error;
     }
 
     MirrorPosition immutable position;
@@ -26,20 +25,6 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
 
     constructor(IAuthority _authority, MirrorPosition _position) CoreContract(_authority) {
         position = _position;
-    }
-
-    function storeUnhandledCallback(
-        GmxPositionUtils.Props calldata _order,
-        bytes32 _key,
-        bytes calldata _eventData
-    ) public auth {
-        UnhandledCallback memory callbackResponse =
-            UnhandledCallback({order: _order, operator: address(this), eventData: _eventData, key: _key});
-
-        uint id = ++unhandledCallbackListId;
-        unhandledCallbackMap[id] = callbackResponse;
-
-        _logEvent("StoreUnhandledCallback", abi.encode(id, _key, _order, _eventData));
     }
 
     /**
@@ -54,9 +39,17 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
             GmxPositionUtils.isIncreaseOrder(order.numbers.orderType)
                 || GmxPositionUtils.isDecreaseOrder(order.numbers.orderType)
         ) {
-            position.execute(key);
+            try position.execute(key) {}
+            catch (bytes memory err) {
+                _storeUnhandledCallback(key, err);
+            }
+        } else if (GmxPositionUtils.isLiquidateOrder(order.numbers.orderType)) {
+            try position.liquidate(order.addresses.account) {}
+            catch (bytes memory err) {
+                _storeUnhandledCallback(key, err);
+            }
         } else {
-            revert Error.GmxExecutionCallback__InvalidOrderType(order.numbers.orderType);
+            _storeUnhandledCallback(key, "Invalid order type");
         }
     }
 
@@ -65,15 +58,10 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
      */
     function afterOrderCancellation(
         bytes32 key,
-        GmxPositionUtils.Props calldata order,
-        bytes calldata eventData
+        GmxPositionUtils.Props calldata, /*order*/
+        bytes calldata /*eventData*/
     ) external auth {
-        revert("Not implemented");
-        // try handleCancelled(key, order, eventData) {
-        //     // Successful cancellation handling
-        // } catch {
-        //     storeUnhandledCallback(order, key, eventData);
-        // }
+        _storeUnhandledCallback(key, "Cancellation not implemented");
     }
 
     /**
@@ -81,30 +69,16 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
      */
     function afterOrderFrozen(
         bytes32 key,
-        GmxPositionUtils.Props calldata order,
-        bytes calldata eventData
+        GmxPositionUtils.Props calldata, /*order*/
+        bytes calldata /*eventData*/
     ) external auth {
-        revert("Not implemented");
-        // try handleFrozen(key, order, eventData) {
-        //     // Successful frozen handling
-        // } catch {
-        //     storeUnhandledCallback(order, key, eventData);
-        // }
+        _storeUnhandledCallback(key, "Freezing not implemented");
     }
 
-    // function executeUnhandledExecutionCallback(
-    //     bytes32 key
-    // ) external auth {
-    //     PositionStore.UnhandledCallback memory callbackData = position.getUnhandledCallback(key);
+    function _storeUnhandledCallback(bytes32 _key, bytes memory error) internal {
+        uint id = ++unhandledCallbackListId;
+        unhandledCallbackMap[id] = UnhandledCallback({operator: msg.sender, key: _key, error: error});
 
-    //     if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.ExecutedIncrease) {
-    //         config.executeIncrease.execute(key, callbackData.order, callbackData.eventData);
-    //     } else if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.ExecutedDecrease) {
-    //         config.executeDecrease.execute(key, callbackData.order, callbackData.eventData);
-    //     } else if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.Cancelled) {
-    //         config.executeRevertedAdjustment.handleCancelled(key, callbackData.order);
-    //     } else if (callbackData.status == GmxPositionUtils.OrderExecutionStatus.Frozen) {
-    //         config.executeRevertedAdjustment.handleFrozen(key, callbackData.order);
-    //     }
-    // }
+        _logEvent("StoreUnhandledCallback", abi.encode(id, error, _key));
+    }
 }

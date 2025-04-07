@@ -66,7 +66,7 @@ contract MirrorPosition is CoreContract {
     }
 
     struct RequestAdjustment {
-        bytes32 allocationKey;
+        address allocationAddress;
         bool traderIsIncrease;
         uint traderTargetLeverage;
         uint traderCollateralDelta;
@@ -87,8 +87,8 @@ contract MirrorPosition is CoreContract {
 
     mapping(address => mapping(address => uint)) public activityThrottleMap;
     mapping(bytes32 => mapping(address => uint)) public allocationPuppetMap;
-    mapping(bytes32 => uint) public allocationMap; // used as a denominator
-    mapping(bytes32 => Position) public positionMap;
+    mapping(address => uint) public allocationMap; // used as a denominator
+    mapping(address => Position) public positionMap;
     mapping(bytes32 => RequestAdjustment) public requestAdjustmentMap;
     mapping(IERC20 => uint) public tokenDustThresholdAmountMap;
 
@@ -96,16 +96,25 @@ contract MirrorPosition is CoreContract {
         return config;
     }
 
-    function getAllocation(
+    function getAllocationByKey(
         bytes32 _allocationKey
     ) external view returns (uint) {
-        return allocationMap[_allocationKey];
+        address _allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
+            allocationStoreImplementation, _allocationKey, address(this)
+        );
+        return allocationMap[_allocationAddress];
+    }
+
+    function getAllocation(
+        address _allocationAddress
+    ) external view returns (uint) {
+        return allocationMap[_allocationAddress];
     }
 
     function getPosition(
-        bytes32 _allocationKey
+        address _allocationAddress
     ) external view returns (Position memory) {
-        return positionMap[_allocationKey];
+        return positionMap[_allocationAddress];
     }
 
     function getRequestAdjustment(
@@ -137,8 +146,7 @@ contract MirrorPosition is CoreContract {
      * This function determines how much capital each eligible puppet allocates based on their individual matching rules
      * (`MatchRule`),
      * available funds (`AllocationStore`), and activity limits. It ensures the total allocated amount is sufficient to
-     * cover the
-     * provided keeper execution fee (`_callParams.keeperExecutionFee`).
+     * cover the provided keeper execution fee (`_callParams.keeperExecutionFee`).
      *
      * The function orchestrates the fund movements:
      * 1. It reserves the calculated allocation amounts from each puppet's balance in the `AllocationStore`.
@@ -159,13 +167,14 @@ contract MirrorPosition is CoreContract {
      * @param _callParams Structure containing details of the trader's initial action (must be `isIncrease=true`),
      * market, collateral, size/collateral deltas, GMX execution fee, keeper fee, and keeper fee receiver.
      * @param _puppetList An array of puppet addresses to potentially participate in mirroring this position.
+     * @return _allocationAddress The unique address of the allocation account created for a newly created position.
      * @return _nextAllocationId A unique ID generated for this specific allocation instance.
      * @return _requestKey The unique key returned by GMX identifying the created order request, used for callbacks.
      */
     function mirror(
         CallPosition calldata _callParams,
         address[] calldata _puppetList
-    ) external payable auth returns (uint _nextAllocationId, bytes32 _requestKey) {
+    ) external payable auth returns (address _allocationAddress, uint _nextAllocationId, bytes32 _requestKey) {
         uint _puppetListLength = _puppetList.length;
         require(_puppetListLength > 0, Error.MirrorPosition__PuppetListEmpty());
         require(_puppetListLength <= config.maxPuppetList, Error.MirrorPosition__MaxPuppetList());
@@ -182,8 +191,7 @@ contract MirrorPosition is CoreContract {
         _nextAllocationId = ++nextAllocationId;
         bytes32 _matchKey = PositionUtils.getMatchKey(_callParams.collateralToken, _callParams.trader);
         bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _matchKey, _nextAllocationId);
-        address _allocationAddress =
-            AllocationAccountUtils.cloneDeterministic(allocationStoreImplementation, _allocationKey);
+        _allocationAddress = AllocationAccountUtils.cloneDeterministic(allocationStoreImplementation, _allocationKey);
 
         MatchRule.Rule[] memory _ruleList = matchRule.getRuleList(_matchKey, _puppetList);
         uint[] memory _nextBalanceList = allocationStore.getBalanceList(_callParams.collateralToken, _puppetList);
@@ -238,9 +246,9 @@ contract MirrorPosition is CoreContract {
             _netAllocation
         );
 
-        allocationMap[_allocationKey] = _allocation;
+        allocationMap[_allocationAddress] = _allocation;
         requestAdjustmentMap[_requestKey] = RequestAdjustment({
-            allocationKey: _allocationKey,
+            allocationAddress: _allocationAddress,
             traderIsIncrease: true,
             traderTargetLeverage: _traderTargetLeverage,
             traderSizeDelta: _callParams.sizeDeltaInUsd,
@@ -313,16 +321,16 @@ contract MirrorPosition is CoreContract {
         bytes32 _matchKey = PositionUtils.getMatchKey(_callParams.collateralToken, _callParams.trader);
         bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _matchKey, _allocationId);
 
-        Position memory _position = positionMap[_allocationKey];
-        require(_position.size > 0, Error.MirrorPosition__PositionNotFound());
-        require(_position.traderCollateral > 0, Error.MirrorPosition__TraderCollateralZero());
-
         address _allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
             allocationStoreImplementation, _allocationKey, address(this)
         );
         require(CallUtils.isContract(_allocationAddress), Error.MirrorPosition__AllocationAccountNotFound());
 
-        uint _allocation = allocationMap[_allocationKey];
+        Position memory _position = positionMap[_allocationAddress];
+        require(_position.size > 0, Error.MirrorPosition__PositionNotFound());
+        require(_position.traderCollateral > 0, Error.MirrorPosition__TraderCollateralZero());
+
+        uint _allocation = allocationMap[_allocationAddress];
         require(_allocation > 0, Error.MirrorPosition__InvalidAllocation());
 
         uint _feeCollectedFromBalance = 0;
@@ -359,7 +367,7 @@ contract MirrorPosition is CoreContract {
             Error.MirrorPosition__KeeperFeeExceedsCostFactor()
         );
 
-        allocationMap[_allocationKey] = _nextAllocation;
+        allocationMap[_allocationAddress] = _nextAllocation;
 
         uint _currentPuppetLeverage = Precision.toBasisPoints(_position.size, _nextAllocation);
         uint _traderTargetLeverage;
@@ -412,7 +420,7 @@ contract MirrorPosition is CoreContract {
         }
 
         requestAdjustmentMap[_requestKey] = RequestAdjustment({
-            allocationKey: _allocationKey,
+            allocationAddress: _allocationAddress,
             traderIsIncrease: _callParams.isIncrease,
             traderTargetLeverage: _traderTargetLeverage,
             traderSizeDelta: _callParams.sizeDeltaInUsd,
@@ -453,19 +461,19 @@ contract MirrorPosition is CoreContract {
         bytes32 _requestKey
     ) external auth {
         RequestAdjustment memory _request = requestAdjustmentMap[_requestKey];
-        require(_request.allocationKey != bytes32(0), Error.MirrorPosition__ExecutionRequestMissing());
+        require(_request.allocationAddress != address(0), Error.MirrorPosition__ExecutionRequestMissing());
 
-        Position memory _position = positionMap[_request.allocationKey];
+        Position memory _position = positionMap[_request.allocationAddress];
 
         delete requestAdjustmentMap[_requestKey];
 
         if (_request.traderTargetLeverage == 0) {
-            delete positionMap[_request.allocationKey];
-            _logEvent("Execute", abi.encode(_request.allocationKey, _requestKey, 0, 0, 0, 0));
+            delete positionMap[_request.allocationAddress];
+            _logEvent("Execute", abi.encode(_request.allocationAddress, _requestKey, 0, 0, 0, 0));
             return;
         }
 
-        uint _allocation = allocationMap[_request.allocationKey];
+        uint _allocation = allocationMap[_request.allocationAddress];
         uint _currentPuppetLeverage = _allocation > 0 ? Precision.toBasisPoints(_position.size, _allocation) : 0;
 
         if (_request.traderTargetLeverage > _currentPuppetLeverage) {
@@ -485,11 +493,11 @@ contract MirrorPosition is CoreContract {
         }
 
         if (_position.size == 0) {
-            delete positionMap[_request.allocationKey];
+            delete positionMap[_request.allocationAddress];
             _logEvent(
                 "Execute",
                 abi.encode(
-                    _request.allocationKey,
+                    _request.allocationAddress,
                     _requestKey,
                     _position.traderSize,
                     _position.traderCollateral,
@@ -498,11 +506,11 @@ contract MirrorPosition is CoreContract {
                 )
             );
         } else {
-            positionMap[_request.allocationKey] = _position;
+            positionMap[_request.allocationAddress] = _position;
             _logEvent(
                 "Execute",
                 abi.encode(
-                    _request.allocationKey,
+                    _request.allocationAddress,
                     _requestKey,
                     _position.traderSize,
                     _position.traderCollateral,
@@ -511,6 +519,17 @@ contract MirrorPosition is CoreContract {
                 )
             );
         }
+    }
+
+    function liquidate(
+        address _allocationAddress
+    ) external auth {
+        Position memory _position = positionMap[_allocationAddress];
+        require(_position.size > 0, Error.MirrorPosition__PositionNotFound());
+
+        delete positionMap[_allocationAddress];
+
+        _logEvent("Liquidate", abi.encode(_allocationAddress));
     }
 
     /**
@@ -553,7 +572,7 @@ contract MirrorPosition is CoreContract {
 
         require(CallUtils.isContract(_allocationAddress), Error.MirrorPosition__AllocationAccountNotFound());
 
-        uint _allocation = allocationMap[_allocationKey];
+        uint _allocation = allocationMap[_allocationAddress];
         require(_allocation > 0, Error.MirrorPosition__InvalidAllocationOrFullyReduced());
 
         uint _settledBalance = _callParams.distributeToken.balanceOf(_allocationAddress);
@@ -696,6 +715,26 @@ contract MirrorPosition is CoreContract {
         require(gmxRequestKey != bytes32(0), Error.MirrorPosition__OrderCreationFailed());
     }
 
+    function setTokenDustThreshold(
+        IERC20[] calldata _tokenDustThresholdList,
+        uint[] calldata _tokenDustThresholdCapList
+    ) external auth {
+        for (uint i = 0; i < tokenDustThresholdList.length; i++) {
+            delete tokenDustThresholdAmountMap[tokenDustThresholdList[i]];
+        }
+
+        require(_tokenDustThresholdList.length > 0, "Invalid token dust threshold list");
+        require(
+            _tokenDustThresholdList.length == _tokenDustThresholdCapList.length, "Invalid token dust threshold list"
+        );
+
+        for (uint i = 0; i < _tokenDustThresholdList.length; i++) {
+            tokenDustThresholdAmountMap[_tokenDustThresholdList[i]] = _tokenDustThresholdCapList[i];
+        }
+
+        _logEvent("SetTokenDustThreshold", abi.encode(_tokenDustThresholdList, _tokenDustThresholdCapList));
+    }
+
     /// @notice  Sets the configuration parameters via governance
     /// @param _data The encoded configuration data
     /// @dev Emits a SetConfig event upon successful execution
@@ -715,25 +754,5 @@ contract MirrorPosition is CoreContract {
         require(config.maxKeeperFeeToAllocationRatio > 0, "Invalid Min Execution Cost Rate");
         require(config.maxKeeperFeeToAdjustmentRatio > 0, "Invalid Min Adjustment Execution Cost Rate");
         require(config.maxKeeperFeeToCollectDustRatio > 0, "Invalid Min Collect Dust Execution Cost Rate");
-    }
-
-    function setTokenDustThreshold(
-        IERC20[] calldata _tokenDustThresholdList,
-        uint[] calldata _tokenDustThresholdCapList
-    ) external auth {
-        for (uint i = 0; i < tokenDustThresholdList.length; i++) {
-            delete tokenDustThresholdAmountMap[tokenDustThresholdList[i]];
-        }
-
-        require(_tokenDustThresholdList.length > 0, "Invalid token dust threshold list");
-        require(
-            _tokenDustThresholdList.length == _tokenDustThresholdCapList.length, "Invalid token dust threshold list"
-        );
-
-        for (uint i = 0; i < _tokenDustThresholdList.length; i++) {
-            tokenDustThresholdAmountMap[_tokenDustThresholdList[i]] = _tokenDustThresholdCapList[i];
-        }
-
-        _logEvent("SetTokenDustThreshold", abi.encode(_tokenDustThresholdList, _tokenDustThresholdCapList));
     }
 }

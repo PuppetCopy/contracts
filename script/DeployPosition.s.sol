@@ -55,6 +55,7 @@ contract DeployPosition is BaseScript {
             address(matchRule) // MatchRule initializes throttle
         );
         dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(gmxCallbackHandler));
+        dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, address(gmxCallbackHandler));
 
         dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
         dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, getDeployedAddress("Router"));
