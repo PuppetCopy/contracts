@@ -22,8 +22,6 @@ import {PositionUtils} from "./utils/PositionUtils.sol";
 
 contract MirrorPosition is CoreContract {
     struct Config {
-        IERC20[] tokenDustThresholdList;
-        uint[] tokenDustThresholdCapList;
         IGmxExchangeRouter gmxExchangeRouter;
         address callbackHandler;
         address gmxOrderVault;
@@ -77,6 +75,8 @@ contract MirrorPosition is CoreContract {
     }
 
     Config public config;
+    IERC20[] tokenDustThresholdList;
+    uint[] tokenDustThresholdCapList;
 
     AllocationStore immutable allocationStore;
     MatchRule immutable matchRule;
@@ -702,17 +702,8 @@ contract MirrorPosition is CoreContract {
     function _setConfig(
         bytes calldata _data
     ) internal override {
-        for (uint i = 0; i < config.tokenDustThresholdList.length; i++) {
-            delete tokenDustThresholdAmountMap[config.tokenDustThresholdList[i]];
-        }
-
         config = abi.decode(_data, (Config));
 
-        require(config.tokenDustThresholdList.length > 0, "Invalid token dust threshold list");
-        require(
-            config.tokenDustThresholdList.length == config.tokenDustThresholdCapList.length,
-            "Invalid token dust threshold list"
-        );
         require(config.gmxExchangeRouter != IGmxExchangeRouter(address(0)), "Invalid GMX Router address");
         require(config.callbackHandler != address(0), "Invalid Callback Handler address");
         require(config.gmxOrderVault != address(0), "Invalid GMX Order Vault address");
@@ -724,9 +715,25 @@ contract MirrorPosition is CoreContract {
         require(config.maxKeeperFeeToAllocationRatio > 0, "Invalid Min Execution Cost Rate");
         require(config.maxKeeperFeeToAdjustmentRatio > 0, "Invalid Min Adjustment Execution Cost Rate");
         require(config.maxKeeperFeeToCollectDustRatio > 0, "Invalid Min Collect Dust Execution Cost Rate");
+    }
 
-        for (uint i = 0; i < config.tokenDustThresholdList.length; i++) {
-            tokenDustThresholdAmountMap[config.tokenDustThresholdList[i]] = config.tokenDustThresholdCapList[i];
+    function setTokenDustThreshold(
+        IERC20[] calldata _tokenDustThresholdList,
+        uint[] calldata _tokenDustThresholdCapList
+    ) external auth {
+        for (uint i = 0; i < tokenDustThresholdList.length; i++) {
+            delete tokenDustThresholdAmountMap[tokenDustThresholdList[i]];
         }
+
+        require(_tokenDustThresholdList.length > 0, "Invalid token dust threshold list");
+        require(
+            _tokenDustThresholdList.length == _tokenDustThresholdCapList.length, "Invalid token dust threshold list"
+        );
+
+        for (uint i = 0; i < _tokenDustThresholdList.length; i++) {
+            tokenDustThresholdAmountMap[_tokenDustThresholdList[i]] = _tokenDustThresholdCapList[i];
+        }
+
+        _logEvent("SetTokenDustThreshold", abi.encode(_tokenDustThresholdList, _tokenDustThresholdCapList));
     }
 }

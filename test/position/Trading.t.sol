@@ -75,6 +75,34 @@ contract TradingTest is BasicSetup {
         feeMarketplace = new FeeMarketplace(dictator, tokenRouter, feeMarketplaceStore, puppetToken);
         mirrorPosition = new MirrorPosition(dictator, allocationStore, matchRule, feeMarketplace);
 
+        dictator.setAccess(tokenRouter, address(allocationStore));
+        dictator.setAccess(allocationStore, address(matchRule));
+        dictator.setAccess(allocationStore, address(mirrorPosition));
+        dictator.setAccess(allocationStore, address(feeMarketplace));
+
+        // mirrorPosition permissions (owner for most actions in tests)
+        dictator.setPermission(mirrorPosition, mirrorPosition.mirror.selector, users.owner);
+        dictator.setPermission(mirrorPosition, mirrorPosition.adjust.selector, users.owner); // Added adjust permission
+        dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, users.owner);
+        dictator.setPermission(mirrorPosition, mirrorPosition.collectDust.selector, users.owner);
+        dictator.setPermission(mirrorPosition, mirrorPosition.setTokenDustThreshold.selector, users.owner);
+        dictator.setPermission(
+            mirrorPosition,
+            mirrorPosition.initializeTraderActivityThrottle.selector,
+            address(matchRule) // MatchRule initializes throttle
+        );
+        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, users.owner);
+
+        dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
+        dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, users.owner);
+        dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, users.owner);
+        dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
+        dictator.setAccess(allocationStore, address(feeMarketplaceStore));
+        dictator.setAccess(tokenRouter, address(feeMarketplaceStore));
+
+        dictator.setPermission(matchRule, matchRule.setRule.selector, users.owner);
+        dictator.setPermission(matchRule, matchRule.deposit.selector, users.owner);
+
         // Config
         IERC20[] memory allowedTokenList = new IERC20[](2);
         allowedTokenList[0] = wnt;
@@ -118,8 +146,6 @@ contract TradingTest is BasicSetup {
             mirrorPosition,
             abi.encode(
                 MirrorPosition.Config({
-                    tokenDustThresholdList: allowedTokenList,
-                    tokenDustThresholdCapList: tokenDustThresholdCapList,
                     gmxExchangeRouter: mockGmxExchangeRouter,
                     callbackHandler: address(mirrorPosition), // Self-callback for tests
                     gmxOrderVault: Address.gmxOrderVault,
@@ -135,33 +161,8 @@ contract TradingTest is BasicSetup {
             )
         );
 
-        dictator.setAccess(tokenRouter, address(allocationStore));
-        dictator.setAccess(allocationStore, address(matchRule));
-        dictator.setAccess(allocationStore, address(mirrorPosition));
-        dictator.setAccess(allocationStore, address(feeMarketplace));
-
-        // mirrorPosition permissions (owner for most actions in tests)
-        dictator.setPermission(mirrorPosition, mirrorPosition.mirror.selector, users.owner);
-        dictator.setPermission(mirrorPosition, mirrorPosition.adjust.selector, users.owner); // Added adjust permission
-        dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, users.owner);
-        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, users.owner);
-        dictator.setPermission(mirrorPosition, mirrorPosition.collectDust.selector, users.owner);
-        dictator.setPermission(
-            mirrorPosition,
-            mirrorPosition.initializeTraderActivityThrottle.selector,
-            address(matchRule) // MatchRule initializes throttle
-        );
-
-        dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
-        dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, users.owner);
-        dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, users.owner);
-        dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
-        dictator.setAccess(allocationStore, address(feeMarketplaceStore));
-        dictator.setAccess(tokenRouter, address(feeMarketplaceStore));
+        mirrorPosition.setTokenDustThreshold(allowedTokenList, tokenDustThresholdCapList);
         feeMarketplace.setAskPrice(usdc, 100e18);
-
-        dictator.setPermission(matchRule, matchRule.setRule.selector, users.owner);
-        dictator.setPermission(matchRule, matchRule.deposit.selector, users.owner);
 
         // Pre-approve token allowances
         vm.startPrank(users.alice); // Example user for createPuppet
