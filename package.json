@@ -7,11 +7,11 @@
   "scripts": {
     "test": "forge test --match-contract TradingTest -vvvvv",
     "test:target": "bun run test --match-test testSizeAdjustmentsMatchMirrorPositionLogic",
+    "test:prod": "FOUNDRY_PROFILE=prod bun run test",
     "test:fork": "forge test --chain arbitrum --match-contract TradingTest -vvvvv --fork-block-number 192315592 --fork-url=$ARBITRUM_RPC_URL",
-    "test:prod": "FOUNDRY_PROFILE=prod forge test -vvvvv",
     "build": "forge build --sizes",
     "build:prod": "FOUNDRY_PROFILE=prod forge build --sizes",
-    "deploy": "CHAIN=42161 SCRIPT='DeployPuppetBase' bun deploy.ts",
+    "deploy": "FOUNDRY_PROFILE=prod CHAIN=42161 SCRIPT='DeployPuppetBase' bun deploy.ts",
     "docgen": "forge doc --out '.docgen' --build",
     "gas-report": "forge test --match-contract TradingTest --gas-report",
     "lint": "bun run lint:sol",
