@@ -8,7 +8,7 @@ import {IAuthority} from "./../interfaces/IAuthority.sol";
 /// @notice Provides granular access control based on function signatures (`bytes4`).
 /// @dev Managed by a central Authority (Dictatorship). Inheriting contracts use the 'auth' modifier.
 abstract contract Permission {
-    /// @notice The central Authority responsible for managing permissions.
+    /// @notice The central Authority contract responsible for managing permissions.
     IAuthority public immutable authority;
 
     /// @dev Mapping storing permission state: function signature => user address => allowed (bool).

@@ -11,6 +11,9 @@
   bytecode_hash = "ipfs"
   cbor_metadata = true
   build_info = true
+  fs_permissions = [
+    { access = "read", path = "./deployments" },
+  ]
 
 [doc]
   ignore = ["**/interface/**/*.sol", "**/utils/**/*.sol", "**/shared/**/*.sol"]

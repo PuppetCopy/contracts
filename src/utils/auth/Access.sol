@@ -8,7 +8,7 @@ import {IAuthority} from "./../interfaces/IAuthority.sol"; // Adjust path
 /// @notice Provides basic access control where users are either authorized or not.
 /// @dev Managed by a central Authority (Dictatorship). Inheriting contracts use the 'auth' modifier.
 abstract contract Access {
-    /// @notice The central Authority responsible for managing access.
+    /// @notice The central Authority contract responsible for managing access.
     IAuthority public immutable authority;
 
     /// @dev Mapping storing the authorization state for each user address.

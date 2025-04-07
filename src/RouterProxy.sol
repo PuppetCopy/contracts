@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {Proxy} from "@openzeppelin/contracts/proxy/Proxy.sol";
+import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 
 import {Access} from "./utils/auth/Access.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
@@ -13,12 +14,12 @@ import {IAuthority} from "./utils/interfaces/IAuthority.sol";
  *         contract (the implementation). This uses OpenZeppelin's ERC1967Upgrade
  *         to manage the implementation address.
  */
-contract RouterProxy is Proxy, Access {
+contract RouterProxy is Proxy, Access, Multicall {
     constructor(
         IAuthority _authority
-    ) payable Access(_authority) {}
+    ) Access(_authority) {}
 
-    function updateRouter(
+    function update(
         address _impl
     ) external auth {
         ERC1967Utils.upgradeToAndCall(_impl, "");
