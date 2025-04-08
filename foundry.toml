@@ -6,7 +6,7 @@
   cache_path = 'forge-cache'
   libs = ['node_modules']
   evm_version = 'cancun'
-  solc_version = '0.8.28'
+  solc_version = '0.8.29'
   via_ir = true
   extra_output = ["storageLayout", "evm.bytecode.generatedSources", "evm.legacyAssembly", "evm.deployedBytecode.immutableReferences"]
   bytecode_hash = "ipfs"
