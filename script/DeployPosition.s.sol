@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {GmxExecutionCallback} from "src/position/GmxExecutionCallback.sol";
-import {MatchRule} from "src/position/MatchRule.sol";
+import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {AllocationStore} from "src/shared/AllocationStore.sol";
@@ -32,14 +32,14 @@ contract DeployPosition is BaseScript {
         TokenRouter tokenRouter = TokenRouter(getDeployedAddress("TokenRouter"));
 
         AllocationStore allocationStore = new AllocationStore(dictator, tokenRouter);
-        MatchRule matchRule = new MatchRule(dictator, allocationStore, MirrorPosition(getNextCreateAddress(3)));
+        MatchingRule matchingRule = new MatchingRule(dictator, allocationStore, MirrorPosition(getNextCreateAddress(3)));
         FeeMarketplaceStore feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
         FeeMarketplace feeMarketplace = new FeeMarketplace(dictator, tokenRouter, feeMarketplaceStore, puppetToken);
-        MirrorPosition mirrorPosition = new MirrorPosition(dictator, allocationStore, matchRule, feeMarketplace);
+        MirrorPosition mirrorPosition = new MirrorPosition(dictator, allocationStore, matchingRule, feeMarketplace);
         GmxExecutionCallback gmxCallbackHandler = new GmxExecutionCallback(dictator, mirrorPosition);
 
         dictator.setAccess(tokenRouter, address(allocationStore));
-        dictator.setAccess(allocationStore, address(matchRule));
+        dictator.setAccess(allocationStore, address(matchingRule));
         dictator.setAccess(allocationStore, address(mirrorPosition));
         dictator.setAccess(allocationStore, address(feeMarketplace));
 
@@ -52,7 +52,7 @@ contract DeployPosition is BaseScript {
         dictator.setPermission(
             mirrorPosition,
             mirrorPosition.initializeTraderActivityThrottle.selector,
-            address(matchRule) // MatchRule initializes throttle
+            address(matchingRule) // MatchingRule initializes throttle
         );
         dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(gmxCallbackHandler));
         dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, address(gmxCallbackHandler));
@@ -79,9 +79,9 @@ contract DeployPosition is BaseScript {
 
         // Configure contracts
         dictator.initContract(
-            matchRule,
+            matchingRule,
             abi.encode(
-                MatchRule.Config({
+                MatchingRule.Config({
                     minExpiryDuration: 1 days,
                     minAllowanceRate: 100, // 1 basis points = 1%
                     maxAllowanceRate: 10000, // 100%

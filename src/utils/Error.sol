@@ -53,14 +53,14 @@ library Error {
     // PuppetStore
     error PuppetStore__OverwriteAllocation();
 
-    // MatchRule
-    error MatchRule__InvalidAllowanceRate(uint min, uint max);
-    error MatchRule__TokenNotAllowed();
-    error MatchRule__AllowanceAboveLimit(uint allowanceCap);
-    error MatchRule__InvalidAmount();
-    error MatchRule__InsufficientBalance();
-    error MatchRule__InvalidActivityThrottle(uint minAllocationActivity, uint maxAllocationActivity);
-    error MatchRule__InvalidExpiryDuration(uint minExpiryDuration);
+    // MatchingRule
+    error MatchingRule__InvalidAllowanceRate(uint min, uint max);
+    error MatchingRule__TokenNotAllowed();
+    error MatchingRule__AllowanceAboveLimit(uint allowanceCap);
+    error MatchingRule__InvalidAmount();
+    error MatchingRule__InsufficientBalance();
+    error MatchingRule__InvalidActivityThrottle(uint minAllocationActivity, uint maxAllocationActivity);
+    error MatchingRule__InvalidExpiryDuration(uint minExpiryDuration);
 
     // MirrorPosition
     // --- Call Validation ---

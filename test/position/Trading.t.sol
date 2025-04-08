@@ -8,7 +8,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Vm} from "forge-std/src/Vm.sol";
 import {console} from "forge-std/src/console.sol"; // Import Vm for expectRevert etc.
 
-import {MatchRule} from "src/position/MatchRule.sol";
+import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {AllocationAccountUtils} from "src/position/utils/AllocationAccountUtils.sol";
@@ -30,7 +30,7 @@ import {MockERC20} from "test/mock/MockERC20.sol";
 
 contract TradingTest is BasicSetup {
     AllocationStore internal allocationStore;
-    MatchRule internal matchRule;
+    MatchingRule internal matchingRule;
     FeeMarketplace internal feeMarketplace;
     MirrorPosition internal mirrorPosition;
     MockGmxExchangeRouter internal mockGmxExchangeRouter;
@@ -70,13 +70,13 @@ contract TradingTest is BasicSetup {
 
         mockGmxExchangeRouter = new MockGmxExchangeRouter();
         allocationStore = new AllocationStore(dictator, tokenRouter);
-        matchRule = new MatchRule(dictator, allocationStore, MirrorPosition(_getNextContractAddress(3)));
+        matchingRule = new MatchingRule(dictator, allocationStore, MirrorPosition(_getNextContractAddress(3)));
         feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
         feeMarketplace = new FeeMarketplace(dictator, tokenRouter, feeMarketplaceStore, puppetToken);
-        mirrorPosition = new MirrorPosition(dictator, allocationStore, matchRule, feeMarketplace);
+        mirrorPosition = new MirrorPosition(dictator, allocationStore, matchingRule, feeMarketplace);
 
         dictator.setAccess(tokenRouter, address(allocationStore));
-        dictator.setAccess(allocationStore, address(matchRule));
+        dictator.setAccess(allocationStore, address(matchingRule));
         dictator.setAccess(allocationStore, address(mirrorPosition));
         dictator.setAccess(allocationStore, address(feeMarketplace));
 
@@ -89,7 +89,7 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(
             mirrorPosition,
             mirrorPosition.initializeTraderActivityThrottle.selector,
-            address(matchRule) // MatchRule initializes throttle
+            address(matchingRule) // MatchingRule initializes throttle
         );
         dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, users.owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, users.owner);
@@ -101,8 +101,8 @@ contract TradingTest is BasicSetup {
         dictator.setAccess(allocationStore, address(feeMarketplaceStore));
         dictator.setAccess(tokenRouter, address(feeMarketplaceStore));
 
-        dictator.setPermission(matchRule, matchRule.setRule.selector, users.owner);
-        dictator.setPermission(matchRule, matchRule.deposit.selector, users.owner);
+        dictator.setPermission(matchingRule, matchingRule.setRule.selector, users.owner);
+        dictator.setPermission(matchingRule, matchingRule.deposit.selector, users.owner);
 
         // Config
         IERC20[] memory allowedTokenList = new IERC20[](2);
@@ -118,9 +118,9 @@ contract TradingTest is BasicSetup {
 
         // Configure contracts
         dictator.initContract(
-            matchRule,
+            matchingRule,
             abi.encode(
-                MatchRule.Config({
+                MatchingRule.Config({
                     minExpiryDuration: 1 days,
                     minAllowanceRate: 100, // 1 basis points = 1%
                     maxAllowanceRate: 10000, // 100%
@@ -183,7 +183,7 @@ contract TradingTest is BasicSetup {
         uint initialPuppetBalance = 100e6;
         address trader = defaultCallPosition.trader;
         address[] memory puppetList = _generatePuppetList(usdc, trader, 10);
-        bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
+        bytes32 matchingKey = PositionUtils.getMatchingKey(usdc, trader);
         uint allocationStoreBalanceBefore = usdc.balanceOf(address(allocationStore));
 
         // 1. Initial Mirror (combines allocation & opening)
@@ -194,7 +194,7 @@ contract TradingTest is BasicSetup {
         assertNotEq(increaseRequestKey, bytes32(0));
         assertNotEq(allocationId, 0);
 
-        bytes32 allocationKey = _getAllocationKey(puppetList, matchKey, allocationId);
+        bytes32 allocationKey = _getAllocationKey(puppetList, matchingKey, allocationId);
         address allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
             mirrorPosition.allocationStoreImplementation(), allocationKey, address(mirrorPosition)
         );
@@ -376,8 +376,8 @@ contract TradingTest is BasicSetup {
         (, uint allocationId, bytes32 requestKey) =
             mirrorPosition.mirror{value: callParams.executionFee}(callParams, puppetList);
 
-        bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
-        bytes32 allocationKey = _getAllocationKey(puppetList, matchKey, allocationId);
+        bytes32 matchingKey = PositionUtils.getMatchingKey(usdc, trader);
+        bytes32 allocationKey = _getAllocationKey(puppetList, matchingKey, allocationId);
         address allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
             mirrorPosition.allocationStoreImplementation(), allocationKey, address(mirrorPosition)
         );
@@ -502,7 +502,7 @@ contract TradingTest is BasicSetup {
         puppetList[1] = puppet2;
         puppetList[2] = puppet3;
 
-        bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
+        bytes32 matchingKey = PositionUtils.getMatchingKey(usdc, trader);
 
         MirrorPosition.CallPosition memory callOpen = defaultCallPosition;
 
@@ -510,7 +510,7 @@ contract TradingTest is BasicSetup {
             mirrorPosition.mirror{value: callOpen.executionFee}(callOpen, puppetList);
         assertNotEq(allocationId, 0);
 
-        bytes32 allocationKey = _getAllocationKey(puppetList, matchKey, allocationId);
+        bytes32 allocationKey = _getAllocationKey(puppetList, matchingKey, allocationId);
         address allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
             mirrorPosition.allocationStoreImplementation(), allocationKey, address(mirrorPosition)
         );
@@ -646,7 +646,7 @@ contract TradingTest is BasicSetup {
         // Set up: Create a position and close it to get an allocation account
         address trader = defaultCallPosition.trader;
         address[] memory puppetList = _generatePuppetList(usdc, trader, 2);
-        bytes32 matchKey = PositionUtils.getMatchKey(usdc, trader);
+        bytes32 matchingKey = PositionUtils.getMatchingKey(usdc, trader);
 
         // Open position
         MirrorPosition.CallPosition memory callOpen = defaultCallPosition;
@@ -689,7 +689,7 @@ contract TradingTest is BasicSetup {
         vm.prank(users.owner);
         (address allocationAddress, uint allocationId, bytes32 requestKey) =
             mirrorPosition.mirror{value: callMirror.executionFee}(callMirror, puppetList);
-        bytes32 allocationKey = _getAllocationKey(puppetList, PositionUtils.getMatchKey(usdc, trader), allocationId);
+        bytes32 allocationKey = _getAllocationKey(puppetList, PositionUtils.getMatchingKey(usdc, trader), allocationId);
         vm.stopPrank(); // Reset prank state
 
         MirrorPosition.CallPosition memory callAdjust = defaultCallPosition;
@@ -733,7 +733,7 @@ contract TradingTest is BasicSetup {
         mirrorPosition.settle(callSettle, puppetList);
         vm.stopPrank(); // Reset prank state
 
-        // --- Test initializeTraderActivityThrottle (only MatchRule should call) ---
+        // --- Test initializeTraderActivityThrottle (only MatchingRule should call) ---
         vm.expectRevert();
         vm.prank(users.owner); // Owner shouldn't call directly
         mirrorPosition.initializeTraderActivityThrottle(trader, puppetList[0]);
@@ -776,14 +776,14 @@ contract TradingTest is BasicSetup {
         collateralToken.approve(address(tokenRouter), type(uint).max);
 
         vm.startPrank(users.owner);
-        matchRule.deposit(collateralToken, user, fundValue);
+        matchingRule.deposit(collateralToken, user, fundValue);
 
         // Owner sets rule for puppet-trader relationship
-        matchRule.setRule(
+        matchingRule.setRule(
             collateralToken,
             user, // puppet address
             trader,
-            MatchRule.Rule({allowanceRate: 1000, throttleActivity: 1 hours, expiry: block.timestamp + 2 days})
+            MatchingRule.Rule({allowanceRate: 1000, throttleActivity: 1 hours, expiry: block.timestamp + 2 days})
         );
 
         return user;
@@ -791,11 +791,11 @@ contract TradingTest is BasicSetup {
 
     function _getAllocationKey(
         address[] memory _puppetList,
-        bytes32 _matchKey,
+        bytes32 _matchingKey,
         uint _allocationId
     ) internal pure returns (bytes32) {
         // Matches PositionUtils.getAllocationKey
-        return keccak256(abi.encodePacked(_puppetList, _matchKey, _allocationId));
+        return keccak256(abi.encodePacked(_puppetList, _matchingKey, _allocationId));
     }
 
     function _getSettleFeeFactor() internal view returns (uint) {

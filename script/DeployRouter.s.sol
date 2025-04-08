@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Router} from "src/Router.sol";
 import {RouterProxy} from "src/RouterProxy.sol";
-import {MatchRule} from "src/position/MatchRule.sol";
+import {MatchingRule} from "src/position/MatchingRule.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 
@@ -23,9 +23,9 @@ contract DeployPuppetLogic is BaseScript {
         Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
         RouterProxy routerProxy = RouterProxy(payable(getDeployedAddress("RouterProxy")));
 
-        MatchRule matchRule = MatchRule(getDeployedAddress("MatchRule"));
-        dictator.setPermission(matchRule, matchRule.setRule.selector, address(routerProxy));
-        dictator.setPermission(matchRule, matchRule.deposit.selector, address(routerProxy));
+        MatchingRule matchingRule = MatchingRule(getDeployedAddress("MatchingRule"));
+        dictator.setPermission(matchingRule, matchingRule.setRule.selector, address(routerProxy));
+        dictator.setPermission(matchingRule, matchingRule.deposit.selector, address(routerProxy));
 
         FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
         dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, address(routerProxy));
@@ -34,7 +34,7 @@ contract DeployPuppetLogic is BaseScript {
         routerProxy.update(
             address(
                 new Router(
-                    matchRule, //
+                    matchingRule, //
                     feeMarketplace
                 )
             )

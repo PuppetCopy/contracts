@@ -4,15 +4,15 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-import {MatchRule} from "./position/MatchRule.sol";
+import {MatchingRule} from "./position/MatchingRule.sol";
 import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
 
 contract Router is ReentrancyGuardTransient {
-    MatchRule public immutable matchRule;
+    MatchingRule public immutable matchingRule;
     FeeMarketplace public immutable feeMarketplace;
 
-    constructor(MatchRule _matchRule, FeeMarketplace _feeMarketplace) {
-        matchRule = _matchRule;
+    constructor(MatchingRule _matchingRule, FeeMarketplace _feeMarketplace) {
+        matchingRule = _matchingRule;
         feeMarketplace = _feeMarketplace;
     }
 
@@ -22,7 +22,7 @@ contract Router is ReentrancyGuardTransient {
      * @param amount The amount being deposited.
      */
     function deposit(IERC20 token, uint amount) external nonReentrant {
-        matchRule.deposit(token, msg.sender, amount);
+        matchingRule.deposit(token, msg.sender, amount);
     }
 
     /**
@@ -32,7 +32,7 @@ contract Router is ReentrancyGuardTransient {
      * @param amount The amount being withdrawn.
      */
     function withdraw(IERC20 token, address receiver, uint amount) external nonReentrant {
-        matchRule.withdraw(token, msg.sender, receiver, amount);
+        matchingRule.withdraw(token, msg.sender, receiver, amount);
     }
 
     /**
@@ -41,12 +41,12 @@ contract Router is ReentrancyGuardTransient {
      * @param trader The trader the caller wishes to potentially mirror.
      * @param ruleParams The parameters for the rule (allowance rate, throttle, expiry).
      */
-    function setMatchRule(
+    function setMatchingRule(
         IERC20 collateralToken,
         address trader,
-        MatchRule.Rule calldata ruleParams
+        MatchingRule.Rule calldata ruleParams
     ) external nonReentrant {
-        matchRule.setRule(collateralToken, msg.sender, trader, ruleParams);
+        matchingRule.setRule(collateralToken, msg.sender, trader, ruleParams);
     }
 
     /**

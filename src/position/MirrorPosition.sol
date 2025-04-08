@@ -8,7 +8,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {FeeMarketplace} from "../shared/FeeMarketplace.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {MatchRule} from "./../position/MatchRule.sol";
+import {MatchingRule} from "./../position/MatchingRule.sol";
 import {AllocationAccount} from "./../shared/AllocationAccount.sol";
 import {AllocationStore} from "./../shared/AllocationStore.sol";
 import {CallUtils} from "./../utils/CallUtils.sol";
@@ -79,7 +79,7 @@ contract MirrorPosition is CoreContract {
     uint[] tokenDustThresholdCapList;
 
     AllocationStore immutable allocationStore;
-    MatchRule immutable matchRule;
+    MatchingRule immutable matchingRule;
     FeeMarketplace immutable feeMarket;
     address public immutable allocationStoreImplementation;
 
@@ -126,11 +126,11 @@ contract MirrorPosition is CoreContract {
     constructor(
         IAuthority _authority,
         AllocationStore _puppetStore,
-        MatchRule _matchRule,
+        MatchingRule _matchingRule,
         FeeMarketplace _feeMarket
     ) CoreContract(_authority) {
         allocationStore = _puppetStore;
-        matchRule = _matchRule;
+        matchingRule = _matchingRule;
         feeMarket = _feeMarket;
         allocationStoreImplementation = address(new AllocationAccount(allocationStore));
     }
@@ -144,7 +144,7 @@ contract MirrorPosition is CoreContract {
      * @dev Called by an authorized Keeper (`auth`) to initiate the copy-trading process when a followed trader opens a
      * new position.
      * This function determines how much capital each eligible puppet allocates based on their individual matching rules
-     * (`MatchRule`),
+     * (`MatchingRule`),
      * available funds (`AllocationStore`), and activity limits. It ensures the total allocated amount is sufficient to
      * cover the provided keeper execution fee (`_callParams.keeperExecutionFee`).
      *
@@ -189,17 +189,17 @@ contract MirrorPosition is CoreContract {
         require(_callParams.sizeDeltaInUsd > 0, Error.MirrorPosition__InvalidSizeDelta());
 
         _nextAllocationId = ++nextAllocationId;
-        bytes32 _matchKey = PositionUtils.getMatchKey(_callParams.collateralToken, _callParams.trader);
-        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _matchKey, _nextAllocationId);
+        bytes32 _matchingKey = PositionUtils.getMatchingKey(_callParams.collateralToken, _callParams.trader);
+        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _matchingKey, _nextAllocationId);
         _allocationAddress = AllocationAccountUtils.cloneDeterministic(allocationStoreImplementation, _allocationKey);
 
-        MatchRule.Rule[] memory _ruleList = matchRule.getRuleList(_matchKey, _puppetList);
+        MatchingRule.Rule[] memory _ruleList = matchingRule.getRuleList(_matchingKey, _puppetList);
         uint[] memory _nextBalanceList = allocationStore.getBalanceList(_callParams.collateralToken, _puppetList);
         uint _estimatedExecutionFeePerPuppet = _keeperFee / _puppetListLength;
         uint _allocation = 0;
 
         for (uint i = 0; i < _puppetListLength; i++) {
-            MatchRule.Rule memory rule = _ruleList[i];
+            MatchingRule.Rule memory rule = _ruleList[i];
             address _puppet = _puppetList[i];
 
             if (rule.expiry > block.timestamp && block.timestamp >= activityThrottleMap[_callParams.trader][_puppet]) {
@@ -259,7 +259,7 @@ contract MirrorPosition is CoreContract {
         _logEvent(
             "Mirror",
             abi.encode(
-                _matchKey,
+                _matchingKey,
                 _allocationKey,
                 _requestKey,
                 _allocationAddress,
@@ -268,7 +268,8 @@ contract MirrorPosition is CoreContract {
                 _allocation,
                 _netAllocation,
                 _sizeDelta,
-                _traderTargetLeverage
+                _traderTargetLeverage,
+                _nextBalanceList
             )
         );
     }
@@ -318,8 +319,8 @@ contract MirrorPosition is CoreContract {
             Error.MirrorPosition__NoAdjustmentRequired()
         );
 
-        bytes32 _matchKey = PositionUtils.getMatchKey(_callParams.collateralToken, _callParams.trader);
-        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _matchKey, _allocationId);
+        bytes32 _matchingKey = PositionUtils.getMatchingKey(_callParams.collateralToken, _callParams.trader);
+        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _matchingKey, _allocationId);
 
         address _allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
             allocationStoreImplementation, _allocationKey, address(this)
@@ -335,7 +336,7 @@ contract MirrorPosition is CoreContract {
 
         uint _feeCollectedFromBalance = 0;
         uint _puppetKeeperExecutionFeeInsolvency = 0;
-        uint[] memory _nextBalances = allocationStore.getBalanceList(_callParams.collateralToken, _puppetList);
+        uint[] memory _nextBalanceList = allocationStore.getBalanceList(_callParams.collateralToken, _puppetList);
 
         require(_allocation > _keeperFee, Error.MirrorPosition__KeeperAdjustmentExecutionFeeExceedsAllocatedAmount());
 
@@ -347,8 +348,8 @@ contract MirrorPosition is CoreContract {
 
             uint _puppetFeePortion = _keeperFee * _puppetAllocation / _allocation;
 
-            if (_nextBalances[i] >= _puppetFeePortion) {
-                _nextBalances[i] -= _puppetFeePortion;
+            if (_nextBalanceList[i] >= _puppetFeePortion) {
+                _nextBalanceList[i] -= _puppetFeePortion;
                 _feeCollectedFromBalance += _puppetFeePortion;
             } else {
                 allocationPuppetMap[_allocationKey][_puppet] =
@@ -357,7 +358,7 @@ contract MirrorPosition is CoreContract {
             }
         }
 
-        allocationStore.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalances);
+        allocationStore.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
         allocationStore.transferOut(_callParams.collateralToken, _keeperFeeReceiver, _keeperFee);
 
         uint _nextAllocation = _allocation - _puppetKeeperExecutionFeeInsolvency;
@@ -431,7 +432,7 @@ contract MirrorPosition is CoreContract {
         _logEvent(
             "Adjust",
             abi.encode(
-                _matchKey,
+                _matchingKey,
                 _allocationKey,
                 _allocationAddress,
                 _requestKey,
@@ -440,7 +441,8 @@ contract MirrorPosition is CoreContract {
                 _nextAllocation,
                 _sizeDelta,
                 _traderTargetLeverage,
-                _puppetKeeperExecutionFeeInsolvency
+                _puppetKeeperExecutionFeeInsolvency,
+                _nextBalanceList
             )
         );
     }
@@ -564,8 +566,8 @@ contract MirrorPosition is CoreContract {
         address _keeperFeeReceiver = _callParams.keeperExecutionFeeReceiver;
         require(_keeperFeeReceiver != address(0), Error.MirrorPosition__InvalidKeeperExeuctionFeeReceiver());
 
-        bytes32 _matchKey = PositionUtils.getMatchKey(_callParams.allocationToken, _callParams.trader);
-        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _matchKey, _callParams.allocationId);
+        bytes32 _matchingKey = PositionUtils.getMatchingKey(_callParams.allocationToken, _callParams.trader);
+        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _matchingKey, _callParams.allocationId);
         address _allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
             allocationStoreImplementation, _allocationKey, address(this)
         );
@@ -610,8 +612,10 @@ contract MirrorPosition is CoreContract {
             }
         }
 
+        uint[] memory _nextBalanceList;
+
         if (_distributionAmount > 0) {
-            uint[] memory _nextBalanceList = allocationStore.getBalanceList(_callParams.distributeToken, _puppetList);
+            _nextBalanceList = allocationStore.getBalanceList(_callParams.distributeToken, _puppetList);
             uint _distributedTotal = 0;
 
             for (uint i = 0; i < _puppetListLength; i++) {
@@ -629,14 +633,15 @@ contract MirrorPosition is CoreContract {
         _logEvent(
             "Settle",
             abi.encode(
-                _matchKey,
+                _matchingKey,
                 _allocationKey,
                 _allocationAddress,
                 _keeperFeeReceiver,
                 _keeperFee,
                 _settledBalance,
                 _distributionAmount,
-                _platformFeeAmount
+                _platformFeeAmount,
+                _nextBalanceList
             )
         );
     }

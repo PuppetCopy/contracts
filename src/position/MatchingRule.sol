@@ -10,7 +10,7 @@ import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {MirrorPosition} from "./MirrorPosition.sol";
 
-contract MatchRule is CoreContract {
+contract MatchingRule is CoreContract {
     struct Rule {
         uint allowanceRate;
         uint throttleActivity;
@@ -30,13 +30,13 @@ contract MatchRule is CoreContract {
     Config public config;
 
     mapping(IERC20 token => uint) tokenAllowanceCapMap;
-    mapping(bytes32 matchKey => mapping(address puppet => Rule)) public matchRuleMap;
+    mapping(bytes32 matchingKey => mapping(address puppet => Rule)) public matchingRuleMap;
 
     MirrorPosition immutable mirrorPosition;
     AllocationStore immutable allocationStore;
 
     function getRuleList(
-        bytes32 _matchKey,
+        bytes32 _matchingKey,
         address[] calldata _puppetList
     ) external view returns (Rule[] memory _ruleList) {
         uint _puppetListCount = _puppetList.length;
@@ -44,7 +44,7 @@ contract MatchRule is CoreContract {
 
         for (uint i = 0; i < _puppetListCount; i++) {
             address _puppet = _puppetList[i];
-            _ruleList[i] = matchRuleMap[_matchKey][_puppet];
+            _ruleList[i] = matchingRuleMap[_matchingKey][_puppet];
         }
     }
 
@@ -58,13 +58,13 @@ contract MatchRule is CoreContract {
     }
 
     function deposit(IERC20 _collateralToken, address _user, uint _amount) external auth {
-        require(_amount > 0, Error.MatchRule__InvalidAmount());
+        require(_amount > 0, Error.MatchingRule__InvalidAmount());
 
         uint allowanceCap = tokenAllowanceCapMap[_collateralToken];
-        require(allowanceCap > 0, Error.MatchRule__TokenNotAllowed());
+        require(allowanceCap > 0, Error.MatchingRule__TokenNotAllowed());
 
         uint nextBalance = allocationStore.userBalanceMap(_collateralToken, _user) + _amount;
-        require(nextBalance <= allowanceCap, Error.MatchRule__AllowanceAboveLimit(allowanceCap));
+        require(nextBalance <= allowanceCap, Error.MatchingRule__AllowanceAboveLimit(allowanceCap));
 
         allocationStore.transferIn(_collateralToken, _user, _amount);
         allocationStore.setUserBalance(_collateralToken, _user, nextBalance);
@@ -73,11 +73,11 @@ contract MatchRule is CoreContract {
     }
 
     function withdraw(IERC20 _collateralToken, address _user, address _receiver, uint _amount) external auth {
-        require(_amount > 0, Error.MatchRule__InvalidAmount());
+        require(_amount > 0, Error.MatchingRule__InvalidAmount());
 
         uint balance = allocationStore.userBalanceMap(_collateralToken, _user);
 
-        require(_amount <= balance, Error.MatchRule__InsufficientBalance());
+        require(_amount <= balance, Error.MatchingRule__InsufficientBalance());
 
         uint nextBalance = balance - _amount;
 
@@ -96,24 +96,24 @@ contract MatchRule is CoreContract {
         require(
             _ruleParams.throttleActivity >= config.minActivityThrottle
                 && _ruleParams.throttleActivity <= config.maxActivityThrottle,
-            Error.MatchRule__InvalidActivityThrottle(config.minActivityThrottle, config.maxActivityThrottle)
+            Error.MatchingRule__InvalidActivityThrottle(config.minActivityThrottle, config.maxActivityThrottle)
         );
 
         require(
             _ruleParams.expiry >= config.minExpiryDuration,
-            Error.MatchRule__InvalidExpiryDuration(config.minExpiryDuration)
+            Error.MatchingRule__InvalidExpiryDuration(config.minExpiryDuration)
         );
 
         require(
             _ruleParams.allowanceRate >= config.minAllowanceRate && _ruleParams.allowanceRate <= config.maxAllowanceRate,
-            Error.MatchRule__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate)
+            Error.MatchingRule__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate)
         );
 
-        bytes32 _matchKey = PositionUtils.getMatchKey(_collateralToken, _trader);
-        matchRuleMap[_matchKey][_user] = _ruleParams;
+        bytes32 _matchingKey = PositionUtils.getMatchingKey(_collateralToken, _trader);
+        matchingRuleMap[_matchingKey][_user] = _ruleParams;
         mirrorPosition.initializeTraderActivityThrottle(_trader, _user);
 
-        _logEvent("SetMatchRule", abi.encode(_collateralToken, _matchKey, _user, _trader, _ruleParams));
+        _logEvent("SetMatchingRule", abi.encode(_collateralToken, _matchingKey, _user, _trader, _ruleParams));
     }
 
     /// @notice  Sets the configuration parameters via governance

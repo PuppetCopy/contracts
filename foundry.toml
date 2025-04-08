@@ -16,7 +16,7 @@
     { access = "read", path = "./deployments" },
   ]
   optimizer = true
-  optimizer_runs = 50
+  optimizer_runs = 200
   verbosity = 4
 
 [doc]
