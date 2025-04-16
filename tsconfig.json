@@ -4,8 +4,7 @@
     "outDir": "dist/esm",
     "rootDir": "./deployments",
     "declarationDir": "dist/types",
-    "emitDeclarationOnly": false,
-    "allowSyntheticDefaultImports": true,
+    "emitDeclarationOnly": false
   },
   "references": []
 }

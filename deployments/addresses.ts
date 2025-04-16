@@ -1,6 +1,6 @@
 import * as abi from "./abi.js";
 
-export const CONTRACT = {
+export const PUPPET_ADDRESSES = {
   42161: {
     RouterProxy: {
       address: "0x186194beB8FF7c6CeE8E2C56F0969c87e396c118",
