@@ -8,9 +8,9 @@ import {IAsset, IVault} from "@balancer-labs/v2-interfaces/contracts/vault/IVaul
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {Dictatorship} from "src/shared/Dictatorship.sol";
-import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
-import {IWNT} from "src/utils/interfaces/IWNT.sol";
+import {Dictatorship} from "contracts/src/shared/Dictatorship.sol";
+import {PuppetToken} from "contracts/src/tokenomics/PuppetToken.sol";
+import {IWNT} from "contracts/src/utils/interfaces/IWNT.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
 import {Const} from "script/Const.sol";

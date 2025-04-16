@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.29;
 
-import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
-import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
+import {IGmxExchangeRouter} from "contracts/src/position/interface/IGmxExchangeRouter.sol";
+import {GmxPositionUtils} from "contracts/src/position/utils/GmxPositionUtils.sol";
 
 contract MockGmxExchangeRouter is IGmxExchangeRouter {
     // This mapping can be used to track created orders for testing purposes

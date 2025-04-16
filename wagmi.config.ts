@@ -5,6 +5,7 @@ export default defineConfig({
   out: "deployments/abi.ts",
   plugins: [
     foundry({
+      include: ['contracts/src/**/*.sol'],
       forge: {
         clean: true,
       }

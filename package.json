@@ -10,17 +10,7 @@
   "sideEffects": false,
   "packageManager": "bun@1.2.9",
   "scripts": {
-    "test": "forge test --match-contract TradingTest -vvvvv",
-    "test:target": "bun run test --match-test testSizeAdjustmentsMatchMirrorPositionLogic",
-    "test:prod": "FOUNDRY_PROFILE=prod bun run test",
-    "test:fork": "forge test --chain arbitrum --match-contract TradingTest -vvvvv --fork-block-number 192315592 --fork-url=$ARBITRUM_RPC_URL",
-    "build": "forge build --sizes",
-    "build:prod": "FOUNDRY_PROFILE=prod forge build --sizes",
-    "deploy": "FOUNDRY_PROFILE=prod CHAIN=42161 SCRIPT='DeployPosition' bun deploy.ts",
-    "docgen": "forge doc --out '.docgen' --build",
-    "gas-report": "forge test --match-contract TradingTest --gas-report",
-    "lint": "bun run lint:sol",
-    "lint:sol": "forge fmt --check && bun solhint \"{script,src,test}/**/*.sol\"",
+    "wagmi:generate": "wagmi generate",
     "clean:tsc": "rm -fr dist/*",
     "build:tsc": "bun tsc -b"
   },
@@ -32,6 +22,7 @@
     "@zeframlou/create3-factory": "github:zeframlou/create3-factory#main",
     "dotenv": "^16.4.7",
     "forge-std": "github:foundry-rs/forge-std#v1.9.6",
-    "solhint": "5.0.5"
+    "solhint": "5.0.5",
+    "@wagmi/cli": "^2.2.1"
   }
 }

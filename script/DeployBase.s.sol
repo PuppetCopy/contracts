@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.29;
 
-import {RouterProxy} from "src/RouterProxy.sol";
-import {Dictatorship} from "src/shared/Dictatorship.sol";
-import {TokenRouter} from "src/shared/TokenRouter.sol";
-import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
-import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
+import {RouterProxy} from "contracts/src/RouterProxy.sol";
+import {Dictatorship} from "contracts/src/shared/Dictatorship.sol";
+import {TokenRouter} from "contracts/src/shared/TokenRouter.sol";
+import {PuppetToken} from "contracts/src/tokenomics/PuppetToken.sol";
+import {PuppetVoteToken} from "contracts/src/tokenomics/PuppetVoteToken.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
 import {Const} from "./Const.sol";

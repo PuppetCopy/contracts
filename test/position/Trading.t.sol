@@ -8,25 +8,24 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Vm} from "forge-std/src/Vm.sol";
 import {console} from "forge-std/src/console.sol"; // Import Vm for expectRevert etc.
 
-import {MatchingRule} from "src/position/MatchingRule.sol";
-import {MirrorPosition} from "src/position/MirrorPosition.sol";
-import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
-import {AllocationAccountUtils} from "src/position/utils/AllocationAccountUtils.sol";
-import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol"; // Added for OrderType
-import {PositionUtils} from "src/position/utils/PositionUtils.sol";
-import {AllocationAccount} from "src/shared/AllocationAccount.sol";
-import {AllocationStore} from "src/shared/AllocationStore.sol";
-import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
-import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
-import {BankStore} from "src/utils/BankStore.sol";
-import {Error} from "src/utils/Error.sol";
-import {Precision} from "src/utils/Precision.sol";
+import {MatchingRule} from "contracts/src/position/MatchingRule.sol";
+import {MirrorPosition} from "contracts/src/position/MirrorPosition.sol";
+import {IGmxExchangeRouter} from "contracts/src/position/interface/IGmxExchangeRouter.sol";
+import {AllocationAccountUtils} from "contracts/src/position/utils/AllocationAccountUtils.sol";
+import {GmxPositionUtils} from "contracts/src/position/utils/GmxPositionUtils.sol"; // Added for OrderType
+import {PositionUtils} from "contracts/src/position/utils/PositionUtils.sol";
+import {AllocationAccount} from "contracts/src/shared/AllocationAccount.sol";
+import {AllocationStore} from "contracts/src/shared/AllocationStore.sol";
+import {FeeMarketplace} from "contracts/src/shared/FeeMarketplace.sol";
+import {FeeMarketplaceStore} from "contracts/src/shared/FeeMarketplaceStore.sol";
+import {BankStore} from "contracts/src/utils/BankStore.sol";
+import {Error} from "contracts/src/utils/Error.sol";
+import {Precision} from "contracts/src/utils/Precision.sol";
 
 import {BasicSetup} from "../base/BasicSetup.t.sol";
 import {MockGmxExchangeRouter} from "../mock/MockGmxExchangeRouter.sol";
-import {Const} from "script/Const.sol";
-
-import {MockERC20} from "test/mock/MockERC20.sol";
+import {Const} from "contracts/script/Const.sol";
+import {MockERC20} from "contracts/test/mock/MockERC20.sol";
 
 contract TradingTest is BasicSetup {
     AllocationStore internal allocationStore;
