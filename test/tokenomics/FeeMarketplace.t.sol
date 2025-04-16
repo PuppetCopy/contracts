@@ -3,13 +3,13 @@ pragma solidity ^0.8.29;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {FeeMarketplace} from "contracts/src/shared/FeeMarketplace.sol";
-import {FeeMarketplaceStore} from "contracts/src/shared/FeeMarketplaceStore.sol";
-import {TokenRouter} from "contracts/src/shared/TokenRouter.sol";
-import {PuppetToken} from "contracts/src/tokenomics/PuppetToken.sol";
-import {BankStore} from "contracts/src/utils/BankStore.sol";
-import {Error} from "contracts/src/utils/Error.sol";
-import {IAuthority} from "contracts/src/utils/interfaces/IAuthority.sol";
+import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
+import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
+import {TokenRouter} from "src/shared/TokenRouter.sol";
+import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+import {BankStore} from "src/utils/BankStore.sol";
+import {Error} from "src/utils/Error.sol";
+import {IAuthority} from "src/utils/interfaces/IAuthority.sol";
 
 import {BasicSetup} from "../base/BasicSetup.t.sol";
 

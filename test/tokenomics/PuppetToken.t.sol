@@ -3,9 +3,9 @@
 
 // import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-// import {Error} from "contracts/src/utils/Error.sol";
-// import {PuppetToken} from "contracts/src/tokenomics/PuppetToken.sol";
-// import {Precision} from "contracts/src/utils/Precision.sol";
+// import {Error} from "src/utils/Error.sol";
+// import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+// import {Precision} from "src/utils/Precision.sol";
 // import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
 // contract PuppetTest is BasicSetup {

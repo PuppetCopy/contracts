@@ -1,13 +1,22 @@
 {
   "name": "@puppet/contracts",
   "license": "BSL-1.1",
-  "module": "dist/esm/index.js",
-  "main": "dist/cjs/index.js",
-  "types": "dist/types/index.d.ts",
-  "type": "module",
   "files": [
-    "dist"
+    "deployments",
+    "contracts"
   ],
+  "scripts": {
+    "test": "forge test --match-contract TradingTest -vvvvv",
+    "test:target": "bun run test --match-test testSizeAdjustmentsMatchMirrorPositionLogic",
+    "test:prod": "FOUNDRY_PROFILE=prod bun run test",
+    "test:fork": "forge test --chain arbitrum --match-contract TradingTest -vvvvv --fork-block-number 192315592 --fork-url=$ARBITRUM_RPC_URL",
+    "build": "forge build --sizes",
+    "build:prod": "FOUNDRY_PROFILE=prod forge build --sizes",
+    "deploy": "FOUNDRY_PROFILE=prod CHAIN=42161 SCRIPT='DeployPosition' bun deploy.ts",
+    "docgen": "forge doc --out '.docgen' --build",
+    "gas-report": "forge test --match-contract TradingTest --gas-report",
+    "lint:sol": "forge fmt --check && bun solhint \"{script,src,test}/**/*.sol\""
+  },
   "private": true,
   "sideEffects": false,
   "packageManager": "bun@1.2.9",

@@ -4,14 +4,14 @@
 // import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 // import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-// import {TokenomicsRouter} from "contracts/src/TokenomicsRouter.sol";
-// import {ContributeLogic} from "contracts/src/tokenomics/ContributeLogic.sol";
-// import {PuppetToken} from "contracts/src/tokenomics/PuppetToken.sol";
-// import {RewardLogic} from "contracts/src/tokenomics/RewardLogic.sol";
-// import {VotingEscrowLogic} from "contracts/src/tokenomics/VotingEscrowLogic.sol";
-// import {ContributeStore} from "contracts/src/tokenomics/ContributeStore.sol";
-// import {RewardStore} from "contracts/src/tokenomics/RewardStore.sol";
-// import {VotingEscrowStore} from "contracts/src/tokenomics/VotingEscrowStore.sol";
+// import {TokenomicsRouter} from "src/TokenomicsRouter.sol";
+// import {ContributeLogic} from "src/tokenomics/ContributeLogic.sol";
+// import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+// import {RewardLogic} from "src/tokenomics/RewardLogic.sol";
+// import {VotingEscrowLogic} from "src/tokenomics/VotingEscrowLogic.sol";
+// import {ContributeStore} from "src/tokenomics/ContributeStore.sol";
+// import {RewardStore} from "src/tokenomics/RewardStore.sol";
+// import {VotingEscrowStore} from "src/tokenomics/VotingEscrowStore.sol";
 // import {BasicSetup} from "test/base/BasicSetup.t.sol";
 
 // contract TokenomicsTest is BasicSetup {

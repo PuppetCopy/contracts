@@ -1,0 +1,51 @@
+# Full reference https://github.com/foundry-rs/foundry/tree/master/config
+
+[profile.default]
+  src = 'src'
+  out = 'forge-artifacts'
+  cache_path = 'forge-cache'
+  libs = ['node_modules']
+  evm_version = 'cancun'
+  solc_version = '0.8.29'
+  via_ir = true
+  extra_output = ["storageLayout", "evm.bytecode.generatedSources", "evm.legacyAssembly", "evm.deployedBytecode.immutableReferences"]
+  bytecode_hash = "ipfs"
+  cbor_metadata = true
+  build_info = true
+  fs_permissions = [
+    { access = "read", path = "./deployments" },
+  ]
+  optimizer = true
+  optimizer_runs = 200
+  verbosity = 4
+
+[doc]
+  ignore = ["**/interface/**/*.sol", "**/utils/**/*.sol", "**/shared/**/*.sol"]
+
+[profile.prod]
+  out = "forge-artifacts-prod"
+  cache_path  = 'forge-cache-prod'
+  optimizer_runs = 100_000
+
+
+[profile.default.fuzz]
+  max_test_rejects = 1_000_000 # Number of times `vm.assume` can fail
+  runs = 50
+
+[fmt]
+  bracket_spacing = false
+  int_types = "short"
+  number_underscore = "preserve"
+  quote_style = "double"
+  multiline_func_header = "params_first"
+  sort_imports = true
+  tab_width = 4
+  wrap_comments = true
+  func_attrs_with_params_multiline = true
+
+[rpc_endpoints]
+  localhost = "http://localhost:8545"
+  arbitrum = "${ARBITRUM_RPC_URL}"
+
+[etherscan]
+  arbitrum = { key = "${ARBISCAN_API_KEY}", chain = 42161 }

@@ -4,14 +4,15 @@ pragma solidity ^0.8.29;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Test} from "forge-std/src/Test.sol";
-import {MockERC20} from "contracts/test/mock/MockERC20.sol";
+import {Dictatorship} from "src/shared/Dictatorship.sol";
+import {TokenRouter} from "src/shared/TokenRouter.sol";
+import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
+import {IWNT} from "src/utils/interfaces/IWNT.sol";
 
-import {Dictatorship} from "contracts/src/shared/Dictatorship.sol";
-import {TokenRouter} from "contracts/src/shared/TokenRouter.sol";
-import {PuppetToken} from "contracts/src/tokenomics/PuppetToken.sol";
-import {PuppetVoteToken} from "contracts/src/tokenomics/PuppetVoteToken.sol";
-import {IWNT} from "contracts/src/utils/interfaces/IWNT.sol";
+import {Test} from "forge-std/src/Test.sol";
+import {MockERC20} from "test/mock/MockERC20.sol";
+
 
 contract BasicSetup is Test {
     struct Users {

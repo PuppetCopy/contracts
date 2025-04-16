@@ -3,20 +3,20 @@ pragma solidity ^0.8.29;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {GmxExecutionCallback} from "contracts/src/position/GmxExecutionCallback.sol";
-import {MatchingRule} from "contracts/src/position/MatchingRule.sol";
-import {MirrorPosition} from "contracts/src/position/MirrorPosition.sol";
-import {IGmxExchangeRouter} from "contracts/src/position/interface/IGmxExchangeRouter.sol";
-import {AllocationStore} from "contracts/src/shared/AllocationStore.sol";
-import {Dictatorship} from "contracts/src/shared/Dictatorship.sol";
-import {FeeMarketplace} from "contracts/src/shared/FeeMarketplace.sol";
-import {FeeMarketplaceStore} from "contracts/src/shared/FeeMarketplaceStore.sol";
-import {TokenRouter} from "contracts/src/shared/TokenRouter.sol";
-import {TokenRouter} from "contracts/src/shared/TokenRouter.sol";
-import {PuppetToken} from "contracts/src/tokenomics/PuppetToken.sol";
-import {PuppetVoteToken} from "contracts/src/tokenomics/PuppetVoteToken.sol";
-import {RouterProxy} from "contracts/src/RouterProxy.sol";
-import {Router} from "contracts/src/Router.sol";
+import {GmxExecutionCallback} from "src/position/GmxExecutionCallback.sol";
+import {MatchingRule} from "src/position/MatchingRule.sol";
+import {MirrorPosition} from "src/position/MirrorPosition.sol";
+import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
+import {AllocationStore} from "src/shared/AllocationStore.sol";
+import {Dictatorship} from "src/shared/Dictatorship.sol";
+import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
+import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
+import {TokenRouter} from "src/shared/TokenRouter.sol";
+import {TokenRouter} from "src/shared/TokenRouter.sol";
+import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
+import {RouterProxy} from "src/RouterProxy.sol";
+import {Router} from "src/Router.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
 import {Const} from "./Const.sol";
