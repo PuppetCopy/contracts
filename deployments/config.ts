@@ -1,5 +1,6 @@
 import * as abi from "./abi.js";
-import * as addresses from './addresses.json'
+import addresses from './addresses.json' with { type: "json" };
+
 
 export const PUPPET_ADDRESSES = {
   42161: {

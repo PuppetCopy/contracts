@@ -1,6 +1,8 @@
 {
   "name": "@puppet/contracts",
+  "license": "BSL-1.1",
   "module": "dist/esm/index.js",
+  "main": "dist/cjs/index.js",
   "types": "dist/types/index.d.ts",
   "type": "module",
   "files": [
@@ -9,11 +11,6 @@
   "private": true,
   "sideEffects": false,
   "packageManager": "bun@1.2.9",
-  "scripts": {
-    "wagmi:generate": "wagmi generate",
-    "clean:tsc": "rm -fr dist/*",
-    "build:tsc": "bun tsc -b"
-  },
   "devDependencies": {
     "@aragon/osx": "^1.4.0",
     "@balancer-labs/v2-interfaces": "0.4.0",

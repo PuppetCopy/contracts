@@ -1,10 +1,10 @@
 {
-  "extends": "../tsconfig",
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist/esm",
-    "rootDir": "./deployments",
-    "declarationDir": "dist/types",
+    "resolveJsonModule": true,
     "emitDeclarationOnly": false
   },
+  "include": ["./deployments"],
   "references": []
 }
