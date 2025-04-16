@@ -1,19 +1,19 @@
 import * as abi from "./abi.js";
-import {} from './addresses.json'
+import * as addresses from './addresses.json'
 
 export const PUPPET_ADDRESSES = {
   42161: {
     RouterProxy: {
-      address: "0x186194beB8FF7c6CeE8E2C56F0969c87e396c118",
+      address: addresses[42161].RouterProxy,
       abi: [...abi.routerAbi, ...abi.routerProxyAbi],
     },
 
     Dictatorship: {
-      address: addresses.Dictatorship,
+      address: addresses[42161].Dictatorship,
       abi: abi.dictatorshipAbi,
     },
     PuppetToken: {
-      address: "0x2F076BdCE9bf6f118d612Ee6bAa9BCF6266De199",
+      address: addresses[42161].PuppetToken,
       abi: abi.puppetTokenAbi,
     },
     PuppetVoteToken: {
@@ -21,7 +21,7 @@ export const PUPPET_ADDRESSES = {
       abi: abi.puppetVoteTokenAbi,
     },
     TokenRouter: {
-      address: "0xb05Ec3598F5fA2f997B1a79E5e6995a158E8C26D",
+      address: addresses[42161].TokenRouter,
       abi: abi.routerAbi,
     },
     AllocationStore: {
@@ -30,20 +30,16 @@ export const PUPPET_ADDRESSES = {
     },
 
     MatchingRule: {
-      address: "0x1fC2D4aE5E8bA3fE3dF7B6c8D9B1fF8C8E0eA8C7",
+      address: "",
       abi: abi.matchingRuleAbi,
     },
     MirrorPosition: {
-      address: "0x4F2B5C8D3E1A7F6C9D5B2A8E4F8C8E0eA8C7",
+      address: "",
       abi: abi.mirrorPositionAbi,
     },
     FeeMarketplace: {
-      address: "0x5F2B5C8D3E1A7F6C9D5B2A8E4F8C8E0eA8C7",
+      address: "",
       abi: abi.feeMarketplaceAbi,
-    },
-
-    CustomError: {
-      abi: abi.errorAbi,
-    },
+    }
   },
 } as const;
