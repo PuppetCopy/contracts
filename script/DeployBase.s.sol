@@ -8,9 +8,9 @@ import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
-import {Address} from "./Const.sol";
+import {Const} from "./Const.sol";
 
-contract DeployPuppetBase is BaseScript {
+contract DeployBase is BaseScript {
     function run() public {
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
         deployContracts();
@@ -19,7 +19,7 @@ contract DeployPuppetBase is BaseScript {
 
     function deployContracts() internal {
         // Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
-        Dictatorship dictatorship = new Dictatorship(Address.dao);
+        Dictatorship dictatorship = new Dictatorship(Const.dao);
 
         new PuppetToken();
         // new PuppetVoteToken(dictatorship);

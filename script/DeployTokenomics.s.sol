@@ -16,7 +16,7 @@
 // import {VotingEscrowStore} from "src/tokenomics/VotingEscrowStore.sol";
 
 // import {BaseScript} from "./BaseScript.s.sol";
-// import {Address} from "./Const.sol";
+// import {Const} from "./Const.sol";
 
 // contract DeployTokenomics is BaseScript {
 //     Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
@@ -45,14 +45,14 @@
 //         // ContributeStore contributeStore = ContributeStore(getDeployedAddress("ContributeStore"));
 
 //         // dao settings setup
-//         dictator.setPermission(puppetToken, puppetToken.mintCore.selector, Address.dao);
+//         dictator.setPermission(puppetToken, puppetToken.mintCore.selector, Const.dao);
 
 //         ContributeLogic contributeLogic = new ContributeLogic(dictator, puppetToken, contributeStore);
 //         dictator.setPermission(puppetToken, puppetToken.mint.selector, address(contributeLogic));
 //         dictator.setAccess(contributeStore, address(contributeLogic));
-//         dictator.setPermission(contributeLogic, contributeLogic.setBuybackQuote.selector, Address.dao);
-//         contributeLogic.setBuybackQuote(IERC20(Address.wnt), 100e18);
-//         contributeLogic.setBuybackQuote(IERC20(Address.usdc), 100e18);
+//         dictator.setPermission(contributeLogic, contributeLogic.setBuybackQuote.selector, Const.dao);
+//         contributeLogic.setBuybackQuote(IERC20(Const.wnt), 100e18);
+//         contributeLogic.setBuybackQuote(IERC20(Const.usdc), 100e18);
 //         dictator.initContract(contributeLogic, abi.encode(ContributeLogic.Config({baselineEmissionRate: 0.5e30})));
 
 //         VotingEscrowLogic veLogic = new VotingEscrowLogic(dictator, veStore, puppetToken, puppetVoteToken);

@@ -24,7 +24,7 @@ import {Precision} from "src/utils/Precision.sol";
 
 import {BasicSetup} from "../base/BasicSetup.t.sol";
 import {MockGmxExchangeRouter} from "../mock/MockGmxExchangeRouter.sol";
-import {Address} from "script/Const.sol";
+import {Const} from "script/Const.sol";
 
 import {MockERC20} from "test/mock/MockERC20.sol";
 
@@ -47,7 +47,7 @@ contract TradingTest is BasicSetup {
         defaultCallPosition = MirrorPosition.CallPosition({
             collateralToken: usdc,
             trader: users.bob,
-            market: Address.gmxEthUsdcMarket,
+            market: Const.gmxEthUsdcMarket,
             keeperExecutionFeeReceiver: users.yossi,
             isIncrease: true,
             isLong: true, // Match original direction
@@ -60,8 +60,8 @@ contract TradingTest is BasicSetup {
         });
 
         defaultCallSettle = MirrorPosition.CallSettle({
-            allocationToken: usdc,
-            distributeToken: usdc,
+            collateralToken: usdc,
+            distributionToken: usdc,
             trader: defaultCallPosition.trader,
             allocationId: 0,
             keeperExecutionFeeReceiver: users.yossi,
@@ -149,8 +149,8 @@ contract TradingTest is BasicSetup {
                 MirrorPosition.Config({
                     gmxExchangeRouter: mockGmxExchangeRouter,
                     callbackHandler: address(mirrorPosition), // Self-callback for tests
-                    gmxOrderVault: Address.gmxOrderVault,
-                    referralCode: Address.referralCode,
+                    gmxOrderVault: Const.gmxOrderVault,
+                    referralCode: Const.referralCode,
                     increaseCallbackGasLimit: 2_000_000,
                     decreaseCallbackGasLimit: 2_000_000,
                     platformSettleFeeFactor: 0.1e30, // 10%
@@ -185,6 +185,7 @@ contract TradingTest is BasicSetup {
         address[] memory puppetList = _generatePuppetList(usdc, trader, 10);
         bytes32 matchingKey = PositionUtils.getMatchingKey(usdc, trader);
         uint allocationStoreBalanceBefore = usdc.balanceOf(address(allocationStore));
+        uint initialGrossTotalAllocation = 100e6; // 10 puppets * 10e6 contribution each
 
         // 1. Initial Mirror (combines allocation & opening)
         MirrorPosition.CallPosition memory callIncrease = defaultCallPosition;
@@ -199,17 +200,16 @@ contract TradingTest is BasicSetup {
             mirrorPosition.allocationStoreImplementation(), allocationKey, address(mirrorPosition)
         );
 
-        uint totalAllocated = mirrorPosition.getAllocation(allocationAddress);
-        uint netAllocated = totalAllocated - callIncrease.keeperExecutionFee;
-        // Expect 10 puppets * 100e6 balance * 10% rule = 100e6
-        assertEq(totalAllocated, 100e6, "Total allocation should be 100e6");
+        uint netAllocationFromMirror = mirrorPosition.getAllocation(allocationAddress);
+        // Expect 10 puppets * 100e6 balance * 10% rule = 100e6 GROSS, minus 1e6 keeper fee = 99e6 NET
+        assertEq(netAllocationFromMirror, 99e6, "Net allocation from mirror should be 99e6");
 
         // Check balance change in AllocationStore OR GMX Vault after mirror()
         // Mirror transfers NET allocated amount to vault
-        // assertEq(usdc.balanceOf(Address.gmxOrderVault), netAllocated, "Vault balance after mirror mismatch");
+        // assertEq(usdc.balanceOf(Const.gmxOrderVault), netAllocationFromMirror, "Vault balance after mirror mismatch");
         // Alternatively check AllocationStore balance decreased
-        uint allocationStoreBalanceAfterMirror = allocationStoreBalanceBefore - totalAllocated; // Store balance reduces
-            // by TOTAL allocated
+        // Store balance reduces by GROSS allocated (100e6)
+        uint allocationStoreBalanceAfterMirror = allocationStoreBalanceBefore - initialGrossTotalAllocation;
         assertEq(
             usdc.balanceOf(address(allocationStore)),
             allocationStoreBalanceAfterMirror,
@@ -220,21 +220,19 @@ contract TradingTest is BasicSetup {
         mirrorPosition.execute(increaseRequestKey);
         MirrorPosition.Position memory pos1 = mirrorPosition.getPosition(allocationAddress);
 
-        // Calculate expected initial size based on the new logic in mirror()
-        uint expectedInitialMirroredSize = _calculateExpectedInitialMirrorSize(
-            callIncrease.sizeDeltaInUsd, callIncrease.collateralDelta, totalAllocated, callIncrease.keeperExecutionFee
-        );
-        // Expected: 1000e30 * (100e6 - fee) / 100e6 ~= 1000e30 (if fee is small relative to allocation)
-        // Let's use the helper: 1000e30 * (100e6 - 0.005e6) / 100e6 = 999.95e30
+        // Calculate expected initial size based on the new logic in mirror() using NET allocation
+        uint expectedInitialMirroredSize =
+            callIncrease.sizeDeltaInUsd * netAllocationFromMirror / callIncrease.collateralDelta;
+        // Expected: 1000e30 * 99e6 / 100e6 = 990e30
         assertEq(
             expectedInitialMirroredSize,
-            defaultCallPosition.sizeDeltaInUsd * netAllocated / defaultCallPosition.collateralDelta,
+            defaultCallPosition.sizeDeltaInUsd * netAllocationFromMirror / defaultCallPosition.collateralDelta,
             "Calculated initial mirrored size mismatch"
         );
 
         assertEq(pos1.traderSize, defaultCallPosition.sizeDeltaInUsd, "pos1.traderSize");
         assertEq(pos1.traderCollateral, defaultCallPosition.collateralDelta, "pos1.traderCollateral");
-        assertEq(pos1.size, expectedInitialMirroredSize, "pos1.size mismatch"); // Mirrored size based on new calc
+        assertEq(pos1.size, expectedInitialMirroredSize, "pos1.size mismatch"); // Mirrored size based on net allocation
 
         // 3. Adjust Decrease (Full Close) using adjust()
         MirrorPosition.CallPosition memory callDecrease = defaultCallPosition;
@@ -246,12 +244,12 @@ contract TradingTest is BasicSetup {
             mirrorPosition.adjust{value: callDecrease.executionFee}(callDecrease, puppetList, allocationId);
         assertNotEq(decreaseRequestKey, bytes32(0));
 
-        // Calculate netAllocated considering BOTH open and close keeper fees for PnL simulation
-        uint netAllocatedForPnL = totalAllocated - callIncrease.keeperExecutionFee - callDecrease.keeperExecutionFee;
+        // Calculate netAllocated considering NET allocation from mirror minus the close keeper fee for PnL simulation
+        uint netAllocatedForPnL = netAllocationFromMirror - callDecrease.keeperExecutionFee; // 99e6 - 1e6 = 98e6
 
         // 4. Simulate Profit & Execute Decrease
-        uint profit = netAllocatedForPnL; // 100% profit on NET allocated capital (after both fees)
-        uint settledAmount = netAllocatedForPnL + profit; // Return = netAllocated (after both fees) + profit
+        uint profit = netAllocatedForPnL; // 100% profit on NET allocated capital (after close fee) = 98e6
+        uint settledAmount = netAllocatedForPnL + profit; // Return = 98e6 + 98e6 = 196e6
 
         deal(address(usdc), allocationAddress, settledAmount); // Deal funds to allocation account
         mirrorPosition.execute(decreaseRequestKey); // Simulate GMX callback executing the close
@@ -271,12 +269,12 @@ contract TradingTest is BasicSetup {
 
         // Calculate platform fee based on amount after settlement keeper fee
         uint amountForFeeCalc =
-            settledAmount > callSettle.keeperExecutionFee ? settledAmount - callSettle.keeperExecutionFee : 0;
-        uint platformFeeCalculated = Precision.applyFactor(_getSettleFeeFactor(), amountForFeeCalc);
+            settledAmount > callSettle.keeperExecutionFee ? settledAmount - callSettle.keeperExecutionFee : 0; // 196e6 - 1e6 = 195e6
+        uint platformFeeCalculated = Precision.applyFactor(_getSettleFeeFactor(), amountForFeeCalc); // 0.1 * 195e6 = 19.5e6
 
         // Calculate amount distributed during settlement
-        uint settlementDeductions = platformFeeCalculated + callSettle.keeperExecutionFee;
-        uint amountDistributed = settledAmount > settlementDeductions ? settledAmount - settlementDeductions : 0;
+        uint settlementDeductions = platformFeeCalculated + callSettle.keeperExecutionFee; // 19.5e6 + 1e6 = 20.5e6
+        uint amountDistributed = settledAmount > settlementDeductions ? settledAmount - settlementDeductions : 0; // 196e6 - 20.5e6 = 175.5e6
 
         // Check store balance increased correctly
         // Expected final balance = (balance after mirror - adjust fee) + distributed amount
@@ -291,20 +289,20 @@ contract TradingTest is BasicSetup {
 
         // 6. Check puppet balances
         // Calculate expected balance after adjust fee deduction
-        uint contributionPerPuppet = totalAllocated / puppetList.length; // Assuming equal contributions
-        uint adjustFeePerPuppet = callDecrease.keeperExecutionFee / puppetList.length; // Assuming equal split
-        uint balanceAfterAdjust = initialPuppetBalance - contributionPerPuppet - adjustFeePerPuppet;
+        uint initialContributionPerPuppet = initialGrossTotalAllocation / puppetList.length; // 100e6 / 10 = 10e6
+        uint adjustFeePerPuppet = Math.mulDiv(callDecrease.keeperExecutionFee, initialContributionPerPuppet, initialGrossTotalAllocation); // 1e6 * 10e6 / 100e6 = 0.1e6
+        uint balanceAfterAdjust = initialPuppetBalance - initialContributionPerPuppet - adjustFeePerPuppet; // 100e6 - 10e6 - 0.1e6 = 89.9e6
 
         for (uint i = 0; i < puppetList.length; i++) {
             address puppet = puppetList[i];
             uint contribution = _getPuppetAllocation(allocationKey, puppet);
-            assertEq(contribution, contributionPerPuppet, "Contribution mismatch"); // Verify assumption
+            assertEq(contribution, initialContributionPerPuppet, "Contribution mismatch"); // Verify assumption
 
-            // Calculate expected share based on TOTAL allocation ratio
-            uint expectedShare = Math.mulDiv(amountDistributed, contribution, totalAllocated);
+            // Calculate expected share based on INITIAL GROSS allocation ratio
+            uint expectedShare = Math.mulDiv(amountDistributed, contribution, initialGrossTotalAllocation); // 175.5e6 * 10e6 / 100e6 = 17.55e6
 
             // Calculate final expected balance
-            uint expectedFinalBalance = balanceAfterAdjust + expectedShare;
+            uint expectedFinalBalance = balanceAfterAdjust + expectedShare; // 89.9e6 + 17.55e6 = 107.45e6
 
             assertEq(
                 allocationStore.userBalanceMap(usdc, puppet),
@@ -320,28 +318,20 @@ contract TradingTest is BasicSetup {
         mirrorPosition.execute(nonExistentRequestKey);
     }
 
-    // Changed test: Test calling ADJUST with a non-existent allocationId
     function testAdjustNonExistentPositionError() public {
         address trader = defaultCallPosition.trader;
         address[] memory puppetList = _generatePuppetList(usdc, trader, 2);
 
-        // Try to call adjust() with the non-existent ID
         MirrorPosition.CallPosition memory callAdjust = defaultCallPosition;
 
-        // adjust() first checks if position.size > 0 for the derived allocationKey
-        MirrorPosition.Position memory nonExistentPos = mirrorPosition.getPosition(address(0xdead));
-        assertEq(nonExistentPos.size, 0); // Pre-condition: Position should not exist
-
         uint nonExistentAllocationId = 99999; // An ID for which mirror was not called
-        vm.expectRevert(Error.MirrorPosition__PositionNotFound.selector);
+        vm.expectRevert(Error.MirrorPosition__AllocationAccountNotFound.selector);
         mirrorPosition.adjust{value: callAdjust.executionFee}(callAdjust, puppetList, nonExistentAllocationId);
     }
 
-    // Changed test: Test calling mirror() with too many puppets
     function testMirrorExceedingMaximumPuppets() public {
         uint limitAllocationListLength = mirrorPosition.getConfig().maxPuppetList; // Should be 20
         address trader = defaultCallPosition.trader;
-        // Create one more puppet address than allowed
         address[] memory tooManyPuppets = new address[](limitAllocationListLength + 1);
         for (uint i = 0; i < tooManyPuppets.length; i++) {
             tooManyPuppets[i] = address(uint160(uint(keccak256(abi.encodePacked("dummyPuppet", i)))));
@@ -353,9 +343,7 @@ contract TradingTest is BasicSetup {
         mirrorPosition.mirror{value: callOpen.executionFee}(callOpen, tooManyPuppets);
     }
 
-    // Test that checks if settlement correctly distributes profits proportionally
     function testProportionalProfitDistribution() public {
-        // Create 3 puppets with different balances and allocations
         address trader = defaultCallPosition.trader;
         address puppet1 = _createPuppet(usdc, trader, "puppet1", 50e6);
         address puppet2 = _createPuppet(usdc, trader, "puppet2", 100e6);
@@ -366,12 +354,10 @@ contract TradingTest is BasicSetup {
         puppetList[1] = puppet2;
         puppetList[2] = puppet3;
 
-        // Get initial balances
         uint puppet1InitialBalance = allocationStore.userBalanceMap(usdc, puppet1);
         uint puppet2InitialBalance = allocationStore.userBalanceMap(usdc, puppet2);
         uint puppet3InitialBalance = allocationStore.userBalanceMap(usdc, puppet3);
 
-        // Create position with mirror
         MirrorPosition.CallPosition memory callParams = defaultCallPosition;
         (, uint allocationId, bytes32 requestKey) =
             mirrorPosition.mirror{value: callParams.executionFee}(callParams, puppetList);
@@ -382,16 +368,14 @@ contract TradingTest is BasicSetup {
             mirrorPosition.allocationStoreImplementation(), allocationKey, address(mirrorPosition)
         );
 
-        // Execute open
         mirrorPosition.execute(requestKey);
 
-        // Get individual contributions
         uint puppet1Contribution = _getPuppetAllocation(allocationKey, puppet1);
         uint puppet2Contribution = _getPuppetAllocation(allocationKey, puppet2);
         uint puppet3Contribution = _getPuppetAllocation(allocationKey, puppet3);
-        uint totalContribution = puppet1Contribution + puppet2Contribution + puppet3Contribution;
+        uint initialGrossTotalContribution = puppet1Contribution + puppet2Contribution + puppet3Contribution;
+        uint netAllocationFromMirror = mirrorPosition.getAllocation(allocationAddress);
 
-        // Close position
         MirrorPosition.Position memory position = mirrorPosition.getPosition(allocationAddress);
         MirrorPosition.CallPosition memory closeParams = defaultCallPosition;
         closeParams.isIncrease = false;
@@ -400,64 +384,43 @@ contract TradingTest is BasicSetup {
 
         bytes32 closeKey = mirrorPosition.adjust{value: closeParams.executionFee}(closeParams, puppetList, allocationId);
 
-        // Simulate 150% profit on net allocated
-        // Update to account for both opening and closing keeper execution fees
-        uint netAllocated = totalContribution - callParams.keeperExecutionFee - closeParams.keeperExecutionFee;
-        // Correct the assertion: compare calculated netAllocated to expected value
-        assertEq(
-            netAllocated,
-            totalContribution - callParams.keeperExecutionFee - closeParams.keeperExecutionFee, // Use the same
-                // calculation
-            "Net allocated should match total contributions minus fees"
-        );
+        uint netAllocatedForPnL = netAllocationFromMirror - closeParams.keeperExecutionFee;
 
-        uint profit = netAllocated * 3 / 2; // 150% profit
-        uint settledAmount = netAllocated + profit;
+        uint profit = netAllocatedForPnL * 3 / 2;
+        uint settledAmount = netAllocatedForPnL + profit;
 
-        // Deal profit to allocation account and execute close
         deal(address(usdc), allocationAddress, settledAmount);
         mirrorPosition.execute(closeKey);
 
-        // Settle and check proportional distribution
         MirrorPosition.CallSettle memory settleParams = defaultCallSettle;
         settleParams.allocationId = allocationId;
         mirrorPosition.settle(settleParams, puppetList);
 
-        // --- Recalculate expected balances ---
-
-        // Calculate expected balance after adjust fee deduction
-        // Note: Adjust fee was deducted proportionally before this settlement step
         uint puppet1ShareOfAdjustFee =
-            Math.mulDiv(closeParams.keeperExecutionFee, puppet1Contribution, totalContribution);
+            Math.mulDiv(closeParams.keeperExecutionFee, puppet1Contribution, initialGrossTotalContribution);
         uint puppet2ShareOfAdjustFee =
-            Math.mulDiv(closeParams.keeperExecutionFee, puppet2Contribution, totalContribution);
+            Math.mulDiv(closeParams.keeperExecutionFee, puppet2Contribution, initialGrossTotalContribution);
         uint puppet3ShareOfAdjustFee =
-            Math.mulDiv(closeParams.keeperExecutionFee, puppet3Contribution, totalContribution);
-        // Use initial balances for calculation base
+            Math.mulDiv(closeParams.keeperExecutionFee, puppet3Contribution, initialGrossTotalContribution);
         uint puppet1BalanceAfterAdjust = puppet1InitialBalance - puppet1Contribution - puppet1ShareOfAdjustFee;
         uint puppet2BalanceAfterAdjust = puppet2InitialBalance - puppet2Contribution - puppet2ShareOfAdjustFee;
         uint puppet3BalanceAfterAdjust = puppet3InitialBalance - puppet3Contribution - puppet3ShareOfAdjustFee;
 
-        // Calculate platform fee as likely done in contract (after settle keeper fee deduction)
         uint amountForFeeCalc =
             settledAmount > settleParams.keeperExecutionFee ? settledAmount - settleParams.keeperExecutionFee : 0;
         uint platformFeeCalculated = Precision.applyFactor(_getSettleFeeFactor(), amountForFeeCalc);
 
-        // Calculate amount distributed during settlement
         uint settlementDeductions = platformFeeCalculated + settleParams.keeperExecutionFee;
         uint amountDistributed = settledAmount > settlementDeductions ? settledAmount - settlementDeductions : 0;
 
-        // Calculate expected distribution share for each puppet
-        uint puppet1ExpectedShare = Math.mulDiv(amountDistributed, puppet1Contribution, totalContribution);
-        uint puppet2ExpectedShare = Math.mulDiv(amountDistributed, puppet2Contribution, totalContribution);
-        uint puppet3ExpectedShare = Math.mulDiv(amountDistributed, puppet3Contribution, totalContribution);
+        uint puppet1ExpectedShare = Math.mulDiv(amountDistributed, puppet1Contribution, initialGrossTotalContribution);
+        uint puppet2ExpectedShare = Math.mulDiv(amountDistributed, puppet2Contribution, initialGrossTotalContribution);
+        uint puppet3ExpectedShare = Math.mulDiv(amountDistributed, puppet3Contribution, initialGrossTotalContribution);
 
-        // Calculate final expected balances
         uint puppet1ExpectedFinalBalance = puppet1BalanceAfterAdjust + puppet1ExpectedShare;
         uint puppet2ExpectedFinalBalance = puppet2BalanceAfterAdjust + puppet2ExpectedShare;
         uint puppet3ExpectedFinalBalance = puppet3BalanceAfterAdjust + puppet3ExpectedShare;
 
-        // Check final balances
         uint puppet1FinalBalance = allocationStore.userBalanceMap(usdc, puppet1);
         uint puppet2FinalBalance = allocationStore.userBalanceMap(usdc, puppet2);
         uint puppet3FinalBalance = allocationStore.userBalanceMap(usdc, puppet3);
@@ -466,25 +429,23 @@ contract TradingTest is BasicSetup {
         assertEq(puppet2FinalBalance, puppet2ExpectedFinalBalance, "Puppet2 final balance incorrect");
         assertEq(puppet3FinalBalance, puppet3ExpectedFinalBalance, "Puppet3 final balance incorrect");
 
-        // Verify the proportions are correct (use amountDistributed for ratio check)
         if (amountDistributed > 0) {
-            // Avoid division by zero if nothing is distributed
             assertApproxEqRel(
-                puppet1ExpectedShare * 100 / amountDistributed, // Use share vs distributed
-                puppet1Contribution * 100 / totalContribution,
-                0.01e18, // 1% tolerance
+                puppet1ExpectedShare * 10000 / amountDistributed,
+                puppet1Contribution * 10000 / initialGrossTotalContribution,
+                10,
                 "Puppet1 return ratio should match contribution ratio"
             );
             assertApproxEqRel(
-                puppet2ExpectedShare * 100 / amountDistributed, // Use share vs distributed
-                puppet2Contribution * 100 / totalContribution,
-                0.01e18, // 1% tolerance
+                puppet2ExpectedShare * 10000 / amountDistributed,
+                puppet2Contribution * 10000 / initialGrossTotalContribution,
+                10,
                 "Puppet2 return ratio should match contribution ratio"
             );
             assertApproxEqRel(
-                puppet3ExpectedShare * 100 / amountDistributed, // Use share vs distributed
-                puppet3Contribution * 100 / totalContribution,
-                0.01e18, // 1% tolerance
+                puppet3ExpectedShare * 10000 / amountDistributed,
+                puppet3Contribution * 10000 / initialGrossTotalContribution,
+                10,
                 "Puppet3 return ratio should match contribution ratio"
             );
         }
@@ -503,6 +464,7 @@ contract TradingTest is BasicSetup {
         puppetList[2] = puppet3;
 
         bytes32 matchingKey = PositionUtils.getMatchingKey(usdc, trader);
+        uint initialGrossTotalAllocation = 30e6;
 
         MirrorPosition.CallPosition memory callOpen = defaultCallPosition;
 
@@ -515,44 +477,34 @@ contract TradingTest is BasicSetup {
             mirrorPosition.allocationStoreImplementation(), allocationKey, address(mirrorPosition)
         );
 
-        uint totalAllocation = mirrorPosition.getAllocation(allocationAddress); // 30e6
-        uint puppet1Allocation = _getPuppetAllocation(allocationKey, puppet1); // 10e6
-        uint puppet2Allocation = _getPuppetAllocation(allocationKey, puppet2); // 10e6
-        uint puppet3Allocation = _getPuppetAllocation(allocationKey, puppet3); // 10e6
-        assertEq(totalAllocation, 30e6);
-        assertEq(puppet1Allocation + puppet2Allocation + puppet3Allocation, totalAllocation);
+        uint netAllocationFromMirror = mirrorPosition.getAllocation(allocationAddress);
+        uint puppet1Allocation = _getPuppetAllocation(allocationKey, puppet1);
+        uint puppet2Allocation = _getPuppetAllocation(allocationKey, puppet2);
+        uint puppet3Allocation = _getPuppetAllocation(allocationKey, puppet3);
+        assertEq(netAllocationFromMirror, 29e6);
+        assertEq(puppet1Allocation + puppet2Allocation + puppet3Allocation, initialGrossTotalAllocation);
 
-        // Record balances after contributions deducted
-        uint puppet1BalanceAfterMirror = allocationStore.userBalanceMap(usdc, puppet1); // 90e6
-        uint puppet2BalanceAfterMirror = allocationStore.userBalanceMap(usdc, puppet2); // 90e6
-        uint puppet3BalanceAfterMirror = allocationStore.userBalanceMap(usdc, puppet3); // 90e6
+        uint puppet1BalanceAfterMirror = allocationStore.userBalanceMap(usdc, puppet1);
+        uint puppet2BalanceAfterMirror = allocationStore.userBalanceMap(usdc, puppet2);
+        uint puppet3BalanceAfterMirror = allocationStore.userBalanceMap(usdc, puppet3);
 
-        // Execute Open
         mirrorPosition.execute(openKey);
         MirrorPosition.Position memory currentPos = mirrorPosition.getPosition(allocationAddress);
 
         MirrorPosition.CallPosition memory callClose = defaultCallPosition;
-        callClose.collateralDelta = currentPos.traderCollateral; // Decrease by current trader collateral
-        callClose.sizeDeltaInUsd = currentPos.traderSize; // Decrease by current trader size
-        callClose.isIncrease = false; // Decrease
+        callClose.collateralDelta = currentPos.traderCollateral;
+        callClose.sizeDeltaInUsd = currentPos.traderSize;
+        callClose.isIncrease = false;
 
         bytes32 closeKey = mirrorPosition.adjust{value: callClose.executionFee}(callClose, puppetList, allocationId);
 
-        // Calculate netAllocated considering BOTH open and close keeper fees
-        uint netAllocated = totalAllocation - callOpen.keeperExecutionFee - callClose.keeperExecutionFee;
-        assertEq(
-            netAllocated,
-            mirrorPosition.getAllocation(allocationAddress) - callOpen.keeperExecutionFee - callClose.keeperExecutionFee,
-            "Net allocated should match total contributions minus both fees"
-        );
+        uint netAllocatedForPnL = netAllocationFromMirror - callClose.keeperExecutionFee;
 
-        // Simulate 20% loss on NET allocated capital - return 80% of netAllocated
-        uint settledAmount = Math.mulDiv(netAllocated, 80, 100);
+        uint settledAmount = Math.mulDiv(netAllocatedForPnL, 80, 100);
         deal(address(usdc), allocationAddress, settledAmount);
 
         mirrorPosition.execute(closeKey);
 
-        // Settle funds
         MirrorPosition.CallSettle memory callSettle = defaultCallSettle;
         callSettle.allocationId = allocationId;
         mirrorPosition.settle(callSettle, puppetList);
@@ -561,115 +513,92 @@ contract TradingTest is BasicSetup {
         uint puppet2BalanceAfterSettle = allocationStore.userBalanceMap(usdc, puppet2);
         uint puppet3BalanceAfterSettle = allocationStore.userBalanceMap(usdc, puppet3);
 
-        // --- Recalculate expected balances ---
-
-        // Calculate expected balance after adjust fee deduction
-        // Note: Adjust fee was deducted proportionally before this settlement step
-        uint puppet1ShareOfAdjustFee = Math.mulDiv(callClose.keeperExecutionFee, puppet1Allocation, totalAllocation);
-        uint puppet2ShareOfAdjustFee = Math.mulDiv(callClose.keeperExecutionFee, puppet2Allocation, totalAllocation);
-        uint puppet3ShareOfAdjustFee = Math.mulDiv(callClose.keeperExecutionFee, puppet3Allocation, totalAllocation);
+        uint puppet1ShareOfAdjustFee = Math.mulDiv(callClose.keeperExecutionFee, puppet1Allocation, initialGrossTotalAllocation);
+        uint puppet2ShareOfAdjustFee = Math.mulDiv(callClose.keeperExecutionFee, puppet2Allocation, initialGrossTotalAllocation);
+        uint puppet3ShareOfAdjustFee = Math.mulDiv(callClose.keeperExecutionFee, puppet3Allocation, initialGrossTotalAllocation);
         uint puppet1BalanceAfterAdjust = puppet1BalanceAfterMirror - puppet1ShareOfAdjustFee;
         uint puppet2BalanceAfterAdjust = puppet2BalanceAfterMirror - puppet2ShareOfAdjustFee;
         uint puppet3BalanceAfterAdjust = puppet3BalanceAfterMirror - puppet3ShareOfAdjustFee;
 
-        // Calculate platform fee as likely done in contract (after settle keeper fee deduction)
         uint amountForFeeCalc =
             settledAmount > callSettle.keeperExecutionFee ? settledAmount - callSettle.keeperExecutionFee : 0;
         uint platformFeeCalculated = Precision.applyFactor(feeFactor, amountForFeeCalc);
 
-        // Calculate amount distributed during settlement
         uint settlementDeductions = platformFeeCalculated + callSettle.keeperExecutionFee;
         uint amountDistributed = settledAmount > settlementDeductions ? settledAmount - settlementDeductions : 0;
 
-        // Calculate expected distribution share for each puppet
-        uint puppet1ExpectedShare = Math.mulDiv(amountDistributed, puppet1Allocation, totalAllocation);
-        uint puppet2ExpectedShare = Math.mulDiv(amountDistributed, puppet2Allocation, totalAllocation);
-        uint puppet3ExpectedShare = Math.mulDiv(amountDistributed, puppet3Allocation, totalAllocation);
+        uint puppet1ExpectedShare = Math.mulDiv(amountDistributed, puppet1Allocation, initialGrossTotalAllocation);
+        uint puppet2ExpectedShare = Math.mulDiv(amountDistributed, puppet2Allocation, initialGrossTotalAllocation);
+        uint puppet3ExpectedShare = Math.mulDiv(amountDistributed, puppet3Allocation, initialGrossTotalAllocation);
 
-        // Calculate final expected balances
         uint puppet1ExpectedFinalBalance = puppet1BalanceAfterAdjust + puppet1ExpectedShare;
         uint puppet2ExpectedFinalBalance = puppet2BalanceAfterAdjust + puppet2ExpectedShare;
         uint puppet3ExpectedFinalBalance = puppet3BalanceAfterAdjust + puppet3ExpectedShare;
 
-        // Assert final balances match expected final balances
         assertEq(puppet1BalanceAfterSettle, puppet1ExpectedFinalBalance, "Puppet1 final balance mismatch");
         assertEq(puppet2BalanceAfterSettle, puppet2ExpectedFinalBalance, "Puppet2 final balance mismatch");
         assertEq(puppet3BalanceAfterSettle, puppet3ExpectedFinalBalance, "Puppet3 final balance mismatch");
     }
 
-    // Test adjust() with zero collateral change
     function testZeroCollateralAdjustments() public {
         address trader = defaultCallPosition.trader;
-        address[] memory puppetList = _generatePuppetList(usdc, trader, 2); // Use default trader
+        address[] memory puppetList = _generatePuppetList(usdc, trader, 2);
 
         MirrorPosition.CallPosition memory callOpen = defaultCallPosition;
         (address allocationAddress, uint allocationId, bytes32 openRequestKey) =
             mirrorPosition.mirror{value: callOpen.executionFee}(callOpen, puppetList);
         mirrorPosition.execute(openRequestKey);
         MirrorPosition.Position memory pos1 = mirrorPosition.getPosition(allocationAddress);
-        uint totalAllocated = mirrorPosition.getAllocation(allocationAddress); // Get totalAllocated here
+        uint netAllocationFromMirror = mirrorPosition.getAllocation(allocationAddress);
         assertGt(pos1.size, 0, "Pos1 initial size should be > 0");
 
-        // Adjust: Increase trader size without changing trader collateral -> Trader Leverage increases (10x -> 15x)
         MirrorPosition.CallPosition memory zeroCollateralIncreaseParams = defaultCallPosition;
-        zeroCollateralIncreaseParams.collateralDelta = 0; // No change in trader collateral
-        zeroCollateralIncreaseParams.sizeDeltaInUsd = 500e30; // Increase trader size by 50% (500e30)
+        zeroCollateralIncreaseParams.collateralDelta = 0;
+        zeroCollateralIncreaseParams.sizeDeltaInUsd = 500e30;
+        zeroCollateralIncreaseParams.keeperExecutionFee = 0.5e6;
 
-        uint expectedTraderSize2 = pos1.traderSize + zeroCollateralIncreaseParams.sizeDeltaInUsd; // 1500e30
-        uint expectedTraderCollat2 = pos1.traderCollateral; // 100e6 (remains same)
+        uint expectedTraderSize2 = pos1.traderSize + zeroCollateralIncreaseParams.sizeDeltaInUsd;
+        uint expectedTraderCollat2 = pos1.traderCollateral;
 
-        // Use adjust()
         bytes32 zeroCollateralRequestKey = mirrorPosition.adjust{value: zeroCollateralIncreaseParams.executionFee}(
             zeroCollateralIncreaseParams, puppetList, allocationId
         );
         mirrorPosition.execute(zeroCollateralRequestKey);
-        MirrorPosition.Position memory pos2 = mirrorPosition.getPosition(allocationAddress); // Use correct
-            // allocationKey
+        MirrorPosition.Position memory pos2 = mirrorPosition.getPosition(allocationAddress);
 
         assertEq(pos2.traderSize, expectedTraderSize2, "ZeroCollat: TSize mismatch");
         assertEq(pos2.traderCollateral, expectedTraderCollat2, "ZeroCollat: TCollat mismatch");
 
-        // Calculate final mirrored leverage relative to TOTAL allocated capital (in Basis Points)
-        // The adjust function calculates target size based on totalAllocated
-        uint finalMirrorLeverageBP = Precision.toBasisPoints(pos2.size, totalAllocated);
+        uint finalNetAllocation = mirrorPosition.getAllocation(allocationAddress);
+        uint finalMirrorLeverageBP = Precision.toBasisPoints(pos2.size, finalNetAllocation);
 
-        // Calculate final trader leverage (in Basis Points)
         uint finalTraderLeverageBP = Precision.toBasisPoints(pos2.traderSize, pos2.traderCollateral);
 
-        // Assert that the mirrored leverage (relative to total capital) matches the trader leverage
         assertApproxEqAbs(
             finalMirrorLeverageBP, finalTraderLeverageBP, LEVERAGE_TOLERANCE_BP, "ZeroCollat: Leverage mismatch"
         );
     }
 
     function testCollectDust() public {
-        // Set up: Create a position and close it to get an allocation account
         address trader = defaultCallPosition.trader;
         address[] memory puppetList = _generatePuppetList(usdc, trader, 2);
-        bytes32 matchingKey = PositionUtils.getMatchingKey(usdc, trader);
 
-        // Open position
         MirrorPosition.CallPosition memory callOpen = defaultCallPosition;
         (address allocationAddress,,) = mirrorPosition.mirror{value: callOpen.executionFee}(callOpen, puppetList);
 
-        // Deal some dust to the allocation account (less than threshold)
-        uint dustAmount = 0.002e6; // 2 USDC
+        uint dustAmount = 0.002e6;
         deal(address(usdc), allocationAddress, dustAmount);
 
-        // Check balances before collect
         uint receiverBalanceBefore = usdc.balanceOf(users.alice);
         uint allocationBalanceBefore = usdc.balanceOf(allocationAddress);
         assertEq(allocationBalanceBefore, dustAmount, "Allocation account should have dust");
 
-        // Collect dust
         address receiver = users.alice;
         mirrorPosition.collectDust(AllocationAccount(allocationAddress), usdc, receiver);
 
-        // Check balances after collect
         uint receiverBalanceAfter = usdc.balanceOf(users.alice);
         uint allocationBalanceAfter = usdc.balanceOf(allocationAddress);
 
-        // Assertions
         assertEq(receiverBalanceAfter, receiverBalanceBefore + dustAmount, "Receiver should get dust amount");
         assertEq(allocationBalanceAfter, 0, "Allocation account should have no dust left");
     }
@@ -680,84 +609,76 @@ contract TradingTest is BasicSetup {
 
         MirrorPosition.CallPosition memory callMirror = defaultCallPosition;
 
-        vm.expectRevert(); // Expect revert due to lack of permission
-        vm.prank(users.bob); // Non-owner user
+        vm.expectRevert();
+        vm.prank(users.bob);
         mirrorPosition.mirror{value: callMirror.executionFee}(callMirror, puppetList);
-        vm.stopPrank(); // Reset prank state
+        vm.stopPrank();
 
-        // --- Owner performs initial mirror to get keys for subsequent tests ---
+        bytes32 matchingKey = PositionUtils.getMatchingKey(usdc, trader);
         vm.prank(users.owner);
         (address allocationAddress, uint allocationId, bytes32 requestKey) =
             mirrorPosition.mirror{value: callMirror.executionFee}(callMirror, puppetList);
-        bytes32 allocationKey = _getAllocationKey(puppetList, PositionUtils.getMatchingKey(usdc, trader), allocationId);
-        vm.stopPrank(); // Reset prank state
+        bytes32 allocationKey = _getAllocationKey(puppetList, matchingKey, allocationId);
+        vm.stopPrank();
 
         MirrorPosition.CallPosition memory callAdjust = defaultCallPosition;
         callAdjust.collateralDelta = 10e6;
         callAdjust.sizeDeltaInUsd = 100e30;
-        callAdjust.isIncrease = false; // Decrease
+        callAdjust.isIncrease = false;
 
         vm.expectRevert();
         vm.prank(users.bob);
         mirrorPosition.adjust{value: callAdjust.executionFee}(callAdjust, puppetList, allocationId);
-        vm.stopPrank(); // Reset prank state
+        vm.stopPrank();
 
-        // --- Test execute ---
         vm.expectRevert();
         vm.prank(users.bob);
-        mirrorPosition.execute(requestKey); // Try execute the owner's request
-        vm.stopPrank(); // Reset prank state
+        mirrorPosition.execute(requestKey);
+        vm.stopPrank();
 
-        // --- Test settle ---
-        // Owner executes open, adjusts to close, executes close, deals funds
         vm.prank(users.owner);
-        mirrorPosition.execute(requestKey); // Execute the open request
+        mirrorPosition.execute(requestKey);
         MirrorPosition.Position memory currentPos = mirrorPosition.getPosition(allocationAddress);
 
         MirrorPosition.CallPosition memory callClose = defaultCallPosition;
-        callClose.collateralDelta = currentPos.traderCollateral; // Decrease by current trader collateral
-        callClose.sizeDeltaInUsd = currentPos.traderSize; // Decrease by current trader size
-        callClose.isIncrease = false; // Decrease
+        callClose.collateralDelta = currentPos.traderCollateral;
+        callClose.sizeDeltaInUsd = currentPos.traderSize;
+        callClose.isIncrease = false;
 
         bytes32 closeKey = mirrorPosition.adjust{value: callClose.executionFee}(callClose, puppetList, allocationId);
-        mirrorPosition.execute(closeKey); // Execute close
+        mirrorPosition.execute(closeKey);
 
-        deal(address(usdc), allocationAddress, 10e6); // Deal some funds to settle
-        vm.stopPrank(); // Reset prank state
+        deal(address(usdc), allocationAddress, 10e6);
+        vm.stopPrank();
 
         MirrorPosition.CallSettle memory callSettle = defaultCallSettle;
         callSettle.allocationId = allocationId;
-        // Non-owner tries to settle
         vm.expectRevert();
         vm.prank(users.bob);
         mirrorPosition.settle(callSettle, puppetList);
-        vm.stopPrank(); // Reset prank state
-
-        // --- Test initializeTraderActivityThrottle (only MatchingRule should call) ---
-        vm.expectRevert();
-        vm.prank(users.owner); // Owner shouldn't call directly
-        mirrorPosition.initializeTraderActivityThrottle(trader, puppetList[0]);
-        vm.stopPrank(); // Reset prank state
+        vm.stopPrank();
 
         vm.expectRevert();
-        vm.prank(users.bob); // Other users shouldn't call
-        mirrorPosition.initializeTraderActivityThrottle(trader, puppetList[0]);
-        vm.stopPrank(); // Reset prank state
+        vm.prank(users.owner);
+        mirrorPosition.initializeTraderActivityThrottle(matchingKey, puppetList[0]);
+        vm.stopPrank();
+
+        vm.expectRevert();
+        vm.prank(users.bob);
+        mirrorPosition.initializeTraderActivityThrottle(matchingKey, puppetList[0]);
+        vm.stopPrank();
     }
 
-    // --- Helper functions ---
-
-    // Helper specifically for the initial mirror size calculation now done in mirror()
     function _calculateExpectedInitialMirrorSize(
         uint _traderSizeDeltaUsd,
         uint _traderCollateralDelta,
-        uint _totalAllocated,
+        uint _initialGrossTotalAllocated,
         uint _executionFee
     ) internal pure returns (uint initialSize) {
         require(_traderCollateralDelta > 0, "Initial trader collat > 0");
         require(_traderSizeDeltaUsd > 0, "Initial trader size > 0");
-        uint _netAllocated = _totalAllocated - _executionFee;
-        require(_netAllocated > 0, "Net allocation must be positive");
+        require(_initialGrossTotalAllocated > _executionFee, "Gross allocation must cover fee");
+        uint _netAllocated = _initialGrossTotalAllocated - _executionFee;
 
         return _traderSizeDeltaUsd * _netAllocated / _traderCollateralDelta;
     }
@@ -769,7 +690,6 @@ contract TradingTest is BasicSetup {
         uint fundValue
     ) internal returns (address payable) {
         address payable user = payable(makeAddr(name));
-        // _dealERC20(collateralToken, user, fundValue);
         collateralToken.mint(user, fundValue);
 
         vm.startPrank(user);
@@ -778,10 +698,9 @@ contract TradingTest is BasicSetup {
         vm.startPrank(users.owner);
         matchingRule.deposit(collateralToken, user, fundValue);
 
-        // Owner sets rule for puppet-trader relationship
         matchingRule.setRule(
             collateralToken,
-            user, // puppet address
+            user,
             trader,
             MatchingRule.Rule({allowanceRate: 1000, throttleActivity: 1 hours, expiry: block.timestamp + 2 days})
         );
@@ -794,7 +713,6 @@ contract TradingTest is BasicSetup {
         bytes32 _matchingKey,
         uint _allocationId
     ) internal pure returns (bytes32) {
-        // Matches PositionUtils.getAllocationKey
         return keccak256(abi.encodePacked(_puppetList, _matchingKey, _allocationId));
     }
 
@@ -811,7 +729,7 @@ contract TradingTest is BasicSetup {
         address[] memory puppetList = new address[](_length);
         for (uint i = 0; i < _length; i++) {
             string memory puppetNameLabel = string(abi.encodePacked("puppetOwner:", Strings.toString(i + 1)));
-            puppetList[i] = _createPuppet(collateralToken, trader, puppetNameLabel, 100e6); // Default 100e6
+            puppetList[i] = _createPuppet(collateralToken, trader, puppetNameLabel, 100e6);
         }
 
         return puppetList;

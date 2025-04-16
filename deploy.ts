@@ -1,10 +1,22 @@
 import { $, file, write } from "bun"
 
-type IDeploymentMetadata = {
-	[chainId: string]: {
-		[contractName: string]: string
-	}
+
+const config = {
+	chainId: process.env.CHAIN,
+	RPC_URL: process.env.ARBITRUM_RPC_URL,
+	script: process.env.SCRIPT,
 }
+
+if (!config.RPC_URL || !config.script || !config.chainId) {
+	throw new Error(`Missing required environment variables: ${JSON.stringify(config)}`)
+}
+
+const scriptFile = `${config.script}.s.sol`
+
+console.log(`Generating wagmi for ${scriptFile}`)
+await $`wagmi generate`
+
+
 
 type IDeploymentArtifact = {
 	transactions: {
@@ -31,19 +43,9 @@ type IDeploymentArtifact = {
 	timestamp: number
 }
 
-const config = {
-	chainId: process.env.CHAIN,
-	RPC_URL: process.env.ARBITRUM_RPC_URL,
-	script: process.env.SCRIPT,
-}
-
 console.log(`Deploying ${config.chainId}:${config.script} with RPC_URL ${config.RPC_URL}`)
 
-if (!config.RPC_URL || !config.chainId) {
-	throw new Error("RPC_URL is required")
-}
 
-const scriptFile = `${config.script}.s.sol`
 
 await $`forge script script/${scriptFile}:${config.script} --broadcast --verify -vvvv --rpc-url $ARBITRUM_RPC_URL`
 
@@ -51,7 +53,11 @@ const deploymentsFilePath = "./deployments/addresses.json"
 const deploymentsFile = file(deploymentsFilePath)
 const deployments = (await deploymentsFile.exists())
 	? await deploymentsFile.json()
-	: ({} as IDeploymentMetadata)
+	: ({} as {
+		[chainId: string]: {
+			[contractName: string]: string
+		}
+	})
 
 const latestRun = (await import(
 	`./broadcast/${scriptFile}/${config.chainId}/run-latest.json`

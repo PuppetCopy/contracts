@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 import {Script} from "forge-std/src/Script.sol";
 import {stdJson} from "forge-std/src/StdJson.sol";
 
-import {Address} from "./Const.sol";
+import {Const} from "./Const.sol";
 
 abstract contract BaseScript is Script {
     address DEPLOYER_ADDRESS = vm.envAddress("DEPLOYER_ADDRESS");

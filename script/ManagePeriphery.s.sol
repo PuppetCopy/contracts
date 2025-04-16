@@ -13,13 +13,13 @@ import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {IWNT} from "src/utils/interfaces/IWNT.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
-import {Address} from "script/Const.sol";
+import {Const} from "script/Const.sol";
 
 contract ManagePeriphery is BaseScript {
     IWNT wnt;
     Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
     PuppetToken puppetToken = PuppetToken(getDeployedAddress("PuppetToken"));
-    IERC20 weth = IERC20(Address.wnt);
+    IERC20 weth = IERC20(Const.wnt);
 
     IVault vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
     IWeightedPoolFactory poolFactory = IWeightedPoolFactory(0xc7E5ED1054A24Ef31D827E6F86caA58B3Bc168d7);
@@ -33,7 +33,7 @@ contract ManagePeriphery is BaseScript {
 
     function initPool() public {
         IERC20[] memory tokens = new IERC20[](2);
-        tokens[0] = IERC20(Address.wnt);
+        tokens[0] = IERC20(Const.wnt);
         tokens[1] = puppetToken;
 
         uint[] memory normalizedWeights = new uint[](2);
@@ -46,7 +46,7 @@ contract ManagePeriphery is BaseScript {
 
         IBasePoolErc20 pool = IBasePoolErc20(
             poolFactory.create(
-                "PUPPET-WETH", "PUPPET-WETH", tokens, normalizedWeights, rateProviders, 0.01e18, Address.dao, bytes32(0)
+                "PUPPET-WETH", "PUPPET-WETH", tokens, normalizedWeights, rateProviders, 0.01e18, Const.dao, bytes32(0)
             )
         );
 
@@ -81,7 +81,7 @@ contract ManagePeriphery is BaseScript {
     }
 
     function exitPool() public {
-        IBasePoolErc20 pool = IBasePoolErc20(Address.BasePool);
+        IBasePoolErc20 pool = IBasePoolErc20(Const.BasePool);
         bytes32 poolId = pool.getPoolId();
 
         (IBERC20[] memory tokens,,) = vault.getPoolTokens(poolId);

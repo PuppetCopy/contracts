@@ -2,7 +2,7 @@
 pragma solidity ^0.8.29;
 
 
-library Address {
+library Const {
     address constant dao = 0x145E9Ee481Bb885A49E1fF4c1166222587D61916;
     address constant orderflowHandler = 0x145E9Ee481Bb885A49E1fF4c1166222587D61916;
 
