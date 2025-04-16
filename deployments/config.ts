@@ -1,4 +1,5 @@
 import * as abi from "./abi.js";
+import {} from './addresses.json'
 
 export const PUPPET_ADDRESSES = {
   42161: {
@@ -8,7 +9,7 @@ export const PUPPET_ADDRESSES = {
     },
 
     Dictatorship: {
-      address: "0x583367f217a6684039d378C0a142Cbe17F2FC058",
+      address: addresses.Dictatorship,
       abi: abi.dictatorshipAbi,
     },
     PuppetToken: {
