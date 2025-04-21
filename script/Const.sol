@@ -20,6 +20,8 @@ library Const {
     address constant gmxOracle = 0xa11B501c2dd83Acd29F6727570f2502FAaa617F2;
     address constant gmxDatastore = 0xFD70de6b91282D8017aA4E741e9Ae325CAb992d8;
     address constant gmxOrderHandler = 0xfc9Bc118fdDb89FF6fF720840446D73478dE4153;
+    address constant gmxLiquidationHandler = 0xdAb9bA9e3a301CCb353f18B4C8542BA2149E4010;
+    address constant gmxAdlHandler = 0x9242FbED25700e82aE26ae319BCf68E9C508451c;
     address constant gmxEthUsdcMarket = 0x70d95587d40A2caf56bd97485aB3Eec10Bee6336;
 
     bytes32 constant referralCode = 0x5055505045540000000000000000000000000000000000000000000000000000;

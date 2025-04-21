@@ -2,6 +2,7 @@
 pragma solidity ^0.8.29;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {console} from "forge-std/src/console.sol";
 
 import {GmxExecutionCallback} from "src/position/GmxExecutionCallback.sol";
 import {MatchingRule} from "src/position/MatchingRule.sol";
@@ -24,21 +25,45 @@ import {Const} from "./Const.sol";
 contract DeployPosition is BaseScript {
     function run() public {
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
-        deployContracts();
+        // deployContracts();
+        setupPermissions();
         vm.stopBroadcast();
     }
 
     function deployContracts() internal {
+        // log current nonce
+        uint256 currentNonce = vm.getNonce(DEPLOYER_ADDRESS);
+        console.log("Current nonce: %s", currentNonce);
+
+
         Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
         PuppetToken puppetToken = PuppetToken(getDeployedAddress("PuppetToken"));
         TokenRouter tokenRouter = TokenRouter(getDeployedAddress("TokenRouter"));
-
+        
         AllocationStore allocationStore = new AllocationStore(dictator, tokenRouter);
-        address nextMirrorPositionAddress = getNextCreateAddress(3);
-        MatchingRule matchingRule = new MatchingRule(dictator, allocationStore, MirrorPosition(nextMirrorPositionAddress));
         FeeMarketplaceStore feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
         FeeMarketplace feeMarketplace = new FeeMarketplace(dictator, tokenRouter, feeMarketplaceStore, puppetToken);
+        MatchingRule matchingRule = new MatchingRule(dictator, allocationStore, MirrorPosition(getNextCreateAddress(1)));
         MirrorPosition mirrorPosition = new MirrorPosition(dictator, allocationStore, matchingRule, feeMarketplace);
+        
+
+        require(
+            address(mirrorPosition) == address(matchingRule.mirrorPosition()),
+            "MirrorPosition address mismatch"
+        );
+
+    }
+
+    function setupPermissions() internal {
+        Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
+        TokenRouter tokenRouter = TokenRouter(getDeployedAddress("TokenRouter"));
+
+        AllocationStore allocationStore = AllocationStore(getDeployedAddress("AllocationStore"));
+        FeeMarketplaceStore feeMarketplaceStore = FeeMarketplaceStore(getDeployedAddress("FeeMarketplaceStore"));
+        FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
+        MatchingRule matchingRule = MatchingRule(getDeployedAddress("MatchingRule"));
+        MirrorPosition mirrorPosition = MirrorPosition(getDeployedAddress("MirrorPosition"));
+
 
         dictator.setAccess(tokenRouter, address(allocationStore));
         dictator.setAccess(allocationStore, address(matchingRule));
@@ -58,20 +83,20 @@ contract DeployPosition is BaseScript {
         );
 
         dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
-        dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, getDeployedAddress("Router"));
         dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, Const.dao);
         dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
         dictator.setAccess(allocationStore, address(feeMarketplaceStore));
         dictator.setAccess(tokenRouter, address(feeMarketplaceStore));
 
-        // external contract integration
-        require(
-            address(mirrorPosition) == nextMirrorPositionAddress,
-            "MirrorPosition address mismatch"
-        );
+
         GmxExecutionCallback gmxCallbackHandler = new GmxExecutionCallback(dictator, mirrorPosition);
         dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(gmxCallbackHandler));
         dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, address(gmxCallbackHandler));
+        dictator.setPermission(gmxCallbackHandler, gmxCallbackHandler.afterOrderExecution.selector, Const.gmxOrderHandler);
+        dictator.setPermission(gmxCallbackHandler, gmxCallbackHandler.afterOrderExecution.selector, Const.gmxLiquidationHandler);
+        dictator.setPermission(gmxCallbackHandler, gmxCallbackHandler.afterOrderExecution.selector, Const.gmxAdlHandler);
+        dictator.setPermission(gmxCallbackHandler, gmxCallbackHandler.afterOrderCancellation.selector, Const.gmxOrderHandler);
+        dictator.setPermission(gmxCallbackHandler, gmxCallbackHandler.afterOrderFrozen.selector, Const.gmxOrderHandler);
 
 
         // Config
@@ -108,7 +133,7 @@ contract DeployPosition is BaseScript {
                 FeeMarketplace.Config({
                     distributionTimeframe: 1 days,
                     burnBasisPoints: 10000,
-                    feeDistributor: FeeMarketplaceStore(address(0))
+                    feeDistributor: feeMarketplaceStore
                 })
             )
         );

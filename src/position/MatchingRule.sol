@@ -32,8 +32,8 @@ contract MatchingRule is CoreContract {
     mapping(IERC20 token => uint) tokenAllowanceCapMap;
     mapping(bytes32 matchingKey => mapping(address puppet => Rule)) public matchingRuleMap;
 
-    MirrorPosition immutable mirrorPosition;
-    AllocationStore immutable allocationStore;
+    MirrorPosition immutable public mirrorPosition;
+    AllocationStore immutable public allocationStore;
 
     function getRuleList(
         bytes32 _matchingKey,
@@ -84,7 +84,7 @@ contract MatchingRule is CoreContract {
         allocationStore.setUserBalance(_collateralToken, _user, nextBalance);
         allocationStore.transferOut(_collateralToken, _receiver, _amount);
 
-        _logEvent("Withdraw", abi.encode(_collateralToken, _user, nextBalance, _amount));
+        _logEvent("Withdraw", abi.encode(_collateralToken, _user, _receiver, nextBalance, _amount));
     }
 
     function setRule(

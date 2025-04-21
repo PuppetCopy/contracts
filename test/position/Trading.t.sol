@@ -74,6 +74,11 @@ contract TradingTest is BasicSetup {
         feeMarketplace = new FeeMarketplace(dictator, tokenRouter, feeMarketplaceStore, puppetToken);
         mirrorPosition = new MirrorPosition(dictator, allocationStore, matchingRule, feeMarketplace);
 
+        require(
+            address(mirrorPosition) == address(matchingRule.mirrorPosition()),
+            "MirrorPosition address mismatch"
+        );
+
         dictator.setAccess(tokenRouter, address(allocationStore));
         dictator.setAccess(allocationStore, address(matchingRule));
         dictator.setAccess(allocationStore, address(mirrorPosition));

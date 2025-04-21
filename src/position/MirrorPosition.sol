@@ -78,10 +78,10 @@ contract MirrorPosition is CoreContract {
     IERC20[] tokenDustThresholdList;
     uint[] tokenDustThresholdCapList;
 
-    AllocationStore immutable allocationStore;
-    MatchingRule immutable matchingRule;
-    FeeMarketplace immutable feeMarket;
-    address public immutable allocationStoreImplementation;
+    AllocationStore immutable public allocationStore;
+    MatchingRule immutable public matchingRule;
+    FeeMarketplace immutable public feeMarket;
+    address immutable public allocationStoreImplementation;
 
     uint public nextAllocationId = 0;
 
