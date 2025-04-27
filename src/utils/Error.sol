@@ -94,6 +94,8 @@ library Error {
     error MirrorPosition__InsufficientGmxExecutionFee();
     error MirrorPosition__KeeperAdjustmentExecutionFeeExceedsAllocatedAmount();
     error MirrorPosition__KeeperFeeExceedsCostFactor();
+    error MirrorPosition__KeeperExecutionFeeNotFullyCovered();
+    error MirrorPosition__PaymasterExecutionFeeNotFullyCovered(uint remaining);
     error MirrorPosition__NoNetFundsAllocated();
     // --- External Interaction ---
     error MirrorPosition__OrderCreationFailed();

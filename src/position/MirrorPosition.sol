@@ -332,7 +332,7 @@ contract MirrorPosition is CoreContract {
         uint _allocation = allocationMap[_allocationAddress];
         require(_allocation > 0, Error.MirrorPosition__InvalidAllocation());
 
-        uint _feeCollectedFromBalance = 0;
+        uint _remainingKeeperFeeToCollect = _keeperFee;
         uint _puppetKeeperExecutionFeeInsolvency = 0;
         uint[] memory _nextBalanceList = allocationStore.getBalanceList(_callParams.collateralToken, _puppetList);
 
@@ -344,17 +344,22 @@ contract MirrorPosition is CoreContract {
 
             if (_puppetAllocation == 0) continue;
 
-            uint _puppetFeePortion = _keeperFee * _puppetAllocation / _allocation;
+            uint _executionFee = _remainingKeeperFeeToCollect / _puppetListLength - i;
 
-            if (_nextBalanceList[i] >= _puppetFeePortion) {
-                _nextBalanceList[i] -= _puppetFeePortion;
-                _feeCollectedFromBalance += _puppetFeePortion;
+            if (_nextBalanceList[i] >= _executionFee) {
+                _nextBalanceList[i] -= _executionFee;
+                _remainingKeeperFeeToCollect -= _executionFee;
             } else {
                 allocationPuppetMap[_allocationKey][_puppet] =
-                    _puppetAllocation >= _puppetFeePortion ? _puppetAllocation - _puppetFeePortion : 0;
-                _puppetKeeperExecutionFeeInsolvency += _puppetFeePortion;
+                    _puppetAllocation >= _executionFee ? _puppetAllocation - _executionFee : 0;
+                _puppetKeeperExecutionFeeInsolvency += _executionFee;
             }
         }
+
+        require(
+            _remainingKeeperFeeToCollect == 0,
+            Error.MirrorPosition__KeeperExecutionFeeNotFullyCovered()
+        );
 
         allocationStore.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
         allocationStore.transferOut(_callParams.collateralToken, _keeperFeeReceiver, _keeperFee);
