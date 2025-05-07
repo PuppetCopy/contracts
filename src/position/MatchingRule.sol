@@ -32,8 +32,8 @@ contract MatchingRule is CoreContract {
     mapping(IERC20 token => uint) tokenAllowanceCapMap;
     mapping(bytes32 matchingKey => mapping(address puppet => Rule)) public matchingRuleMap;
 
-    MirrorPosition immutable public mirrorPosition;
-    AllocationStore immutable public allocationStore;
+    MirrorPosition public immutable mirrorPosition;
+    AllocationStore public immutable allocationStore;
 
     function getRuleList(
         bytes32 _matchingKey,
@@ -135,7 +135,7 @@ contract MatchingRule is CoreContract {
         require(config.maxAllowanceRate > config.minAllowanceRate, "Invalid max allowance rate");
         require(config.minActivityThrottle > 0, "Invalid min activity throttle");
         require(config.maxActivityThrottle > config.minActivityThrottle, "Invalid max activity throttle");
-    
+
         for (uint i; i < config.tokenAllowanceList.length; i++) {
             tokenAllowanceCapMap[config.tokenAllowanceList[i]] = config.tokenAllowanceCapList[i];
         }

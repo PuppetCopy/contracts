@@ -5,9 +5,11 @@ import {GmxPositionUtils} from "./../utils/GmxPositionUtils.sol";
 
 interface IGmxExchangeRouter {
     /// @dev Executes multiple calls in a single transaction, and returns the results of each call.
-    function multicall(bytes[] calldata data) external payable returns (bytes[] memory results);
+    function multicall(
+        bytes[] calldata data
+    ) external payable returns (bytes[] memory results);
 
-    function sendWnt(address receiver, uint amount) external payable;
+        function sendWnt(address receiver, uint amount) external payable;
     function sendNativeToken(address receiver, uint amount) external payable;
     /// @dev Sends the given amount of tokens to the given address
     function sendTokens(address token, address receiver, uint amount) external payable;
@@ -16,8 +18,9 @@ interface IGmxExchangeRouter {
     ///      created by transferring the specified amount of collateral tokens from the caller's account to the
     ///      order store, and then calling the `createOrder()` function on the order handler contract. The
     ///      referral code is also set on the caller's account using the referral storage contract.
-    function createOrder(GmxPositionUtils.CreateOrderParams calldata params) external payable returns (bytes32);
-
+    function createOrder(
+        GmxPositionUtils.CreateOrderParams calldata params
+    ) external payable returns (bytes32);
 
     /**
      * @dev Cancels the given order. The `cancelOrder()` feature must be enabled for the given order
@@ -28,7 +31,9 @@ interface IGmxExchangeRouter {
      *
      * @param key The unique ID of the order to be cancelled
      */
-    function cancelOrder(bytes32 key) external payable;
+    function cancelOrder(
+        bytes32 key
+    ) external payable;
 
     /**
      * @dev Claims funding fees for the given markets and tokens on behalf of the caller, and sends the
@@ -40,7 +45,11 @@ interface IGmxExchangeRouter {
      * @param tokens An array of token addresses, corresponding to the given markets
      * @param receiver The address to which the claimed fees should be sent
      */
-    function claimFundingFees(address[] memory markets, address[] memory tokens, address receiver) external payable returns (uint[] memory);
+    function claimFundingFees(
+        address[] memory markets,
+        address[] memory tokens,
+        address receiver
+    ) external payable returns (uint[] memory);
 
     /**
      * @dev Claims affiliate rewards for the given markets and tokens on behalf of the caller, and sends
@@ -52,5 +61,9 @@ interface IGmxExchangeRouter {
      * @param tokens An array of token addresses, corresponding to the given markets
      * @param receiver The address to which the claimed rewards should be sent
      */
-    function claimAffiliateRewards(address[] memory markets, address[] memory tokens, address receiver) external payable returns (uint[] memory);
+    function claimAffiliateRewards(
+        address[] memory markets,
+        address[] memory tokens,
+        address receiver
+    ) external payable returns (uint[] memory);
 }

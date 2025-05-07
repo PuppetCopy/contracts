@@ -10,7 +10,9 @@ library PoolUtils {
     int24 constant MAX_TICK = -MIN_TICK;
     uint constant SCALE_FACTOR = 1 << 192;
 
-    function calcSqrtRatioAtTick(int24 tick) internal pure returns (uint160 sqrtPriceX96) {
+    function calcSqrtRatioAtTick(
+        int24 tick
+    ) internal pure returns (uint160 sqrtPriceX96) {
         uint absTick = tick < 0 ? uint(-int(tick)) : uint(int(tick));
         require(absTick <= SafeCast.toUint256(MAX_TICK), "T");
 
@@ -71,13 +73,20 @@ library PoolUtils {
         return numerator1 * numerator2 / SCALE_FACTOR;
     }
 
-    function getTwapPrice(IUniswapV3Pool pool, uint8 token0Decimals, uint32 twapInterval) internal view returns (uint priceX96) {
+    function getTwapPrice(
+        IUniswapV3Pool pool,
+        uint8 token0Decimals,
+        uint32 twapInterval
+    ) internal view returns (uint priceX96) {
         uint160 sqrtPriceX96 = calcSqrtTwapX96(pool, twapInterval);
 
         return calcSqrtPriceX96ToUint(sqrtPriceX96, token0Decimals);
     }
 
-    function getTwapMedianPrice(IUniswapV3Pool[] memory poolList, uint32 twapInterval) internal view returns (uint medianPrice) {
+    function getTwapMedianPrice(
+        IUniswapV3Pool[] memory poolList,
+        uint32 twapInterval
+    ) internal view returns (uint medianPrice) {
         uint sourceListLength = poolList.length;
 
         uint[] memory priceList = new uint[](sourceListLength);

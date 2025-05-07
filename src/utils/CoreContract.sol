@@ -12,8 +12,9 @@ abstract contract CoreContract is Permission {
     /// @notice The central authority (Dictatorship) managing this contract.
     // Inherited 'authority' variable assumed from Permission contract
     /// @param _authority The address of the Dictatorship contract.
-    constructor(IAuthority _authority) Permission(_authority) {
-    }
+    constructor(
+        IAuthority _authority
+    ) Permission(_authority) {}
 
     /// @notice Entry point for the Authority to push configuration updates.
     /// @dev Requires caller to be the registered Authority. Delegates to internal _setConfig implementation.

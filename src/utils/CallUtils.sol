@@ -48,8 +48,7 @@ library CallUtils {
         (bool success, bytes memory returndata) = target.call{gas: gasLimit}(data);
 
         require(
-            returndata.length != 0 && abi.decode(returndata, (bool)),
-            Error.CallUtils__SafeERC20FailedOperation(target)
+            returndata.length != 0 && abi.decode(returndata, (bool)), Error.CallUtils__SafeERC20FailedOperation(target)
         );
 
         if (success) {

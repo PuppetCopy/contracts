@@ -74,10 +74,7 @@ contract TradingTest is BasicSetup {
         feeMarketplace = new FeeMarketplace(dictator, tokenRouter, feeMarketplaceStore, puppetToken);
         mirrorPosition = new MirrorPosition(dictator, allocationStore, matchingRule, feeMarketplace);
 
-        require(
-            address(mirrorPosition) == address(matchingRule.mirrorPosition()),
-            "MirrorPosition address mismatch"
-        );
+        require(address(mirrorPosition) == address(matchingRule.mirrorPosition()), "MirrorPosition address mismatch");
 
         dictator.setAccess(tokenRouter, address(allocationStore));
         dictator.setAccess(allocationStore, address(matchingRule));
@@ -210,7 +207,8 @@ contract TradingTest is BasicSetup {
 
         // Check balance change in AllocationStore OR GMX Vault after mirror()
         // Mirror transfers NET allocated amount to vault
-        // assertEq(usdc.balanceOf(Const.gmxOrderVault), netAllocationFromMirror, "Vault balance after mirror mismatch");
+        // assertEq(usdc.balanceOf(Const.gmxOrderVault), netAllocationFromMirror, "Vault balance after mirror
+        // mismatch");
         // Alternatively check AllocationStore balance decreased
         // Store balance reduces by GROSS allocated (100e6)
         uint allocationStoreBalanceAfterMirror = allocationStoreBalanceBefore - initialGrossTotalAllocation;
@@ -273,12 +271,15 @@ contract TradingTest is BasicSetup {
 
         // Calculate platform fee based on amount after settlement keeper fee
         uint amountForFeeCalc =
-            settledAmount > callSettle.keeperExecutionFee ? settledAmount - callSettle.keeperExecutionFee : 0; // 196e6 - 1e6 = 195e6
-        uint platformFeeCalculated = Precision.applyFactor(_getSettleFeeFactor(), amountForFeeCalc); // 0.1 * 195e6 = 19.5e6
+            settledAmount > callSettle.keeperExecutionFee ? settledAmount - callSettle.keeperExecutionFee : 0; // 196e6 -
+            // 1e6 = 195e6
+        uint platformFeeCalculated = Precision.applyFactor(_getSettleFeeFactor(), amountForFeeCalc); // 0.1 * 195e6 =
+            // 19.5e6
 
         // Calculate amount distributed during settlement
         uint settlementDeductions = platformFeeCalculated + callSettle.keeperExecutionFee; // 19.5e6 + 1e6 = 20.5e6
-        uint amountDistributed = settledAmount > settlementDeductions ? settledAmount - settlementDeductions : 0; // 196e6 - 20.5e6 = 175.5e6
+        uint amountDistributed = settledAmount > settlementDeductions ? settledAmount - settlementDeductions : 0; // 196e6
+            // - 20.5e6 = 175.5e6
 
         // Check store balance increased correctly
         // Expected final balance = (balance after mirror - adjust fee) + distributed amount
@@ -294,8 +295,11 @@ contract TradingTest is BasicSetup {
         // 6. Check puppet balances
         // Calculate expected balance after adjust fee deduction
         uint initialContributionPerPuppet = initialGrossTotalAllocation / puppetList.length; // 100e6 / 10 = 10e6
-        uint adjustFeePerPuppet = Math.mulDiv(callDecrease.keeperExecutionFee, initialContributionPerPuppet, initialGrossTotalAllocation); // 1e6 * 10e6 / 100e6 = 0.1e6
-        uint balanceAfterAdjust = initialPuppetBalance - initialContributionPerPuppet - adjustFeePerPuppet; // 100e6 - 10e6 - 0.1e6 = 89.9e6
+        uint adjustFeePerPuppet =
+            Math.mulDiv(callDecrease.keeperExecutionFee, initialContributionPerPuppet, initialGrossTotalAllocation); // 1e6
+            // * 10e6 / 100e6 = 0.1e6
+        uint balanceAfterAdjust = initialPuppetBalance - initialContributionPerPuppet - adjustFeePerPuppet; // 100e6 -
+            // 10e6 - 0.1e6 = 89.9e6
 
         for (uint i = 0; i < puppetList.length; i++) {
             address puppet = puppetList[i];
@@ -303,7 +307,8 @@ contract TradingTest is BasicSetup {
             assertEq(contribution, initialContributionPerPuppet, "Contribution mismatch"); // Verify assumption
 
             // Calculate expected share based on INITIAL GROSS allocation ratio
-            uint expectedShare = Math.mulDiv(amountDistributed, contribution, initialGrossTotalAllocation); // 175.5e6 * 10e6 / 100e6 = 17.55e6
+            uint expectedShare = Math.mulDiv(amountDistributed, contribution, initialGrossTotalAllocation); // 175.5e6 *
+                // 10e6 / 100e6 = 17.55e6
 
             // Calculate final expected balance
             uint expectedFinalBalance = balanceAfterAdjust + expectedShare; // 89.9e6 + 17.55e6 = 107.45e6
@@ -517,9 +522,12 @@ contract TradingTest is BasicSetup {
         uint puppet2BalanceAfterSettle = allocationStore.userBalanceMap(usdc, puppet2);
         uint puppet3BalanceAfterSettle = allocationStore.userBalanceMap(usdc, puppet3);
 
-        uint puppet1ShareOfAdjustFee = Math.mulDiv(callClose.keeperExecutionFee, puppet1Allocation, initialGrossTotalAllocation);
-        uint puppet2ShareOfAdjustFee = Math.mulDiv(callClose.keeperExecutionFee, puppet2Allocation, initialGrossTotalAllocation);
-        uint puppet3ShareOfAdjustFee = Math.mulDiv(callClose.keeperExecutionFee, puppet3Allocation, initialGrossTotalAllocation);
+        uint puppet1ShareOfAdjustFee =
+            Math.mulDiv(callClose.keeperExecutionFee, puppet1Allocation, initialGrossTotalAllocation);
+        uint puppet2ShareOfAdjustFee =
+            Math.mulDiv(callClose.keeperExecutionFee, puppet2Allocation, initialGrossTotalAllocation);
+        uint puppet3ShareOfAdjustFee =
+            Math.mulDiv(callClose.keeperExecutionFee, puppet3Allocation, initialGrossTotalAllocation);
         uint puppet1BalanceAfterAdjust = puppet1BalanceAfterMirror - puppet1ShareOfAdjustFee;
         uint puppet2BalanceAfterAdjust = puppet2BalanceAfterMirror - puppet2ShareOfAdjustFee;
         uint puppet3BalanceAfterAdjust = puppet3BalanceAfterMirror - puppet3ShareOfAdjustFee;

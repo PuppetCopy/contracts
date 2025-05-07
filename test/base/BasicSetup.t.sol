@@ -13,7 +13,6 @@ import {IWNT} from "src/utils/interfaces/IWNT.sol";
 import {Test} from "forge-std/src/Test.sol";
 import {MockERC20} from "test/mock/MockERC20.sol";
 
-
 contract BasicSetup is Test {
     struct Users {
         address payable owner;

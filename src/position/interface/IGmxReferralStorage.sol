@@ -8,23 +8,33 @@ interface IGmxReferralStorage {
     // @dev get the owner of a referral code
     // @param _code the referral code
     // @return the owner of the referral code
-    function codeOwners(bytes32 _code) external view returns (address);
+    function codeOwners(
+        bytes32 _code
+    ) external view returns (address);
     // @dev get the referral code of a trader
     // @param _account the address of the trader
     // @return the referral code
-    function traderReferralCodes(address _account) external view returns (bytes32);
+    function traderReferralCodes(
+        address _account
+    ) external view returns (bytes32);
     // @dev get the trader discount share for an affiliate
     // @param _account the address of the affiliate
     // @return the trader discount share
-    function referrerDiscountShares(address _account) external view returns (uint);
+    function referrerDiscountShares(
+        address _account
+    ) external view returns (uint);
     // @dev get the tier level of an affiliate
     // @param _account the address of the affiliate
     // @return the tier level of the affiliate
-    function referrerTiers(address _account) external view returns (uint);
+    function referrerTiers(
+        address _account
+    ) external view returns (uint);
     // @dev get the referral info for a trader
     // @param _account the address of the trader
     // @return (referral code, affiliate)
-    function getTraderReferralInfo(address _account) external view returns (bytes32, address);
+    function getTraderReferralInfo(
+        address _account
+    ) external view returns (bytes32, address);
     // @dev set the referral code for a trader
     // @param _account the address of the trader
     // @param _code the referral code
@@ -45,7 +55,9 @@ interface IGmxReferralStorage {
     // @dev get the tier values for a tier level
     // @param _tierLevel the tier level
     // @return (totalRebate, discountShare)
-    function tiers(uint _tierLevel) external view returns (uint, uint);
+    function tiers(
+        uint _tierLevel
+    ) external view returns (uint, uint);
 
     function setCodeOwner(bytes32 _codeHash, address _owner) external;
 }

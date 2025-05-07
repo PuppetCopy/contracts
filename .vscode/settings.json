@@ -1,7 +1,4 @@
 {
   "solidity.formatter": "forge",
-  "[solidity]": {
-    "editor.defaultFormatter": "NomicFoundation.hardhat-solidity"
-  },
   "security.olympix.project.includePath": "/src",
 }

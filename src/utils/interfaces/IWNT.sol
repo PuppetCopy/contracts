@@ -15,7 +15,9 @@ interface IWNT is IERC20 {
 
     // @dev withdraw the native token by burning WNT
     // @param amount the amount to withdraw
-    function withdraw(uint amount) external;
+    function withdraw(
+        uint amount
+    ) external;
 
     // @dev mint tokens to an account
     // @param account the account to mint to

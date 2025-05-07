@@ -5,14 +5,14 @@ import {IGmxReferralStorage} from "../position/interface/IGmxReferralStorage.sol
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Error} from "../utils/Error.sol";
 import {BankStore} from "../utils/BankStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
+import {Error} from "../utils/Error.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {RewardStore} from "./RewardStore.sol";
 
-contract RewardDistributor is CoreContract {
+    contract RewardDistributor is CoreContract {
     /// @notice Configuration parameters
     struct Config {
         uint distributionWindow; // Time window for reward distribution (in seconds)

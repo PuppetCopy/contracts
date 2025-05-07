@@ -78,10 +78,10 @@ contract MirrorPosition is CoreContract {
     IERC20[] tokenDustThresholdList;
     uint[] tokenDustThresholdCapList;
 
-    AllocationStore immutable public allocationStore;
-    MatchingRule immutable public matchingRule;
-    FeeMarketplace immutable public feeMarket;
-    address immutable public allocationStoreImplementation;
+    AllocationStore public immutable allocationStore;
+    MatchingRule public immutable matchingRule;
+    FeeMarketplace public immutable feeMarket;
+    address public immutable allocationStoreImplementation;
 
     uint public nextAllocationId = 0;
 
@@ -206,8 +206,9 @@ contract MirrorPosition is CoreContract {
                 uint _puppetBalance = _nextBalanceList[i];
                 uint _puppetAllocation = Precision.applyBasisPoints(rule.allowanceRate, _nextBalanceList[i]);
 
-                if (_estimatedExecutionFeePerPuppet
-                            > Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _puppetBalance)
+                if (
+                    _estimatedExecutionFeePerPuppet
+                        > Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _puppetBalance)
                 ) {
                     continue;
                 }
@@ -356,10 +357,7 @@ contract MirrorPosition is CoreContract {
             }
         }
 
-        require(
-            _remainingKeeperFeeToCollect == 0,
-            Error.MirrorPosition__KeeperExecutionFeeNotFullyCovered()
-        );
+        require(_remainingKeeperFeeToCollect == 0, Error.MirrorPosition__KeeperExecutionFeeNotFullyCovered());
 
         allocationStore.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
         allocationStore.transferOut(_callParams.collateralToken, _keeperFeeReceiver, _keeperFee);

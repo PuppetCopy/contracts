@@ -3,9 +3,9 @@ pragma solidity ^0.8.29;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Error} from "../utils/Error.sol";
 import {PuppetToken} from "../tokenomics/PuppetToken.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
+import {Error} from "../utils/Error.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {PuppetVoteToken} from "./PuppetVoteToken.sol";
