@@ -12,23 +12,22 @@
     "deploy": "FOUNDRY_PROFILE=prod SCRIPT='DeployPosition' bun deploy.ts",
     "docgen": "forge doc --out '.docgen' --build",
     "gas-report": "forge test --match-contract TradingTest --gas-report",
-    "lint:sol": "forge fmt --check && bun solhint \"{script,src,test}/**/*.sol\""
+    "lint:sol": "forge fmt --check",
+    "lint:fmt": "forge fmt"
   },
   "private": true,
   "sideEffects": false,
   "devDependencies": {
-    "@aragon/osx": "^1.4.0",
+    "@aragon/osx": "1.4.0",
     "@balancer-labs/v2-interfaces": "0.4.0",
     "@openzeppelin/contracts": "5.3.0",
-    "@types/bun": "1.2.10",
     "@uniswap/v3-core": "1.0.1",
     "@zeframlou/create3-factory": "github:zeframlou/create3-factory#main",
-    "dotenv": "^16.4.7",
-    "forge-std": "github:foundry-rs/forge-std#v1.9.6",
-    "solhint": "5.0.5",
-    "viem": "^2.27.2"
+    "dotenv": "16.5.0",
+    "forge-std": "github:foundry-rs/forge-std#v1.9.7",
+    "viem": "2.29.0"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "5.8.3"
   }
 }
