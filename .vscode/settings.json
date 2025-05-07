@@ -1,4 +1,6 @@
 {
   "solidity.formatter": "forge",
   "security.olympix.project.includePath": "/src",
+  "npm.packageManager": "bun",
+  "npm.scriptRunner": "bun",
 }
