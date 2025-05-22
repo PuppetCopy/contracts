@@ -42,7 +42,7 @@ contract DeployPosition is BaseScript {
         
         AllocationStore allocationStore = new AllocationStore(dictator, tokenRouter);
         FeeMarketplaceStore feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
-        FeeMarketplace feeMarketplace = new FeeMarketplace(dictator, tokenRouter, feeMarketplaceStore, puppetToken);
+        FeeMarketplace feeMarketplace = new FeeMarketplace(dictator, feeMarketplaceStore, puppetToken);
         MatchingRule matchingRule = new MatchingRule(dictator, allocationStore, MirrorPosition(getNextCreateAddress(1)));
         MirrorPosition mirrorPosition = new MirrorPosition(dictator, allocationStore, matchingRule, feeMarketplace);
         

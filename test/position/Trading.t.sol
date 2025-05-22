@@ -71,7 +71,7 @@ contract TradingTest is BasicSetup {
         allocationStore = new AllocationStore(dictator, tokenRouter);
         matchingRule = new MatchingRule(dictator, allocationStore, MirrorPosition(_getNextContractAddress(3)));
         feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
-        feeMarketplace = new FeeMarketplace(dictator, tokenRouter, feeMarketplaceStore, puppetToken);
+        feeMarketplace = new FeeMarketplace(dictator, feeMarketplaceStore, puppetToken);
         mirrorPosition = new MirrorPosition(dictator, allocationStore, matchingRule, feeMarketplace);
 
         require(address(mirrorPosition) == address(matchingRule.mirrorPosition()), "MirrorPosition address mismatch");
@@ -184,7 +184,7 @@ contract TradingTest is BasicSetup {
         uint initialPuppetBalance = 100e6;
         address trader = defaultCallPosition.trader;
         address[] memory puppetList = _generatePuppetList(usdc, trader, 10);
-        bytes32 matchingKey = PositionUtils.getMatchingKey(usdc, trader);
+        bytes32 traderMatchingKey = PositionUtils.getTraderMatchingKey(usdc, trader);
         uint allocationStoreBalanceBefore = usdc.balanceOf(address(allocationStore));
         uint initialGrossTotalAllocation = 100e6; // 10 puppets * 10e6 contribution each
 
@@ -196,7 +196,7 @@ contract TradingTest is BasicSetup {
         assertNotEq(increaseRequestKey, bytes32(0));
         assertNotEq(allocationId, 0);
 
-        bytes32 allocationKey = _getAllocationKey(puppetList, matchingKey, allocationId);
+        bytes32 allocationKey = _getAllocationKey(puppetList, traderMatchingKey, allocationId);
         address allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
             mirrorPosition.allocationStoreImplementation(), allocationKey, address(mirrorPosition)
         );
@@ -371,8 +371,8 @@ contract TradingTest is BasicSetup {
         (, uint allocationId, bytes32 requestKey) =
             mirrorPosition.mirror{value: callParams.executionFee}(callParams, puppetList);
 
-        bytes32 matchingKey = PositionUtils.getMatchingKey(usdc, trader);
-        bytes32 allocationKey = _getAllocationKey(puppetList, matchingKey, allocationId);
+        bytes32 traderMatchingKey = PositionUtils.getTraderMatchingKey(usdc, trader);
+        bytes32 allocationKey = _getAllocationKey(puppetList, traderMatchingKey, allocationId);
         address allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
             mirrorPosition.allocationStoreImplementation(), allocationKey, address(mirrorPosition)
         );
@@ -472,7 +472,7 @@ contract TradingTest is BasicSetup {
         puppetList[1] = puppet2;
         puppetList[2] = puppet3;
 
-        bytes32 matchingKey = PositionUtils.getMatchingKey(usdc, trader);
+        bytes32 traderMatchingKey = PositionUtils.getTraderMatchingKey(usdc, trader);
         uint initialGrossTotalAllocation = 30e6;
 
         MirrorPosition.CallPosition memory callOpen = defaultCallPosition;
@@ -481,7 +481,7 @@ contract TradingTest is BasicSetup {
             mirrorPosition.mirror{value: callOpen.executionFee}(callOpen, puppetList);
         assertNotEq(allocationId, 0);
 
-        bytes32 allocationKey = _getAllocationKey(puppetList, matchingKey, allocationId);
+        bytes32 allocationKey = _getAllocationKey(puppetList, traderMatchingKey, allocationId);
         address allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
             mirrorPosition.allocationStoreImplementation(), allocationKey, address(mirrorPosition)
         );
@@ -626,11 +626,11 @@ contract TradingTest is BasicSetup {
         mirrorPosition.mirror{value: callMirror.executionFee}(callMirror, puppetList);
         vm.stopPrank();
 
-        bytes32 matchingKey = PositionUtils.getMatchingKey(usdc, trader);
+        bytes32 traderMatchingKey = PositionUtils.getTraderMatchingKey(usdc, trader);
         vm.prank(users.owner);
         (address allocationAddress, uint allocationId, bytes32 requestKey) =
             mirrorPosition.mirror{value: callMirror.executionFee}(callMirror, puppetList);
-        bytes32 allocationKey = _getAllocationKey(puppetList, matchingKey, allocationId);
+        bytes32 allocationKey = _getAllocationKey(puppetList, traderMatchingKey, allocationId);
         vm.stopPrank();
 
         MirrorPosition.CallPosition memory callAdjust = defaultCallPosition;
@@ -672,12 +672,12 @@ contract TradingTest is BasicSetup {
 
         vm.expectRevert();
         vm.prank(users.owner);
-        mirrorPosition.initializeTraderActivityThrottle(matchingKey, puppetList[0]);
+        mirrorPosition.initializeTraderActivityThrottle(traderMatchingKey, puppetList[0]);
         vm.stopPrank();
 
         vm.expectRevert();
         vm.prank(users.bob);
-        mirrorPosition.initializeTraderActivityThrottle(matchingKey, puppetList[0]);
+        mirrorPosition.initializeTraderActivityThrottle(traderMatchingKey, puppetList[0]);
         vm.stopPrank();
     }
 
@@ -722,10 +722,10 @@ contract TradingTest is BasicSetup {
 
     function _getAllocationKey(
         address[] memory _puppetList,
-        bytes32 _matchingKey,
+        bytes32 _traderMatchingKey,
         uint _allocationId
     ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(_puppetList, _matchingKey, _allocationId));
+        return keccak256(abi.encodePacked(_puppetList, _traderMatchingKey, _allocationId));
     }
 
     function _getSettleFeeFactor() internal view returns (uint) {

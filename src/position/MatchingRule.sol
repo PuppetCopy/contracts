@@ -30,13 +30,13 @@ contract MatchingRule is CoreContract {
     Config public config;
 
     mapping(IERC20 token => uint) tokenAllowanceCapMap;
-    mapping(bytes32 matchingKey => mapping(address puppet => Rule)) public matchingRuleMap;
+    mapping(bytes32 traderMatchingKey => mapping(address puppet => Rule)) public matchingRuleMap;
 
     MirrorPosition public immutable mirrorPosition;
     AllocationStore public immutable allocationStore;
 
     function getRuleList(
-        bytes32 _matchingKey,
+        bytes32 _traderMatchingKey,
         address[] calldata _puppetList
     ) external view returns (Rule[] memory _ruleList) {
         uint _puppetListCount = _puppetList.length;
@@ -44,7 +44,7 @@ contract MatchingRule is CoreContract {
 
         for (uint i = 0; i < _puppetListCount; i++) {
             address _puppet = _puppetList[i];
-            _ruleList[i] = matchingRuleMap[_matchingKey][_puppet];
+            _ruleList[i] = matchingRuleMap[_traderMatchingKey][_puppet];
         }
     }
 
@@ -109,11 +109,11 @@ contract MatchingRule is CoreContract {
             Error.MatchingRule__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate)
         );
 
-        bytes32 _matchingKey = PositionUtils.getMatchingKey(_collateralToken, _trader);
-        matchingRuleMap[_matchingKey][_user] = _ruleParams;
-        mirrorPosition.initializeTraderActivityThrottle(_matchingKey, _user);
+        bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_collateralToken, _trader);
+        matchingRuleMap[_traderMatchingKey][_user] = _ruleParams;
+        mirrorPosition.initializeTraderActivityThrottle(_traderMatchingKey, _user);
 
-        _logEvent("SetMatchingRule", abi.encode(_collateralToken, _matchingKey, _user, _trader, _ruleParams));
+        _logEvent("SetMatchingRule", abi.encode(_collateralToken, _traderMatchingKey, _user, _trader, _ruleParams));
     }
 
     /// @notice  Sets the configuration parameters via governance

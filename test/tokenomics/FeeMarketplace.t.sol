@@ -29,7 +29,7 @@ contract FeeMarketplaceTest is BasicSetup {
 
         vm.startPrank(users.owner);
         feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
-        feeMarketplace = new FeeMarketplace(dictator, tokenRouter, feeMarketplaceStore, puppetToken);
+        feeMarketplace = new FeeMarketplace(dictator, feeMarketplaceStore, puppetToken);
 
         // Set up permissions.
         dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, users.owner);

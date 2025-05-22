@@ -28,6 +28,7 @@ contract MirrorPosition is CoreContract {
         bytes32 referralCode;
         uint increaseCallbackGasLimit;
         uint decreaseCallbackGasLimit;
+        
         uint platformSettleFeeFactor;
         uint maxPuppetList;
         uint maxKeeperFeeToAllocationRatio;
@@ -85,7 +86,7 @@ contract MirrorPosition is CoreContract {
 
     uint public nextAllocationId = 0;
 
-    mapping(bytes32 matchingKey => mapping(address puppet => uint)) public lastActivityThrottleMap;
+    mapping(bytes32 traderMatchingKey => mapping(address puppet => uint)) public lastActivityThrottleMap;
     mapping(bytes32 allocationKey => mapping(address puppet => uint)) public allocationPuppetMap;
     mapping(address allocationAddress => uint) public allocationMap; // used as a denominator
     mapping(address allocationAddress => Position) public positionMap;
@@ -135,8 +136,8 @@ contract MirrorPosition is CoreContract {
         allocationStoreImplementation = address(new AllocationAccount(allocationStore));
     }
 
-    function initializeTraderActivityThrottle(bytes32 _matchingKey, address _puppet) external auth {
-        lastActivityThrottleMap[_matchingKey][_puppet] = 1;
+    function initializeTraderActivityThrottle(bytes32 _traderMatchingKey, address _puppet) external auth {
+        lastActivityThrottleMap[_traderMatchingKey][_puppet] = 1;
     }
 
     /**
@@ -189,11 +190,11 @@ contract MirrorPosition is CoreContract {
         require(_callParams.sizeDeltaInUsd > 0, Error.MirrorPosition__InvalidSizeDelta());
 
         _nextAllocationId = ++nextAllocationId;
-        bytes32 _matchingKey = PositionUtils.getMatchingKey(_callParams.collateralToken, _callParams.trader);
-        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _matchingKey, _nextAllocationId);
+        bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
+        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _nextAllocationId);
         _allocationAddress = AllocationAccountUtils.cloneDeterministic(allocationStoreImplementation, _allocationKey);
 
-        MatchingRule.Rule[] memory _ruleList = matchingRule.getRuleList(_matchingKey, _puppetList);
+        MatchingRule.Rule[] memory _ruleList = matchingRule.getRuleList(_traderMatchingKey, _puppetList);
         uint[] memory _nextBalanceList = allocationStore.getBalanceList(_callParams.collateralToken, _puppetList);
         uint _estimatedExecutionFeePerPuppet = _keeperFee / _puppetListLength;
         uint _allocation = 0;
@@ -202,7 +203,9 @@ contract MirrorPosition is CoreContract {
             MatchingRule.Rule memory rule = _ruleList[i];
             address _puppet = _puppetList[i];
 
-            if (rule.expiry > block.timestamp && block.timestamp >= lastActivityThrottleMap[_matchingKey][_puppet]) {
+            if (
+                rule.expiry > block.timestamp && block.timestamp >= lastActivityThrottleMap[_traderMatchingKey][_puppet]
+            ) {
                 uint _puppetBalance = _nextBalanceList[i];
                 uint _puppetAllocation = Precision.applyBasisPoints(rule.allowanceRate, _nextBalanceList[i]);
 
@@ -216,7 +219,7 @@ contract MirrorPosition is CoreContract {
                 allocationPuppetMap[_allocationKey][_puppet] = _puppetAllocation;
                 _nextBalanceList[i] -= _puppetAllocation;
                 _allocation += _puppetAllocation;
-                lastActivityThrottleMap[_matchingKey][_puppet] = block.timestamp + rule.throttleActivity;
+                lastActivityThrottleMap[_traderMatchingKey][_puppet] = block.timestamp + rule.throttleActivity;
             }
         }
 
@@ -259,7 +262,7 @@ contract MirrorPosition is CoreContract {
         _logEvent(
             "Mirror",
             abi.encode(
-                _matchingKey,
+                _traderMatchingKey,
                 _allocationKey,
                 _requestKey,
                 _allocationAddress,
@@ -318,8 +321,8 @@ contract MirrorPosition is CoreContract {
             Error.MirrorPosition__NoAdjustmentRequired()
         );
 
-        bytes32 _matchingKey = PositionUtils.getMatchingKey(_callParams.collateralToken, _callParams.trader);
-        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _matchingKey, _allocationId);
+        bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
+        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _allocationId);
 
         address _allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
             allocationStoreImplementation, _allocationKey, address(this)
@@ -433,7 +436,7 @@ contract MirrorPosition is CoreContract {
         _logEvent(
             "Adjust",
             abi.encode(
-                _matchingKey,
+                _traderMatchingKey,
                 _allocationKey,
                 _allocationAddress,
                 _requestKey,
@@ -567,8 +570,9 @@ contract MirrorPosition is CoreContract {
         address _keeperFeeReceiver = _callParams.keeperExecutionFeeReceiver;
         require(_keeperFeeReceiver != address(0), Error.MirrorPosition__InvalidKeeperExeuctionFeeReceiver());
 
-        bytes32 _matchingKey = PositionUtils.getMatchingKey(_callParams.collateralToken, _callParams.trader);
-        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _matchingKey, _callParams.allocationId);
+        bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
+        bytes32 _allocationKey =
+            PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId);
         address _allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
             allocationStoreImplementation, _allocationKey, address(this)
         );
@@ -634,7 +638,7 @@ contract MirrorPosition is CoreContract {
         _logEvent(
             "Settle",
             abi.encode(
-                _matchingKey,
+                _traderMatchingKey,
                 _allocationKey,
                 _allocationAddress,
                 _keeperFeeReceiver,

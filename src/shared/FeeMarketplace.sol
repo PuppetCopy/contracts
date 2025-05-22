@@ -4,7 +4,6 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {TokenRouter} from "../shared/TokenRouter.sol";
 import {PuppetToken} from "../tokenomics/PuppetToken.sol";
 import {BankStore} from "../utils/BankStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
@@ -59,9 +58,6 @@ contract FeeMarketplace is CoreContract {
         uint burnBasisPoints;
     }
 
-    /// @notice Router contract for token transfers
-    TokenRouter public immutable tokenRouter;
-
     /// @notice Store contract that holds the fee tokens
     FeeMarketplaceStore public immutable store;
 
@@ -82,11 +78,9 @@ contract FeeMarketplace is CoreContract {
 
     constructor(
         IAuthority _authority,
-        TokenRouter _tokenRouter,
         FeeMarketplaceStore _store,
         PuppetToken _protocolToken
     ) CoreContract(_authority) {
-        tokenRouter = _tokenRouter;
         store = _store;
         protocolToken = _protocolToken;
     }
