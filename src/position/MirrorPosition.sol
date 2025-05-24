@@ -28,7 +28,6 @@ contract MirrorPosition is CoreContract {
         bytes32 referralCode;
         uint increaseCallbackGasLimit;
         uint decreaseCallbackGasLimit;
-        
         uint platformSettleFeeFactor;
         uint maxPuppetList;
         uint maxKeeperFeeToAllocationRatio;
@@ -172,7 +171,7 @@ contract MirrorPosition is CoreContract {
      * @return _nextAllocationId A unique ID generated for this specific allocation instance.
      * @return _requestKey The unique key returned by GMX identifying the created order request, used for callbacks.
      */
-    function mirror(
+    function requestMirror(
         CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth returns (address _allocationAddress, uint _nextAllocationId, bytes32 _requestKey) {
@@ -260,7 +259,7 @@ contract MirrorPosition is CoreContract {
         });
 
         _logEvent(
-            "Mirror",
+            "RequestMirror",
             abi.encode(
                 _traderMatchingKey,
                 _allocationKey,
@@ -302,7 +301,7 @@ contract MirrorPosition is CoreContract {
      * @param _allocationId The unique ID identifying the allocation instance being adjusted.
      * @return _requestKey The unique key returned by GMX identifying the created adjustment order request.
      */
-    function adjust(
+    function requestAdjust(
         CallPosition calldata _callParams,
         address[] calldata _puppetList,
         uint _allocationId
@@ -348,7 +347,7 @@ contract MirrorPosition is CoreContract {
 
             if (_puppetAllocation == 0) continue;
 
-            uint _executionFee = _remainingKeeperFeeToCollect / _puppetListLength - i;
+            uint _executionFee = _remainingKeeperFeeToCollect / (_puppetListLength - i);
 
             if (_nextBalanceList[i] >= _executionFee) {
                 _nextBalanceList[i] -= _executionFee;
@@ -434,7 +433,7 @@ contract MirrorPosition is CoreContract {
         });
 
         _logEvent(
-            "Adjust",
+            "RequestAdjust",
             abi.encode(
                 _traderMatchingKey,
                 _allocationKey,

@@ -71,8 +71,8 @@ contract DeployPosition is BaseScript {
         dictator.setAccess(allocationStore, address(feeMarketplace));
 
         // mirrorPosition permissions (owner for most actions in tests)
-        dictator.setPermission(mirrorPosition, mirrorPosition.mirror.selector, Const.orderflowHandler);
-        dictator.setPermission(mirrorPosition, mirrorPosition.adjust.selector, Const.orderflowHandler);
+        dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, Const.orderflowHandler);
+        dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, Const.orderflowHandler);
         dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, Const.orderflowHandler);
         dictator.setPermission(mirrorPosition, mirrorPosition.collectDust.selector, Const.orderflowHandler);
         dictator.setPermission(mirrorPosition, mirrorPosition.setTokenDustThreshold.selector, Const.orderflowHandler);
