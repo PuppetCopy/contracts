@@ -17,11 +17,12 @@ import {ErrorUtils} from "./../utils/ErrorUtils.sol";
 import {Precision} from "./../utils/Precision.sol";
 import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
 import {AllocationAccountUtils} from "./utils/AllocationAccountUtils.sol";
-import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
+import {GmxPositionUtils, IDataStore} from "./utils/GmxPositionUtils.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
 contract MirrorPosition is CoreContract {
     struct Config {
+        IDataStore gmxDatastore;
         IGmxExchangeRouter gmxExchangeRouter;
         address callbackHandler;
         address gmxOrderVault;
@@ -86,7 +87,7 @@ contract MirrorPosition is CoreContract {
     uint public nextAllocationId = 0;
 
     mapping(bytes32 traderMatchingKey => mapping(address puppet => uint)) public lastActivityThrottleMap;
-    mapping(bytes32 allocationKey => mapping(address puppet => uint)) public allocationPuppetMap;
+    mapping(address allocationAddress => mapping(address puppet => uint)) public allocationPuppetMap;
     mapping(address allocationAddress => uint) public allocationMap; // used as a denominator
     mapping(address allocationAddress => Position) public positionMap;
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
@@ -175,6 +176,14 @@ contract MirrorPosition is CoreContract {
         CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth returns (address _allocationAddress, uint _nextAllocationId, bytes32 _requestKey) {
+        bytes32 _traderPositionKey = GmxPositionUtils.getPositionKey(
+            _callParams.trader, _callParams.market, _callParams.collateralToken, _callParams.isLong
+        );
+        require(
+            GmxPositionUtils.getPositionSize(config.gmxDatastore, _traderPositionKey) > 0,
+            Error.MirrorPosition__GmxTraderPositionNotFound()
+        );
+
         uint _puppetListLength = _puppetList.length;
         require(_puppetListLength > 0, Error.MirrorPosition__PuppetListEmpty());
         require(_puppetListLength <= config.maxPuppetList, Error.MirrorPosition__MaxPuppetList());
@@ -215,7 +224,7 @@ contract MirrorPosition is CoreContract {
                     continue;
                 }
 
-                allocationPuppetMap[_allocationKey][_puppet] = _puppetAllocation;
+                allocationPuppetMap[_allocationAddress][_puppet] = _puppetAllocation;
                 _nextBalanceList[i] -= _puppetAllocation;
                 _allocation += _puppetAllocation;
                 lastActivityThrottleMap[_traderMatchingKey][_puppet] = block.timestamp + rule.throttleActivity;
@@ -343,7 +352,7 @@ contract MirrorPosition is CoreContract {
 
         for (uint i = 0; i < _puppetListLength; i++) {
             address _puppet = _puppetList[i];
-            uint _puppetAllocation = allocationPuppetMap[_allocationKey][_puppet];
+            uint _puppetAllocation = allocationPuppetMap[_allocationAddress][_puppet];
 
             if (_puppetAllocation == 0) continue;
 
@@ -353,7 +362,7 @@ contract MirrorPosition is CoreContract {
                 _nextBalanceList[i] -= _executionFee;
                 _remainingKeeperFeeToCollect -= _executionFee;
             } else {
-                allocationPuppetMap[_allocationKey][_puppet] =
+                allocationPuppetMap[_allocationAddress][_puppet] =
                     _puppetAllocation >= _executionFee ? _puppetAllocation - _executionFee : 0;
                 _puppetKeeperExecutionFeeInsolvency += _executionFee;
             }
@@ -623,7 +632,7 @@ contract MirrorPosition is CoreContract {
             uint _distributedTotal = 0;
 
             for (uint i = 0; i < _puppetListLength; i++) {
-                uint _puppetAllocationShare = allocationPuppetMap[_allocationKey][_puppetList[i]];
+                uint _puppetAllocationShare = allocationPuppetMap[_allocationAddress][_puppetList[i]];
                 if (_puppetAllocationShare == 0) continue;
 
                 uint _puppetDistribution = (_distributionAmount * _puppetAllocationShare) / _allocation;

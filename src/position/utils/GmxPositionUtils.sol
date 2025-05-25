@@ -1,9 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.29;
 
+import {IGmxExchangeRouter} from "../interface/IGmxExchangeRouter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+interface IDataStore {
+    function getUint(
+        bytes32 key
+    ) external view returns (uint);
+}
+
 library GmxPositionUtils {
+    bytes32 public constant SIZE_IN_USD_KEY = keccak256(abi.encode("SIZE_IN_USD"));
+    bytes32 public constant COLLATERAL_AMOUNT_KEY = keccak256(abi.encode("COLLATERAL_AMOUNT"));
+
     enum OrderType {
         MarketSwap, // 0
         LimitSwap, // 1
@@ -140,5 +150,13 @@ library GmxPositionUtils {
         bool isLong
     ) internal pure returns (bytes32) {
         return keccak256(abi.encode(account, market, collateralToken, isLong));
+    }
+
+    function getPositionSize(IDataStore dataStore, bytes32 positionKey) external view returns (uint) {
+        return dataStore.getUint(keccak256(abi.encode(positionKey, SIZE_IN_USD_KEY)));
+    }
+
+    function getPositionCollateral(IDataStore dataStore, bytes32 positionKey) external view returns (uint) {
+        return dataStore.getUint(keccak256(abi.encode(positionKey, COLLATERAL_AMOUNT_KEY)));
     }
 }

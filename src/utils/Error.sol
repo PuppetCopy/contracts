@@ -71,6 +71,7 @@ library Error {
     error MirrorPosition__InvalidKeeperExeuctionFeeAmount();
     error MirrorPosition__InvalidKeeperExeuctionFeeReceiver();
     error MirrorPosition__InvalidSizeDelta();
+    error MirrorPosition__GmxTraderPositionNotFound();
     error MirrorPosition__PuppetListEmpty();
     error MirrorPosition__MaxPuppetList();
     error MirrorPosition__InvalidReceiver();
