@@ -27,7 +27,6 @@ contract FeeMarketplaceTest is BasicSetup {
 
         testFundingStore = new TestStore(dictator, tokenRouter);
 
-        vm.startPrank(users.owner);
         feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
         feeMarketplace = new FeeMarketplace(dictator, feeMarketplaceStore, puppetToken);
 
@@ -184,7 +183,7 @@ contract FeeMarketplaceTest is BasicSetup {
         feeMarketplace.deposit(usdc, testFundingStore, 100e6);
 
         vm.startPrank(users.alice);
-        vm.expectRevert(abi.encodeWithSelector(Error.Permission__Unauthorized.selector, users.alice));
+        vm.expectRevert(abi.encodeWithSelector(Error.Permission__Unauthorized.selector));
         feeMarketplace.deposit(usdc, testFundingStore, 100e6);
     }
 

@@ -13,44 +13,26 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {FeeMarketplaceStore} from "./FeeMarketplaceStore.sol";
 
 /**
- * @title Oracle-less Gradual Fee Marketplace
- * @notice Offers various accumulated protocol fee tokens (e.g., stablecoins, ETH) for public purchase
- * using the protocol's native token. Fees deposited by the protocol unlock linearly over time,
- * smoothing availability and mitigating redemption volatility often seen with instant large deposits.
- * This marketplace uniquely operates without external price oracles; fixed redemption rates
- * (`askAmount`) are set administratively, ensuring predictable exchange terms.
+ * @title Fee Marketplace
+ * @notice Publicly offers accumulated protocol fees for purchase in exchange for protocol tokens at fixed prices.
  *
- * @dev This contract facilitates a public market where the protocol effectively offers its accrued fees
- * in exchange for the native protocol token. Anyone providing the required protocol token (via an
- * authorized router) can participate in this exchange. The time-based linear unlocking (`distributionTimeframe`)
- * is a deliberate mechanism to prevent momentary supply shocks and ensure fairer access to fees as
- * they accumulate, rather than allowing immediate capture which could lead to unfavorable slippage.
+ * @dev Core mechanics:
+ * - Fee tokens unlock gradually over time after deposit
+ * - Each fee token has a fixed redemption price (askAmount)
+ * - Price applies to ANY quantity up to available balance
+ * - Public can purchase all unlocked tokens at the posted price
+ * - Protocol tokens received are burned/distributed per configuration
  *
- * @dev Key advantages and characteristics:
- * - **Oracle-less Operation:** By avoiding external price feeds, the system gains simplicity, robustness
- * against oracle manipulation or failure, and predictable gas costs. Exchange rates are deterministic
- * based on protocol governance (`setAskPrice`) rather than volatile market data.
- * - **Volatility Mitigation:** The gradual release of fees prevents scenarios where large, sudden fee
- * deposits can be instantly acquired, potentially destabilizing redemption dynamics or enabling arbitrage
- * solely based on deposit timing.
- * - **Fixed, Predictable Rates:** Participants (including bots or arbitrageurs) know exactly how much
- * protocol token is required per unit of fee token (`askAmount`), simplifying the redemption logic.
- * - **Controlled Interaction:** While offering fees publicly, the core redemption function (`acceptOffer`)
- * typically requires calls from authorized router contracts (`auth` modifier). This allows for protocol-level
- * checks or features before executing the redemption. Participants grant `protocolToken` approval to the
- * `FeeMarketplaceStore` to enable these mediated redemptions.
- *
- * @dev Tokenomics (burning/distribution of received protocol tokens) are configurable via `_setConfig`.
+ * @dev Example: If askAmount[USDC] = 1000 and there are 500 USDC unlocked:
+ * - Taker paying 1000 protocol tokens redeems all 500 USDC
+ * - If unlocked balance grows to 2000 USDC, same 1000 tokens now gets 2000 USDC
+ * - Protocol publicly offers all unlocked tokens at this fixed price
  */
 contract FeeMarketplace is CoreContract {
     /**
-     * @dev Marketplace configuration parameters
-     * @param feeDistributor The BankStore contract that receives non-burned protocol tokens
-     *        for distribution as rewards
-     * @param distributionTimeframe Duration in seconds over which new fee deposits
-     *        become fully unlocked (linear release)
-     * @param burnBasisPoints Percentage of exchanged protocol tokens to burn, expressed in
-     *        basis points (100 = 1%, 10000 = 100%)
+     * @param feeDistributor Receives non-burned protocol tokens
+     * @param distributionTimeframe Unlock duration for deposits (seconds)
+     * @param burnBasisPoints Protocol tokens to burn (basis points: 100 = 1%)
      */
     struct Config {
         BankStore feeDistributor;
@@ -58,22 +40,22 @@ contract FeeMarketplace is CoreContract {
         uint burnBasisPoints;
     }
 
-    /// @notice Store contract that holds the fee tokens
+    /// @notice Holds fee tokens
     FeeMarketplaceStore public immutable store;
 
-    /// @notice The protocol's native governance token used for redemptions
+    /// @notice Protocol token used for purchases
     PuppetToken public immutable protocolToken;
 
-    /// @notice Maps fee tokens to their redemption cost in protocol tokens
+    /// @notice Fixed price to redeem any amount of each fee token
     mapping(IERC20 => uint) public askAmount;
 
-    /// @notice Maps fee tokens to their unlocked (available) balance
+    /// @notice Currently unlocked balance per fee token
     mapping(IERC20 => uint) public accruedFee;
 
-    /// @notice Tracks the last time unlocked balances were calculated for each fee token
+    /// @notice Last unlock calculation timestamp per fee token
     mapping(IERC20 => uint) public lastDistributionTimestamp;
 
-    /// @notice Current marketplace configuration parameters
+    /// @notice Current marketplace settings
     Config public config;
 
     constructor(
@@ -155,11 +137,11 @@ contract FeeMarketplace is CoreContract {
         uint _distributeAmount = _currentAskAmount;
         uint _burnAmount;
 
-        // Burn the designated portion of protocol tokens.
+        store.transferIn(protocolToken, _depositor, _currentAskAmount);
 
+        // Burn the designated portion of protocol tokens.
         if (config.burnBasisPoints > 0) {
             _burnAmount = Precision.applyBasisPoints(config.burnBasisPoints, _currentAskAmount);
-            store.transferIn(protocolToken, _depositor, _currentAskAmount);
             store.burn(_burnAmount);
             _distributeAmount -= _burnAmount;
         }
@@ -179,9 +161,10 @@ contract FeeMarketplace is CoreContract {
     }
 
     /**
-     * @notice Sets the redemption cost (price in protocol tokens) for a fee token.
+     * @notice Sets the fixed redemption price for a fee token.
+     * @dev This sets the total protocol token cost required to redeem ANY amount of unlocked fee tokens.
      * @param _feeToken The fee token.
-     * @param _amount The new cost in protocol tokens.
+     * @param _amount The fixed price in protocol tokens (not per-unit).
      */
     function setAskPrice(IERC20 _feeToken, uint _amount) external auth {
         askAmount[_feeToken] = _amount;
