@@ -4,21 +4,23 @@
   "packageManager": "bun@1.2.12",
   "scripts": {
     "test": "forge test --match-contract TradingTest -vvvvv",
-    "test:target": "bun run test --match-test testSizeAdjustmentsMatchMirrorPositionLogic",
+    "test:target": "bun run test --match-test testPositionSettlementWithLoss",
     "test:prod": "FOUNDRY_PROFILE=prod bun run test",
-    "test:fork": "forge test --chain arbitrum --match-contract TradingTest -vvvvv --fork-block-number 192315592 --fork-url=$ARBITRUM_RPC_URL",
+    "test:fork": "forge test --chain arbitrum --match-contract TradingTest -vvvvv --fork-block-number 192315592 --fork-url=arbitrum",
     "build": "forge build --sizes",
     "build:prod": "FOUNDRY_PROFILE=prod forge build --sizes",
-    "deploy": "FOUNDRY_PROFILE=prod SCRIPT='DeployPosition' bun deploy.ts",
+    "script:deploy": "FOUNDRY_PROFILE=prod SCRIPT='DeployPosition' bun deploy.ts",
+    "script:updateRouter": "FOUNDRY_PROFILE=prod forge script script/UpdateRouter.s.sol:UpdateRouter --broadcast --verify --rpc-url arbitrum -- --vvvvv",
     "docgen": "forge doc --out '.docgen' --build",
     "gas-report": "forge test --match-contract TradingTest --gas-report",
     "lint:sol": "forge fmt --check",
     "lint:fmt": "forge fmt"
   },
-  "private": true,
-  "sideEffects": false,
+  "files": [
+    "src",
+    "deployments.json"
+  ],
   "devDependencies": {
-    "@aragon/osx": "1.4.0",
     "@balancer-labs/v2-interfaces": "0.4.0",
     "@openzeppelin/contracts": "5.3.0",
     "@uniswap/v3-core": "1.0.1",

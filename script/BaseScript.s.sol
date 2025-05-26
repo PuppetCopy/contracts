@@ -9,7 +9,7 @@ import {Const} from "./Const.sol";
 abstract contract BaseScript is Script {
     address DEPLOYER_ADDRESS = vm.envAddress("DEPLOYER_ADDRESS");
     uint DEPLOYER_PRIVATE_KEY = vm.envUint("DEPLOYER_PRIVATE_KEY");
-    string ADDRESSES = vm.readFile(string.concat(vm.projectRoot(), "/deployments/addresses.json"));
+    string ADDRESSES = vm.readFile(string.concat(vm.projectRoot(), "/deployments.json"));
 
     function getDeployedAddress(
         string memory name

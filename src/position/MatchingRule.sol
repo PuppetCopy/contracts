@@ -18,8 +18,6 @@ contract MatchingRule is CoreContract {
     }
 
     struct Config {
-        IERC20[] tokenAllowanceList;
-        uint[] tokenAllowanceCapList;
         uint minExpiryDuration;
         uint minAllowanceRate;
         uint maxAllowanceRate;
@@ -28,6 +26,7 @@ contract MatchingRule is CoreContract {
     }
 
     Config public config;
+    IERC20[] public tokenAllowanceList;
 
     mapping(IERC20 token => uint) tokenAllowanceCapMap;
     mapping(bytes32 traderMatchingKey => mapping(address puppet => Rule)) public matchingRuleMap;
@@ -116,28 +115,41 @@ contract MatchingRule is CoreContract {
         _logEvent("SetMatchingRule", abi.encode(_collateralToken, _traderMatchingKey, _user, _trader, _ruleParams));
     }
 
+    function setTokenAllowanceList(
+        IERC20[] calldata _tokenAllowanceList,
+        uint[] calldata _tokenDustThresholdCapList
+    ) external auth {
+        require(_tokenAllowanceList.length == _tokenDustThresholdCapList.length, "Invalid token dust threshold list");
+
+        for (uint i = 0; i < tokenAllowanceList.length; i++) {
+            delete tokenAllowanceCapMap[tokenAllowanceList[i]];
+        }
+
+        for (uint i = 0; i < _tokenAllowanceList.length; i++) {
+            IERC20 _token = _tokenAllowanceList[i];
+            uint _cap = _tokenDustThresholdCapList[i];
+
+            require(_cap > 0, "Invalid token allowance cap");
+            require(address(_token) != address(0), "Invalid token address");
+
+            tokenAllowanceCapMap[_token] = _cap;
+        }
+
+        tokenAllowanceList = _tokenAllowanceList;
+    }
+
     /// @notice  Sets the configuration parameters via governance
     /// @param _data The encoded configuration data
     /// @dev Emits a SetConfig event upon successful execution
     function _setConfig(
         bytes calldata _data
     ) internal override {
-        for (uint i; i < config.tokenAllowanceList.length; i++) {
-            delete tokenAllowanceCapMap[config.tokenAllowanceList[i]];
-        }
-
         config = abi.decode(_data, (Config));
 
-        require(config.tokenAllowanceList.length == config.tokenAllowanceCapList.length, "Invalid token allowance list");
-        require(config.tokenAllowanceList.length > 0, "Empty token allowance list");
         require(config.minExpiryDuration > 0, "Invalid min expiry duration");
         require(config.minAllowanceRate > 0, "Invalid min allowance rate");
         require(config.maxAllowanceRate > config.minAllowanceRate, "Invalid max allowance rate");
         require(config.minActivityThrottle > 0, "Invalid min activity throttle");
         require(config.maxActivityThrottle > config.minActivityThrottle, "Invalid max activity throttle");
-
-        for (uint i; i < config.tokenAllowanceList.length; i++) {
-            tokenAllowanceCapMap[config.tokenAllowanceList[i]] = config.tokenAllowanceCapList[i];
-        }
     }
 }

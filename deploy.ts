@@ -4,6 +4,11 @@ import { createPublicClient, http } from 'viem'
 console.log('Running deployment script...')
 
 const rpcUrl = process.env.ARBITRUM_RPC_URL
+
+if (!rpcUrl) {
+  throw new Error('Missing environment variable: ARBITRUM_RPC_URL')
+}
+
 // Create a Viem client
 const client = createPublicClient({
   transport: http(rpcUrl)
@@ -49,14 +54,12 @@ console.log(`Deploying ${chainId}:${scriptName} with RPC_URL ${rpcUrl}`)
 
 await $`forge script \
   script/${scriptFile}:${scriptName} \
-  --slow \
   --broadcast \
   --verify \
-  --resume \
   -vvvv \
   --rpc-url ${rpcUrl}`
 
-const deploymentsFilePath = './deployments/addresses.json'
+const deploymentsFilePath = './deployments.json'
 const deploymentsFile = file(deploymentsFilePath)
 const deployments = (await deploymentsFile.exists())
   ? await deploymentsFile.json()

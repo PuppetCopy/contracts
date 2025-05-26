@@ -5,7 +5,7 @@ import {Error} from "../utils/Error.sol";
 import {Access} from "./../utils/auth/Access.sol";
 
 /**
- * @title Subaccount
+ * @title AllocationAccount
  * @author Puppet Protocol
  * @notice A minimal proxy contract that enables identity-preserving delegated execution
  * @dev This contract has been directed to work with EIP-1167 minimal proxies.
@@ -37,8 +37,15 @@ contract AllocationAccount {
         address _contract,
         bytes calldata _data
     ) external payable returns (bool _success, bytes memory _returnData) {
-        require(store.canCall(msg.sender), Error.Subaccount__UnauthorizedOperator());
+        require(store.canCall(msg.sender), Error.AllocationAccount__UnauthorizedOperator());
 
         return _contract.call{value: msg.value, gas: gasleft()}(_data);
+    }
+
+    function recoverETH(address payable _to, uint _amount) external returns (bool _success, bytes memory _returnData) {
+        require(store.canCall(msg.sender), Error.AllocationAccount__UnauthorizedOperator());
+        require(_amount <= address(this).balance, Error.AllocationAccount__InsufficientBalance());
+
+        return _to.call{value: _amount}("");
     }
 }

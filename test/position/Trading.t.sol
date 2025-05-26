@@ -77,17 +77,20 @@ contract TradingTest is BasicSetup {
         require(address(mirrorPosition) == address(matchingRule.mirrorPosition()), "MirrorPosition address mismatch");
 
         dictator.setAccess(tokenRouter, address(allocationStore));
+        dictator.setAccess(tokenRouter, address(feeMarketplaceStore));
+
         dictator.setAccess(allocationStore, address(matchingRule));
         dictator.setAccess(allocationStore, address(mirrorPosition));
         dictator.setAccess(allocationStore, address(feeMarketplace));
+        dictator.setAccess(allocationStore, address(feeMarketplaceStore));
+        dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
 
         // mirrorPosition permissions (owner for most actions in tests)
         dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, users.owner);
-        dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, users.owner); // Added adjust
-            // permission
+        dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, users.owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, users.owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.collectDust.selector, users.owner);
-        dictator.setPermission(mirrorPosition, mirrorPosition.setTokenDustThreshold.selector, users.owner);
+        dictator.setPermission(mirrorPosition, mirrorPosition.setTokenDustThresholdList.selector, users.owner);
         dictator.setPermission(
             mirrorPosition,
             mirrorPosition.initializeTraderActivityThrottle.selector,
@@ -99,24 +102,15 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
         dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, users.owner);
         dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, users.owner);
-        dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
-        dictator.setAccess(allocationStore, address(feeMarketplaceStore));
-        dictator.setAccess(tokenRouter, address(feeMarketplaceStore));
 
         dictator.setPermission(matchingRule, matchingRule.setRule.selector, users.owner);
         dictator.setPermission(matchingRule, matchingRule.deposit.selector, users.owner);
+        dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, users.owner);
 
         // Config
         IERC20[] memory allowedTokenList = new IERC20[](2);
         allowedTokenList[0] = wnt;
         allowedTokenList[1] = usdc;
-        uint[] memory tokenAllowanceCapAmountList = new uint[](2);
-        tokenAllowanceCapAmountList[0] = 0.2e18;
-        tokenAllowanceCapAmountList[1] = 500e30;
-
-        uint[] memory tokenDustThresholdCapList = new uint[](2);
-        tokenDustThresholdCapList[0] = 0.01e18;
-        tokenDustThresholdCapList[1] = 1e6;
 
         // Configure contracts
         dictator.initContract(
@@ -127,12 +121,15 @@ contract TradingTest is BasicSetup {
                     minAllowanceRate: 100, // 1 basis points = 1%
                     maxAllowanceRate: 10000, // 100%
                     minActivityThrottle: 1 hours,
-                    maxActivityThrottle: 30 days,
-                    tokenAllowanceList: allowedTokenList,
-                    tokenAllowanceCapList: tokenAllowanceCapAmountList
+                    maxActivityThrottle: 30 days
                 })
             )
         );
+
+        uint[] memory tokenAllowanceCapAmountList = new uint[](2);
+        tokenAllowanceCapAmountList[0] = 0.2e18;
+        tokenAllowanceCapAmountList[1] = 500e30;
+        matchingRule.setTokenAllowanceList(allowedTokenList, tokenAllowanceCapAmountList);
 
         dictator.initContract(
             feeMarketplace,
@@ -164,7 +161,10 @@ contract TradingTest is BasicSetup {
             )
         );
 
-        mirrorPosition.setTokenDustThreshold(allowedTokenList, tokenDustThresholdCapList);
+        uint[] memory tokenDustThresholdCapList = new uint[](2);
+        tokenDustThresholdCapList[0] = 0.01e18;
+        tokenDustThresholdCapList[1] = 1e6;
+        mirrorPosition.setTokenDustThresholdList(allowedTokenList, tokenDustThresholdCapList);
         feeMarketplace.setAskPrice(usdc, 100e18);
 
         // Pre-approve token allowances

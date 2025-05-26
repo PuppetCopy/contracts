@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.29;
 
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -22,7 +24,6 @@ import {PositionUtils} from "./utils/PositionUtils.sol";
 
 contract MirrorPosition is CoreContract {
     struct Config {
-        IDataStore gmxDatastore;
         IGmxExchangeRouter gmxExchangeRouter;
         address callbackHandler;
         address gmxOrderVault;
@@ -76,22 +77,35 @@ contract MirrorPosition is CoreContract {
     }
 
     Config public config;
-    IERC20[] tokenDustThresholdList;
-    uint[] tokenDustThresholdCapList;
+    IERC20[] public tokenDustThresholdList;
 
     AllocationStore public immutable allocationStore;
     MatchingRule public immutable matchingRule;
-    FeeMarketplace public immutable feeMarket;
+    FeeMarketplace public immutable feeMarketplace;
     address public immutable allocationStoreImplementation;
 
     uint public nextAllocationId = 0;
 
     mapping(bytes32 traderMatchingKey => mapping(address puppet => uint)) public lastActivityThrottleMap;
     mapping(address allocationAddress => mapping(address puppet => uint)) public allocationPuppetMap;
-    mapping(address allocationAddress => uint) public allocationMap; // used as a denominator
+    mapping(address allocationAddress => uint) public allocationMap;
     mapping(address allocationAddress => Position) public positionMap;
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
     mapping(IERC20 token => uint) public tokenDustThresholdAmountMap;
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor(
+        IAuthority _authority,
+        AllocationStore _puppetStore,
+        MatchingRule _matchingRule,
+        FeeMarketplace _feeMarket
+    ) CoreContract(_authority) {
+        allocationStore = _puppetStore;
+        matchingRule = _matchingRule;
+        feeMarketplace = _feeMarket;
+
+        allocationStoreImplementation = address(new AllocationAccount(allocationStore));
+    }
 
     function getConfig() external view returns (Config memory) {
         return config;
@@ -122,18 +136,6 @@ contract MirrorPosition is CoreContract {
         bytes32 _requestKey
     ) external view returns (RequestAdjustment memory) {
         return requestAdjustmentMap[_requestKey];
-    }
-
-    constructor(
-        IAuthority _authority,
-        AllocationStore _puppetStore,
-        MatchingRule _matchingRule,
-        FeeMarketplace _feeMarket
-    ) CoreContract(_authority) {
-        allocationStore = _puppetStore;
-        matchingRule = _matchingRule;
-        feeMarket = _feeMarket;
-        allocationStoreImplementation = address(new AllocationAccount(allocationStore));
     }
 
     function initializeTraderActivityThrottle(bytes32 _traderMatchingKey, address _puppet) external auth {
@@ -176,14 +178,6 @@ contract MirrorPosition is CoreContract {
         CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth returns (address _allocationAddress, uint _nextAllocationId, bytes32 _requestKey) {
-        bytes32 _traderPositionKey = GmxPositionUtils.getPositionKey(
-            _callParams.trader, _callParams.market, _callParams.collateralToken, _callParams.isLong
-        );
-        require(
-            GmxPositionUtils.getPositionSize(config.gmxDatastore, _traderPositionKey) > 0,
-            Error.MirrorPosition__GmxTraderPositionNotFound()
-        );
-
         uint _puppetListLength = _puppetList.length;
         require(_puppetListLength > 0, Error.MirrorPosition__PuppetListEmpty());
         require(_puppetListLength <= config.maxPuppetList, Error.MirrorPosition__MaxPuppetList());
@@ -612,7 +606,7 @@ contract MirrorPosition is CoreContract {
         uint _platformFeeAmount = 0;
         if (
             config.platformSettleFeeFactor > 0 && _distributionAmount > 0
-                && feeMarket.askAmount(_callParams.distributionToken) > 0
+                && feeMarketplace.askAmount(_callParams.distributionToken) > 0
         ) {
             _platformFeeAmount = Precision.applyFactor(config.platformSettleFeeFactor, _distributionAmount);
 
@@ -621,7 +615,7 @@ contract MirrorPosition is CoreContract {
                     _platformFeeAmount = _distributionAmount;
                 }
                 _distributionAmount -= _platformFeeAmount;
-                feeMarket.deposit(_callParams.distributionToken, allocationStore, _platformFeeAmount);
+                feeMarketplace.deposit(_callParams.distributionToken, allocationStore, _platformFeeAmount);
             }
         }
 
@@ -733,22 +727,29 @@ contract MirrorPosition is CoreContract {
         require(gmxRequestKey != bytes32(0), Error.MirrorPosition__OrderCreationFailed());
     }
 
-    function setTokenDustThreshold(
+    function setTokenDustThresholdList(
         IERC20[] calldata _tokenDustThresholdList,
         uint[] calldata _tokenDustThresholdCapList
     ) external auth {
-        for (uint i = 0; i < tokenDustThresholdList.length; i++) {
-            delete tokenDustThresholdAmountMap[tokenDustThresholdList[i]];
-        }
-
-        require(_tokenDustThresholdList.length > 0, "Invalid token dust threshold list");
         require(
             _tokenDustThresholdList.length == _tokenDustThresholdCapList.length, "Invalid token dust threshold list"
         );
 
-        for (uint i = 0; i < _tokenDustThresholdList.length; i++) {
-            tokenDustThresholdAmountMap[_tokenDustThresholdList[i]] = _tokenDustThresholdCapList[i];
+        for (uint i = 0; i < tokenDustThresholdList.length; i++) {
+            delete tokenDustThresholdAmountMap[tokenDustThresholdList[i]];
         }
+
+        for (uint i = 0; i < _tokenDustThresholdList.length; i++) {
+            IERC20 _token = _tokenDustThresholdList[i];
+            uint _cap = _tokenDustThresholdCapList[i];
+
+            require(_cap > 0, "Invalid token dust threshold cap");
+            require(address(_token) != address(0), "Invalid token address");
+
+            tokenDustThresholdAmountMap[_token] = _cap;
+        }
+
+        tokenDustThresholdList = _tokenDustThresholdList;
 
         _logEvent("SetTokenDustThreshold", abi.encode(_tokenDustThresholdList, _tokenDustThresholdCapList));
     }

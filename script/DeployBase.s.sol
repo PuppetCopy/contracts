@@ -24,6 +24,8 @@ contract DeployBase is BaseScript {
         new PuppetToken();
         // new PuppetVoteToken(dictatorship);
         new TokenRouter(dictatorship, 200_000);
-        new RouterProxy(dictatorship);
+        RouterProxy routerProxy = new RouterProxy(dictatorship);
+
+        dictatorship.setAccess(routerProxy, Const.dao);
     }
 }
