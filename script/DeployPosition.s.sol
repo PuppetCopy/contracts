@@ -40,7 +40,7 @@ contract DeployPosition is BaseScript {
         FeeMarketplaceStore feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
         FeeMarketplace feeMarketplace = new FeeMarketplace(dictator, feeMarketplaceStore, puppetToken);
         MirrorPosition mirrorPosition =
-            new MirrorPosition(dictator, allocationStore, MatchingRule(getNextCreateAddress(2)), feeMarketplace);
+            new MirrorPosition(dictator, allocationStore, MatchingRule(getNextCreateAddress(1)), feeMarketplace);
 
         MatchingRule matchingRule = new MatchingRule(dictator, allocationStore, mirrorPosition);
         GmxExecutionCallback gmxCallbackHandler = new GmxExecutionCallback(dictator, mirrorPosition);
@@ -160,15 +160,10 @@ contract DeployPosition is BaseScript {
         console.log("Router implementation deployed at:", address(newRouter));
 
         console.log("Seeding MatchingRule with initial rules...");
-        matchingRule.setRule(
+        Router(address(routerProxy)).setMatchingRule(
             IERC20(Const.usdc),
             DEPLOYER_ADDRESS,
-            DEPLOYER_ADDRESS,
-            MatchingRule.Rule({
-                allowanceRate: 1000, // Example value
-                throttleActivity: 500, // Example value
-                expiry: block.timestamp + 30 days // Example expiry
-            })
+            MatchingRule.Rule({allowanceRate: 1000, throttleActivity: 1 hours, expiry: block.timestamp + 30 days})
         );
     }
 }

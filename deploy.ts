@@ -56,6 +56,7 @@ await $`forge script \
   script/${scriptFile}:${scriptName} \
   --broadcast \
   --verify \
+  --resume \
   -vvvv \
   --rpc-url ${rpcUrl}`
 

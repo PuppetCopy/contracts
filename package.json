@@ -17,8 +17,8 @@
     "lint:fmt": "forge fmt"
   },
   "files": [
-    "src",
-    "deployments.json"
+    "./src",
+    "./deployments.json"
   ],
   "devDependencies": {
     "@balancer-labs/v2-interfaces": "0.4.0",
