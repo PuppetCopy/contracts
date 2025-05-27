@@ -5,8 +5,7 @@
   "scripts": {
     "test": "forge test --match-contract TradingTest -vvvvv",
     "test:target": "bun run test --match-test testPositionSettlementWithLoss",
-    "test:prod": "FOUNDRY_PROFILE=prod bun run test",
-    "test:fork": "forge test --chain arbitrum --match-contract TradingTest -vvvvv --fork-block-number 192315592 --fork-url=arbitrum",
+    "test:fork": "forge test --match-contract TradingForkTest -vvvvv --fork-url=arbitrum",
     "build": "forge build --sizes",
     "build:prod": "FOUNDRY_PROFILE=prod forge build --sizes",
     "script:deploy": "FOUNDRY_PROFILE=prod SCRIPT='DeployPosition' bun deploy.ts",
@@ -25,6 +24,7 @@
     "@openzeppelin/contracts": "5.3.0",
     "@uniswap/v3-core": "1.0.1",
     "@zeframlou/create3-factory": "github:zeframlou/create3-factory#main",
+    "@gmx": "github:gmx-io/gmx-synthetics#main",
     "dotenv": "16.5.0",
     "forge-std": "github:foundry-rs/forge-std#v1.9.7",
     "viem": "2.30.1"

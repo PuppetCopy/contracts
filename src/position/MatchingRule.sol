@@ -56,7 +56,7 @@ contract MatchingRule is CoreContract {
         mirrorPosition = _mirrorPosition;
     }
 
-    function deposit(IERC20 _collateralToken, address _user, uint _amount) external auth {
+    function deposit(IERC20 _collateralToken, address _depositor, address _user, uint _amount) external auth {
         require(_amount > 0, Error.MatchingRule__InvalidAmount());
 
         uint allowanceCap = tokenAllowanceCapMap[_collateralToken];
@@ -65,10 +65,10 @@ contract MatchingRule is CoreContract {
         uint nextBalance = allocationStore.userBalanceMap(_collateralToken, _user) + _amount;
         require(nextBalance <= allowanceCap, Error.MatchingRule__AllowanceAboveLimit(allowanceCap));
 
-        allocationStore.transferIn(_collateralToken, _user, _amount);
+        allocationStore.transferIn(_collateralToken, _depositor, _amount);
         allocationStore.setUserBalance(_collateralToken, _user, nextBalance);
 
-        _logEvent("Deposit", abi.encode(_collateralToken, _user, nextBalance, _amount));
+        _logEvent("Deposit", abi.encode(_collateralToken, _depositor, _user, nextBalance, _amount));
     }
 
     function withdraw(IERC20 _collateralToken, address _user, address _receiver, uint _amount) external auth {

@@ -22,7 +22,7 @@ contract Router is ReentrancyGuardTransient {
      * @param amount The amount being deposited.
      */
     function deposit(IERC20 token, uint amount) external nonReentrant {
-        matchingRule.deposit(token, msg.sender, amount);
+        matchingRule.deposit(token, msg.sender, msg.sender, amount);
     }
 
     /**

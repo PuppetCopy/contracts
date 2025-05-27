@@ -19,7 +19,7 @@ import {ErrorUtils} from "./../utils/ErrorUtils.sol";
 import {Precision} from "./../utils/Precision.sol";
 import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
 import {AllocationAccountUtils} from "./utils/AllocationAccountUtils.sol";
-import {GmxPositionUtils, IDataStore} from "./utils/GmxPositionUtils.sol";
+import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
 contract MirrorPosition is CoreContract {

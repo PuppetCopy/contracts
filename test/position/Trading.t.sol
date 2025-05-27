@@ -694,7 +694,7 @@ contract TradingTest is BasicSetup {
         collateralToken.approve(address(tokenRouter), type(uint).max);
 
         vm.startPrank(users.owner);
-        matchingRule.deposit(collateralToken, user, fundValue);
+        matchingRule.deposit(collateralToken, user, user, fundValue);
 
         matchingRule.setRule(
             collateralToken,

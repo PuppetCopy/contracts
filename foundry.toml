@@ -14,7 +14,8 @@
   build_info = true
   optimizer = true
   optimizer_runs = 200
-  verbosity = 4
+  verbosity = 5
+  decode_internal = true
 
 [doc]
   ignore = ["**/interface/**/*.sol", "**/utils/**/*.sol", "**/shared/**/*.sol"]
@@ -43,7 +44,7 @@
 
 [rpc_endpoints]
   localhost = "http://localhost:8545"
-  arbitrum = "${ARBITRUM_RPC_URL}"
+  arbitrum = "${RPC_URL}"
 
 [etherscan]
-  arbitrum = { key = "${ARBISCAN_API_KEY}", chain = 42161 }
+  arbitrum = { key = "${ETHERSCAN_API_KEY}", chain = 42161 }

@@ -3,10 +3,10 @@ import { createPublicClient, http } from 'viem'
 
 console.log('Running deployment script...')
 
-const rpcUrl = process.env.ARBITRUM_RPC_URL
+const rpcUrl = process.env.RPC_URL
 
 if (!rpcUrl) {
-  throw new Error('Missing environment variable: ARBITRUM_RPC_URL')
+  throw new Error('Missing environment variable: RPC_URL')
 }
 
 // Create a Viem client
