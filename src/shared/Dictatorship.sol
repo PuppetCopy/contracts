@@ -107,24 +107,31 @@ contract Dictatorship is Ownable, IAuthority {
     function initContract(
         CoreContract _target
     ) public onlyOwner {
+        require(address(_target) != address(0), Error.Dictatorship__InvalidTargetAddress());
+
         address targetAddress = address(_target);
         require(!contractAccessRegistry[targetAddress], Error.Dictatorship__ContractAlreadyInitialized());
 
         contractAccessRegistry[targetAddress] = true;
         emit AddContractAccess(targetAddress);
 
-        bytes memory _intialConfig = _target.getInitConfig();
+        bytes memory _initialConfig = _target.getInitConfig(); // Fixed typo
 
-        _setConfig(_target, _intialConfig);
+        // Only set config if there is initial configuration
+        if (_initialConfig.length > 0) {
+            _setConfig(_target, _initialConfig);
+        }
     }
 
     /// @notice Pushes a configuration update to a registered CoreContract.
     /// @param _target The CoreContract instance to configure.
     /// @param _config The ABI-encoded configuration data.
     function setConfig(CoreContract _target, bytes calldata _config) public onlyOwner {
-        address targetAddress = address(_target);
+        require(address(_target) != address(0), Error.Dictatorship__InvalidTargetAddress());
+        require(_config.length > 0, Error.Dictatorship__EmptyConfiguration());
 
-        require(contractAccessRegistry[targetAddress], Error.Dictatorship__ContractNotInitialized());
+        address targetAddress = address(_target);
+        require(contractAccessRegistry[targetAddress], Error.Dictatorship__ContractNotRegistered());
 
         _setConfig(_target, _config);
     }
@@ -134,8 +141,10 @@ contract Dictatorship is Ownable, IAuthority {
     function removeContract(
         CoreContract _target
     ) public onlyOwner {
+        require(address(_target) != address(0), Error.Dictatorship__InvalidTargetAddress());
+
         address targetAddress = address(_target);
-        require(contractAccessRegistry[targetAddress], Error.Dictatorship__ContractNotInitialized());
+        require(contractAccessRegistry[targetAddress], Error.Dictatorship__ContractNotRegistered());
 
         contractAccessRegistry[targetAddress] = false;
         emit RemoveContractAccess(targetAddress);
@@ -144,7 +153,7 @@ contract Dictatorship is Ownable, IAuthority {
     /// @dev Internal function to perform the setConfig call on the target contract.
     function _setConfig(CoreContract _target, bytes memory _config) internal {
         require(_config.length > 0, Error.Dictatorship__CoreContractInitConfigNotSet());
-        
+
         // Add try-catch for config validation
         try _target.setConfig(_config) {
             emit SetConfig(address(_target), _config);

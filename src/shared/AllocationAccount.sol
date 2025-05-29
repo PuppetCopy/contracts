@@ -40,6 +40,7 @@ contract AllocationAccount {
         uint _ethAmount
     ) public payable returns (bool _success, bytes memory _returnData) {
         require(store.canCall(msg.sender), Error.AllocationAccount__UnauthorizedOperator());
+        require(address(this).balance >= _ethAmount, Error.AllocationAccount__InsufficientBalance());
 
         return _contract.call{value: _ethAmount, gas: gasleft()}(_data);
     }

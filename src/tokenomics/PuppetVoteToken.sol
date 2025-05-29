@@ -28,12 +28,12 @@ contract PuppetVoteToken is Permission, ERC20Votes, ERC165 {
 
     /// @notice Transfers are unsupported in this contract.
     function transfer(address, uint) public pure override returns (bool) {
-        revert Error.VotingEscrow__Unsupported();
+        revert Error.PuppetVoteToken__Unsupported();
     }
 
     /// @notice TransferFrom is unsupported in this contract.
     function transferFrom(address, address, uint) public pure override returns (bool) {
-        revert Error.VotingEscrow__Unsupported();
+        revert Error.PuppetVoteToken__Unsupported();
     }
 
     // Modify the supportsInterface function

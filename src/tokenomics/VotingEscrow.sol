@@ -80,8 +80,8 @@ contract VotingEscrow is CoreContract {
     }
 
     function lock(address depositor, address user, uint amount, uint duration) external auth {
-        require(amount > 0, Error.VotingEscrowLogic__ZeroAmount());
-        require(duration <= MAXTIME, Error.VotingEscrowLogic__ExceedMaxTime());
+        require(amount > 0, Error.VotingEscrow__ZeroAmount());
+        require(duration <= MAXTIME, Error.VotingEscrow__ExceedMaxTime());
 
         uint bonusAmount = getVestedBonus(amount, duration);
 
@@ -107,11 +107,11 @@ contract VotingEscrow is CoreContract {
     }
 
     function claim(address user, address receiver, uint amount) external auth {
-        require(amount > 0, Error.VotingEscrowLogic__ZeroAmount());
+        require(amount > 0, Error.VotingEscrow__ZeroAmount());
 
         Vested memory vested = getVestingCursor(user);
 
-        require(amount <= vested.accrued, Error.VotingEscrowLogic__ExceedingAccruedAmount(vested.accrued));
+        require(amount <= vested.accrued, Error.VotingEscrow__ExceedingAccruedAmount(vested.accrued));
 
         vested.accrued -= amount;
         vestMap[user] = vested;
@@ -127,7 +127,7 @@ contract VotingEscrow is CoreContract {
     }
 
     function _vest(address user, address receiver, uint amount, uint duration) internal {
-        if (amount == 0) revert Error.VotingEscrowLogic__ZeroAmount();
+        if (amount == 0) revert Error.VotingEscrow__ZeroAmount();
 
         Vested memory vested = getVestingCursor(user);
         uint amountNext = vested.amount + amount;

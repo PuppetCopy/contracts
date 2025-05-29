@@ -17,18 +17,19 @@ library Error {
 
     event TransferUtils__TokenTransferReverted(string reason, bytes returndata);
 
-    error Dictatorship__ContractNotInitialized();
     error Dictatorship__ContractNotRegistered();
     error Dictatorship__ContractAlreadyInitialized();
     error Dictatorship__CoreContractInitConfigNotSet();
     error Dictatorship__InvalidUserAddress();
     error Dictatorship__ConfigurationUpdateFailed();
+    error Dictatorship__InvalidTargetAddress();
+    error Dictatorship__EmptyConfiguration();
 
     error Permission__InvalidFunctionSignature();
 
     error BankStore__InsufficientBalance();
 
-    error VotingEscrow__Unsupported();
+    error PuppetVoteToken__Unsupported();
 
     error CoreContract__Unauthorized(string contractName, string version);
     error CoreContract__ConfigurationNotSet();
@@ -36,16 +37,15 @@ library Error {
     error RewardDistributor__InvalidAmount();
     error RewardDistributor__InsufficientRewards(uint accured);
 
-    error VotingEscrowLogic__ZeroAmount();
-    error VotingEscrowLogic__ExceedMaxTime();
-    error VotingEscrowLogic__ExceedingAccruedAmount(uint accured);
+    error VotingEscrow__ZeroAmount();
+    error VotingEscrow__ExceedMaxTime();
+    error VotingEscrow__ExceedingAccruedAmount(uint accured);
 
     error Access__CallerNotAuthority();
     error Access__Unauthorized();
+
     error Permission__Unauthorized();
     error Permission__CallerNotAuthority();
-
-    error Store__InvalidLength();
 
     error PuppetStore__OverwriteAllocation();
 
@@ -55,9 +55,8 @@ library Error {
     error MatchingRule__InvalidAmount();
     error MatchingRule__InsufficientBalance();
     error MatchingRule__InvalidActivityThrottle(uint minAllocationActivity, uint maxAllocationActivity);
-    error MatchingRule__InvalidExpiryDuration(uint minExpiryDuration);
-
     error MirrorPosition__InvalidAllocation();
+    error MatchingRule__InvalidExpiryDuration(uint minExpiryDuration);
     error MirrorPosition__InvalidAllocationOrFullyReduced();
     error MirrorPosition__InvalidCollateralDelta();
     error MirrorPosition__InvalidCurrentLeverage();
@@ -83,12 +82,11 @@ library Error {
     error MirrorPosition__InsufficientGmxExecutionFee();
     error MirrorPosition__KeeperAdjustmentExecutionFeeExceedsAllocatedAmount();
     error MirrorPosition__KeeperFeeExceedsCostFactor();
+    error MirrorPosition__OrderCreationFailed();
+    error MirrorPosition__SettlementTransferFailed();
     error MirrorPosition__KeeperExecutionFeeNotFullyCovered();
     error MirrorPosition__PaymasterExecutionFeeNotFullyCovered(uint remaining);
     error MirrorPosition__NoNetFundsAllocated();
-
-    error MirrorPosition__OrderCreationFailed();
-    error MirrorPosition__SettlementTransferFailed();
 
     error GmxExecutionCallback__InvalidOrderType(GmxPositionUtils.OrderType orderType);
 
