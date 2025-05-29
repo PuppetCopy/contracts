@@ -69,12 +69,45 @@ contract TradingTest is BasicSetup {
 
         mockGmxExchangeRouter = new MockGmxExchangeRouter();
         allocationStore = new AllocationStore(dictator, tokenRouter);
-        matchingRule = new MatchingRule(dictator, allocationStore, MirrorPosition(_getNextContractAddress(3)));
+        matchingRule = new MatchingRule(
+            dictator,
+            allocationStore,
+            MatchingRule.Config({
+                minExpiryDuration: 1 days,
+                minAllowanceRate: 100, // 1 basis points = 1%
+                maxAllowanceRate: 10000, // 100%
+                minActivityThrottle: 1 hours,
+                maxActivityThrottle: 30 days
+            })
+        );
         feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
-        feeMarketplace = new FeeMarketplace(dictator, feeMarketplaceStore, puppetToken);
-        mirrorPosition = new MirrorPosition(dictator, allocationStore, matchingRule, feeMarketplace);
-
-        require(address(mirrorPosition) == address(matchingRule.mirrorPosition()), "MirrorPosition address mismatch");
+        feeMarketplace = new FeeMarketplace(
+            dictator,
+            puppetToken,
+            feeMarketplaceStore,
+            FeeMarketplace.Config({
+                distributionTimeframe: 1 days,
+                burnBasisPoints: 10000,
+                feeDistributor: BankStore(address(0))
+            })
+        );
+        mirrorPosition = new MirrorPosition(
+            dictator,
+            allocationStore,
+            MirrorPosition.Config({
+                gmxExchangeRouter: mockGmxExchangeRouter,
+                callbackHandler: address(this),
+                gmxOrderVault: Const.gmxOrderVault,
+                referralCode: Const.referralCode,
+                increaseCallbackGasLimit: 2_000_000,
+                decreaseCallbackGasLimit: 2_000_000,
+                platformSettleFeeFactor: 0.1e30, // 10%
+                maxPuppetList: 20,
+                maxKeeperFeeToAllocationRatio: 0.1e30, // 10%
+                maxKeeperFeeToAdjustmentRatio: 0.05e30, // 5%
+                maxKeeperFeeToCollectDustRatio: 0.1e30 // 10%
+            })
+        );
 
         dictator.setAccess(tokenRouter, address(allocationStore));
         dictator.setAccess(tokenRouter, address(feeMarketplaceStore));
@@ -85,7 +118,6 @@ contract TradingTest is BasicSetup {
         dictator.setAccess(allocationStore, address(feeMarketplaceStore));
         dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
 
-        // mirrorPosition permissions (owner for most actions in tests)
         dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, users.owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, users.owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, users.owner);
@@ -98,14 +130,18 @@ contract TradingTest is BasicSetup {
         );
         dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, users.owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, users.owner);
+        dictator.initContract(mirrorPosition);
 
         dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
         dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, users.owner);
         dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, users.owner);
+        dictator.initContract(feeMarketplace);
+        feeMarketplace.setAskPrice(usdc, 100e18);
 
         dictator.setPermission(matchingRule, matchingRule.setRule.selector, users.owner);
         dictator.setPermission(matchingRule, matchingRule.deposit.selector, users.owner);
         dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, users.owner);
+        dictator.initContract(matchingRule);
 
         // Config
         IERC20[] memory allowedTokenList = new IERC20[](2);
@@ -113,59 +149,16 @@ contract TradingTest is BasicSetup {
         allowedTokenList[1] = usdc;
 
         // Configure contracts
-        dictator.initContract(
-            matchingRule,
-            abi.encode(
-                MatchingRule.Config({
-                    minExpiryDuration: 1 days,
-                    minAllowanceRate: 100, // 1 basis points = 1%
-                    maxAllowanceRate: 10000, // 100%
-                    minActivityThrottle: 1 hours,
-                    maxActivityThrottle: 30 days
-                })
-            )
-        );
 
         uint[] memory tokenAllowanceCapAmountList = new uint[](2);
         tokenAllowanceCapAmountList[0] = 0.2e18;
         tokenAllowanceCapAmountList[1] = 500e30;
         matchingRule.setTokenAllowanceList(allowedTokenList, tokenAllowanceCapAmountList);
 
-        dictator.initContract(
-            feeMarketplace,
-            abi.encode(
-                FeeMarketplace.Config({
-                    distributionTimeframe: 1 days,
-                    burnBasisPoints: 10000,
-                    feeDistributor: BankStore(address(0))
-                })
-            )
-        );
-
-        dictator.initContract(
-            mirrorPosition,
-            abi.encode(
-                MirrorPosition.Config({
-                    gmxExchangeRouter: mockGmxExchangeRouter,
-                    callbackHandler: address(mirrorPosition), // Self-callback for tests
-                    gmxOrderVault: Const.gmxOrderVault,
-                    referralCode: Const.referralCode,
-                    increaseCallbackGasLimit: 2_000_000,
-                    decreaseCallbackGasLimit: 2_000_000,
-                    platformSettleFeeFactor: 0.1e30, // 10%
-                    maxPuppetList: 20,
-                    maxKeeperFeeToAllocationRatio: 0.1e30, // 10%
-                    maxKeeperFeeToAdjustmentRatio: 0.05e30, // 5%
-                    maxKeeperFeeToCollectDustRatio: 0.1e30 // 10%
-                })
-            )
-        );
-
         uint[] memory tokenDustThresholdCapList = new uint[](2);
         tokenDustThresholdCapList[0] = 0.01e18;
         tokenDustThresholdCapList[1] = 1e6;
         mirrorPosition.setTokenDustThresholdList(allowedTokenList, tokenDustThresholdCapList);
-        feeMarketplace.setAskPrice(usdc, 100e18);
 
         // Pre-approve token allowances
         vm.startPrank(users.alice); // Example user for createPuppet
@@ -192,7 +185,7 @@ contract TradingTest is BasicSetup {
         MirrorPosition.CallPosition memory callIncrease = defaultCallPosition;
 
         (address allocationAddress, uint allocationId, bytes32 increaseRequestKey) =
-            mirrorPosition.requestMirror{value: callIncrease.executionFee}(callIncrease, puppetList);
+            mirrorPosition.requestMirror{value: callIncrease.executionFee}(matchingRule, callIncrease, puppetList);
         assertNotEq(increaseRequestKey, bytes32(0));
         assertNotEq(allocationId, 0);
 
@@ -260,7 +253,7 @@ contract TradingTest is BasicSetup {
         // 5. Settle
         MirrorPosition.CallSettle memory callSettle = defaultCallSettle;
         callSettle.allocationId = allocationId;
-        mirrorPosition.settle(callSettle, puppetList);
+        mirrorPosition.settle(feeMarketplace, callSettle, puppetList);
 
         // --- Recalculate expected balances ---
 
@@ -343,7 +336,7 @@ contract TradingTest is BasicSetup {
         MirrorPosition.CallPosition memory callOpen = defaultCallPosition;
 
         vm.expectRevert(Error.MirrorPosition__MaxPuppetList.selector);
-        mirrorPosition.requestMirror{value: callOpen.executionFee}(callOpen, tooManyPuppets);
+        mirrorPosition.requestMirror{value: callOpen.executionFee}(matchingRule, callOpen, tooManyPuppets);
     }
 
     function testProportionalProfitDistribution() public {
@@ -363,7 +356,7 @@ contract TradingTest is BasicSetup {
 
         MirrorPosition.CallPosition memory callParams = defaultCallPosition;
         (address allocationAddress, uint allocationId, bytes32 requestKey) =
-            mirrorPosition.requestMirror{value: callParams.executionFee}(callParams, puppetList);
+            mirrorPosition.requestMirror{value: callParams.executionFee}(matchingRule, callParams, puppetList);
 
         mirrorPosition.execute(requestKey);
 
@@ -392,7 +385,7 @@ contract TradingTest is BasicSetup {
 
         MirrorPosition.CallSettle memory settleParams = defaultCallSettle;
         settleParams.allocationId = allocationId;
-        mirrorPosition.settle(settleParams, puppetList);
+        mirrorPosition.settle(feeMarketplace, settleParams, puppetList);
 
         uint puppet1ShareOfAdjustFee =
             Math.mulDiv(closeParams.keeperExecutionFee, puppet1Contribution, initialGrossTotalContribution);
@@ -466,7 +459,7 @@ contract TradingTest is BasicSetup {
         MirrorPosition.CallPosition memory callOpen = defaultCallPosition;
 
         (address allocationAddress, uint allocationId, bytes32 openKey) =
-            mirrorPosition.requestMirror{value: callOpen.executionFee}(callOpen, puppetList);
+            mirrorPosition.requestMirror{value: callOpen.executionFee}(matchingRule, callOpen, puppetList);
         assertNotEq(allocationId, 0);
 
         uint puppet1Allocation = mirrorPosition.allocationPuppetMap(allocationAddress, puppet1);
@@ -501,7 +494,7 @@ contract TradingTest is BasicSetup {
 
         MirrorPosition.CallSettle memory callSettle = defaultCallSettle;
         callSettle.allocationId = allocationId;
-        mirrorPosition.settle(callSettle, puppetList);
+        mirrorPosition.settle(feeMarketplace, callSettle, puppetList);
 
         uint puppet1BalanceAfterSettle = allocationStore.userBalanceMap(usdc, puppet1);
         uint puppet2BalanceAfterSettle = allocationStore.userBalanceMap(usdc, puppet2);
@@ -543,7 +536,7 @@ contract TradingTest is BasicSetup {
 
         MirrorPosition.CallPosition memory callOpen = defaultCallPosition;
         (address allocationAddress, uint allocationId, bytes32 openRequestKey) =
-            mirrorPosition.requestMirror{value: callOpen.executionFee}(callOpen, puppetList);
+            mirrorPosition.requestMirror{value: callOpen.executionFee}(matchingRule, callOpen, puppetList);
         mirrorPosition.execute(openRequestKey);
         MirrorPosition.Position memory pos1 = mirrorPosition.getPosition(allocationAddress);
 
@@ -581,7 +574,8 @@ contract TradingTest is BasicSetup {
         address[] memory puppetList = _generatePuppetList(usdc, trader, 2);
 
         MirrorPosition.CallPosition memory callOpen = defaultCallPosition;
-        (address allocationAddress,,) = mirrorPosition.requestMirror{value: callOpen.executionFee}(callOpen, puppetList);
+        (address allocationAddress,,) =
+            mirrorPosition.requestMirror{value: callOpen.executionFee}(matchingRule, callOpen, puppetList);
 
         uint dustAmount = 0.002e6;
         deal(address(usdc), allocationAddress, dustAmount);
@@ -608,13 +602,13 @@ contract TradingTest is BasicSetup {
 
         vm.expectRevert();
         vm.prank(users.bob);
-        mirrorPosition.requestMirror{value: callMirror.executionFee}(callMirror, puppetList);
+        mirrorPosition.requestMirror{value: callMirror.executionFee}(matchingRule, callMirror, puppetList);
         vm.stopPrank();
 
         bytes32 traderMatchingKey = PositionUtils.getTraderMatchingKey(usdc, trader);
         vm.prank(users.owner);
         (address allocationAddress, uint allocationId, bytes32 requestKey) =
-            mirrorPosition.requestMirror{value: callMirror.executionFee}(callMirror, puppetList);
+            mirrorPosition.requestMirror{value: callMirror.executionFee}(matchingRule, callMirror, puppetList);
 
         vm.stopPrank();
 
@@ -653,7 +647,7 @@ contract TradingTest is BasicSetup {
         callSettle.allocationId = allocationId;
         vm.expectRevert();
         vm.prank(users.bob);
-        mirrorPosition.settle(callSettle, puppetList);
+        mirrorPosition.settle(feeMarketplace, callSettle, puppetList);
         vm.stopPrank();
 
         vm.expectRevert();
@@ -697,6 +691,7 @@ contract TradingTest is BasicSetup {
         matchingRule.deposit(collateralToken, user, user, fundValue);
 
         matchingRule.setRule(
+            mirrorPosition,
             collateralToken,
             user,
             trader,

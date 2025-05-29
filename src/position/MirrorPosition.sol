@@ -76,13 +76,11 @@ contract MirrorPosition is CoreContract {
         uint sizeDelta;
     }
 
+    AllocationStore public immutable allocationStore;
+    address public immutable allocationStoreImplementation;
+
     Config public config;
     IERC20[] public tokenDustThresholdList;
-
-    AllocationStore public immutable allocationStore;
-    MatchingRule public immutable matchingRule;
-    FeeMarketplace public immutable feeMarketplace;
-    address public immutable allocationStoreImplementation;
 
     uint public nextAllocationId = 0;
 
@@ -92,20 +90,6 @@ contract MirrorPosition is CoreContract {
     mapping(address allocationAddress => Position) public positionMap;
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
     mapping(IERC20 token => uint) public tokenDustThresholdAmountMap;
-
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor(
-        IAuthority _authority,
-        AllocationStore _puppetStore,
-        MatchingRule _matchingRule,
-        FeeMarketplace _feeMarket
-    ) CoreContract(_authority) {
-        allocationStore = _puppetStore;
-        matchingRule = _matchingRule;
-        feeMarketplace = _feeMarket;
-
-        allocationStoreImplementation = address(new AllocationAccount(allocationStore));
-    }
 
     function getConfig() external view returns (Config memory) {
         return config;
@@ -136,6 +120,17 @@ contract MirrorPosition is CoreContract {
         bytes32 _requestKey
     ) external view returns (RequestAdjustment memory) {
         return requestAdjustmentMap[_requestKey];
+    }
+
+    constructor(
+        IAuthority _authority,
+        AllocationStore _allocationStore,
+        Config memory _config
+    ) CoreContract(_authority) {
+        allocationStore = _allocationStore;
+        allocationStoreImplementation = address(new AllocationAccount(allocationStore));
+
+        _setInitConfig(abi.encode(_config));
     }
 
     function initializeTraderActivityThrottle(bytes32 _traderMatchingKey, address _puppet) external auth {
@@ -175,6 +170,7 @@ contract MirrorPosition is CoreContract {
      * @return _requestKey The unique key returned by GMX identifying the created order request, used for callbacks.
      */
     function requestMirror(
+        MatchingRule _matchingRule,
         CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth returns (address _allocationAddress, uint _nextAllocationId, bytes32 _requestKey) {
@@ -196,7 +192,7 @@ contract MirrorPosition is CoreContract {
         bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _nextAllocationId);
         _allocationAddress = AllocationAccountUtils.cloneDeterministic(allocationStoreImplementation, _allocationKey);
 
-        MatchingRule.Rule[] memory _ruleList = matchingRule.getRuleList(_traderMatchingKey, _puppetList);
+        MatchingRule.Rule[] memory _ruleList = _matchingRule.getRuleList(_traderMatchingKey, _puppetList);
         uint[] memory _nextBalanceList = allocationStore.getBalanceList(_callParams.collateralToken, _puppetList);
         uint _estimatedExecutionFeePerPuppet = _keeperFee / _puppetListLength;
         uint _allocation = 0;
@@ -562,7 +558,11 @@ contract MirrorPosition is CoreContract {
      * @param _callParams Structure containing settlement details (tokens, trader, allocationId, keeperFee).
      * @param _puppetList The list of puppet addresses involved in this specific allocation instance.
      */
-    function settle(CallSettle calldata _callParams, address[] calldata _puppetList) external auth {
+    function settle(
+        FeeMarketplace _feeMarketpalce,
+        CallSettle calldata _callParams,
+        address[] calldata _puppetList
+    ) external auth {
         uint _puppetListLength = _puppetList.length;
         require(_puppetListLength > 0, Error.MirrorPosition__PuppetListEmpty());
         require(_puppetListLength <= config.maxPuppetList, Error.MirrorPosition__MaxPuppetList());
@@ -606,7 +606,7 @@ contract MirrorPosition is CoreContract {
         uint _platformFeeAmount = 0;
         if (
             config.platformSettleFeeFactor > 0 && _distributionAmount > 0
-                && feeMarketplace.askAmount(_callParams.distributionToken) > 0
+                && _feeMarketpalce.askAmount(_callParams.distributionToken) > 0
         ) {
             _platformFeeAmount = Precision.applyFactor(config.platformSettleFeeFactor, _distributionAmount);
 
@@ -615,7 +615,7 @@ contract MirrorPosition is CoreContract {
                     _platformFeeAmount = _distributionAmount;
                 }
                 _distributionAmount -= _platformFeeAmount;
-                feeMarketplace.deposit(_callParams.distributionToken, allocationStore, _platformFeeAmount);
+                _feeMarketpalce.deposit(_callParams.distributionToken, allocationStore, _platformFeeAmount);
             }
         }
 
@@ -715,9 +715,12 @@ contract MirrorPosition is CoreContract {
             })
         );
 
-        (bool success, bytes memory returnData) = AllocationAccount(_allocationAddress).execute{
-            value: _order.executionFee
-        }(address(config.gmxExchangeRouter), gmxCallData);
+        // IERC20 weth = IERC20(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1); // WETH on Arbitrum
+
+        config.gmxExchangeRouter.sendWnt{value: _order.executionFee}(config.gmxOrderVault, _order.executionFee);
+
+        (bool success, bytes memory returnData) =
+            AllocationAccount(_allocationAddress).execute(address(config.gmxExchangeRouter), gmxCallData);
 
         if (!success) {
             ErrorUtils.revertWithParsedMessage(returnData);
@@ -758,20 +761,22 @@ contract MirrorPosition is CoreContract {
     /// @param _data The encoded configuration data
     /// @dev Emits a SetConfig event upon successful execution
     function _setConfig(
-        bytes calldata _data
+        bytes memory _data
     ) internal override {
-        config = abi.decode(_data, (Config));
+        Config memory _config = abi.decode(_data, (Config));
 
-        require(config.gmxExchangeRouter != IGmxExchangeRouter(address(0)), "Invalid GMX Router address");
-        require(config.callbackHandler != address(0), "Invalid Callback Handler address");
-        require(config.gmxOrderVault != address(0), "Invalid GMX Order Vault address");
-        require(config.referralCode != bytes32(0), "Invalid Referral Code");
-        require(config.maxPuppetList > 0, "Invalid Max Puppet List");
-        require(config.increaseCallbackGasLimit > 0, "Invalid Increase Callback Gas Limit");
-        require(config.decreaseCallbackGasLimit > 0, "Invalid Decrease Callback Gas Limit");
-        require(config.platformSettleFeeFactor > 0, "Invalid Platform Settle Fee Factor");
-        require(config.maxKeeperFeeToAllocationRatio > 0, "Invalid Min Execution Cost Rate");
-        require(config.maxKeeperFeeToAdjustmentRatio > 0, "Invalid Min Adjustment Execution Cost Rate");
-        require(config.maxKeeperFeeToCollectDustRatio > 0, "Invalid Min Collect Dust Execution Cost Rate");
+        require(_config.gmxExchangeRouter != IGmxExchangeRouter(address(0)), "Invalid GMX Router address");
+        require(_config.callbackHandler != address(0), "Invalid Callback Handler address");
+        require(_config.gmxOrderVault != address(0), "Invalid GMX Order Vault address");
+        require(_config.referralCode != bytes32(0), "Invalid Referral Code");
+        require(_config.maxPuppetList > 0, "Invalid Max Puppet List");
+        require(_config.increaseCallbackGasLimit > 0, "Invalid Increase Callback Gas Limit");
+        require(_config.decreaseCallbackGasLimit > 0, "Invalid Decrease Callback Gas Limit");
+        require(_config.platformSettleFeeFactor > 0, "Invalid Platform Settle Fee Factor");
+        require(_config.maxKeeperFeeToAllocationRatio > 0, "Invalid Min Execution Cost Rate");
+        require(_config.maxKeeperFeeToAdjustmentRatio > 0, "Invalid Min Adjustment Execution Cost Rate");
+        require(_config.maxKeeperFeeToCollectDustRatio > 0, "Invalid Min Collect Dust Execution Cost Rate");
+
+        config = _config;
     }
 }

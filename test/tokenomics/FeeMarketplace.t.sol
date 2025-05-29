@@ -26,9 +26,17 @@ contract FeeMarketplaceTest is BasicSetup {
         super.setUp();
 
         testFundingStore = new TestStore(dictator, tokenRouter);
-
         feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
-        feeMarketplace = new FeeMarketplace(dictator, feeMarketplaceStore, puppetToken);
+        feeMarketplace = new FeeMarketplace(
+            dictator,
+            puppetToken,
+            feeMarketplaceStore,
+            FeeMarketplace.Config({
+                distributionTimeframe: 1 days,
+                burnBasisPoints: 10000, // 100% burn
+                feeDistributor: BankStore(address(0))
+            })
+        );
 
         // Set up permissions.
         dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, users.owner);
@@ -40,16 +48,7 @@ contract FeeMarketplaceTest is BasicSetup {
         dictator.setAccess(testFundingStore, address(feeMarketplaceStore));
 
         // Initialize with a 1-day distribution timeframe, 100% burn, no distributor.
-        dictator.initContract(
-            feeMarketplace,
-            abi.encode(
-                FeeMarketplace.Config({
-                    distributionTimeframe: 1 days,
-                    burnBasisPoints: 10000, // 100% burn
-                    feeDistributor: BankStore(address(0))
-                })
-            )
-        );
+        dictator.initContract(feeMarketplace);
 
         dictator.setAccess(testFundingStore, address(users.owner));
         testFundingStore.syncTokenBalance(usdc);

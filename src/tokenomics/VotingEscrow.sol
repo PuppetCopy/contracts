@@ -121,7 +121,7 @@ contract VotingEscrow is CoreContract {
     }
 
     function _setConfig(
-        bytes calldata data
+        bytes memory data
     ) internal override {
         config = abi.decode(data, (Config));
     }

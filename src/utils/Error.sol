@@ -18,14 +18,20 @@ library Error {
     event TransferUtils__TokenTransferReverted(string reason, bytes returndata);
 
     error Dictatorship__ContractNotInitialized();
+    error Dictatorship__ContractNotRegistered();
     error Dictatorship__ContractAlreadyInitialized();
+    error Dictatorship__CoreContractInitConfigNotSet();
+    error Dictatorship__InvalidUserAddress();
     error Dictatorship__ConfigurationUpdateFailed();
+
+    error Permission__InvalidFunctionSignature();
 
     error BankStore__InsufficientBalance();
 
     error VotingEscrow__Unsupported();
 
     error CoreContract__Unauthorized(string contractName, string version);
+    error CoreContract__ConfigurationNotSet();
 
     error RewardDistributor__InvalidAmount();
     error RewardDistributor__InsufficientRewards(uint accured);

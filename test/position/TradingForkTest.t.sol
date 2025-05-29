@@ -7,6 +7,8 @@ import {Test} from "forge-std/src/Test.sol";
 import {console} from "forge-std/src/console.sol";
 
 import {Const} from "script/Const.sol";
+
+import {GmxExecutionCallback} from "src/position/GmxExecutionCallback.sol";
 import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
@@ -42,15 +44,13 @@ contract TradingForkTest is Test {
     IERC20 constant USDC = IERC20(Const.usdc);
     IERC20 constant WETH = IERC20(Const.wnt);
 
-    // Oracle gmxOracle = Oracle(Const.gmxOracle);
-    // DataStore gmxDatastore = DataStore(Const.gmxDatastore);
-
     // Test contracts
     Dictatorship dictator;
     TokenRouter tokenRouter;
     PuppetToken puppetToken;
     AllocationStore allocationStore;
     MatchingRule matchingRule;
+    GmxExecutionCallback gmxExecutionCallback;
     FeeMarketplace feeMarketplace;
     FeeMarketplaceStore feeMarketplaceStore;
     MirrorPosition mirrorPosition;
@@ -60,7 +60,6 @@ contract TradingForkTest is Test {
     address trader = makeAddr("trader");
     address puppet1 = makeAddr("puppet1");
     address puppet2 = makeAddr("puppet2");
-    address keeper = makeAddr("keeper");
 
     function setUp() public {
         vm.createFork(vm.envString("RPC_URL"));
@@ -75,20 +74,112 @@ contract TradingForkTest is Test {
 
         // Deploy position contracts
         feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
-        feeMarketplace = new FeeMarketplace(dictator, feeMarketplaceStore, puppetToken);
+        feeMarketplace = new FeeMarketplace(
+            dictator,
+            puppetToken,
+            feeMarketplaceStore,
+            FeeMarketplace.Config({
+                distributionTimeframe: 1 days,
+                burnBasisPoints: 10000, // 100% burn
+                feeDistributor: BankStore(address(0))
+            })
+        );
         allocationStore = new AllocationStore(dictator, tokenRouter);
-        matchingRule = new MatchingRule(dictator, allocationStore, MirrorPosition(_getNextContractAddress(owner, 1)));
-        mirrorPosition = new MirrorPosition(dictator, allocationStore, matchingRule, feeMarketplace);
+        matchingRule = new MatchingRule(
+            dictator,
+            allocationStore,
+            MatchingRule.Config({
+                minExpiryDuration: 1 days,
+                minAllowanceRate: 100, // 1%
+                maxAllowanceRate: 10000, // 100%
+                minActivityThrottle: 1 hours,
+                maxActivityThrottle: 30 days
+            })
+        );
+        gmxExecutionCallback = new GmxExecutionCallback(
+            dictator, GmxExecutionCallback.Config({mirrorPosition: MirrorPosition(_getNextContractAddress(msg.sender))})
+        );
+        mirrorPosition = new MirrorPosition(
+            dictator,
+            allocationStore,
+            MirrorPosition.Config({
+                gmxExchangeRouter: IGmxExchangeRouter(Const.gmxExchangeRouter),
+                callbackHandler: address(gmxExecutionCallback),
+                gmxOrderVault: Const.gmxOrderVault,
+                referralCode: bytes32("PUPPET"),
+                increaseCallbackGasLimit: 2_000_000,
+                decreaseCallbackGasLimit: 2_000_000,
+                platformSettleFeeFactor: 0.1e30, // 10%
+                maxPuppetList: 50,
+                maxKeeperFeeToAllocationRatio: 0.1e30, // 10%
+                maxKeeperFeeToAdjustmentRatio: 0.05e30, // 5%
+                maxKeeperFeeToCollectDustRatio: 0.1e30 // 10%
+            })
+        );
 
         // Set up permissions
-        _setupPermissions();
+        dictator.setAccess(tokenRouter, address(allocationStore));
+        dictator.setAccess(tokenRouter, address(feeMarketplaceStore));
+        dictator.setAccess(allocationStore, address(matchingRule));
+        dictator.setAccess(allocationStore, address(mirrorPosition));
+        dictator.setAccess(allocationStore, address(feeMarketplace));
+        dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
 
-        // Initialize contracts with configurations
-        _initializeContracts();
+        dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, owner);
+        dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, owner);
+        dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, owner);
+        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, owner);
+        dictator.setPermission(mirrorPosition, mirrorPosition.setTokenDustThresholdList.selector, owner);
+        dictator.setPermission(
+            mirrorPosition, mirrorPosition.initializeTraderActivityThrottle.selector, address(matchingRule)
+        );
 
+        dictator.setPermission(matchingRule, matchingRule.setRule.selector, owner);
+        dictator.setPermission(matchingRule, matchingRule.deposit.selector, owner);
+        dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, owner);
+        dictator.initContract(matchingRule);
+
+        dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
+        dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, owner);
+
+        // Set allowed tokens
+        IERC20[] memory allowedTokens = new IERC20[](2);
+        allowedTokens[0] = USDC;
+        allowedTokens[1] = WETH;
+
+        uint[] memory allowanceCaps = new uint[](2);
+        allowanceCaps[0] = 1000e6; // 1000 USDC
+        allowanceCaps[1] = 1e18; // 1 ETH
+
+        matchingRule.setTokenAllowanceList(allowedTokens, allowanceCaps);
+
+        // Initialize FeeMarketplace
+        dictator.initContract(feeMarketplace);
+
+        // Set ask price for USDC
+        feeMarketplace.setAskPrice(USDC, 100e18);
+
+        // Initialize MirrorPosition
+        dictator.initContract(mirrorPosition);
+
+        // Set dust thresholds
+        uint[] memory dustThresholds = new uint[](2);
+        dustThresholds[0] = 1e6; // 1 USDC
+        dustThresholds[1] = 0.001e18; // 0.001 ETH
+
+        mirrorPosition.setTokenDustThresholdList(allowedTokens, dustThresholds);
         // Fund test accounts with real tokens
-        _setupTestAccounts();
+        vm.deal(owner, 100 ether);
 
+        deal(address(WETH), owner, 100 ether);
+        WETH.approve(address(tokenRouter), type(uint).max);
+        matchingRule.deposit(WETH, owner, puppet1, 0.1 ether);
+        matchingRule.deposit(WETH, owner, puppet2, 0.1 ether);
+
+        deal(address(USDC), owner, 10000e6);
+        USDC.approve(address(tokenRouter), type(uint).max);
+        matchingRule.deposit(USDC, owner, puppet1, 100e6);
+        matchingRule.deposit(USDC, owner, puppet2, 100e6);
         vm.stopPrank();
     }
 
@@ -102,6 +193,7 @@ contract TradingForkTest is Test {
 
         // Set up matching rules for puppets
         matchingRule.setRule(
+            mirrorPosition,
             USDC,
             puppet1,
             trader,
@@ -113,6 +205,7 @@ contract TradingForkTest is Test {
         );
 
         matchingRule.setRule(
+            mirrorPosition,
             USDC,
             puppet2,
             trader,
@@ -122,20 +215,17 @@ contract TradingForkTest is Test {
                 expiry: block.timestamp + 30 days
             })
         );
+
         // Encode and execute the call
-        IChainlinkPriceFeedProvider.ValidatedPrice memory price = IChainlinkPriceFeedProvider(
-            Const.chainlinkPriceFeedProvider
-        ).getOraclePrice(
-            Const.wnt,
-            ""
-        );
+        IChainlinkPriceFeedProvider.ValidatedPrice memory price =
+            IChainlinkPriceFeedProvider(Const.chainlinkPriceFeedProvider).getOraclePrice(Const.wnt, "");
 
         // Create position call parameters
         MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
             collateralToken: USDC,
             trader: trader,
             market: Const.gmxEthUsdcMarket, // ETH/USD market
-            keeperExecutionFeeReceiver: keeper,
+            keeperExecutionFeeReceiver: owner,
             isIncrease: true,
             isLong: true,
             executionFee: 0.001 ether, // GMX execution fee
@@ -155,7 +245,7 @@ contract TradingForkTest is Test {
 
         // Request mirror position
         (address allocationAddress, uint allocationId, bytes32 requestKey) =
-            mirrorPosition.requestMirror{value: callParams.executionFee}(callParams, puppetList);
+            mirrorPosition.requestMirror{value: callParams.executionFee}(matchingRule, callParams, puppetList);
 
         console.log("Allocation address:", allocationAddress);
         console.log("Allocation ID:", allocationId);
@@ -201,129 +291,6 @@ contract TradingForkTest is Test {
         console.log("Mirror size:", position.size);
 
         vm.stopPrank();
-    }
-
-    function _setupPermissions() private {
-        // AllocationStore permissions
-        dictator.setAccess(tokenRouter, address(allocationStore));
-        dictator.setAccess(tokenRouter, address(feeMarketplaceStore));
-        dictator.setAccess(allocationStore, address(matchingRule));
-        dictator.setAccess(allocationStore, address(mirrorPosition));
-        dictator.setAccess(allocationStore, address(feeMarketplace));
-        dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
-
-        // MirrorPosition permissions
-        dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, owner);
-        dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, owner);
-        dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, owner);
-        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, owner);
-        dictator.setPermission(mirrorPosition, mirrorPosition.setTokenDustThresholdList.selector, owner);
-        dictator.setPermission(
-            mirrorPosition, mirrorPosition.initializeTraderActivityThrottle.selector, address(matchingRule)
-        );
-
-        // MatchingRule permissions
-        dictator.setPermission(matchingRule, matchingRule.setRule.selector, owner);
-        dictator.setPermission(matchingRule, matchingRule.deposit.selector, owner);
-        dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, owner);
-
-        // FeeMarketplace permissions
-        dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
-        dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, owner);
-    }
-
-    function _initializeContracts() private {
-        // Initialize MatchingRule
-        dictator.initContract(
-            matchingRule,
-            abi.encode(
-                MatchingRule.Config({
-                    minExpiryDuration: 1 days,
-                    minAllowanceRate: 100, // 1%
-                    maxAllowanceRate: 10000, // 100%
-                    minActivityThrottle: 1 hours,
-                    maxActivityThrottle: 30 days
-                })
-            )
-        );
-
-        // Set allowed tokens
-        IERC20[] memory allowedTokens = new IERC20[](2);
-        allowedTokens[0] = USDC;
-        allowedTokens[1] = WETH;
-
-        uint[] memory allowanceCaps = new uint[](2);
-        allowanceCaps[0] = 1000e6; // 1000 USDC
-        allowanceCaps[1] = 1e18; // 1 ETH
-
-        matchingRule.setTokenAllowanceList(allowedTokens, allowanceCaps);
-
-        // Initialize FeeMarketplace
-        dictator.initContract(
-            feeMarketplace,
-            abi.encode(
-                FeeMarketplace.Config({
-                    distributionTimeframe: 1 days,
-                    burnBasisPoints: 10000, // 100% burn
-                    feeDistributor: BankStore(address(0))
-                })
-            )
-        );
-
-        // Set ask price for USDC
-        feeMarketplace.setAskPrice(USDC, 100e18);
-
-        // Initialize MirrorPosition
-        dictator.initContract(
-            mirrorPosition,
-            abi.encode(
-                MirrorPosition.Config({
-                    gmxExchangeRouter: IGmxExchangeRouter(Const.gmxExchangeRouter),
-                    callbackHandler: address(mirrorPosition), // Self for testing
-                    gmxOrderVault: Const.gmxExchangeRouter,
-                    referralCode: bytes32("PUPPET"),
-                    increaseCallbackGasLimit: 2_000_000,
-                    decreaseCallbackGasLimit: 2_000_000,
-                    platformSettleFeeFactor: 0.1e30, // 10%
-                    maxPuppetList: 50,
-                    maxKeeperFeeToAllocationRatio: 0.1e30, // 10%
-                    maxKeeperFeeToAdjustmentRatio: 0.05e30, // 5%
-                    maxKeeperFeeToCollectDustRatio: 0.1e30 // 10%
-                })
-            )
-        );
-
-        // Set dust thresholds
-        uint[] memory dustThresholds = new uint[](2);
-        dustThresholds[0] = 1e6; // 1 USDC
-        dustThresholds[1] = 0.001e18; // 0.001 ETH
-
-        mirrorPosition.setTokenDustThresholdList(allowedTokens, dustThresholds);
-    }
-
-    function _setupTestAccounts() private {
-        // Deal ETH for gas
-        vm.deal(owner, 10 ether);
-        vm.deal(trader, 10 ether);
-        vm.deal(puppet1, 10 ether);
-        vm.deal(puppet2, 10 ether);
-        vm.deal(keeper, 10 ether);
-
-        deal(address(USDC), owner, 10000e6);
-        USDC.approve(address(tokenRouter), type(uint).max);
-        matchingRule.deposit(USDC, owner, puppet1, 100e6);
-        matchingRule.deposit(USDC, owner, puppet2, 100e6);
-
-        // // Distribute USDC to test accounts
-        // USDC.transfer(puppet1, 1000e6);
-        // USDC.transfer(puppet2, 1000e6);
-
-        // // Approve token router
-        // vm.startPrank(puppet1);
-        // USDC.approve(address(tokenRouter), type(uint).max);
-
-        // vm.startPrank(puppet2);
-        // USDC.approve(address(tokenRouter), type(uint).max);
     }
 
     function _getNextContractAddress(

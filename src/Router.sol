@@ -5,13 +5,22 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {MatchingRule} from "./position/MatchingRule.sol";
+
+import {MirrorPosition} from "./position/MirrorPosition.sol";
+import {AllocationStore} from "./shared/AllocationStore.sol";
 import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
 
 contract Router is ReentrancyGuardTransient {
     MatchingRule public immutable matchingRule;
     FeeMarketplace public immutable feeMarketplace;
+    MirrorPosition public immutable mirrorPosition;
 
-    constructor(MatchingRule _matchingRule, FeeMarketplace _feeMarketplace) {
+    constructor(MirrorPosition _mirrorPosition, MatchingRule _matchingRule, FeeMarketplace _feeMarketplace) {
+        require(address(_mirrorPosition) != address(0), "MirrorPosition not set correctly");
+        require(address(_matchingRule) != address(0), "MatchingRule not set correctly");
+        require(address(_feeMarketplace) != address(0), "FeeMarketplace not set correctly");
+
+        mirrorPosition = _mirrorPosition;
         matchingRule = _matchingRule;
         feeMarketplace = _feeMarketplace;
     }
@@ -46,7 +55,7 @@ contract Router is ReentrancyGuardTransient {
         address trader,
         MatchingRule.Rule calldata ruleParams
     ) external nonReentrant {
-        matchingRule.setRule(collateralToken, msg.sender, trader, ruleParams);
+        matchingRule.setRule(mirrorPosition, collateralToken, msg.sender, trader, ruleParams);
     }
 
     /**

@@ -151,7 +151,7 @@ import {RewardStore} from "./RewardStore.sol";
     /// @notice Update contract configuration.
     /// @dev Expects ABI-encoded data that decodes to a `Config` struct.
     function _setConfig(
-        bytes calldata _data
+        bytes memory _data
     ) internal override {
         Config memory newConfig = abi.decode(_data, (Config));
         require(newConfig.distributionWindow > 0, "RewardDistributor: distribution period must be > 0");

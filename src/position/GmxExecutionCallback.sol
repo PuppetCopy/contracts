@@ -12,19 +12,23 @@ import {IGmxOrderCallbackReceiver} from "./interface/IGmxOrderCallbackReceiver.s
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 
 contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
+    struct Config {
+        MirrorPosition mirrorPosition;
+    }
+
     struct UnhandledCallback {
         address operator;
         bytes32 key;
         bytes error;
     }
 
-    MirrorPosition immutable position;
-
     uint public unhandledCallbackListId = 0;
     mapping(uint unhandledCallbackListSequenceId => UnhandledCallback) public unhandledCallbackMap;
 
-    constructor(IAuthority _authority, MirrorPosition _position) CoreContract(_authority) {
-        position = _position;
+    Config public config;
+
+    constructor(IAuthority _authority, Config memory _config) CoreContract(_authority) {
+        _setInitConfig(abi.encode(_config));
     }
 
     /**
@@ -39,12 +43,12 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
             GmxPositionUtils.isIncreaseOrder(order.numbers.orderType)
                 || GmxPositionUtils.isDecreaseOrder(order.numbers.orderType)
         ) {
-            try position.execute(key) {}
+            try config.mirrorPosition.execute(key) {}
             catch (bytes memory err) {
                 _storeUnhandledCallback(key, err);
             }
         } else if (GmxPositionUtils.isLiquidateOrder(order.numbers.orderType)) {
-            try position.liquidate(order.addresses.account) {}
+            try config.mirrorPosition.liquidate(order.addresses.account) {}
             catch (bytes memory err) {
                 _storeUnhandledCallback(key, err);
             }
@@ -80,5 +84,16 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
         unhandledCallbackMap[id] = UnhandledCallback({operator: msg.sender, key: _key, error: error});
 
         _logEvent("StoreUnhandledCallback", abi.encode(id, error, _key));
+    }
+
+    /// @notice  Sets the configuration parameters via governance
+    /// @param _data The encoded configuration data
+    /// @dev Emits a SetConfig event upon successful execution
+    function _setConfig(
+        bytes memory _data
+    ) internal override {
+        config = abi.decode(_data, (Config));
+
+        require(address(config.mirrorPosition) != address(0), "Invalid mirror position address");
     }
 }

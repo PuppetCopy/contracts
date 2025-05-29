@@ -4,13 +4,14 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/src/console.sol";
 
-import {BaseScript} from "./BaseScript.s.sol";
 import {Router} from "src/Router.sol";
 import {RouterProxy} from "src/RouterProxy.sol";
 import {MatchingRule} from "src/position/MatchingRule.sol";
+import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 
+import {BaseScript} from "./BaseScript.s.sol";
 import {Const} from "./Const.sol";
 
 contract UpdateRouter is BaseScript {
@@ -24,29 +25,20 @@ contract UpdateRouter is BaseScript {
         RouterProxy routerProxy = RouterProxy(payable(getDeployedAddress("RouterProxy")));
         MatchingRule matchingRule = MatchingRule(getDeployedAddress("MatchingRule"));
         FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
+        MirrorPosition mirrorPosition = MirrorPosition(getDeployedAddress("MirrorPosition"));
 
-        require(address(routerProxy) != address(0), "RouterProxy not found");
-        require(address(matchingRule) != address(0), "MatchingRule not found");
-        require(address(feeMarketplace) != address(0), "FeeMarketplace not found");
+        Router newRouter = new Router(mirrorPosition, matchingRule, feeMarketplace);
 
-        // Deploy new Router implementation
-        Router newRouter = new Router(matchingRule, feeMarketplace);
-
-        // Update proxy to point to new implementation
         routerProxy.update(address(newRouter));
 
         console.log("Router implementation deployed at:", address(newRouter));
-
         console.log("Seeding MatchingRule with initial rules...");
         matchingRule.setRule(
+            mirrorPosition,
             IERC20(Const.usdc),
             DEPLOYER_ADDRESS,
             DEPLOYER_ADDRESS,
-            MatchingRule.Rule({
-                allowanceRate: 1000, // Example value
-                throttleActivity: 100, // Example value
-                expiry: block.timestamp + 30 days // Example expiry
-            })
+            MatchingRule.Rule({allowanceRate: 1000, throttleActivity: 100, expiry: block.timestamp + 30 days})
         );
     }
 }

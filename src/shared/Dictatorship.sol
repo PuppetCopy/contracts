@@ -58,6 +58,9 @@ contract Dictatorship is Ownable, IAuthority {
     /// @param target The Access contract instance to modify.
     /// @param user The user address to grant access to.
     function setAccess(Access target, address user) public onlyOwner {
+        require(user != address(0), Error.Dictatorship__InvalidUserAddress());
+        require(contractAccessRegistry[address(target)], Error.Dictatorship__ContractNotRegistered());
+
         target.setAccess(user, true);
         emit UpdateAccess(address(target), user, true);
     }
@@ -75,6 +78,10 @@ contract Dictatorship is Ownable, IAuthority {
     /// @param functionSig The function selector to grant permission for.
     /// @param user The user address to grant permission to.
     function setPermission(Permission target, bytes4 functionSig, address user) public onlyOwner {
+        require(user != address(0), Error.Dictatorship__InvalidUserAddress());
+        require(contractAccessRegistry[address(target)], Error.Dictatorship__ContractNotRegistered());
+        require(functionSig != bytes4(0), Error.Permission__InvalidFunctionSignature());
+
         target.setPermission(functionSig, user, true);
         emit UpdatePermission(address(target), user, functionSig, true);
     }
@@ -90,39 +97,44 @@ contract Dictatorship is Ownable, IAuthority {
 
     /// @notice Called by registered CoreContracts to log events centrally.
     /// @inheritdoc IAuthority
-    function logEvent(string memory method, bytes memory data) external {
-        require(contractAccessRegistry[msg.sender], Error.Dictatorship__ContractNotInitialized());
+    function logEvent(string memory method, bytes memory data) public {
+        require(contractAccessRegistry[msg.sender], Error.Dictatorship__ContractNotRegistered());
         emit LogEvent(msg.sender, method, data);
     }
 
     /// @notice Initializes a CoreContract, registers it, and optionally sets initial configuration.
-    /// @param target The CoreContract instance to initialize.
-    /// @param config The ABI-encoded initial configuration data (can be empty bytes `""`).
-    function initContract(CoreContract target, bytes calldata config) public onlyOwner {
-        address targetAddress = address(target);
+    /// @param _target The CoreContract instance to initialize.
+    function initContract(
+        CoreContract _target
+    ) public onlyOwner {
+        address targetAddress = address(_target);
         require(!contractAccessRegistry[targetAddress], Error.Dictatorship__ContractAlreadyInitialized());
 
         contractAccessRegistry[targetAddress] = true;
         emit AddContractAccess(targetAddress);
 
-        if (config.length > 0) {
-            _setConfig(target, config);
-        }
+        bytes memory _intialConfig = _target.getInitConfig();
+
+        _setConfig(_target, _intialConfig);
     }
 
     /// @notice Pushes a configuration update to a registered CoreContract.
-    /// @param target The CoreContract instance to configure.
-    /// @param config The ABI-encoded configuration data.
-    function setConfig(CoreContract target, bytes calldata config) public onlyOwner {
-        _setConfig(target, config);
+    /// @param _target The CoreContract instance to configure.
+    /// @param _config The ABI-encoded configuration data.
+    function setConfig(CoreContract _target, bytes calldata _config) public onlyOwner {
+        address targetAddress = address(_target);
+
+        require(contractAccessRegistry[targetAddress], Error.Dictatorship__ContractNotInitialized());
+
+        _setConfig(_target, _config);
     }
 
     /// @notice De-registers a CoreContract, preventing it from logging further events.
-    /// @param target The CoreContract instance to remove.
+    /// @param _target The CoreContract instance to remove.
     function removeContract(
-        CoreContract target
+        CoreContract _target
     ) public onlyOwner {
-        address targetAddress = address(target);
+        address targetAddress = address(_target);
         require(contractAccessRegistry[targetAddress], Error.Dictatorship__ContractNotInitialized());
 
         contractAccessRegistry[targetAddress] = false;
@@ -130,14 +142,14 @@ contract Dictatorship is Ownable, IAuthority {
     }
 
     /// @dev Internal function to perform the setConfig call on the target contract.
-    function _setConfig(CoreContract target, bytes calldata config) internal {
-        address targetAddress = address(target);
-
-        require(contractAccessRegistry[targetAddress], Error.Dictatorship__ContractNotInitialized());
-
-        (bool success,) = targetAddress.call(abi.encodeWithSignature("setConfig(bytes)", config));
-        require(success, Error.Dictatorship__ConfigurationUpdateFailed());
-
-        emit SetConfig(targetAddress, config);
+    function _setConfig(CoreContract _target, bytes memory _config) internal {
+        require(_config.length > 0, Error.Dictatorship__CoreContractInitConfigNotSet());
+        
+        // Add try-catch for config validation
+        try _target.setConfig(_config) {
+            emit SetConfig(address(_target), _config);
+        } catch {
+            revert Error.Dictatorship__ConfigurationUpdateFailed();
+        }
     }
 }

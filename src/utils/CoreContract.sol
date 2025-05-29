@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.29;
 
+import {Error} from "../utils/Error.sol";
 import {Permission} from "./auth/Permission.sol";
 import {IAuthority} from "./interfaces/IAuthority.sol";
 
@@ -9,6 +10,12 @@ import {IAuthority} from "./interfaces/IAuthority.sol";
 /// @dev Handles interaction with the central Authority for configuration and event logging.
 ///      Inherits Permission logic linked to the Authority.
 abstract contract CoreContract is Permission {
+    bytes initConfig_; // Holds the current configuration of the contract
+
+    function getInitConfig() external view returns (bytes memory) {
+        return initConfig_;
+    }
+
     /// @notice The central authority (Dictatorship) managing this contract.
     // Inherited 'authority' variable assumed from Permission contract
     /// @param _authority The address of the Dictatorship contract.
@@ -16,24 +23,31 @@ abstract contract CoreContract is Permission {
         IAuthority _authority
     ) Permission(_authority) {}
 
-    /// @notice Entry point for the Authority to push configuration updates.
-    /// @dev Requires caller to be the registered Authority. Delegates to internal _setConfig implementation.
-    ///      Logs a "SetConfig" event via the Authority upon successful configuration.
-    /// @param data ABI-encoded configuration data specific to the inheriting contract.
+    /// @notice  Sets the configuration parameters via governance
+    /// @param _data The encoded configuration data
+    /// @dev Emits a SetConfig event upon successful execution
+    function _setConfig(
+        bytes memory _data
+    ) internal virtual;
+
     function setConfig(
-        bytes calldata data
-    ) external onlyAuthority {
-        _setConfig(data);
-        _logEvent("SetConfig", data);
+        bytes calldata _data
+    ) external virtual onlyAuthority {
+        _setConfig(_data);
+
+        _logEvent("SetConfig", _data);
     }
 
-    /// @notice Internal function to be implemented by inheriting contracts to handle configuration logic.
-    /// @param data ABI-encoded configuration data.
-    function _setConfig(
-        bytes calldata data
-    ) internal virtual {
-        // Implement specific configuration logic in inheriting contracts
-        // This function is intentionally left empty to be overridden
+    function _setInitConfig(
+        bytes memory _initConfig
+    ) internal returns (bytes memory) {
+        if (initConfig_.length != 0) {
+            revert Error.CoreContract__ConfigurationNotSet();
+        }
+
+        initConfig_ = _initConfig;
+
+        return initConfig_;
     }
 
     /// @notice Helper function to log events through the central Authority.

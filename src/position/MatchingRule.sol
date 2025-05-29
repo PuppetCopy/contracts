@@ -25,14 +25,13 @@ contract MatchingRule is CoreContract {
         uint maxActivityThrottle;
     }
 
+    AllocationStore public immutable store;
+
     Config public config;
     IERC20[] public tokenAllowanceList;
 
     mapping(IERC20 token => uint) tokenAllowanceCapMap;
     mapping(bytes32 traderMatchingKey => mapping(address puppet => Rule)) public matchingRuleMap;
-
-    MirrorPosition public immutable mirrorPosition;
-    AllocationStore public immutable allocationStore;
 
     function getRuleList(
         bytes32 _traderMatchingKey,
@@ -47,13 +46,10 @@ contract MatchingRule is CoreContract {
         }
     }
 
-    constructor(
-        IAuthority _authority,
-        AllocationStore _store,
-        MirrorPosition _mirrorPosition
-    ) CoreContract(_authority) {
-        allocationStore = _store;
-        mirrorPosition = _mirrorPosition;
+    constructor(IAuthority _authority, AllocationStore _store, Config memory _config) CoreContract(_authority) {
+        store = _store;
+
+        _setInitConfig(abi.encode(_config));
     }
 
     function deposit(IERC20 _collateralToken, address _depositor, address _user, uint _amount) external auth {
@@ -62,11 +58,11 @@ contract MatchingRule is CoreContract {
         uint allowanceCap = tokenAllowanceCapMap[_collateralToken];
         require(allowanceCap > 0, Error.MatchingRule__TokenNotAllowed());
 
-        uint nextBalance = allocationStore.userBalanceMap(_collateralToken, _user) + _amount;
+        uint nextBalance = store.userBalanceMap(_collateralToken, _user) + _amount;
         require(nextBalance <= allowanceCap, Error.MatchingRule__AllowanceAboveLimit(allowanceCap));
 
-        allocationStore.transferIn(_collateralToken, _depositor, _amount);
-        allocationStore.setUserBalance(_collateralToken, _user, nextBalance);
+        store.transferIn(_collateralToken, _depositor, _amount);
+        store.setUserBalance(_collateralToken, _user, nextBalance);
 
         _logEvent("Deposit", abi.encode(_collateralToken, _depositor, _user, nextBalance, _amount));
     }
@@ -74,19 +70,20 @@ contract MatchingRule is CoreContract {
     function withdraw(IERC20 _collateralToken, address _user, address _receiver, uint _amount) external auth {
         require(_amount > 0, Error.MatchingRule__InvalidAmount());
 
-        uint balance = allocationStore.userBalanceMap(_collateralToken, _user);
+        uint balance = store.userBalanceMap(_collateralToken, _user);
 
         require(_amount <= balance, Error.MatchingRule__InsufficientBalance());
 
         uint nextBalance = balance - _amount;
 
-        allocationStore.setUserBalance(_collateralToken, _user, nextBalance);
-        allocationStore.transferOut(_collateralToken, _receiver, _amount);
+        store.setUserBalance(_collateralToken, _user, nextBalance);
+        store.transferOut(_collateralToken, _receiver, _amount);
 
         _logEvent("Withdraw", abi.encode(_collateralToken, _user, _receiver, nextBalance, _amount));
     }
 
     function setRule(
+        MirrorPosition mirrorPosition,
         IERC20 _collateralToken,
         address _user,
         address _trader,
@@ -142,7 +139,7 @@ contract MatchingRule is CoreContract {
     /// @param _data The encoded configuration data
     /// @dev Emits a SetConfig event upon successful execution
     function _setConfig(
-        bytes calldata _data
+        bytes memory _data
     ) internal override {
         config = abi.decode(_data, (Config));
 

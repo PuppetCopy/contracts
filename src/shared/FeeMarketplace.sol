@@ -60,11 +60,14 @@ contract FeeMarketplace is CoreContract {
 
     constructor(
         IAuthority _authority,
+        PuppetToken _protocolToken,
         FeeMarketplaceStore _store,
-        PuppetToken _protocolToken
+        Config memory _config
     ) CoreContract(_authority) {
         store = _store;
         protocolToken = _protocolToken;
+
+        _setInitConfig(abi.encode(_config));
     }
 
     /**
@@ -185,30 +188,20 @@ contract FeeMarketplace is CoreContract {
         lastDistributionTimestamp[_feeToken] = block.timestamp;
     }
 
-    /**
-     * @dev Updates the configuration of the fee marketplace.
-     * @param _data The abi-encoded Config struct.
-     */
     function _setConfig(
-        bytes calldata _data
+        bytes memory _data
     ) internal override {
-        Config memory newConfig = abi.decode(_data, (Config));
+        Config memory _config = abi.decode(_data, (Config));
 
-        require(newConfig.distributionTimeframe > 0, "FeeMarketplace: timeframe cannot be zero");
+        require(_config.distributionTimeframe > 0, "FeeMarketplace: timeframe cannot be zero");
         require(
-            newConfig.burnBasisPoints <= Precision.BASIS_POINT_DIVISOR, "FeeMarketplace: burn basis points exceeds 100%"
+            _config.burnBasisPoints <= Precision.BASIS_POINT_DIVISOR, "FeeMarketplace: burn basis points exceeds 100%"
         );
         require(
-            newConfig.burnBasisPoints == Precision.BASIS_POINT_DIVISOR
-                || address(newConfig.feeDistributor) != address(0),
+            _config.burnBasisPoints == Precision.BASIS_POINT_DIVISOR || address(_config.feeDistributor) != address(0),
             "FeeMarketplace: reward distributor required when burn < 100%"
         );
 
-        config = newConfig;
-
-        _logEvent(
-            "SetConfig",
-            abi.encode(newConfig.distributionTimeframe, newConfig.burnBasisPoints, newConfig.feeDistributor)
-        );
+        config = _config;
     }
 }
