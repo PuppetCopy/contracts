@@ -44,7 +44,8 @@ contract BasicSetup is Test {
         vm.startPrank(users.owner);
 
         dictator = new Dictatorship(users.owner);
-        tokenRouter = new TokenRouter(dictator, 200_000);
+        tokenRouter = new TokenRouter(dictator, TokenRouter.Config(200_000));
+        dictator.initContract(tokenRouter);
         puppetToken = new PuppetToken();
         vPuppetToken = new PuppetVoteToken(dictator);
 

@@ -130,7 +130,7 @@ contract MirrorPosition is CoreContract {
         allocationStore = _allocationStore;
         allocationStoreImplementation = address(new AllocationAccount(allocationStore));
 
-        _setInitConfig(abi.encode(_config));
+        _setConfig(abi.encode(_config));
     }
 
     function initializeTraderActivityThrottle(bytes32 _traderMatchingKey, address _puppet) external auth {
@@ -225,7 +225,7 @@ contract MirrorPosition is CoreContract {
 
         require(
             _keeperFee < Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _allocation),
-            Error.MirrorPosition__KeeperFeeExceedsCostFactor()
+            Error.MirrorPosition__KeeperFeeExceedsCostFactor(_keeperFee, _allocation)
         );
 
         _allocation -= _keeperFee;
@@ -367,7 +367,7 @@ contract MirrorPosition is CoreContract {
 
         require(
             _keeperFee < Precision.applyFactor(config.maxKeeperFeeToAdjustmentRatio, _allocation),
-            Error.MirrorPosition__KeeperFeeExceedsCostFactor()
+            Error.MirrorPosition__KeeperFeeExceedsCostFactor(_keeperFee, _allocation)
         );
 
         allocationMap[_allocationAddress] = _allocation;
@@ -714,8 +714,6 @@ contract MirrorPosition is CoreContract {
                 referralCode: config.referralCode
             })
         );
-
-        // IERC20 weth = IERC20(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1); // WETH on Arbitrum
 
         config.gmxExchangeRouter.sendWnt{value: _order.executionFee}(config.gmxOrderVault, _order.executionFee);
 

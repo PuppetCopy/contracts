@@ -109,14 +109,20 @@ contract TradingTest is BasicSetup {
             })
         );
 
-        dictator.setAccess(tokenRouter, address(allocationStore));
-        dictator.setAccess(tokenRouter, address(feeMarketplaceStore));
+        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
+        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
 
         dictator.setAccess(allocationStore, address(matchingRule));
         dictator.setAccess(allocationStore, address(mirrorPosition));
         dictator.setAccess(allocationStore, address(feeMarketplace));
         dictator.setAccess(allocationStore, address(feeMarketplaceStore));
+
         dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
+
+        dictator.setPermission(matchingRule, matchingRule.setRule.selector, users.owner);
+        dictator.setPermission(matchingRule, matchingRule.deposit.selector, users.owner);
+        dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, users.owner);
+        dictator.initContract(matchingRule);
 
         dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, users.owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, users.owner);
@@ -137,11 +143,6 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, users.owner);
         dictator.initContract(feeMarketplace);
         feeMarketplace.setAskPrice(usdc, 100e18);
-
-        dictator.setPermission(matchingRule, matchingRule.setRule.selector, users.owner);
-        dictator.setPermission(matchingRule, matchingRule.deposit.selector, users.owner);
-        dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, users.owner);
-        dictator.initContract(matchingRule);
 
         // Config
         IERC20[] memory allowedTokenList = new IERC20[](2);

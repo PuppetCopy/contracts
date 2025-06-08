@@ -18,12 +18,12 @@ contract DeployBase is BaseScript {
     }
 
     function deployContracts() internal {
-        // Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
         Dictatorship dictatorship = new Dictatorship(Const.dao);
 
         new PuppetToken();
         // new PuppetVoteToken(dictatorship);
-        new TokenRouter(dictatorship, 200_000);
+        TokenRouter tokenRouter = new TokenRouter(dictatorship, TokenRouter.Config(200_000));
+        dictatorship.initContract(tokenRouter);
         RouterProxy routerProxy = new RouterProxy(dictatorship);
 
         dictatorship.setAccess(routerProxy, Const.dao);

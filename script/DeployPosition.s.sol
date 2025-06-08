@@ -67,8 +67,8 @@ contract DeployPosition is BaseScript {
 
         MirrorPosition mirrorPosition = deployMirrorPosition(allocationStore, matchingRule, allowedTokenList);
 
-        dictator.setAccess(tokenRouter, address(allocationStore));
-        dictator.setAccess(tokenRouter, address(feeMarketplaceStore));
+        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
+        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
 
         dictator.setAccess(allocationStore, address(matchingRule));
         dictator.setAccess(allocationStore, address(mirrorPosition));
@@ -82,6 +82,7 @@ contract DeployPosition is BaseScript {
 
         dictator.setPermission(matchingRule, matchingRule.setRule.selector, address(routerProxy));
         dictator.setPermission(matchingRule, matchingRule.deposit.selector, address(routerProxy));
+        dictator.setPermission(matchingRule, matchingRule.withdraw.selector, address(routerProxy));
         dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, Const.dao);
 
         // Configure contracts
@@ -151,6 +152,8 @@ contract DeployPosition is BaseScript {
                 maxKeeperFeeToCollectDustRatio: 0.1e30
             })
         );
+        dictator.initContract(mirrorPosition);
+
         dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, Const.orderflowHandler);
         dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, Const.orderflowHandler);
         dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, Const.orderflowHandler);
@@ -165,7 +168,6 @@ contract DeployPosition is BaseScript {
         mirrorPosition.setTokenDustThresholdList(allowedTokenList, tokenDustThresholdCapList);
         dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(gmxCallbackHandler));
         dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, address(gmxCallbackHandler));
-        dictator.initContract(mirrorPosition);
 
         return mirrorPosition;
     }

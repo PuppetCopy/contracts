@@ -22,13 +22,13 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
         bytes error;
     }
 
-    uint public unhandledCallbackListId = 0;
     mapping(uint unhandledCallbackListSequenceId => UnhandledCallback) public unhandledCallbackMap;
 
+    uint public unhandledCallbackListId = 0;
     Config public config;
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority) {
-        _setInitConfig(abi.encode(_config));
+        _setConfig(abi.encode(_config));
     }
 
     /**

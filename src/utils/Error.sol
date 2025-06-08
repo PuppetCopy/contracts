@@ -24,9 +24,12 @@ library Error {
     error Dictatorship__ConfigurationUpdateFailed();
     error Dictatorship__InvalidTargetAddress();
     error Dictatorship__EmptyConfiguration();
+    error Dictatorship__CoreContractConfigCallFailed();
+    error Dictatorship__InvalidCoreContract();
 
     error Permission__InvalidFunctionSignature();
 
+    error TokenRouter__EmptyTokenTranferGasLimit();
     error BankStore__InsufficientBalance();
 
     error PuppetVoteToken__Unsupported();
@@ -81,7 +84,7 @@ library Error {
     error MirrorPosition__InsufficientSettledBalanceForKeeperFee();
     error MirrorPosition__InsufficientGmxExecutionFee();
     error MirrorPosition__KeeperAdjustmentExecutionFeeExceedsAllocatedAmount();
-    error MirrorPosition__KeeperFeeExceedsCostFactor();
+    error MirrorPosition__KeeperFeeExceedsCostFactor(uint keeperFee, uint allocationAmount);
     error MirrorPosition__OrderCreationFailed();
     error MirrorPosition__SettlementTransferFailed();
     error MirrorPosition__KeeperExecutionFeeNotFullyCovered();

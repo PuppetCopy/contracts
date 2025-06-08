@@ -43,7 +43,7 @@ contract FeeMarketplaceTest is BasicSetup {
         dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, users.owner);
         dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, users.owner);
 
-        dictator.setAccess(tokenRouter, address(feeMarketplaceStore));
+        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
         dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
         dictator.setAccess(testFundingStore, address(feeMarketplaceStore));
 

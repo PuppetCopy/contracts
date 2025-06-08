@@ -67,7 +67,7 @@ contract FeeMarketplace is CoreContract {
         store = _store;
         protocolToken = _protocolToken;
 
-        _setInitConfig(abi.encode(_config));
+        _setConfig(abi.encode(_config));
     }
 
     /**

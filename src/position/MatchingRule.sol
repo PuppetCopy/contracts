@@ -49,7 +49,7 @@ contract MatchingRule is CoreContract {
     constructor(IAuthority _authority, AllocationStore _store, Config memory _config) CoreContract(_authority) {
         store = _store;
 
-        _setInitConfig(abi.encode(_config));
+        _setConfig(abi.encode(_config));
     }
 
     function deposit(IERC20 _collateralToken, address _depositor, address _user, uint _amount) external auth {
