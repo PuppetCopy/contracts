@@ -128,7 +128,6 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, users.owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, users.owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.collectDust.selector, users.owner);
-        dictator.setPermission(mirrorPosition, mirrorPosition.setTokenDustThresholdList.selector, users.owner);
         dictator.setPermission(
             mirrorPosition,
             mirrorPosition.initializeTraderActivityThrottle.selector,
@@ -155,11 +154,6 @@ contract TradingTest is BasicSetup {
         tokenAllowanceCapAmountList[0] = 0.2e18;
         tokenAllowanceCapAmountList[1] = 500e30;
         matchingRule.setTokenAllowanceList(allowedTokenList, tokenAllowanceCapAmountList);
-
-        uint[] memory tokenDustThresholdCapList = new uint[](2);
-        tokenDustThresholdCapList[0] = 0.01e18;
-        tokenDustThresholdCapList[1] = 1e6;
-        mirrorPosition.setTokenDustThresholdList(allowedTokenList, tokenDustThresholdCapList);
 
         // Pre-approve token allowances
         vm.startPrank(users.alice); // Example user for createPuppet

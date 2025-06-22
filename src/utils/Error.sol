@@ -89,7 +89,6 @@ library Error {
     error MirrorPosition__SettlementTransferFailed();
     error MirrorPosition__KeeperExecutionFeeNotFullyCovered();
     error MirrorPosition__PaymasterExecutionFeeNotFullyCovered(uint remaining);
-    error MirrorPosition__NoNetFundsAllocated();
 
     error GmxExecutionCallback__InvalidOrderType(GmxPositionUtils.OrderType orderType);
 

@@ -6,8 +6,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test} from "forge-std/src/Test.sol";
 import {console} from "forge-std/src/console.sol";
 
-import {Const} from "script/Const.sol";
-
 import {GmxExecutionCallback} from "src/position/GmxExecutionCallback.sol";
 import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
@@ -19,6 +17,7 @@ import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {BankStore} from "src/utils/BankStore.sol";
+import {Error} from "src/utils/Error.sol";
 
 import {Const} from "script/Const.sol";
 
@@ -113,7 +112,7 @@ contract TradingForkTest is Test {
                 platformSettleFeeFactor: 0.1e30, // 10%
                 maxPuppetList: 50,
                 maxKeeperFeeToAllocationRatio: 0.1e30, // 10%
-                maxKeeperFeeToAdjustmentRatio: 0.05e30, // 5%
+                maxKeeperFeeToAdjustmentRatio: 0.1e30, // 5%
                 maxKeeperFeeToCollectDustRatio: 0.1e30 // 10%
             })
         );
@@ -456,6 +455,52 @@ contract TradingForkTest is Test {
 
     //     vm.stopPrank();
     // }
+
+    function testKeeperFeeExceedsCostFactor() public {
+        vm.startPrank(owner);
+
+        // Create puppet list
+        address[] memory puppetList = new address[](1);
+        puppetList[0] = puppet1;
+
+        // Set up matching rule with a small allowance rate
+        matchingRule.setRule(
+            mirrorPosition,
+            USDC,
+            puppet1,
+            trader,
+            MatchingRule.Rule({
+                allowanceRate: 400, // Only 3% allowance rate (very small)
+                throttleActivity: 1 hours,
+                expiry: block.timestamp + 30 days
+            })
+        );
+
+        // Get current price
+        IChainlinkPriceFeedProvider.ValidatedPrice memory price =
+            IChainlinkPriceFeedProvider(Const.chainlinkPriceFeedProvider).getOraclePrice(Const.wnt, "");
+
+        // Create position with a very high keeper fee relative to allocation
+        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
+            collateralToken: USDC,
+            trader: trader,
+            market: Const.gmxEthUsdcMarket,
+            keeperExecutionFeeReceiver: owner,
+            isIncrease: true,
+            isLong: true,
+            executionFee: 0.001 ether,
+            collateralDelta: 100e6,
+            sizeDeltaInUsd: 1000e30,
+            acceptablePrice: price.min * 110,
+            triggerPrice: price.min,
+            keeperExecutionFee: 301831 // Very high keeper fee (50 USDC when puppet only has 1% of 100 USDC = 1 USDC
+                // allocated)
+        });
+
+        mirrorPosition.requestMirror{value: callParams.executionFee}(matchingRule, callParams, puppetList);
+
+        vm.stopPrank();
+    }
 
     function _getNextContractAddress(
         address user

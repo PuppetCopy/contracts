@@ -230,8 +230,6 @@ contract MirrorPosition is CoreContract {
 
         _allocation -= _keeperFee;
 
-        require(_allocation > 0, Error.MirrorPosition__NoNetFundsAllocated());
-
         uint _traderTargetLeverage = Precision.toBasisPoints(_callParams.sizeDeltaInUsd, _callParams.collateralDelta);
         uint _sizeDelta = (_callParams.sizeDeltaInUsd * _allocation) / _callParams.collateralDelta;
 
