@@ -22,4 +22,10 @@ interface IGmxOrderCallbackReceiver {
     /// @param key the key of the order
     /// @param order the order that was frozen
     function afterOrderFrozen(bytes32 key, GmxPositionUtils.Props memory order, bytes memory eventData) external;
+
+    /// @dev called to refund the execution fee of an order
+    /// @param key the key of the order
+    /// @param eventData the event data that was passed to the order execution
+    /// @notice this function is called when the order execution fails, and the execution fee needs
+    function refundExecutionFee(bytes32 key, bytes memory eventData) external payable;
 }

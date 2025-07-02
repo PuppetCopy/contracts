@@ -60,6 +60,12 @@ contract TradingForkTest is Test {
     address puppet1 = makeAddr("puppet1");
     address puppet2 = makeAddr("puppet2");
 
+    uint internal nextAllocationId = 0;
+
+    function getNextAllocationId() internal returns (uint) {
+        return ++nextAllocationId;
+    }
+
     function setUp() public {
         vm.createFork(vm.envString("RPC_URL"));
         vm.rollFork(340881246);
@@ -97,7 +103,11 @@ contract TradingForkTest is Test {
             })
         );
         gmxExecutionCallback = new GmxExecutionCallback(
-            dictator, GmxExecutionCallback.Config({mirrorPosition: MirrorPosition(_getNextContractAddress(msg.sender))})
+            dictator,
+            GmxExecutionCallback.Config({
+                mirrorPosition: MirrorPosition(_getNextContractAddress(msg.sender)),
+                refundExecutionFeeReceiver: Const.orderflowHandler
+            })
         );
         mirrorPosition = new MirrorPosition(
             dictator,
@@ -244,8 +254,10 @@ contract TradingForkTest is Test {
         console.log("Puppet2 balance before:", puppet2BalanceBefore);
 
         // Request mirror position
-        (address allocationAddress, uint allocationId, bytes32 requestKey) =
-            mirrorPosition.requestMirror{value: callParams.executionFee}(matchingRule, callParams, puppetList);
+        uint allocationId = getNextAllocationId();
+        (address allocationAddress, bytes32 requestKey) = mirrorPosition.requestMirror{value: callParams.executionFee}(
+            matchingRule, callParams, puppetList, allocationId
+        );
 
         console.log("Allocation address:", allocationAddress);
         console.log("Allocation ID:", allocationId);
@@ -496,8 +508,9 @@ contract TradingForkTest is Test {
             keeperExecutionFee: 301831 // Very high keeper fee (50 USDC when puppet only has 1% of 100 USDC = 1 USDC
                 // allocated)
         });
-
-        mirrorPosition.requestMirror{value: callParams.executionFee}(matchingRule, callParams, puppetList);
+        mirrorPosition.requestMirror{value: callParams.executionFee}(
+            matchingRule, callParams, puppetList, getNextAllocationId()
+        );
 
         vm.stopPrank();
     }

@@ -33,15 +33,16 @@ contract DeployPosition is BaseScript {
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
         // deployContracts();
         // setMirrorPositionConfig();
-        // deployMirrorPosition(
-        //     AllocationStore(getDeployedAddress("AllocationStore")), MatchingRule(getDeployedAddress("MatchingRule"))
-        // );
-
-        // updateRouter(
-        //     MirrorPosition(getDeployedAddress("MirrorPosition")),
-        //     MatchingRule(getDeployedAddress("MatchingRule")),
-        //     FeeMarketplace(getDeployedAddress("FeeMarketplace"))
-        // );
+        deployMirrorPosition(
+            AllocationStore(getDeployedAddress("AllocationStore")),
+            MatchingRule(getDeployedAddress("MatchingRule")),
+            FeeMarketplace(getDeployedAddress("FeeMarketplace"))
+        );
+        updateRouter(
+            MirrorPosition(getDeployedAddress("MirrorPosition")),
+            MatchingRule(getDeployedAddress("MatchingRule")),
+            FeeMarketplace(getDeployedAddress("FeeMarketplace"))
+        );
         vm.stopBroadcast();
     }
 
@@ -71,18 +72,16 @@ contract DeployPosition is BaseScript {
         );
 
         (MirrorPosition mirrorPosition, IERC20[] memory allowedTokenList) =
-            deployMirrorPosition(allocationStore, matchingRule);
+            deployMirrorPosition(allocationStore, matchingRule, feeMarketplace);
 
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
 
         dictator.setAccess(allocationStore, address(matchingRule));
-        dictator.setAccess(allocationStore, address(mirrorPosition));
         dictator.setAccess(allocationStore, address(feeMarketplace));
         dictator.setAccess(allocationStore, address(feeMarketplaceStore));
         dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
 
-        dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
         dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, Const.dao);
         dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, address(routerProxy));
 
@@ -127,7 +126,8 @@ contract DeployPosition is BaseScript {
 
     function deployMirrorPosition(
         AllocationStore allocationStore,
-        MatchingRule matchingRule
+        MatchingRule matchingRule,
+        FeeMarketplace feeMarketplace
     ) public returns (MirrorPosition mirrorPosition, IERC20[] memory allowedTokenList) {
         allowedTokenList = new IERC20[](2);
         allowedTokenList[0] = IERC20(Const.wnt);
@@ -136,7 +136,8 @@ contract DeployPosition is BaseScript {
         GmxExecutionCallback gmxCallbackHandler = new GmxExecutionCallback(
             dictator,
             GmxExecutionCallback.Config({
-                mirrorPosition: MirrorPosition(getNextCreateAddress()) // Placeholder, will be set later
+                mirrorPosition: MirrorPosition(getNextCreateAddress()),
+                refundExecutionFeeReceiver: Const.orderflowHandler
             })
         );
         mirrorPosition = new MirrorPosition(
@@ -147,8 +148,8 @@ contract DeployPosition is BaseScript {
                 callbackHandler: address(gmxCallbackHandler),
                 gmxOrderVault: Const.gmxOrderVault,
                 referralCode: Const.referralCode,
-                increaseCallbackGasLimit: 100_000,
-                decreaseCallbackGasLimit: 100_000,
+                increaseCallbackGasLimit: 200_000,
+                decreaseCallbackGasLimit: 200_000,
                 platformSettleFeeFactor: 0.01e30,
                 maxPuppetList: 50,
                 maxKeeperFeeToAllocationRatio: 0.1e30,
@@ -159,12 +160,12 @@ contract DeployPosition is BaseScript {
         dictator.initContract(mirrorPosition);
 
         dictator.setPermission(
-            gmxCallbackHandler, gmxCallbackHandler.afterOrderExecution.selector, Const.gmxOrderHandler
-        );
-        dictator.setPermission(
             gmxCallbackHandler, gmxCallbackHandler.afterOrderExecution.selector, Const.gmxLiquidationHandler
         );
         dictator.setPermission(gmxCallbackHandler, gmxCallbackHandler.afterOrderExecution.selector, Const.gmxAdlHandler);
+        dictator.setPermission(
+            gmxCallbackHandler, gmxCallbackHandler.afterOrderExecution.selector, Const.gmxOrderHandler
+        );
         dictator.setPermission(
             gmxCallbackHandler, gmxCallbackHandler.afterOrderCancellation.selector, Const.gmxOrderHandler
         );
@@ -185,6 +186,8 @@ contract DeployPosition is BaseScript {
         mirrorPosition.setTokenDustThresholdList(allowedTokenList, tokenDustThresholdCapList);
         dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(gmxCallbackHandler));
         dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, address(gmxCallbackHandler));
+        dictator.setAccess(allocationStore, address(mirrorPosition));
+        dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
 
         // return mirrorPosition;
         return (mirrorPosition, allowedTokenList);

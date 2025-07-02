@@ -3,6 +3,7 @@ pragma solidity ^0.8.29;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -18,7 +19,6 @@ import {Error} from "./../utils/Error.sol";
 import {ErrorUtils} from "./../utils/ErrorUtils.sol";
 import {Precision} from "./../utils/Precision.sol";
 import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
-import {AllocationAccountUtils} from "./utils/AllocationAccountUtils.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
@@ -82,8 +82,6 @@ contract MirrorPosition is CoreContract {
     Config public config;
     IERC20[] public tokenDustThresholdList;
 
-    uint public nextAllocationId = 0;
-
     mapping(bytes32 traderMatchingKey => mapping(address puppet => uint)) public lastActivityThrottleMap;
     mapping(address allocationAddress => mapping(address puppet => uint)) public allocationPuppetMap;
     mapping(address allocationAddress => uint) public allocationMap;
@@ -98,9 +96,8 @@ contract MirrorPosition is CoreContract {
     function getAllocationByKey(
         bytes32 _allocationKey
     ) external view returns (uint) {
-        address _allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
-            allocationStoreImplementation, _allocationKey, address(this)
-        );
+        address _allocationAddress =
+            Clones.predictDeterministicAddress(allocationStoreImplementation, _allocationKey, address(this));
         return allocationMap[_allocationAddress];
     }
 
@@ -165,15 +162,16 @@ contract MirrorPosition is CoreContract {
      * @param _callParams Structure containing details of the trader's initial action (must be `isIncrease=true`),
      * market, collateral, size/collateral deltas, GMX execution fee, keeper fee, and keeper fee receiver.
      * @param _puppetList An array of puppet addresses to potentially participate in mirroring this position.
+     * @param _allocationId The unique ID for this allocation instance, provided by the keeper.
      * @return _allocationAddress The unique address of the allocation account created for a newly created position.
-     * @return _nextAllocationId A unique ID generated for this specific allocation instance.
      * @return _requestKey The unique key returned by GMX identifying the created order request, used for callbacks.
      */
     function requestMirror(
         MatchingRule _matchingRule,
         CallPosition calldata _callParams,
-        address[] calldata _puppetList
-    ) external payable auth returns (address _allocationAddress, uint _nextAllocationId, bytes32 _requestKey) {
+        address[] calldata _puppetList,
+        uint _allocationId
+    ) external payable auth returns (address _allocationAddress, bytes32 _requestKey) {
         uint _puppetListLength = _puppetList.length;
         require(_puppetListLength > 0, Error.MirrorPosition__PuppetListEmpty());
         require(_puppetListLength <= config.maxPuppetList, Error.MirrorPosition__MaxPuppetList());
@@ -186,11 +184,11 @@ contract MirrorPosition is CoreContract {
         require(_callParams.isIncrease, Error.MirrorPosition__InitialMustBeIncrease());
         require(_callParams.collateralDelta > 0, Error.MirrorPosition__InvalidCollateralDelta());
         require(_callParams.sizeDeltaInUsd > 0, Error.MirrorPosition__InvalidSizeDelta());
+        require(_allocationId > 0, Error.MirrorPosition__InvalidAllocationId());
 
-        _nextAllocationId = ++nextAllocationId;
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
-        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _nextAllocationId);
-        _allocationAddress = AllocationAccountUtils.cloneDeterministic(allocationStoreImplementation, _allocationKey);
+        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _allocationId);
+        _allocationAddress = Clones.cloneDeterministic(allocationStoreImplementation, _allocationKey);
 
         MatchingRule.Rule[] memory _ruleList = _matchingRule.getRuleList(_traderMatchingKey, _puppetList);
         uint[] memory _nextBalanceList = allocationStore.getBalanceList(_callParams.collateralToken, _puppetList);
@@ -267,7 +265,8 @@ contract MirrorPosition is CoreContract {
                 _allocation,
                 _sizeDelta,
                 _traderTargetLeverage,
-                _nextBalanceList
+                _nextBalanceList,
+                _puppetList
             )
         );
     }
@@ -320,9 +319,8 @@ contract MirrorPosition is CoreContract {
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
         bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _allocationId);
 
-        address _allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
-            allocationStoreImplementation, _allocationKey, address(this)
-        );
+        address _allocationAddress =
+            Clones.predictDeterministicAddress(allocationStoreImplementation, _allocationKey, address(this));
         require(CallUtils.isContract(_allocationAddress), Error.MirrorPosition__AllocationAccountNotFound());
 
         Position memory _position = positionMap[_allocationAddress];
@@ -573,9 +571,8 @@ contract MirrorPosition is CoreContract {
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
         bytes32 _allocationKey =
             PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId);
-        address _allocationAddress = AllocationAccountUtils.predictDeterministicAddress(
-            allocationStoreImplementation, _allocationKey, address(this)
-        );
+        address _allocationAddress =
+            Clones.predictDeterministicAddress(allocationStoreImplementation, _allocationKey, address(this));
 
         require(CallUtils.isContract(_allocationAddress), Error.MirrorPosition__AllocationAccountNotFound());
 

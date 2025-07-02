@@ -14,6 +14,7 @@ import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
     struct Config {
         MirrorPosition mirrorPosition;
+        address refundExecutionFeeReceiver; // Address to receive execution fee refunds
     }
 
     struct UnhandledCallback {
@@ -77,6 +78,20 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
         bytes calldata /*eventData*/
     ) external auth {
         _storeUnhandledCallback(key, "Freezing not implemented");
+    }
+
+
+    function refundExecutionFee(
+        bytes32 key,
+        bytes calldata /*eventData*/
+    ) external payable auth {
+        require(msg.value > 0, "No execution fee to refund");
+
+        // Refund the execution fee to the configured receiver
+        (bool success, ) = config.refundExecutionFeeReceiver.call{value: msg.value}("");
+        require(success, Error.GmxExecutionCallback__FailedRefundExecutionFee());
+
+        _logEvent("RefundExecutionFee", abi.encode(key, msg.value));
     }
 
     function _storeUnhandledCallback(bytes32 _key, bytes memory error) internal {

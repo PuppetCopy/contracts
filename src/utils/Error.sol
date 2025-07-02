@@ -60,6 +60,7 @@ library Error {
     error MatchingRule__InvalidActivityThrottle(uint minAllocationActivity, uint maxAllocationActivity);
     error MirrorPosition__InvalidAllocation();
     error MatchingRule__InvalidExpiryDuration(uint minExpiryDuration);
+    error MirrorPosition__InvalidAllocationId();
     error MirrorPosition__InvalidAllocationOrFullyReduced();
     error MirrorPosition__InvalidCollateralDelta();
     error MirrorPosition__InvalidCurrentLeverage();
@@ -91,6 +92,7 @@ library Error {
     error MirrorPosition__PaymasterExecutionFeeNotFullyCovered(uint remaining);
 
     error GmxExecutionCallback__InvalidOrderType(GmxPositionUtils.OrderType orderType);
+    error GmxExecutionCallback__FailedRefundExecutionFee();
 
     error AllocationAccount__UnauthorizedOperator();
     error AllocationAccount__InsufficientBalance();
