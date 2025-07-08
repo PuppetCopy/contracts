@@ -7,6 +7,7 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {FeeMarketplace} from "../shared/FeeMarketplace.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
@@ -22,7 +23,7 @@ import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
-contract MirrorPosition is CoreContract {
+contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
     struct Config {
         IGmxExchangeRouter gmxExchangeRouter;
         address callbackHandler;
@@ -84,7 +85,7 @@ contract MirrorPosition is CoreContract {
     IERC20[] public tokenDustThresholdList;
 
     mapping(bytes32 traderMatchingKey => mapping(address puppet => uint)) public lastActivityThrottleMap;
-    mapping(address allocationAddress => mapping(address puppet => uint)) public allocationPuppetMap;
+    mapping(address allocationAddress => uint[]) public allocationPuppetArray;
     mapping(address allocationAddress => uint) public allocationMap;
     mapping(address allocationAddress => Position) public positionMap;
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
@@ -170,7 +171,7 @@ contract MirrorPosition is CoreContract {
         MatchingRule _matchingRule,
         CallPosition calldata _callParams,
         address[] calldata _puppetList
-    ) external payable auth returns (address _allocationAddress, bytes32 _requestKey) {
+    ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
         uint _puppetListLength = _puppetList.length;
         require(_puppetListLength > 0, Error.MirrorPosition__PuppetListEmpty());
         require(
@@ -198,6 +199,9 @@ contract MirrorPosition is CoreContract {
         uint _estimatedExecutionFeePerPuppet = _keeperFee / _puppetListLength;
         uint _allocation = 0;
 
+        // Initialize the allocation array with proper length
+        allocationPuppetArray[_allocationAddress] = new uint[](_puppetListLength);
+
         for (uint i = 0; i < _puppetListLength; i++) {
             MatchingRule.Rule memory rule = _ruleList[i];
             address _puppet = _puppetList[i];
@@ -214,7 +218,7 @@ contract MirrorPosition is CoreContract {
                     continue;
                 }
 
-                allocationPuppetMap[_allocationAddress][_puppet] = _puppetAllocation;
+                allocationPuppetArray[_allocationAddress][i] = _puppetAllocation;
                 _nextBalanceList[i] -= _puppetAllocation;
                 _allocation += _puppetAllocation;
                 lastActivityThrottleMap[_traderMatchingKey][_puppet] = block.timestamp + rule.throttleActivity;
@@ -231,7 +235,7 @@ contract MirrorPosition is CoreContract {
         _allocation -= _keeperFee;
 
         uint _traderTargetLeverage = Precision.toBasisPoints(_callParams.sizeDeltaInUsd, _callParams.collateralDelta);
-        uint _sizeDelta = (_callParams.sizeDeltaInUsd * _allocation) / _callParams.collateralDelta;
+        uint _sizeDelta = Math.mulDiv(_callParams.sizeDeltaInUsd, _allocation, _callParams.collateralDelta);
 
         allocationStore.transferOut(_callParams.collateralToken, _keeperFeeReceiver, _keeperFee);
         allocationStore.transferOut(_callParams.collateralToken, config.gmxOrderVault, _allocation);
@@ -300,7 +304,7 @@ contract MirrorPosition is CoreContract {
     function requestAdjust(
         CallPosition calldata _callParams,
         address[] calldata _puppetList
-    ) external payable auth returns (bytes32 _requestKey) {
+    ) external payable auth nonReentrant returns (bytes32 _requestKey) {
         uint _puppetListLength = _puppetList.length;
         require(_puppetListLength > 0, Error.MirrorPosition__PuppetListEmpty());
         require(
@@ -341,18 +345,24 @@ contract MirrorPosition is CoreContract {
         );
 
         for (uint i = 0; i < _puppetListLength; i++) {
-            address _puppet = _puppetList[i];
-            uint _puppetAllocation = allocationPuppetMap[_allocationAddress][_puppet];
+            uint _puppetAllocation = allocationPuppetArray[_allocationAddress][i];
 
             if (_puppetAllocation == 0) continue;
 
-            uint _executionFee = _remainingKeeperFeeToCollect / (_puppetListLength - i);
+            // Calculate execution fee more precisely to avoid rounding errors
+            uint _remainingPuppets = _puppetListLength - i;
+            uint _executionFee = (_remainingKeeperFeeToCollect + _remainingPuppets - 1) / _remainingPuppets; // Ceiling division
+            
+            // Ensure we don't exceed remaining fee
+            if (_executionFee > _remainingKeeperFeeToCollect) {
+                _executionFee = _remainingKeeperFeeToCollect;
+            }
 
             if (_nextBalanceList[i] >= _executionFee) {
                 _nextBalanceList[i] -= _executionFee;
                 _remainingKeeperFeeToCollect -= _executionFee;
             } else {
-                allocationPuppetMap[_allocationAddress][_puppet] =
+                allocationPuppetArray[_allocationAddress][i] =
                     _puppetAllocation >= _executionFee ? _puppetAllocation - _executionFee : 0;
                 _puppetKeeperExecutionFeeInsolvency += _executionFee;
             }
@@ -399,7 +409,7 @@ contract MirrorPosition is CoreContract {
 
         uint _sizeDelta;
         if (_traderTargetLeverage > _currentPuppetLeverage) {
-            _sizeDelta = _position.size * (_traderTargetLeverage - _currentPuppetLeverage) / _currentPuppetLeverage;
+            _sizeDelta = Math.mulDiv(_position.size, (_traderTargetLeverage - _currentPuppetLeverage), _currentPuppetLeverage);
             _requestKey = _submitOrder(
                 _callParams,
                 _allocationAddress,
@@ -411,7 +421,7 @@ contract MirrorPosition is CoreContract {
         } else {
             _sizeDelta = (_traderTargetLeverage == 0)
                 ? _position.size
-                : _position.size * (_currentPuppetLeverage - _traderTargetLeverage) / _currentPuppetLeverage;
+                : Math.mulDiv(_position.size, (_currentPuppetLeverage - _traderTargetLeverage), _currentPuppetLeverage);
             _requestKey = _submitOrder(
                 _callParams,
                 _allocationAddress,
@@ -561,7 +571,7 @@ contract MirrorPosition is CoreContract {
         FeeMarketplace _feeMarketpalce,
         CallSettle calldata _callParams,
         address[] calldata _puppetList
-    ) external auth {
+    ) external auth nonReentrant {
         uint _puppetListLength = _puppetList.length;
         require(_puppetListLength > 0, Error.MirrorPosition__PuppetListEmpty());
         require(
@@ -630,10 +640,10 @@ contract MirrorPosition is CoreContract {
             uint _distributedTotal = 0;
 
             for (uint i = 0; i < _puppetListLength; i++) {
-                uint _puppetAllocationShare = allocationPuppetMap[_allocationAddress][_puppetList[i]];
+                uint _puppetAllocationShare = allocationPuppetArray[_allocationAddress][i];
                 if (_puppetAllocationShare == 0) continue;
 
-                uint _puppetDistribution = (_distributionAmount * _puppetAllocationShare) / _allocation;
+                uint _puppetDistribution = Math.mulDiv(_distributionAmount, _puppetAllocationShare, _allocation);
 
                 _nextBalanceList[i] += _puppetDistribution;
                 _distributedTotal += _puppetDistribution;
@@ -656,7 +666,7 @@ contract MirrorPosition is CoreContract {
         );
     }
 
-    function collectDust(AllocationAccount _allocationAccount, IERC20 _dustToken, address _receiver) external auth {
+    function collectDust(AllocationAccount _allocationAccount, IERC20 _dustToken, address _receiver) external auth nonReentrant {
         require(_receiver != address(0), Error.MirrorPosition__InvalidReceiver());
 
         uint _dustAmount = _dustToken.balanceOf(address(_allocationAccount));

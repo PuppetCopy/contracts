@@ -301,7 +301,7 @@ contract TradingTest is BasicSetup {
 
         for (uint i = 0; i < puppetList.length; i++) {
             address puppet = puppetList[i];
-            uint contribution = mirrorPosition.allocationPuppetMap(allocationAddress, puppet);
+            uint contribution = mirrorPosition.allocationPuppetArray(allocationAddress, i);
             assertEq(contribution, initialContributionPerPuppet, "Contribution mismatch"); // Verify assumption
 
             // Calculate expected share based on INITIAL GROSS allocation ratio
@@ -386,9 +386,9 @@ contract TradingTest is BasicSetup {
 
         mirrorPosition.execute(requestKey);
 
-        uint puppet1Contribution = mirrorPosition.allocationPuppetMap(allocationAddress, puppet1);
-        uint puppet2Contribution = mirrorPosition.allocationPuppetMap(allocationAddress, puppet2);
-        uint puppet3Contribution = mirrorPosition.allocationPuppetMap(allocationAddress, puppet3);
+        uint puppet1Contribution = mirrorPosition.allocationPuppetArray(allocationAddress, 0);
+        uint puppet2Contribution = mirrorPosition.allocationPuppetArray(allocationAddress, 1);
+        uint puppet3Contribution = mirrorPosition.allocationPuppetArray(allocationAddress, 2);
         uint initialGrossTotalContribution = puppet1Contribution + puppet2Contribution + puppet3Contribution;
         uint netAllocationFromMirror = mirrorPosition.getAllocation(allocationAddress);
 
@@ -489,9 +489,9 @@ contract TradingTest is BasicSetup {
             mirrorPosition.requestMirror{value: callOpen.executionFee}(matchingRule, callOpen, puppetList);
         assertNotEq(callOpen.allocationId, 0);
 
-        uint puppet1Allocation = mirrorPosition.allocationPuppetMap(allocationAddress, puppet1);
-        uint puppet2Allocation = mirrorPosition.allocationPuppetMap(allocationAddress, puppet2);
-        uint puppet3Allocation = mirrorPosition.allocationPuppetMap(allocationAddress, puppet3);
+        uint puppet1Allocation = mirrorPosition.allocationPuppetArray(allocationAddress, 0);
+        uint puppet2Allocation = mirrorPosition.allocationPuppetArray(allocationAddress, 1);
+        uint puppet3Allocation = mirrorPosition.allocationPuppetArray(allocationAddress, 2);
 
         uint netAllocationFromMirror = mirrorPosition.getAllocation(allocationAddress);
         assertEq(netAllocationFromMirror, 29e6);
