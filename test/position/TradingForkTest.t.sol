@@ -231,11 +231,12 @@ contract TradingForkTest is Test {
             IChainlinkPriceFeedProvider(Const.chainlinkPriceFeedProvider).getOraclePrice(Const.wnt, "");
 
         // Create position call parameters
+        uint allocationId = getNextAllocationId();
         MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
             collateralToken: USDC,
             trader: trader,
             market: Const.gmxEthUsdcMarket, // ETH/USD market
-            keeperExecutionFeeReceiver: owner,
+            keeperFeeReceiver: owner,
             isIncrease: true,
             isLong: true,
             executionFee: 0.001 ether, // GMX execution fee
@@ -243,7 +244,8 @@ contract TradingForkTest is Test {
             sizeDeltaInUsd: 1000e30, // 1000 USD position (10x leverage)
             acceptablePrice: price.min * 110, // 10% slippage
             triggerPrice: price.min,
-            keeperExecutionFee: 1e6 // 1 USDC keeper fee
+            keeperExecutionFee: 1e6, // 1 USDC keeper fee
+            allocationId: allocationId
         });
 
         // Check initial balances
@@ -254,10 +256,8 @@ contract TradingForkTest is Test {
         console.log("Puppet2 balance before:", puppet2BalanceBefore);
 
         // Request mirror position
-        uint allocationId = getNextAllocationId();
-        (address allocationAddress, bytes32 requestKey) = mirrorPosition.requestMirror{value: callParams.executionFee}(
-            matchingRule, callParams, puppetList, allocationId
-        );
+        (address allocationAddress, bytes32 requestKey) =
+            mirrorPosition.requestMirror{value: callParams.executionFee}(matchingRule, callParams, puppetList);
 
         console.log("Allocation address:", allocationAddress);
         console.log("Allocation ID:", allocationId);
@@ -305,168 +305,251 @@ contract TradingForkTest is Test {
         vm.stopPrank();
     }
 
-    // function testForkDecreasePosition() public {
-    //     vm.startPrank(owner);
+    function testForkDecreasePosition() public {
+        vm.startPrank(owner);
 
-    //     // Create puppet list
-    //     address[] memory puppetList = new address[](2);
-    //     puppetList[0] = puppet1;
-    //     puppetList[1] = puppet2;
+        // Create puppet list with different allocation rates
+        address[] memory puppetList = new address[](2);
+        puppetList[0] = puppet1;
+        puppetList[1] = puppet2;
 
-    //     // Set up matching rules for puppets
-    //     matchingRule.setRule(
-    //         mirrorPosition,
-    //         USDC,
-    //         puppet1,
-    //         trader,
-    //         MatchingRule.Rule({
-    //             allowanceRate: 1000, // 10%
-    //             throttleActivity: 1 hours,
-    //             expiry: block.timestamp + 30 days
-    //         })
-    //     );
+        // Set up asymmetric matching rules to test proportional decreases
+        matchingRule.setRule(
+            mirrorPosition,
+            USDC,
+            puppet1,
+            trader,
+            MatchingRule.Rule({
+                allowanceRate: 1000, // 10% allocation rate
+                throttleActivity: 1 hours,
+                expiry: block.timestamp + 30 days
+            })
+        );
 
-    //     matchingRule.setRule(
-    //         mirrorPosition,
-    //         USDC,
-    //         puppet2,
-    //         trader,
-    //         MatchingRule.Rule({
-    //             allowanceRate: 1500, // 15%
-    //             throttleActivity: 1 hours,
-    //             expiry: block.timestamp + 30 days
-    //         })
-    //     );
+        matchingRule.setRule(
+            mirrorPosition,
+            USDC,
+            puppet2,
+            trader,
+            MatchingRule.Rule({
+                allowanceRate: 2000, // 20% allocation rate (2x puppet1)
+                throttleActivity: 1 hours,
+                expiry: block.timestamp + 30 days
+            })
+        );
 
-    //     // Get current price for calculations
-    //     IChainlinkPriceFeedProvider.ValidatedPrice memory price =
-    //         IChainlinkPriceFeedProvider(Const.chainlinkPriceFeedProvider).getOraclePrice(Const.wnt, "");
+        // Get ETH price for realistic market conditions
+        IChainlinkPriceFeedProvider.ValidatedPrice memory ethPrice =
+            IChainlinkPriceFeedProvider(Const.chainlinkPriceFeedProvider).getOraclePrice(Const.wnt, "");
 
-    //     // STEP 1: Create initial position (increase)
-    //     MirrorPosition.CallPosition memory increaseParams = MirrorPosition.CallPosition({
-    //         collateralToken: USDC,
-    //         trader: trader,
-    //         market: Const.gmxEthUsdcMarket,
-    //         keeperExecutionFeeReceiver: owner,
-    //         isIncrease: true,
-    //         isLong: true,
-    //         executionFee: 0.001 ether,
-    //         collateralDelta: 100e6, // 100 USDC
-    //         sizeDeltaInUsd: 1000e30, // 1000 USD position (10x leverage)
-    //         acceptablePrice: price.min * 110, // 10% slippage
-    //         triggerPrice: price.min,
-    //         keeperExecutionFee: 1e6 // 1 USDC keeper fee
-    //     });
+        console.log("ETH Price (min/max):", ethPrice.min, "/", ethPrice.max);
 
-    //     // Request initial mirror position
-    //     (address allocationAddress, uint allocationId, bytes32 requestKey) =
-    //         mirrorPosition.requestMirror{value: increaseParams.executionFee}(matchingRule, increaseParams,
-    // puppetList);
+        // STEP 1: Create substantial initial position
+        uint allocationId = getNextAllocationId();
+        MirrorPosition.CallPosition memory increaseParams = MirrorPosition.CallPosition({
+            collateralToken: USDC,
+            trader: trader,
+            market: Const.gmxEthUsdcMarket,
+            keeperFeeReceiver: owner,
+            isIncrease: true,
+            isLong: true,
+            executionFee: 0.001 ether,
+            collateralDelta: 200e6, // 200 USDC collateral
+            sizeDeltaInUsd: 2000e30, // 2000 USD position (10x leverage)
+            acceptablePrice: ethPrice.max * 105 / 100, // 5% slippage tolerance
+            triggerPrice: ethPrice.min,
+            keeperExecutionFee: 1e6, // 1 USDC keeper fee
+            allocationId: allocationId
+        });
 
-    //     // Execute the initial position
-    //     mirrorPosition.execute(requestKey);
+        // Track initial puppet balances
+        uint puppet1InitialBalance = allocationStore.userBalanceMap(USDC, puppet1);
+        uint puppet2InitialBalance = allocationStore.userBalanceMap(USDC, puppet2);
 
-    //     // Verify position was created
-    //     MirrorPosition.Position memory position = mirrorPosition.getPosition(allocationAddress);
-    //     assertGt(position.size, 0, "Initial position size should be > 0");
-    //     assertEq(position.traderSize, increaseParams.sizeDeltaInUsd, "Initial trader size should match");
+        console.log("=== INITIAL POSITION SETUP ===");
+        console.log("Puppet1 initial balance:", puppet1InitialBalance);
+        console.log("Puppet2 initial balance:", puppet2InitialBalance);
 
-    //     console.log("Initial position created:");
-    //     console.log("- Trader size:", position.traderSize);
-    //     console.log("- Mirror size:", position.size);
-    //     console.log("- Trader collateral:", position.traderCollateral);
+        // Request and execute initial position
+        (address allocationAddress, bytes32 initialRequestKey) =
+            mirrorPosition.requestMirror{value: increaseParams.executionFee}(matchingRule, increaseParams, puppetList);
 
-    //     // STEP 2: Decrease the position
-    //     MirrorPosition.CallPosition memory decreaseParams = MirrorPosition.CallPosition({
-    //         collateralToken: USDC,
-    //         trader: trader,
-    //         market: Const.gmxEthUsdcMarket,
-    //         keeperExecutionFeeReceiver: owner,
-    //         isIncrease: false, // This is a decrease
-    //         isLong: true,
-    //         executionFee: 0.001 ether,
-    //         collateralDelta: 50e6, // Reduce collateral by 50 USDC
-    //         sizeDeltaInUsd: 500e30, // Reduce size by 500 USD (half the position)
-    //         acceptablePrice: price.min * 90, // 10% slippage for decrease
-    //         triggerPrice: price.min,
-    //         keeperExecutionFee: 1e6 // 1 USDC keeper fee
-    //     });
+        // Verify allocations were made proportionally
+        uint puppet1Allocation = mirrorPosition.allocationPuppetMap(allocationAddress, puppet1);
+        uint puppet2Allocation = mirrorPosition.allocationPuppetMap(allocationAddress, puppet2);
+        uint totalAllocation = mirrorPosition.getAllocation(allocationAddress);
 
-    //     // Check puppet balances before decrease
-    //     uint puppet1BalanceBefore = allocationStore.userBalanceMap(USDC, puppet1);
-    //     uint puppet2BalanceBefore = allocationStore.userBalanceMap(USDC, puppet2);
+        console.log("Puppet1 allocation:", puppet1Allocation);
+        console.log("Puppet2 allocation:", puppet2Allocation);
+        console.log("Total net allocation:", totalAllocation);
 
-    //     console.log("Balances before decrease:");
-    //     console.log("- Puppet1:", puppet1BalanceBefore);
-    //     console.log("- Puppet2:", puppet2BalanceBefore);
+        // Puppet2 should have approximately 2x puppet1's allocation due to 2x allowance rate
+        assertApproxEqRel(puppet2Allocation, puppet1Allocation * 2, 0.01e18, "Puppet2 should have ~2x puppet1 allocation");
 
-    //     // Request position adjustment (decrease)
-    //     bytes32 decreaseRequestKey =
-    //         mirrorPosition.requestAdjust{value: decreaseParams.executionFee}(decreaseParams, puppetList,
-    // allocationId);
+        mirrorPosition.execute(initialRequestKey);
 
-    //     console.log("Decrease request key:", vm.toString(decreaseRequestKey));
+        MirrorPosition.Position memory initialPosition = mirrorPosition.getPosition(allocationAddress);
+        assertGt(initialPosition.size, 0, "Initial position size should be > 0");
+        assertEq(initialPosition.traderSize, increaseParams.sizeDeltaInUsd, "Initial trader size should match");
+        assertEq(initialPosition.traderCollateral, increaseParams.collateralDelta, "Initial trader collateral should match");
 
-    //     // Verify request adjustment was stored
-    //     MirrorPosition.RequestAdjustment memory adjustmentRequest =
-    //         mirrorPosition.getRequestAdjustment(decreaseRequestKey);
-    //     assertEq(adjustmentRequest.allocationAddress, allocationAddress, "Allocation address should match");
-    //     assertFalse(adjustmentRequest.traderIsIncrease, "Should be decrease");
-    //     assertEq(adjustmentRequest.traderSizeDelta, decreaseParams.sizeDeltaInUsd, "Size delta should match");
-    //     assertEq(
-    //         adjustmentRequest.traderCollateralDelta, decreaseParams.collateralDelta, "Collateral delta should match"
-    //     );
+        console.log("Initial position created:");
+        console.log("- Trader size (USD):", initialPosition.traderSize / 1e30);
+        console.log("- Mirror size (USD):", initialPosition.size / 1e30);
+        console.log("- Trader collateral (USDC):", initialPosition.traderCollateral / 1e6);
 
-    //     // Execute the decrease
-    //     mirrorPosition.execute(decreaseRequestKey);
+        // STEP 2: Perform partial decrease (25% position close)
+        MirrorPosition.CallPosition memory partialDecreaseParams = MirrorPosition.CallPosition({
+            collateralToken: USDC,
+            trader: trader,
+            market: Const.gmxEthUsdcMarket,
+            keeperFeeReceiver: owner,
+            isIncrease: false,
+            isLong: true,
+            executionFee: 0.001 ether,
+            collateralDelta: 50e6, // Reduce collateral by 50 USDC (25% of 200)
+            sizeDeltaInUsd: 500e30, // Reduce size by 500 USD (25% of 2000)
+            acceptablePrice: ethPrice.min * 95 / 100, // 5% slippage for decrease
+            triggerPrice: ethPrice.min,
+            keeperExecutionFee: 0.5e6, // 0.5 USDC keeper fee for adjustment
+            allocationId: allocationId
+        });
 
-    //     // Verify position was decreased
-    //     MirrorPosition.Position memory updatedPosition = mirrorPosition.getPosition(allocationAddress);
+        // Track puppet balances before partial decrease
+        uint puppet1BalanceBeforePartial = allocationStore.userBalanceMap(USDC, puppet1);
+        uint puppet2BalanceBeforePartial = allocationStore.userBalanceMap(USDC, puppet2);
 
-    //     uint expectedTraderSize = position.traderSize - decreaseParams.sizeDeltaInUsd;
-    //     uint expectedTraderCollateral = position.traderCollateral - decreaseParams.collateralDelta;
+        console.log("\n=== PARTIAL DECREASE (25%) ===");
+        console.log("Puppet balances before partial decrease:");
+        console.log("- Puppet1:", puppet1BalanceBeforePartial);
+        console.log("- Puppet2:", puppet2BalanceBeforePartial);
 
-    //     assertEq(updatedPosition.traderSize, expectedTraderSize, "Trader size should be reduced");
-    //     assertEq(updatedPosition.traderCollateral, expectedTraderCollateral, "Trader collateral should be reduced");
-    //     assertLt(updatedPosition.size, position.size, "Mirror position size should be reduced");
-    //     assertGt(updatedPosition.size, 0, "Position should still exist after partial decrease");
+        bytes32 partialDecreaseKey = mirrorPosition.requestAdjust{value: partialDecreaseParams.executionFee}(
+            partialDecreaseParams, puppetList
+        );
 
-    //     console.log("Position after decrease:");
-    //     console.log("- Trader size:", updatedPosition.traderSize);
-    //     console.log("- Mirror size:", updatedPosition.size);
-    //     console.log("- Trader collateral:", updatedPosition.traderCollateral);
+        // Verify adjustment request was stored correctly
+        MirrorPosition.RequestAdjustment memory partialAdjustmentRequest =
+            mirrorPosition.getRequestAdjustment(partialDecreaseKey);
+        assertEq(partialAdjustmentRequest.allocationAddress, allocationAddress, "Allocation address should match");
+        assertFalse(partialAdjustmentRequest.traderIsIncrease, "Should be decrease");
+        assertEq(partialAdjustmentRequest.traderSizeDelta, partialDecreaseParams.sizeDeltaInUsd, "Size delta should match");
 
-    //     // Calculate expected new leverage
-    //     uint newTraderLeverage = (updatedPosition.traderCollateral > 0)
-    //         ? (updatedPosition.traderSize * 10000) / updatedPosition.traderCollateral
-    //         : 0;
+        mirrorPosition.execute(partialDecreaseKey);
 
-    //     console.log("New trader leverage (basis points):", newTraderLeverage);
+        MirrorPosition.Position memory partialPosition = mirrorPosition.getPosition(allocationAddress);
+        uint expectedPartialTraderSize = initialPosition.traderSize - partialDecreaseParams.sizeDeltaInUsd;
+        uint expectedPartialTraderCollateral = initialPosition.traderCollateral - partialDecreaseParams.collateralDelta;
 
-    //     // Verify the decrease was proportional
-    //     assertApproxEqRel(
-    //         updatedPosition.size * 2, // Doubled because we reduced by half
-    //         position.size,
-    //         0.01e18, // 1% tolerance for rounding
-    //         "Position size should be approximately halved"
-    //     );
+        assertEq(partialPosition.traderSize, expectedPartialTraderSize, "Partial: Trader size should be reduced correctly");
+        assertEq(partialPosition.traderCollateral, expectedPartialTraderCollateral, "Partial: Trader collateral should be reduced correctly");
+        assertLt(partialPosition.size, initialPosition.size, "Partial: Mirror position size should be reduced");
+        assertGt(partialPosition.size, 0, "Partial: Position should still exist");
 
-    //     // Check that puppet balances were adjusted for keeper fees
-    //     uint puppet1BalanceAfter = allocationStore.userBalanceMap(USDC, puppet1);
-    //     uint puppet2BalanceAfter = allocationStore.userBalanceMap(USDC, puppet2);
+        console.log("Position after partial decrease:");
+        console.log("- Trader size (USD):", partialPosition.traderSize / 1e30);
+        console.log("- Mirror size (USD):", partialPosition.size / 1e30);
+        console.log("- Trader collateral (USDC):", partialPosition.traderCollateral / 1e6);
 
-    //     console.log("Balances after decrease:");
-    //     console.log("- Puppet1:", puppet1BalanceAfter);
-    //     console.log("- Puppet2:", puppet2BalanceAfter);
+        // Verify proportional reduction in mirror size
+        uint expectedMirrorSizeReduction = (initialPosition.size * partialDecreaseParams.sizeDeltaInUsd) / initialPosition.traderSize;
+        uint actualMirrorSizeReduction = initialPosition.size - partialPosition.size;
+        
+        assertApproxEqRel(
+            actualMirrorSizeReduction,
+            expectedMirrorSizeReduction,
+            0.02e18, // 2% tolerance for rounding and fees
+            "Mirror position should decrease proportionally"
+        );
 
-    //     // Balances should be reduced due to keeper fees during adjustment
-    //     assertLe(puppet1BalanceAfter, puppet1BalanceBefore, "Puppet1 balance should be reduced or same");
-    //     assertLe(puppet2BalanceAfter, puppet2BalanceBefore, "Puppet2 balance should be reduced or same");
+        // STEP 3: Complete position closure
+        MirrorPosition.CallPosition memory closeParams = MirrorPosition.CallPosition({
+            collateralToken: USDC,
+            trader: trader,
+            market: Const.gmxEthUsdcMarket,
+            keeperFeeReceiver: owner,
+            isIncrease: false,
+            isLong: true,
+            executionFee: 0.001 ether,
+            collateralDelta: partialPosition.traderCollateral, // Close remaining collateral
+            sizeDeltaInUsd: partialPosition.traderSize, // Close remaining size
+            acceptablePrice: ethPrice.min * 95 / 100,
+            triggerPrice: ethPrice.min,
+            keeperExecutionFee: 0.5e6,
+            allocationId: allocationId
+        });
 
-    //     console.log("Position decrease test completed successfully!");
+        console.log("\n=== COMPLETE POSITION CLOSURE ===");
+        console.log("Closing remaining position:");
+        console.log("- Remaining trader size (USD):", partialPosition.traderSize / 1e30);
+        console.log("- Remaining trader collateral (USDC):", partialPosition.traderCollateral / 1e6);
 
-    //     vm.stopPrank();
-    // }
+        bytes32 closeKey = mirrorPosition.requestAdjust{value: closeParams.executionFee}(closeParams, puppetList);
+        mirrorPosition.execute(closeKey);
+
+        // Verify position is completely closed
+        MirrorPosition.Position memory finalPosition = mirrorPosition.getPosition(allocationAddress);
+        assertEq(finalPosition.traderSize, 0, "Final: Trader size should be 0");
+        assertEq(finalPosition.traderCollateral, 0, "Final: Trader collateral should be 0");
+        assertEq(finalPosition.size, 0, "Final: Mirror size should be 0");
+
+        console.log("Position completely closed:");
+        console.log("- All sizes are now 0");
+
+        // STEP 4: Verify fee deductions were applied correctly
+        uint puppet1FinalBalance = allocationStore.userBalanceMap(USDC, puppet1);
+        uint puppet2FinalBalance = allocationStore.userBalanceMap(USDC, puppet2);
+
+        console.log("\n=== FINAL BALANCE VERIFICATION ===");
+        console.log("Final puppet balances:");
+        console.log("- Puppet1:", puppet1FinalBalance);
+        console.log("- Puppet2:", puppet2FinalBalance);
+
+        // Calculate total fees paid (keeper fees for all operations)
+        uint totalKeeperFees = increaseParams.keeperExecutionFee + partialDecreaseParams.keeperExecutionFee + closeParams.keeperExecutionFee;
+        
+        // Total balance reduction should be the sum of allocations made
+        uint puppet1TotalReduction = puppet1InitialBalance - puppet1FinalBalance;
+        uint puppet2TotalReduction = puppet2InitialBalance - puppet2FinalBalance;
+        
+        console.log("Total reductions:");
+        console.log("- Puppet1:", puppet1TotalReduction);
+        console.log("- Puppet2:", puppet2TotalReduction);
+        console.log("- Total keeper fees:", totalKeeperFees);
+
+        // Verify that reductions match allocations (balance should be reduced by allocation amount)
+        // Since we opened and closed the position, the reduction should equal the initial allocation
+        assertEq(puppet1TotalReduction, puppet1Allocation, "Puppet1 total reduction should equal allocation");
+        assertEq(puppet2TotalReduction, puppet2Allocation, "Puppet2 total reduction should equal allocation");
+
+        // STEP 5: Test edge case - attempt to adjust non-existent position
+        console.log("\n=== EDGE CASE: ADJUST NON-EXISTENT POSITION ===");
+        
+        MirrorPosition.CallPosition memory invalidAdjustParams = MirrorPosition.CallPosition({
+            collateralToken: USDC,
+            trader: trader,
+            market: Const.gmxEthUsdcMarket,
+            keeperExecutionFeeReceiver: owner,
+            isIncrease: false,
+            isLong: true,
+            executionFee: 0.001 ether,
+            collateralDelta: 10e6,
+            sizeDeltaInUsd: 100e30,
+            acceptablePrice: ethPrice.min * 95 / 100,
+            triggerPrice: ethPrice.min,
+            keeperExecutionFee: 0.5e6,
+            allocationId: allocationId // Using same allocation ID but position is closed
+        });
+
+        // This should revert because the position is now closed (allocation = 0)
+        vm.expectRevert(); // Expecting MirrorPosition__InvalidAllocation error
+        mirrorPosition.requestAdjust{value: invalidAdjustParams.executionFee}(invalidAdjustParams, puppetList);
+
+        console.log("Successfully verified edge case handling");
+        console.log("\n=== FORK DECREASE POSITION TEST COMPLETED ===");
+
+        vm.stopPrank();
+    }
 
     function testKeeperFeeExceedsCostFactor() public {
         vm.startPrank(owner);
@@ -497,7 +580,7 @@ contract TradingForkTest is Test {
             collateralToken: USDC,
             trader: trader,
             market: Const.gmxEthUsdcMarket,
-            keeperExecutionFeeReceiver: owner,
+            keeperFeeReceiver: owner,
             isIncrease: true,
             isLong: true,
             executionFee: 0.001 ether,
@@ -505,11 +588,11 @@ contract TradingForkTest is Test {
             sizeDeltaInUsd: 1000e30,
             acceptablePrice: price.min * 110,
             triggerPrice: price.min,
-            keeperExecutionFee: 301831 // Very high keeper fee (50 USDC when puppet only has 1% of 100 USDC = 1 USDC
-                // allocated)
+            keeperExecutionFee: 301831, // Very high keeper fee 
+            allocationId: getNextAllocationId()
         });
         mirrorPosition.requestMirror{value: callParams.executionFee}(
-            matchingRule, callParams, puppetList, getNextAllocationId()
+            matchingRule, callParams, puppetList
         );
 
         vm.stopPrank();

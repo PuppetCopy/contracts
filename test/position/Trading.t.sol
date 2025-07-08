@@ -52,7 +52,7 @@ contract TradingTest is BasicSetup {
             collateralToken: usdc,
             trader: users.bob,
             market: Const.gmxEthUsdcMarket,
-            keeperExecutionFeeReceiver: users.yossi,
+            keeperFeeReceiver: users.yossi,
             isIncrease: true,
             isLong: true, // Match original direction
             executionFee: 5_000_000 * 1 gwei,
@@ -60,7 +60,8 @@ contract TradingTest is BasicSetup {
             sizeDeltaInUsd: 1000e30, // 1000 USD (10x leverage implied)
             acceptablePrice: 0,
             triggerPrice: 0,
-            keeperExecutionFee: 1e6 // Mirror execution fee (not used in this test)
+            keeperExecutionFee: 1e6, // Mirror execution fee (not used in this test)
+            allocationId: 0 // Will be set during requestMirror
         });
 
         defaultCallSettle = MirrorPosition.CallSettle({
@@ -68,7 +69,7 @@ contract TradingTest is BasicSetup {
             distributionToken: usdc,
             trader: defaultCallPosition.trader,
             allocationId: 0,
-            keeperExecutionFeeReceiver: users.yossi,
+            keeperFeeReceiver: users.yossi,
             keeperExecutionFee: 1e6 // Mirror execution fee (not used in this test)
         });
 
@@ -190,12 +191,12 @@ contract TradingTest is BasicSetup {
 
         // 1. Initial Mirror (combines allocation & opening)
         MirrorPosition.CallPosition memory callIncrease = defaultCallPosition;
+        callIncrease.allocationId = getNextAllocationId(); // Set allocationId for the request
 
-        uint allocationId = getNextAllocationId();
         (address allocationAddress, bytes32 increaseRequestKey) =
-            mirrorPosition.requestMirror{value: callIncrease.executionFee}(matchingRule, callIncrease, puppetList, allocationId);
+            mirrorPosition.requestMirror{value: callIncrease.executionFee}(matchingRule, callIncrease, puppetList);
         assertNotEq(increaseRequestKey, bytes32(0));
-        assertNotEq(allocationId, 0);
+        assertNotEq(callIncrease.allocationId, 0);
 
         uint netAllocationFromMirror = mirrorPosition.getAllocation(allocationAddress);
         // Expect 10 puppets * 100e6 balance * 10% rule = 100e6 GROSS, minus 1e6 keeper fee = 99e6 NET
@@ -234,12 +235,13 @@ contract TradingTest is BasicSetup {
 
         // 3. Adjust Decrease (Full Close) using adjust()
         MirrorPosition.CallPosition memory callDecrease = defaultCallPosition;
+        callDecrease.allocationId = callIncrease.allocationId; // Use the same allocation ID
         callDecrease.collateralDelta = pos1.traderCollateral; // Decrease by current trader collateral
         callDecrease.sizeDeltaInUsd = pos1.traderSize; // Decrease by current trader size
         callDecrease.isIncrease = false; // Decrease position
 
         bytes32 decreaseRequestKey =
-            mirrorPosition.requestAdjust{value: callDecrease.executionFee}(callDecrease, puppetList, allocationId);
+            mirrorPosition.requestAdjust{value: callDecrease.executionFee}(callDecrease, puppetList);
         assertNotEq(decreaseRequestKey, bytes32(0));
 
         // Calculate netAllocated considering NET allocation from mirror minus the close keeper fee for PnL simulation
@@ -260,7 +262,7 @@ contract TradingTest is BasicSetup {
 
         // 5. Settle
         MirrorPosition.CallSettle memory callSettle = defaultCallSettle;
-        callSettle.allocationId = allocationId;
+        callSettle.allocationId = callIncrease.allocationId;
         mirrorPosition.settle(feeMarketplace, callSettle, puppetList);
 
         // --- Recalculate expected balances ---
@@ -322,7 +324,9 @@ contract TradingTest is BasicSetup {
 
     function testExecutionRequestMissingError() public {
         bytes32 nonExistentRequestKey = keccak256(abi.encodePacked("non-existent-request"));
-        vm.expectRevert(Error.MirrorPosition__ExecutionRequestMissing.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(Error.MirrorPosition__ExecutionRequestMissing.selector, nonExistentRequestKey)
+        );
         mirrorPosition.execute(nonExistentRequestKey);
     }
 
@@ -331,10 +335,12 @@ contract TradingTest is BasicSetup {
         address[] memory puppetList = _generatePuppetList(usdc, trader, 2);
 
         MirrorPosition.CallPosition memory callAdjust = defaultCallPosition;
+        callAdjust.allocationId = 99919; // Non-existent allocation ID
 
-        uint nonExistentAllocationId = 99999; // An ID for which mirror was not called
-        vm.expectRevert(Error.MirrorPosition__AllocationAccountNotFound.selector);
-        mirrorPosition.requestAdjust{value: callAdjust.executionFee}(callAdjust, puppetList, nonExistentAllocationId);
+        // The expected allocation address that will be generated for the non-existent allocation
+        // This address is deterministically generated but won't have any allocation value
+        vm.expectRevert(abi.encodeWithSelector(Error.MirrorPosition__InvalidAllocation.selector, 0xee15008dFf30b7BABBF154378E4a836A5fE44756));
+        mirrorPosition.requestAdjust{value: callAdjust.executionFee}(callAdjust, puppetList);
     }
 
     function testMirrorExceedingMaximumPuppets() public {
@@ -345,9 +351,16 @@ contract TradingTest is BasicSetup {
         }
 
         MirrorPosition.CallPosition memory callOpen = defaultCallPosition;
+        callOpen.allocationId = getNextAllocationId(); // Set allocationId for the request
 
-        vm.expectRevert(Error.MirrorPosition__MaxPuppetList.selector);
-        mirrorPosition.requestMirror{value: callOpen.executionFee}(matchingRule, callOpen, tooManyPuppets, getNextAllocationId());
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Error.MirrorPosition__PuppetListExceedsMaximum.selector,
+                tooManyPuppets.length,
+                limitAllocationListLength
+            )
+        );
+        mirrorPosition.requestMirror{value: callOpen.executionFee}(matchingRule, callOpen, tooManyPuppets);
     }
 
     function testProportionalProfitDistribution() public {
@@ -366,9 +379,10 @@ contract TradingTest is BasicSetup {
         uint puppet3InitialBalance = allocationStore.userBalanceMap(usdc, puppet3);
 
         MirrorPosition.CallPosition memory callParams = defaultCallPosition;
-        uint allocationId = getNextAllocationId();
+        callParams.allocationId = getNextAllocationId(); // Set allocationId for the request
+
         (address allocationAddress, bytes32 requestKey) =
-            mirrorPosition.requestMirror{value: callParams.executionFee}(matchingRule, callParams, puppetList, allocationId);
+            mirrorPosition.requestMirror{value: callParams.executionFee}(matchingRule, callParams, puppetList);
 
         mirrorPosition.execute(requestKey);
 
@@ -380,12 +394,12 @@ contract TradingTest is BasicSetup {
 
         MirrorPosition.Position memory position = mirrorPosition.getPosition(allocationAddress);
         MirrorPosition.CallPosition memory closeParams = defaultCallPosition;
+        closeParams.allocationId = callParams.allocationId;
         closeParams.isIncrease = false;
         closeParams.collateralDelta = position.traderCollateral;
         closeParams.sizeDeltaInUsd = position.traderSize;
 
-        bytes32 closeKey =
-            mirrorPosition.requestAdjust{value: closeParams.executionFee}(closeParams, puppetList, allocationId);
+        bytes32 closeKey = mirrorPosition.requestAdjust{value: closeParams.executionFee}(closeParams, puppetList);
 
         uint netAllocatedForPnL = netAllocationFromMirror - closeParams.keeperExecutionFee;
 
@@ -396,7 +410,7 @@ contract TradingTest is BasicSetup {
         mirrorPosition.execute(closeKey);
 
         MirrorPosition.CallSettle memory settleParams = defaultCallSettle;
-        settleParams.allocationId = allocationId;
+        settleParams.allocationId = callParams.allocationId;
         mirrorPosition.settle(feeMarketplace, settleParams, puppetList);
 
         uint puppet1ShareOfAdjustFee =
@@ -469,11 +483,11 @@ contract TradingTest is BasicSetup {
         uint initialGrossTotalAllocation = 30e6;
 
         MirrorPosition.CallPosition memory callOpen = defaultCallPosition;
+        callOpen.allocationId = getNextAllocationId(); // Set allocationId for the request
 
-        uint allocationId = getNextAllocationId();
         (address allocationAddress, bytes32 openKey) =
-            mirrorPosition.requestMirror{value: callOpen.executionFee}(matchingRule, callOpen, puppetList, allocationId);
-        assertNotEq(allocationId, 0);
+            mirrorPosition.requestMirror{value: callOpen.executionFee}(matchingRule, callOpen, puppetList);
+        assertNotEq(callOpen.allocationId, 0);
 
         uint puppet1Allocation = mirrorPosition.allocationPuppetMap(allocationAddress, puppet1);
         uint puppet2Allocation = mirrorPosition.allocationPuppetMap(allocationAddress, puppet2);
@@ -491,12 +505,12 @@ contract TradingTest is BasicSetup {
         MirrorPosition.Position memory currentPos = mirrorPosition.getPosition(allocationAddress);
 
         MirrorPosition.CallPosition memory callClose = defaultCallPosition;
+        callClose.allocationId = callOpen.allocationId; // Use the same allocation ID
         callClose.collateralDelta = currentPos.traderCollateral;
         callClose.sizeDeltaInUsd = currentPos.traderSize;
         callClose.isIncrease = false;
 
-        bytes32 closeKey =
-            mirrorPosition.requestAdjust{value: callClose.executionFee}(callClose, puppetList, allocationId);
+        bytes32 closeKey = mirrorPosition.requestAdjust{value: callClose.executionFee}(callClose, puppetList);
 
         uint netAllocatedForPnL = netAllocationFromMirror - callClose.keeperExecutionFee;
 
@@ -506,7 +520,7 @@ contract TradingTest is BasicSetup {
         mirrorPosition.execute(closeKey);
 
         MirrorPosition.CallSettle memory callSettle = defaultCallSettle;
-        callSettle.allocationId = allocationId;
+        callSettle.allocationId = callOpen.allocationId;
         mirrorPosition.settle(feeMarketplace, callSettle, puppetList);
 
         uint puppet1BalanceAfterSettle = allocationStore.userBalanceMap(usdc, puppet1);
@@ -554,15 +568,17 @@ contract TradingTest is BasicSetup {
         address[] memory puppetList = _generatePuppetList(usdc, trader, 2);
 
         MirrorPosition.CallPosition memory callOpen = defaultCallPosition;
-        uint allocationId = getNextAllocationId();
+        callOpen.allocationId = getNextAllocationId();
+
         (address allocationAddress, bytes32 openRequestKey) =
-            mirrorPosition.requestMirror{value: callOpen.executionFee}(matchingRule, callOpen, puppetList, allocationId);
+            mirrorPosition.requestMirror{value: callOpen.executionFee}(matchingRule, callOpen, puppetList);
         mirrorPosition.execute(openRequestKey);
         MirrorPosition.Position memory pos1 = mirrorPosition.getPosition(allocationAddress);
 
         assertGt(pos1.size, 0, "Pos1 initial size should be > 0");
 
         MirrorPosition.CallPosition memory zeroCollateralIncreaseParams = defaultCallPosition;
+        zeroCollateralIncreaseParams.allocationId = callOpen.allocationId; // Use the same allocation ID
         zeroCollateralIncreaseParams.collateralDelta = 0;
         zeroCollateralIncreaseParams.sizeDeltaInUsd = 500e30;
         zeroCollateralIncreaseParams.keeperExecutionFee = 0.5e6;
@@ -572,7 +588,7 @@ contract TradingTest is BasicSetup {
 
         bytes32 zeroCollateralRequestKey = mirrorPosition.requestAdjust{
             value: zeroCollateralIncreaseParams.executionFee
-        }(zeroCollateralIncreaseParams, puppetList, allocationId);
+        }(zeroCollateralIncreaseParams, puppetList);
         mirrorPosition.execute(zeroCollateralRequestKey);
         MirrorPosition.Position memory pos2 = mirrorPosition.getPosition(allocationAddress);
 
@@ -594,8 +610,9 @@ contract TradingTest is BasicSetup {
         address[] memory puppetList = _generatePuppetList(usdc, trader, 2);
 
         MirrorPosition.CallPosition memory callOpen = defaultCallPosition;
+        callOpen.allocationId = getNextAllocationId(); // Set allocationId for the request
         (address allocationAddress,) =
-            mirrorPosition.requestMirror{value: callOpen.executionFee}(matchingRule, callOpen, puppetList, getNextAllocationId());
+            mirrorPosition.requestMirror{value: callOpen.executionFee}(matchingRule, callOpen, puppetList);
 
         uint dustAmount = 0.002e6;
         deal(address(usdc), allocationAddress, dustAmount);
@@ -619,28 +636,29 @@ contract TradingTest is BasicSetup {
         address[] memory puppetList = _generatePuppetList(usdc, trader, 1);
 
         MirrorPosition.CallPosition memory callMirror = defaultCallPosition;
+        callMirror.allocationId = getNextAllocationId(); // Set allocationId for the request
 
         vm.expectRevert();
         vm.prank(users.bob);
-        mirrorPosition.requestMirror{value: callMirror.executionFee}(matchingRule, callMirror, puppetList, getNextAllocationId());
+        mirrorPosition.requestMirror{value: callMirror.executionFee}(matchingRule, callMirror, puppetList);
         vm.stopPrank();
 
         bytes32 traderMatchingKey = PositionUtils.getTraderMatchingKey(usdc, trader);
         vm.prank(users.owner);
-        uint allocationId = getNextAllocationId();
         (address allocationAddress, bytes32 requestKey) =
-            mirrorPosition.requestMirror{value: callMirror.executionFee}(matchingRule, callMirror, puppetList, allocationId);
+            mirrorPosition.requestMirror{value: callMirror.executionFee}(matchingRule, callMirror, puppetList);
 
         vm.stopPrank();
 
         MirrorPosition.CallPosition memory callAdjust = defaultCallPosition;
+        callAdjust.allocationId = callMirror.allocationId;
         callAdjust.collateralDelta = 10e6;
         callAdjust.sizeDeltaInUsd = 100e30;
         callAdjust.isIncrease = false;
 
         vm.expectRevert();
         vm.prank(users.bob);
-        mirrorPosition.requestAdjust{value: callAdjust.executionFee}(callAdjust, puppetList, allocationId);
+        mirrorPosition.requestAdjust{value: callAdjust.executionFee}(callAdjust, puppetList);
         vm.stopPrank();
 
         vm.expectRevert();
@@ -657,15 +675,14 @@ contract TradingTest is BasicSetup {
         callClose.sizeDeltaInUsd = currentPos.traderSize;
         callClose.isIncrease = false;
 
-        bytes32 closeKey =
-            mirrorPosition.requestAdjust{value: callClose.executionFee}(callClose, puppetList, allocationId);
+        bytes32 closeKey = mirrorPosition.requestAdjust{value: callClose.executionFee}(callClose, puppetList);
         mirrorPosition.execute(closeKey);
 
         deal(address(usdc), allocationAddress, 10e6);
         vm.stopPrank();
 
         MirrorPosition.CallSettle memory callSettle = defaultCallSettle;
-        callSettle.allocationId = allocationId;
+        callSettle.allocationId = callMirror.allocationId;
         vm.expectRevert();
         vm.prank(users.bob);
         mirrorPosition.settle(feeMarketplace, callSettle, puppetList);

@@ -35,7 +35,6 @@ library Error {
     error PuppetVoteToken__Unsupported();
 
     error CoreContract__Unauthorized(string contractName, string version);
-    error CoreContract__ConfigurationNotSet();
 
     error RewardDistributor__InvalidAmount();
     error RewardDistributor__InsufficientRewards(uint accured);
@@ -50,48 +49,41 @@ library Error {
     error Permission__Unauthorized();
     error Permission__CallerNotAuthority();
 
-    error PuppetStore__OverwriteAllocation();
-
     error MatchingRule__InvalidAllowanceRate(uint min, uint max);
     error MatchingRule__TokenNotAllowed();
     error MatchingRule__AllowanceAboveLimit(uint allowanceCap);
     error MatchingRule__InvalidAmount();
     error MatchingRule__InsufficientBalance();
     error MatchingRule__InvalidActivityThrottle(uint minAllocationActivity, uint maxAllocationActivity);
-    error MirrorPosition__InvalidAllocation();
     error MatchingRule__InvalidExpiryDuration(uint minExpiryDuration);
+
+    error MirrorPosition__InvalidAllocation(address allocationAddress);
     error MirrorPosition__InvalidAllocationId();
-    error MirrorPosition__InvalidAllocationOrFullyReduced();
     error MirrorPosition__InvalidCollateralDelta();
     error MirrorPosition__InvalidCurrentLeverage();
-    error MirrorPosition__InvalidKeeperExeuctionFeeAmount();
-    error MirrorPosition__InvalidKeeperExeuctionFeeReceiver();
+    error MirrorPosition__InvalidKeeperExecutionFeeAmount();
+    error MirrorPosition__InvalidKeeperExecutionFeeReceiver();
     error MirrorPosition__InvalidSizeDelta();
     error MirrorPosition__PuppetListEmpty();
-    error MirrorPosition__MaxPuppetList();
+    error MirrorPosition__PuppetListExceedsMaximum(uint provided, uint maximum);
     error MirrorPosition__InvalidReceiver();
-    error MirrorPosition__DustThresholdNotSet();
-    error MirrorPosition__NoDustToCollect();
-    error MirrorPosition__AmountExceedsDustThreshold();
-    error MirrorPosition__AllocationAccountNotFound();
-    error MirrorPosition__ExecuteOnZeroCollateralPosition();
-    error MirrorPosition__ExecutionRequestMissing();
+    error MirrorPosition__DustThresholdNotSet(address token);
+    error MirrorPosition__NoDustToCollect(address token, address account);
+    error MirrorPosition__AmountExceedsDustThreshold(uint amount, uint threshold);
+    error MirrorPosition__ExecutionRequestMissing(bytes32 requestKey);
     error MirrorPosition__InitialMustBeIncrease();
     error MirrorPosition__NoAdjustmentRequired();
-    error MirrorPosition__PositionNotFound();
-    error MirrorPosition__TraderCollateralZero();
-    error MirrorPosition__ZeroCollateralOnIncrease();
-    error MirrorPosition__DustTransferFailed();
-    error MirrorPosition__InsufficientSettledBalanceForKeeperFee();
-    error MirrorPosition__InsufficientGmxExecutionFee();
-    error MirrorPosition__KeeperAdjustmentExecutionFeeExceedsAllocatedAmount();
+    error MirrorPosition__PositionNotFound(address allocationAddress);
+    error MirrorPosition__TraderCollateralZero(address allocationAddress);
+    error MirrorPosition__DustTransferFailed(address token, address account);
+    error MirrorPosition__InsufficientGmxExecutionFee(uint provided, uint required);
+    error MirrorPosition__InsufficientAllocationForKeeperFee(uint allocation, uint keeperFee);
     error MirrorPosition__KeeperFeeExceedsCostFactor(uint keeperFee, uint allocationAmount);
     error MirrorPosition__OrderCreationFailed();
-    error MirrorPosition__SettlementTransferFailed();
+    error MirrorPosition__SettlementTransferFailed(address token, address account);
     error MirrorPosition__KeeperExecutionFeeNotFullyCovered();
-    error MirrorPosition__PaymasterExecutionFeeNotFullyCovered(uint remaining);
+    error MirrorPosition__KeeperFeeExceedsSettledAmount(uint keeperFee, uint settledAmount);
 
-    error GmxExecutionCallback__InvalidOrderType(GmxPositionUtils.OrderType orderType);
     error GmxExecutionCallback__FailedRefundExecutionFee();
 
     error AllocationAccount__UnauthorizedOperator();
@@ -100,8 +92,4 @@ library Error {
     error FeeMarketplace__NotAuctionableToken();
     error FeeMarketplace__InsufficientUnlockedBalance(uint accruedReward);
     error FeeMarketplace__ZeroDeposit();
-
-    error PuppetToken__InvalidRate();
-    error PuppetToken__ExceededRateLimit(uint rateLimit, uint emissionRate);
-    error PuppetToken__CoreShareExceedsMining();
 }
