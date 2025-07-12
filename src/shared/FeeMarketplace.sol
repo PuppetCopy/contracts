@@ -14,28 +14,26 @@ import {FeeMarketplaceStore} from "./FeeMarketplaceStore.sol";
 
 /**
  * @title Fee Marketplace
- * @notice Publicly offers accumulated protocol fees for purchase in exchange for protocol tokens at fixed prices.
+ * @notice Publicly offers accumulated protocol fees to trade with protocol tokens at a fixed price
  *
  * @dev Core mechanics:
  * - Fee tokens unlock gradually over time after deposit
  * - Each fee token has a fixed redemption price (askAmount)
- * - Price applies to ANY quantity up to available balance
- * - Public can purchase all unlocked tokens at the posted price
+ * - Fixed price applies regardless of purchase amount (up to available balance)
+ * - Public can purchase any amount of unlocked tokens at the posted price
  * - Protocol tokens received are burned/distributed per configuration
  *
- * @dev Example: If askAmount[USDC] = 1000 and there are 500 USDC unlocked:
- * - Taker paying 1000 protocol tokens redeems all 500 USDC
- * - If unlocked balance grows to 2000 USDC, same 1000 tokens now gets 2000 USDC
- * - Protocol publicly offers all unlocked tokens at this fixed price
+ * @dev Example: If askAmount[USDC] = 1000:
+ * - Taker paying 1000 protocol tokens can redeem any amount up to unlocked balance
+ * - Price remains 1000 whether purchasing 100 USDC or 2000 USDC
+ * - Protocol offers flexible quantity purchases at this fixed price
  */
 contract FeeMarketplace is CoreContract {
     /**
-     * @param feeDistributor Receives non-burned protocol tokens
      * @param distributionTimeframe Unlock duration for deposits (seconds)
      * @param burnBasisPoints Protocol tokens to burn (basis points: 100 = 1%)
      */
     struct Config {
-        BankStore feeDistributor;
         uint distributionTimeframe;
         uint burnBasisPoints;
     }
@@ -54,6 +52,9 @@ contract FeeMarketplace is CoreContract {
 
     /// @notice Last unlock calculation timestamp per fee token
     mapping(IERC20 => uint) public lastDistributionTimestamp;
+
+    /// @notice Available protocol tokens for distribution (after burns)
+    uint public distributionBalance;
 
     /// @notice Current marketplace settings
     Config public config;
@@ -103,19 +104,18 @@ contract FeeMarketplace is CoreContract {
     /**
      * @notice Deposits fee tokens into the marketplace.
      * @param _feeToken The fee token to deposit.
-     * @param _bank The BankStore to deposit the fee tokens into.
-     * @param _amount The amount of fee tokens to deposit.
      */
-    function deposit(IERC20 _feeToken, BankStore _bank, uint _amount) external auth {
-        require(_amount > 0, Error.FeeMarketplace__ZeroDeposit());
-
+    function deposit(
+        IERC20 _feeToken
+    ) external auth {
         // Update the fee token's unlocked balance before processing the deposit.
         _updateUnlockedBalance(_feeToken);
 
-        // Transfer fee tokens into the BankStore.
-        store.interTransferIn(_feeToken, _bank, _amount);
+        // Record newly transferred tokens
+        uint _amount = store.recordTransferIn(_feeToken);
+        require(_amount > 0, Error.FeeMarketplace__ZeroDeposit());
 
-        _logEvent("Deposit", abi.encode(_feeToken, _bank, _amount));
+        _logEvent("Deposit", abi.encode(_feeToken, _amount));
     }
 
     /**
@@ -136,23 +136,20 @@ contract FeeMarketplace is CoreContract {
         uint _accuredFees = accruedFee[_feeToken];
         require(_accuredFees >= _purchaseAmount, Error.FeeMarketplace__InsufficientUnlockedBalance(_accuredFees));
 
-        // Calculate protocol token burn and reward amounts.
-        uint _distributeAmount = _currentAskAmount;
-        uint _burnAmount;
-
+        // Transfer protocol tokens from depositor
         store.transferIn(protocolToken, _depositor, _currentAskAmount);
 
         // Burn the designated portion of protocol tokens.
+        uint _burnAmount;
+        uint _distributeAmount = _currentAskAmount;
         if (config.burnBasisPoints > 0) {
             _burnAmount = Precision.applyBasisPoints(config.burnBasisPoints, _currentAskAmount);
             store.burn(_burnAmount);
             _distributeAmount -= _burnAmount;
         }
 
-        // Transfer the remaining tokens to the reward distributor.
-        if (_distributeAmount > 0 && address(config.feeDistributor) != address(0)) {
-            config.feeDistributor.interTransferIn(protocolToken, store, _distributeAmount);
-        }
+        // Add remaining tokens to distribution balance
+        distributionBalance += _distributeAmount;
 
         // Deduct the redeemed fee tokens from the unlocked balance.
         accruedFee[_feeToken] = _accuredFees - _purchaseAmount;
@@ -165,13 +162,27 @@ contract FeeMarketplace is CoreContract {
 
     /**
      * @notice Sets the fixed redemption price for a fee token.
-     * @dev This sets the total protocol token cost required to redeem ANY amount of unlocked fee tokens.
+     * @dev This sets the protocol token cost required to redeem any amount of unlocked fee tokens.
      * @param _feeToken The fee token.
-     * @param _amount The fixed price in protocol tokens (not per-unit).
+     * @param _amount The fixed price in protocol tokens.
      */
     function setAskPrice(IERC20 _feeToken, uint _amount) external auth {
         askAmount[_feeToken] = _amount;
         _logEvent("SetAskAmount", abi.encode(_feeToken, _amount));
+    }
+
+    /**
+     * @notice Transfers protocol tokens to receiver
+     * @param _receiver Address to receive the tokens
+     * @param _amount Amount of protocol tokens to transfer
+     */
+    function collectDistribution(address _receiver, uint _amount) external auth {
+        require(_receiver != address(0), Error.FeeMarketplace__InvalidReceiver());
+        require(_amount > 0, Error.FeeMarketplace__InvalidAmount());
+        require(_amount <= distributionBalance, Error.FeeMarketplace__InsufficientDistributionBalance(_amount, distributionBalance));
+
+        distributionBalance -= _amount;
+        store.transferOut(protocolToken, _receiver, _amount);
     }
 
     /**
@@ -196,10 +207,6 @@ contract FeeMarketplace is CoreContract {
         require(_config.distributionTimeframe > 0, "FeeMarketplace: timeframe cannot be zero");
         require(
             _config.burnBasisPoints <= Precision.BASIS_POINT_DIVISOR, "FeeMarketplace: burn basis points exceeds 100%"
-        );
-        require(
-            _config.burnBasisPoints == Precision.BASIS_POINT_DIVISOR || address(_config.feeDistributor) != address(0),
-            "FeeMarketplace: reward distributor required when burn < 100%"
         );
 
         config = _config;

@@ -33,8 +33,7 @@ contract FeeMarketplaceTest is BasicSetup {
             feeMarketplaceStore,
             FeeMarketplace.Config({
                 distributionTimeframe: 1 days,
-                burnBasisPoints: 10000, // 100% burn
-                feeDistributor: BankStore(address(0))
+                burnBasisPoints: 10000 // 100% burn
             })
         );
 
@@ -42,12 +41,13 @@ contract FeeMarketplaceTest is BasicSetup {
         dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, users.owner);
         dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, users.owner);
         dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, users.owner);
+        dictator.setPermission(feeMarketplace, feeMarketplace.collectDistribution.selector, users.owner);
 
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
         dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
         dictator.setAccess(testFundingStore, address(feeMarketplaceStore));
 
-        // Initialize with a 1-day distribution timeframe, 100% burn, no distributor.
+        // Initialize with a 1-day distribution timeframe, 100% burn.
         dictator.initContract(feeMarketplace);
 
         dictator.setAccess(testFundingStore, address(users.owner));
@@ -94,9 +94,11 @@ contract FeeMarketplaceTest is BasicSetup {
         // Capture initial puppet token supply.
         uint initialSupply = puppetToken.totalSupply();
 
-        // Phase 2: Deposits (USDC and WNT).
-        feeMarketplace.deposit(usdc, testFundingStore, 500e6);
-        feeMarketplace.deposit(wnt, testFundingStore, 50e18);
+        // Phase 2: Transfer tokens to store and deposit
+        usdc.transfer(address(feeMarketplaceStore), 500e6);
+        feeMarketplace.deposit(usdc);
+        wnt.transfer(address(feeMarketplaceStore), 50e18);
+        feeMarketplace.deposit(wnt);
 
         // Phase 3: Unlock fees after 1 day.
         skip(1 days);
@@ -106,7 +108,8 @@ contract FeeMarketplaceTest is BasicSetup {
         feeMarketplace.acceptOffer(usdc, users.alice, users.alice, 250e6); // Burns another 10e18.
 
         // Phase 5: Second deposit and partial unlock.
-        feeMarketplace.deposit(usdc, testFundingStore, 300e6);
+        usdc.transfer(address(feeMarketplaceStore), 300e6);
+        feeMarketplace.deposit(usdc);
         skip(12 hours); // Roughly 50% available (150e6 unlocked).
 
         // Phase 6: Bob completes purchases.
@@ -128,7 +131,8 @@ contract FeeMarketplaceTest is BasicSetup {
     }
 
     function testDepositUpdatesState() public {
-        feeMarketplace.deposit(usdc, testFundingStore, 100e6);
+        testFundingStore.transferOut(usdc, address(feeMarketplaceStore), 100e6);
+        feeMarketplace.deposit(usdc);
 
         assertEq(usdc.balanceOf(address(feeMarketplaceStore)), 100e6, "BankStore balance mismatch after deposit");
         assertEq(
@@ -142,7 +146,8 @@ contract FeeMarketplaceTest is BasicSetup {
     function testBuyAndBurnSuccess() public {
         uint initialSupply = puppetToken.totalSupply();
 
-        feeMarketplace.deposit(usdc, testFundingStore, 100e6);
+        testFundingStore.transferOut(usdc, address(feeMarketplaceStore), 100e6);
+        feeMarketplace.deposit(usdc);
         feeMarketplace.setAskPrice(usdc, 10e18);
         skip(1 days);
 
@@ -155,16 +160,18 @@ contract FeeMarketplaceTest is BasicSetup {
         assertEq(feeMarketplace.accruedFee(usdc), 50e6, "Remaining unlocked fee for USDC must be updated");
     }
 
-    function testPartialUnlock2() public {
-        feeMarketplace.deposit(usdc, testFundingStore, 100e6);
+    function testPartialUnlock() public {
+        testFundingStore.transferOut(usdc, address(feeMarketplaceStore), 100e6);
+        feeMarketplace.deposit(usdc);
         skip(6 hours); // 25% unlock over half a day.
         uint pending = feeMarketplace.getPendingUnlock(usdc);
         assertEq(pending, 25e6, "Expected 25e6 pending unlock after 6 hours");
     }
 
     function testZeroBuybackQuote() public {
-        // Deposit 100e6 USDC into the fee marketplace.
-        feeMarketplace.deposit(usdc, testFundingStore, 100e6);
+        // Transfer and deposit 100e6 USDC into the fee marketplace.
+        testFundingStore.transferOut(usdc, address(feeMarketplaceStore), 100e6);
+        feeMarketplace.deposit(usdc);
 
         // Set the ask price for USDC to 0, making it non-auctionable.
         feeMarketplace.setAskPrice(usdc, 0);
@@ -179,20 +186,23 @@ contract FeeMarketplaceTest is BasicSetup {
     }
 
     function testUnauthorizedAccess() public {
-        feeMarketplace.deposit(usdc, testFundingStore, 100e6);
+        testFundingStore.transferOut(usdc, address(feeMarketplaceStore), 100e6);
+        feeMarketplace.deposit(usdc);
 
         vm.startPrank(users.alice);
         vm.expectRevert(abi.encodeWithSelector(Error.Permission__Unauthorized.selector));
-        feeMarketplace.deposit(usdc, testFundingStore, 100e6);
+        feeMarketplace.deposit(usdc);
     }
 
     function testMultipleDeposits() public {
         // First deposit of 100e6 at time 0.
-        feeMarketplace.deposit(usdc, testFundingStore, 100e6);
+        testFundingStore.transferOut(usdc, address(feeMarketplaceStore), 100e6);
+        feeMarketplace.deposit(usdc);
         skip(12 hours); // First deposit accrues 50e6 (half unlocked).
 
         // Second deposit occurs at t = 12 hours.
-        feeMarketplace.deposit(usdc, testFundingStore, 100e6);
+        testFundingStore.transferOut(usdc, address(feeMarketplaceStore), 100e6);
+        feeMarketplace.deposit(usdc);
         skip(12 hours); // At t = 24 hours total.
 
         // Now, due to the deposit updates, the expected total unlocked amount is 125e6.
@@ -207,13 +217,13 @@ contract FeeMarketplaceTest is BasicSetup {
     }
 
     function testConfigUpdate() public {
-        feeMarketplace.deposit(usdc, testFundingStore, 100e6);
+        testFundingStore.transferOut(usdc, address(feeMarketplaceStore), 100e6);
+        feeMarketplace.deposit(usdc);
 
         // Update config: increase distribution timeframe to 2 days.
         FeeMarketplace.Config memory newConfig = FeeMarketplace.Config({
             distributionTimeframe: 2 days,
-            burnBasisPoints: 10000,
-            feeDistributor: BankStore(address(0))
+            burnBasisPoints: 10000
         });
         dictator.setConfig(feeMarketplace, abi.encode(newConfig));
         skip(1 days); // Now only about 50% (50e6) should have unlocked.
@@ -223,7 +233,8 @@ contract FeeMarketplaceTest is BasicSetup {
 
     function testBurnAddressReceipt() public {
         uint initialSupply = puppetToken.totalSupply();
-        feeMarketplace.deposit(usdc, testFundingStore, 100e6);
+        testFundingStore.transferOut(usdc, address(feeMarketplaceStore), 100e6);
+        feeMarketplace.deposit(usdc);
         feeMarketplace.setAskPrice(usdc, 10e18);
         skip(1 days);
 
@@ -233,14 +244,16 @@ contract FeeMarketplaceTest is BasicSetup {
     }
 
     function testExactTimeUnlock() public {
-        feeMarketplace.deposit(usdc, testFundingStore, 100e6);
+        testFundingStore.transferOut(usdc, address(feeMarketplaceStore), 100e6);
+        feeMarketplace.deposit(usdc);
         // Skip 1 day plus a few seconds.
         skip(1 days + 1 seconds);
         assertEq(feeMarketplace.getPendingUnlock(usdc), 100e6, "After 1 day +, entire deposit should be unlocked");
     }
 
     function testSmallAmountPrecision() public {
-        feeMarketplace.deposit(usdc, testFundingStore, 1); // Deposit 1 wei USDC.
+        testFundingStore.transferOut(usdc, address(feeMarketplaceStore), 1);
+        feeMarketplace.deposit(usdc); // Deposit 1 wei USDC.
         skip(12 hours);
         // Expect rounding down yields 0 pending unlock.
         assertEq(feeMarketplace.getPendingUnlock(usdc), 0, "Small deposit should not unlock fractions");
@@ -249,7 +262,8 @@ contract FeeMarketplaceTest is BasicSetup {
     }
 
     function testMaxPurchase() public {
-        feeMarketplace.deposit(usdc, testFundingStore, 100e6);
+        testFundingStore.transferOut(usdc, address(feeMarketplaceStore), 100e6);
+        feeMarketplace.deposit(usdc);
         feeMarketplace.setAskPrice(usdc, 10e18);
         skip(1 days);
         uint maxAmount = feeMarketplace.getTotalUnlocked(usdc);
@@ -259,78 +273,77 @@ contract FeeMarketplaceTest is BasicSetup {
         assertEq(feeMarketplace.accruedFee(usdc), 0, "No unlocked balance should remain");
     }
 
-    function testPartialBurnWithRewards() public {
-        BankStore feeDistributorStore = new TestStore(dictator, tokenRouter);
-        // Change config: 50% burn, remaining to distributor.
+    function testPartialBurnWithDistribution() public {
+        // Change config: 50% burn, remaining for distribution.
         FeeMarketplace.Config memory newConfig = FeeMarketplace.Config({
             distributionTimeframe: 1 days,
-            burnBasisPoints: 5000, // 50% burn.
-            feeDistributor: feeDistributorStore
+            burnBasisPoints: 5000 // 50% burn.
         });
         dictator.setConfig(feeMarketplace, abi.encode(newConfig));
-        dictator.setAccess(feeMarketplaceStore, address(feeDistributorStore));
-        dictator.setAccess(feeDistributorStore, address(feeMarketplace));
 
-        feeMarketplace.deposit(usdc, testFundingStore, 100e6);
+        testFundingStore.transferOut(usdc, address(feeMarketplaceStore), 100e6);
+        feeMarketplace.deposit(usdc);
         feeMarketplace.setAskPrice(usdc, 10e18);
         skip(1 days);
         uint initialSupply = puppetToken.totalSupply();
-        uint initialDistributorBal = puppetToken.balanceOf(address(feeDistributorStore));
+        uint initialDistributionBalance = feeMarketplace.distributionBalance();
 
         feeMarketplace.acceptOffer(usdc, users.alice, users.alice, 50e6);
-        // Expect 50% of 10e18 burned, 50% transferred to distributor.
+        // Expect 50% of 10e18 burned, 50% added to distribution balance.
         assertEq(puppetToken.totalSupply(), initialSupply - 5e18, "Total burned amount should be 5e18");
         assertEq(
-            puppetToken.balanceOf(address(feeDistributorStore)),
-            initialDistributorBal + 5e18,
-            "Reward distributor did not receive correct amount"
+            feeMarketplace.distributionBalance(),
+            initialDistributionBalance + 5e18,
+            "Distribution balance should increase by 5e18"
         );
     }
 
-    // //----------------------------------------------------------------------------
-    // // Additional / Edge Case Tests
-    // //----------------------------------------------------------------------------
+    function testCollectDistribution() public {
+        // Set up partial burn config
+        FeeMarketplace.Config memory newConfig = FeeMarketplace.Config({
+            distributionTimeframe: 1 days,
+            burnBasisPoints: 5000 // 50% burn
+        });
+        dictator.setConfig(feeMarketplace, abi.encode(newConfig));
 
-    // // Test: Zero deposit should revert.
-    // function testZeroDepositReverts() public {
-    //     vm.expectRevert(Error.FeeMarketplace__ZeroDeposit.selector);
-    //     feeMarketplace.deposit(usdc, testFundingStore, 0);
-    // }
+        // Create distribution balance
+        testFundingStore.transferOut(usdc, address(feeMarketplaceStore), 100e6);
+        feeMarketplace.deposit(usdc);
+        feeMarketplace.setAskPrice(usdc, 10e18);
+        skip(1 days);
+        feeMarketplace.acceptOffer(usdc, users.alice, users.alice, 50e6);
 
-    // // Test: No pending unlock immediately after deposit.
-    // function testNoPendingUnlockImmediately() public {
-    //     feeMarketplace.deposit(usdc, testFundingStore, 100e6);
-    //     uint pending = feeMarketplace.getPendingUnlock(usdc);
-    //     assertEq(pending, 0, "Pending unlock should be zero immediately after deposit");
-    // }
+        uint distributionBalance = feeMarketplace.distributionBalance();
+        assertEq(distributionBalance, 5e18, "Distribution balance should be 5e18");
 
-    // // Test: Multiple fee tokens are tracked independently.
-    // function testMultipleFeeTokens() public {
-    //     feeMarketplace.setAskPrice(usdc, 10e18);
-    //     feeMarketplace.setAskPrice(dummyToken, 20e18);
+        uint initialBobBalance = puppetToken.balanceOf(users.bob);
+        
+        // Collect partial distribution
+        feeMarketplace.collectDistribution(users.bob, 3e18);
+        
+        assertEq(puppetToken.balanceOf(users.bob), initialBobBalance + 3e18, "Bob should receive 3e18 tokens");
+        assertEq(feeMarketplace.distributionBalance(), 2e18, "Distribution balance should be reduced to 2e18");
+    }
 
-    //     feeMarketplace.deposit(usdc, testFundingStore, 200e6);
-    //     feeMarketplace.deposit(dummyToken, testFundingStore, 100e18);
-    //     skip(1 days);
-    //     uint usdcUnlocked = feeMarketplace.getTotalUnlocked(usdc);
-    //     uint dummyUnlocked = feeMarketplace.getTotalUnlocked(dummyToken);
-    //     assertEq(usdcUnlocked, 200e6, "USDC should be fully unlocked");
-    //     assertEq(dummyUnlocked, 100e18, "Dummy token should be fully unlocked");
-    // }
+    function testCollectDistributionInvalidReceiver() public {
+        vm.expectRevert(Error.FeeMarketplace__InvalidReceiver.selector);
+        feeMarketplace.collectDistribution(address(0), 1e18);
+    }
 
-    // // Test: Repeated acceptOffer calls update state correctly.
-    // function testRepeatedAcceptOfferUpdatesUnlocked() public {
-    //     feeMarketplace.deposit(usdc, testFundingStore, 100e6);
-    //     feeMarketplace.setAskPrice(usdc, 10e18);
-    //     skip(1 days);
-    //     uint initiallyUnlocked = feeMarketplace.getTotalUnlocked(usdc);
-    //     assertEq(initiallyUnlocked, 100e6, "Expected full unlock before purchases");
+    function testCollectDistributionInvalidAmount() public {
+        vm.expectRevert(Error.FeeMarketplace__InvalidAmount.selector);
+        feeMarketplace.collectDistribution(users.alice, 0);
+    }
 
-    //     feeMarketplace.acceptOffer(usdc, users.alice, users.alice, 60e6);
-    //     assertEq(feeMarketplace.accruedFee(usdc), 40e6, "Remaining unlocked fee should be reduced to 40e6");
-    //     feeMarketplace.acceptOffer(usdc, users.alice, users.alice, 40e6);
-    //     assertEq(feeMarketplace.accruedFee(usdc), 0, "After full redemption, no unlocked fee should remain");
-    // }
+    function testCollectDistributionInsufficientBalance() public {
+        vm.expectRevert(abi.encodeWithSelector(Error.FeeMarketplace__InsufficientDistributionBalance.selector, 1e18, 0));
+        feeMarketplace.collectDistribution(users.alice, 1e18);
+    }
+
+    function testZeroDepositReverts() public {
+        vm.expectRevert(Error.FeeMarketplace__ZeroDeposit.selector);
+        feeMarketplace.deposit(usdc);
+    }
 }
 
 contract TestStore is BankStore {

@@ -30,12 +30,6 @@ contract Allocation is CoreContract {
         uint allocationAccountTransferGasLimit;
     }
 
-    struct AllocationData {
-        uint totalAmount;
-        uint[] puppetAmounts;
-        address[] puppetList;
-    }
-
     struct AllocationParams {
         IERC20 collateralToken;
         address trader;
@@ -467,13 +461,6 @@ contract Allocation is CoreContract {
     }
 
     /**
-     * @notice Transfers funds out from allocation store
-     */
-    function transferOut(IERC20 _token, address _receiver, uint _amount) external auth {
-        allocationStore.transferOut(_token, _receiver, _amount);
-    }
-
-    /**
      * @notice Collects platform fees from AllocationStore
      * @dev This function allows authorized contracts to collect accumulated platform fees
      * @param _token The token to collect fees for
@@ -489,17 +476,6 @@ contract Allocation is CoreContract {
         allocationStore.transferOut(_token, _receiver, _amount);
 
         _logEvent("CollectFees", abi.encode(_token, _receiver, _amount));
-    }
-
-    /**
-     * @notice Get accumulated platform fees for a token
-     * @param _token The token to check accumulated fees for
-     * @return The amount of accumulated platform fees
-     */
-    function getAccumulatedFees(
-        IERC20 _token
-    ) external view returns (uint) {
-        return platformFeeMap[_token];
     }
 
     /**

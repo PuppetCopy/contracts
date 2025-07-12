@@ -93,4 +93,7 @@ library Error {
     error FeeMarketplace__NotAuctionableToken();
     error FeeMarketplace__InsufficientUnlockedBalance(uint accruedReward);
     error FeeMarketplace__ZeroDeposit();
+    error FeeMarketplace__InvalidReceiver();
+    error FeeMarketplace__InvalidAmount();
+    error FeeMarketplace__InsufficientDistributionBalance(uint requested, uint available);
 }

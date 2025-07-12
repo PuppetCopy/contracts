@@ -45,14 +45,14 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient {
 
     /**
      * @notice Orchestrates mirror position creation by coordinating Allocation and MirrorPosition
-     * @param _callParams Position parameters for the trader's action
      * @param _allocParams Allocation parameters for puppet fund management
+     * @param _callParams Position parameters for the trader's action
      * @return _allocationAddress The allocation account address created
      * @return _requestKey The GMX request key for the submitted order
      */
     function requestMirror(
-        MirrorPosition.CallPosition calldata _callParams,
-        Allocation.AllocationParams calldata _allocParams
+        Allocation.AllocationParams calldata _allocParams,
+        MirrorPosition.CallPosition calldata _callParams
     ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
         (address allocationAddress, uint totalAllocation) = allocation.createAllocation(matchingRule, _allocParams);
 
