@@ -117,6 +117,14 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient {
     }
 
     /**
+     * @notice Get configuration (empty for KeeperRouter)
+     * @dev Required by Dictatorship.initContract but not used by KeeperRouter
+     */
+    function config() external pure returns (bytes memory) {
+        return "";
+    }
+
+    /**
      * @notice Internal function to set configuration (not used but required by CoreContract)
      * @dev RouterKeeper doesn't have its own configuration
      */

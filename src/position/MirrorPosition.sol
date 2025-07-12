@@ -36,19 +36,6 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         uint traderCollateral;
     }
 
-    struct CallPosition {
-        IERC20 collateralToken;
-        address trader;
-        address market;
-        bool isIncrease;
-        bool isLong;
-        uint executionFee;
-        uint collateralDelta;
-        uint sizeDeltaInUsd;
-        uint acceptablePrice;
-        uint triggerPrice;
-    }
-
     struct RequestAdjustment {
         address allocationAddress;
         bool traderIsIncrease;
@@ -62,6 +49,19 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         address operator;
         bytes32 key;
         bytes error;
+    }
+
+    struct CallPosition {
+        IERC20 collateralToken;
+        address trader;
+        address market;
+        bool isIncrease;
+        bool isLong;
+        uint executionFee;
+        uint collateralDelta;
+        uint sizeDeltaInUsd;
+        uint acceptablePrice;
+        uint triggerPrice;
     }
 
     Config public config;
