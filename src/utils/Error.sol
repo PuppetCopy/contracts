@@ -59,6 +59,7 @@ library Error {
 
     error MirrorPosition__InvalidAllocation(address allocationAddress);
     error MirrorPosition__InvalidAllocationId();
+    error MirrorPosition__InvalidSettledAmount(IERC20 token, uint recordedAmount, uint settledAmount);
     error MirrorPosition__InvalidCollateralDelta();
     error MirrorPosition__InvalidCurrentLeverage();
     error MirrorPosition__InvalidKeeperExecutionFeeAmount();

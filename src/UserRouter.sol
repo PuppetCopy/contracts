@@ -9,11 +9,11 @@ import {MatchingRule} from "./position/MatchingRule.sol";
 import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
 
 /**
- * @title RouterUser
+ * @title UserRouter
  * @notice Handles user-facing operations for the copy trading system
  * @dev Contains deposit, withdraw, rule setting, and offer acceptance functionality
  */
-contract RouterUser is ReentrancyGuardTransient {
+contract UserRouter is ReentrancyGuardTransient {
     MatchingRule public immutable matchingRule;
     FeeMarketplace public immutable feeMarketplace;
     Allocation public immutable allocation;
@@ -29,7 +29,7 @@ contract RouterUser is ReentrancyGuardTransient {
     }
 
     /**
-     * @notice Deposits tokens into the system for a user (potential puppet).
+     * @notice Deposits tokens into the system for a user.
      * @param token The token being deposited.
      * @param amount The amount being deposited.
      */

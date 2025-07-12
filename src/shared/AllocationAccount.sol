@@ -37,12 +37,14 @@ contract AllocationAccount {
     function execute(
         address _contract,
         bytes calldata _data,
-        uint _ethAmount
+        uint _ethAmount,
+        uint _gasLimit
     ) public payable returns (bool _success, bytes memory _returnData) {
         require(store.canCall(msg.sender), Error.AllocationAccount__UnauthorizedOperator());
         require(address(this).balance >= _ethAmount, Error.AllocationAccount__InsufficientBalance());
+        require(_gasLimit > 0, "Gas limit must be greater than 0");
 
-        return _contract.call{value: _ethAmount, gas: gasleft()}(_data);
+        return _contract.call{value: _ethAmount, gas: _gasLimit}(_data);
     }
 
     /**
@@ -57,8 +59,9 @@ contract AllocationAccount {
      */
     function execute(
         address _contract,
-        bytes calldata _data
+        bytes calldata _data,
+        uint _gasLimit
     ) external returns (bool _success, bytes memory _returnData) {
-        return execute(_contract, _data, 0);
+        return execute(_contract, _data, 0, _gasLimit);
     }
 }

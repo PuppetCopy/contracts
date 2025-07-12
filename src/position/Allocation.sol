@@ -27,6 +27,7 @@ contract Allocation is CoreContract {
         uint maxKeeperFeeToAllocationRatio;
         uint maxKeeperFeeToAdjustmentRatio;
         address gmxOrderVault;
+        uint allocationAccountTransferGasLimit;
     }
 
     struct AllocationData {
@@ -322,14 +323,14 @@ contract Allocation is CoreContract {
      * once a Keeper confirms no further funds are expected, should be used for final cleanup.
      * @param _callParams Structure containing settlement details (tokens, trader, allocationId, keeperFee).
      * @param _puppetList The list of puppet addresses involved in this specific allocation instance.
-     * @return _settledBalance Total amount that was settled
+     * @return _settledAmount Total amount that was settled
      * @return _distributionAmount Amount distributed to puppets after fees
      * @return _platformFeeAmount Platform fee taken
      */
     function settle(
         CallSettle calldata _callParams,
         address[] calldata _puppetList
-    ) external auth returns (uint _settledBalance, uint _distributionAmount, uint _platformFeeAmount) {
+    ) external auth returns (uint _settledAmount, uint _distributionAmount, uint _platformFeeAmount) {
         uint _puppetCount = _puppetList.length;
         require(_puppetCount > 0, Error.MirrorPosition__PuppetListEmpty());
         require(
@@ -342,7 +343,6 @@ contract Allocation is CoreContract {
         address _keeperFeeReceiver = _callParams.keeperFeeReceiver;
         require(_keeperFeeReceiver != address(0), Error.MirrorPosition__InvalidKeeperExecutionFeeReceiver());
 
-        // Calculate allocation address
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
         address _allocationAddress =
             getAllocationAddress(_callParams.collateralToken, _callParams.trader, _puppetList, _callParams.allocationId);
@@ -350,82 +350,73 @@ contract Allocation is CoreContract {
         uint _allocation = allocationMap[_allocationAddress];
         require(_allocation > 0, Error.MirrorPosition__InvalidAllocation(_allocationAddress));
 
-        // Get settled balance from allocation account
-        _settledBalance = _callParams.distributionToken.balanceOf(_allocationAddress);
-        if (_settledBalance > 0) {
-            (bool _success,) = AllocationAccount(_allocationAddress).execute(
-                address(_callParams.distributionToken),
-                abi.encodeWithSelector(IERC20.transfer.selector, address(allocationStore), _settledBalance)
-            );
-            require(
-                _success,
-                Error.MirrorPosition__SettlementTransferFailed(
-                    address(_callParams.distributionToken), _allocationAddress
-                )
-            );
+        _settledAmount = _callParams.distributionToken.balanceOf(_allocationAddress);
 
-            require(
-                _callParams.keeperExecutionFee
-                    < Precision.applyFactor(config.maxKeeperFeeToCollectDustRatio, _settledBalance),
-                Error.MirrorPosition__KeeperFeeExceedsSettledAmount(_callParams.keeperExecutionFee, _settledBalance)
-            );
+        (bool _success, bytes memory returnData) = AllocationAccount(_allocationAddress).execute(
+            address(_callParams.distributionToken),
+            abi.encodeWithSelector(IERC20.transfer.selector, address(allocationStore), _settledAmount),
+            config.allocationAccountTransferGasLimit
+        );
+        require(
+            _success,
+            Error.MirrorPosition__SettlementTransferFailed(address(_callParams.distributionToken), _allocationAddress)
+        );
 
-            allocationStore.recordTransferIn(_callParams.distributionToken);
+        if (returnData.length > 0) {
+            require(abi.decode(returnData, (bool)), "ERC20 transfer returned false");
         }
 
-        _distributionAmount = _settledBalance - _callParams.keeperExecutionFee;
+        // Update AllocationStore internal accounting and get actual transferred amount
+        uint _recordedAmountIn = allocationStore.recordTransferIn(_callParams.distributionToken);
 
-        // Transfer keeper fee
+        require(
+            _recordedAmountIn >= _settledAmount,
+            Error.MirrorPosition__InvalidSettledAmount(_callParams.distributionToken, _recordedAmountIn, _settledAmount)
+        );
+
+        require(
+            _callParams.keeperExecutionFee
+                < Precision.applyFactor(config.maxKeeperFeeToCollectDustRatio, _recordedAmountIn),
+            Error.MirrorPosition__KeeperFeeExceedsSettledAmount(_callParams.keeperExecutionFee, _recordedAmountIn)
+        );
+
+        _distributionAmount = _recordedAmountIn - _callParams.keeperExecutionFee;
+
         allocationStore.transferOut(
             _callParams.distributionToken, _callParams.keeperFeeReceiver, _callParams.keeperExecutionFee
         );
 
-        // Calculate platform fee and keep it in AllocationStore
-        _platformFeeAmount = 0;
-        if (config.platformSettleFeeFactor > 0 && _distributionAmount > 0) {
+        // Calculate platform fee from distribution amount
+        if (config.platformSettleFeeFactor > 0) {
             _platformFeeAmount = Precision.applyFactor(config.platformSettleFeeFactor, _distributionAmount);
 
-            if (_platformFeeAmount > 0) {
-                if (_platformFeeAmount > _distributionAmount) {
-                    _platformFeeAmount = _distributionAmount;
-                }
-                _distributionAmount -= _platformFeeAmount;
-                platformFeeMap[_callParams.distributionToken] += _platformFeeAmount;
+            if (_platformFeeAmount > _distributionAmount) {
+                _platformFeeAmount = _distributionAmount;
             }
+            _distributionAmount -= _platformFeeAmount;
+            platformFeeMap[_callParams.distributionToken] += _platformFeeAmount;
         }
 
-        uint[] memory _nextBalanceList;
+        uint[] memory _nextBalanceList = allocationStore.getBalanceList(_callParams.distributionToken, _puppetList);
+        uint[] memory _puppetAllocations = allocationPuppetArray[_allocationAddress];
 
-        // Distribute to puppets proportionally
-        if (_distributionAmount > 0) {
-            _nextBalanceList = allocationStore.getBalanceList(_callParams.distributionToken, _puppetList);
-            uint[] memory _puppetAllocations = allocationPuppetArray[_allocationAddress];
-
-            for (uint _i = 0; _i < _puppetCount; _i++) {
-                uint _puppetAllocationShare = _puppetAllocations[_i];
-                if (_puppetAllocationShare == 0) continue;
-
-                uint _puppetDistribution = Math.mulDiv(_distributionAmount, _puppetAllocationShare, _allocation);
-                _nextBalanceList[_i] += _puppetDistribution;
-            }
-            allocationStore.setBalanceList(_callParams.distributionToken, _puppetList, _nextBalanceList);
+        for (uint _i = 0; _i < _puppetCount; _i++) {
+            _nextBalanceList[_i] += Math.mulDiv(_distributionAmount, _puppetAllocations[_i], _allocation);
         }
+        allocationStore.setBalanceList(_callParams.distributionToken, _puppetList, _nextBalanceList);
 
-        // Log settlement event
         _logEvent(
             "Settle",
             abi.encode(
                 _callParams,
                 _traderMatchingKey,
                 _allocationAddress,
-                _settledBalance,
+                _settledAmount,
                 _distributionAmount,
                 _platformFeeAmount,
                 _nextBalanceList
             )
         );
-
-        return (_settledBalance, _distributionAmount, _platformFeeAmount);
     }
 
     /**
@@ -454,11 +445,18 @@ contract Allocation is CoreContract {
             _dustAmount <= _dustThreshold, Error.MirrorPosition__AmountExceedsDustThreshold(_dustAmount, _dustThreshold)
         );
 
-        (bool _success,) = _allocationAccount.execute(
-            address(_dustToken), abi.encodeWithSelector(IERC20.transfer.selector, address(allocationStore), _dustAmount)
+        (bool _success, bytes memory returnData) = _allocationAccount.execute(
+            address(_dustToken),
+            abi.encodeWithSelector(IERC20.transfer.selector, address(allocationStore), _dustAmount),
+            config.allocationAccountTransferGasLimit
         );
 
         require(_success, Error.MirrorPosition__DustTransferFailed(address(_dustToken), address(_allocationAccount)));
+
+        // Validate ERC20 transfer return value
+        if (returnData.length > 0) {
+            require(abi.decode(returnData, (bool)), "ERC20 transfer returned false");
+        }
 
         allocationStore.transferOut(_dustToken, _receiver, _dustAmount);
 
@@ -552,6 +550,7 @@ contract Allocation is CoreContract {
         require(_config.maxKeeperFeeToAllocationRatio > 0, "Invalid Max Keeper Fee To Allocation Ratio");
         require(_config.maxKeeperFeeToAdjustmentRatio > 0, "Invalid Max Keeper Fee To Adjustment Ratio");
         require(_config.gmxOrderVault != address(0), "Invalid GMX Order Vault");
+        require(_config.allocationAccountTransferGasLimit > 0, "Invalid Token Transfer Gas Limit");
 
         config = _config;
     }

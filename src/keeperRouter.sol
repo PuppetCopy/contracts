@@ -15,11 +15,11 @@ import {CoreContract} from "./utils/CoreContract.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
 /**
- * @title RouterKeeper
+ * @title KeeperRouter
  * @notice Handles keeper-specific operations for the copy trading system
  * @dev Separates keeper operations from user operations for better security and access control
  */
-contract RouterKeeper is CoreContract, ReentrancyGuardTransient {
+contract KeeperRouter is CoreContract, ReentrancyGuardTransient {
     MatchingRule public immutable matchingRule;
     FeeMarketplace public immutable feeMarketplace;
     MirrorPosition public immutable mirrorPosition;
@@ -54,10 +54,8 @@ contract RouterKeeper is CoreContract, ReentrancyGuardTransient {
         MirrorPosition.CallPosition calldata _callParams,
         Allocation.AllocationParams calldata _allocParams
     ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
-        // Step 1: Create allocation with integrated fund transfers (keeper fee + GMX vault)
         (address allocationAddress, uint totalAllocation) = allocation.createAllocation(matchingRule, _allocParams);
 
-        // Step 2: Submit GMX order through MirrorPosition (no fund transfers needed)
         _requestKey = mirrorPosition.requestMirror{value: msg.value}(_callParams, allocationAddress, totalAllocation);
 
         return (allocationAddress, _requestKey);
@@ -79,17 +77,10 @@ contract RouterKeeper is CoreContract, ReentrancyGuardTransient {
         address _keeperFeeReceiver,
         uint _allocationId
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
-        // Step 1: Handle keeper fee payment through Allocation (handles key calculation internally)
         (address allocationAddress, uint updatedAllocation) = allocation.updateAllocationsForKeeperFee(
-            _callParams.collateralToken,
-            _callParams.trader,
-            _puppetList,
-            _allocationId,
-            _keeperFee,
-            _keeperFeeReceiver
+            _callParams.collateralToken, _callParams.trader, _puppetList, _allocationId, _keeperFee, _keeperFeeReceiver
         );
 
-        // Step 2: Submit adjustment through MirrorPosition
         _requestKey = mirrorPosition.requestAdjust{value: msg.value}(_callParams, allocationAddress, updatedAllocation);
 
         return _requestKey;
@@ -104,10 +95,10 @@ contract RouterKeeper is CoreContract, ReentrancyGuardTransient {
      * @return platformFeeAmount Platform fee collected
      */
     function settle(
-        Allocation.SettleParams calldata _settleParams,
+        Allocation.CallSettle calldata _settleParams,
         address[] calldata _puppetList
     ) external auth nonReentrant returns (uint settledBalance, uint distributionAmount, uint platformFeeAmount) {
-        return allocation.settle(feeMarketplace, _settleParams, _puppetList);
+        return allocation.settle(_settleParams, _puppetList);
     }
 
     /**

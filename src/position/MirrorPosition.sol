@@ -371,7 +371,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         config.gmxExchangeRouter.sendWnt{value: _order.executionFee}(config.gmxOrderVault, _order.executionFee);
 
         (bool success, bytes memory returnData) =
-            AllocationAccount(_allocationAddress).execute(address(config.gmxExchangeRouter), gmxCallData);
+            AllocationAccount(_allocationAddress).execute(address(config.gmxExchangeRouter), gmxCallData, gasleft());
 
         if (!success) {
             ErrorUtils.revertWithParsedMessage(returnData);
