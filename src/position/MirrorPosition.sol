@@ -92,11 +92,33 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
     }
 
     /**
-     * @notice Mirrors a trader's position using pre-allocated funds
-     * @dev Called by Router after allocation has been created. This function focuses purely on GMX order submission.
-     * @param _callParams Structure containing trader's position details
-     * @param _allocationAddress The allocation account address (created by Allocation contract)
-     * @param _netAllocation The net allocation amount available for position (after keeper fees)
+     * @notice Starts copying a trader's new position opening (increase) for a selected group of followers (puppets).
+     * @dev Called by an authorized Keeper (`auth`) to initiate the copy-trading process when a followed trader opens a
+     * new position.
+     * This function determines how much capital each eligible puppet allocates based on their individual matching rules
+     * (`MatchingRule`),
+     * available funds (`AllocationStore`), and activity limits. It ensures the total allocated amount is sufficient to
+     * cover the provided keeper execution fee (`_callParams.keeperExecutionFee`).
+     *
+     * The function orchestrates the fund movements:
+     * 1. It reserves the calculated allocation amounts from each puppet's balance in the `AllocationStore`.
+     * 2. It transfers the total collected capital from the `AllocationStore`.
+     * 3. It pays the `keeperExecutionFee` to the designated `_keeperFeeReceiver`.
+     * 4. It sends the remaining net capital (`_netAllocation`) to the GMX order vault (`config.gmxOrderVault`) to
+     * collateralize the position.
+     *
+     * It then calculates the appropriate size (`_sizeDelta`) for the combined puppet position, proportional to the net
+     * capital provided,
+     * and submits a `MarketIncrease` order to the GMX Router. The Keeper must provide `msg.value` to cover the GMX
+     * network execution fee (`_callParams.executionFee`).
+     *
+     * Finally, it records details about this specific mirror action, including the total capital committed
+     * (`allocationMap`) and the GMX request details (`requestAdjustmentMap`),
+     * which are necessary for future adjustments or settlement via the `execute` function upon GMX callback.
+     * Emits a `Mirror` event with key details.
+     * @param _callParams Position parameters for the trader's action
+     * @param _allocationAddress The allocation account address created
+     * @param _netAllocation The net allocation amount after deducting the keeper fee
      * @return _requestKey The unique key returned by GMX identifying the created order request
      */
     function requestMirror(
@@ -141,12 +163,30 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
     }
 
     /**
-     * @notice Adjusts an existing mirrored position to follow a trader's action
-     * @dev Called by Router after allocation has been updated. Focuses purely on GMX order submission.
-     * @param _callParams Structure containing trader's adjustment details
-     * @param _allocationAddress The allocation account address
-     * @param _currentAllocation The current allocation amount for this position
-     * @return _requestKey The unique key returned by GMX identifying the created adjustment order request
+     * @notice Adjusts an existing mirrored position to follow a trader's action (increase/decrease).
+     * @dev Called by an authorized Keeper when the trader being copied modifies their GMX position. This function
+     * ensures the combined puppet position reflects the trader's change. It requires `msg.value` from the Keeper
+     * to cover the GMX network fee for submitting the adjustment order.
+     *
+     * This function handles the Keeper's execution fee (`_callParams.keeperExecutionFee`) in a way that doesn't block
+     * the adjustment for all puppets if one cannot pay. It attempts to deduct each puppet's share of the fee from
+     * their available balance in the `AllocationStore`. If a puppet lacks sufficient funds, their invested amount
+     * (`allocationPuppetMap`) in *this specific position* is reduced by the unpaid fee amount. The *full* keeper fee
+     * is paid immediately using funds from the `AllocationStore`.
+     *
+     * The core logic calculates the trader's new target leverage based on their latest action. It compares this to the
+     * current leverage of the mirrored position (considering any reductions due to fee insolvency). It then determines
+     * the required size change (`_sizeDelta`) for the mirrored position to match the trader's target leverage and
+     * submits the corresponding `MarketIncrease` or `MarketDecrease` order to GMX.
+     *
+     * Details about the adjustment request are stored (`requestAdjustmentMap`) for processing when GMX confirms the
+     * order execution via the `execute` function callback. If puppet allocations were reduced due to fee handling,
+     * the total allocation (`allocationMap`) is updated. Emits an `Adjust` event.
+     * @param _callParams Structure containing details of the trader's adjustment action (deltas must be > 0),
+     * market, collateral, GMX execution fee, keeper fee, and keeper fee receiver.
+     * @param _allocationAddress The allocation account address associated with the position being adjusted.
+     * @param _currentAllocation The current total allocation amount for the position.
+     * @return _requestKey The unique key returned by GMX identifying the created adjustment order request.
      */
     function requestAdjust(
         CallPosition calldata _callParams,

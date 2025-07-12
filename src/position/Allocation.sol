@@ -30,7 +30,7 @@ contract Allocation is CoreContract {
         uint allocationAccountTransferGasLimit;
     }
 
-    struct AllocationParams {
+    struct CallAllocation {
         IERC20 collateralToken;
         address trader;
         address[] puppetList;
@@ -56,7 +56,7 @@ contract Allocation is CoreContract {
 
     // Allocation tracking
     mapping(address allocationAddress => uint totalAmount) public allocationMap;
-    mapping(address allocationAddress => uint[] puppetAmounts) public allocationPuppetArray;
+    mapping(address allocationAddress => uint[] puppetAmounts) public allocationPuppetList;
     mapping(bytes32 traderMatchingKey => mapping(address puppet => uint lastActivity)) public lastActivityThrottleMap;
     mapping(IERC20 token => uint) public tokenDustThresholdAmountMap;
 
@@ -89,25 +89,10 @@ contract Allocation is CoreContract {
     /**
      * @notice Get puppet allocations for an address
      */
-    function getPuppetAllocations(
+    function getPuppetAllocationList(
         address _allocationAddress
     ) external view returns (uint[] memory) {
-        return allocationPuppetArray[_allocationAddress];
-    }
-
-    /**
-     * @notice Gets allocation address for given parameters
-     * @dev Helper function to calculate allocation key and predict address
-     */
-    function getAllocationAddress(
-        IERC20 _collateralToken,
-        address _trader,
-        address[] memory _puppetList,
-        uint _allocationId
-    ) public view returns (address) {
-        bytes32 traderMatchingKey = PositionUtils.getTraderMatchingKey(_collateralToken, _trader);
-        bytes32 allocationKey = keccak256(abi.encodePacked(_puppetList, traderMatchingKey, _allocationId));
-        return Clones.predictDeterministicAddress(allocationAccountImplementation, allocationKey, address(this));
+        return allocationPuppetList[_allocationAddress];
     }
 
     /**
@@ -121,21 +106,21 @@ contract Allocation is CoreContract {
      * @notice Creates allocations for puppets following a trader
      * @dev Calculates how much each puppet allocates based on their rules and balances
      * @return _allocationAddress The deterministic address for this allocation
-     * @return _totalAllocation The total amount allocated after keeper fee
+     * @return _allocated The total amount allocated after keeper fee
      */
     function createAllocation(
         MatchingRule _matchingRule,
-        AllocationParams memory _params
-    ) external auth returns (address _allocationAddress, uint _totalAllocation) {
+        CallAllocation calldata _params
+    ) external auth returns (address _allocationAddress, uint _allocated) {
         uint _puppetCount = _params.puppetList.length;
         require(_puppetCount > 0, Error.MirrorPosition__PuppetListEmpty());
 
-        // Calculate allocation address and create clone
-        _allocationAddress =
-            getAllocationAddress(_params.collateralToken, _params.trader, _params.puppetList, _params.allocationId);
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_params.collateralToken, _params.trader);
         bytes32 _allocationKey =
-            keccak256(abi.encodePacked(_params.puppetList, _traderMatchingKey, _params.allocationId));
+            PositionUtils.getAllocationKey(_params.puppetList, _traderMatchingKey, _params.allocationId);
+
+        _allocationAddress =
+            Clones.predictDeterministicAddress(allocationAccountImplementation, _allocationKey, address(this));
         Clones.cloneDeterministic(allocationAccountImplementation, _allocationKey);
 
         // Get rules and balances
@@ -147,7 +132,7 @@ contract Allocation is CoreContract {
 
         // Initialize puppet allocations array
         uint[] memory _puppetAllocations = new uint[](_puppetCount);
-        allocationPuppetArray[_allocationAddress] = new uint[](_puppetCount);
+        allocationPuppetList[_allocationAddress] = new uint[](_puppetCount);
 
         // Calculate allocations for each puppet
         for (uint _i = 0; _i < _puppetCount; _i++) {
@@ -170,7 +155,7 @@ contract Allocation is CoreContract {
                 }
 
                 _puppetAllocations[_i] = _puppetAllocation;
-                allocationPuppetArray[_allocationAddress][_i] = _puppetAllocation;
+                allocationPuppetList[_allocationAddress][_i] = _puppetAllocation;
                 _balances[_i] -= _puppetAllocation;
                 _grossAllocation += _puppetAllocation;
 
@@ -189,101 +174,98 @@ contract Allocation is CoreContract {
         );
 
         // Calculate net allocation after keeper fee
-        _totalAllocation = _grossAllocation - _params.keeperFee;
-        allocationMap[_allocationAddress] = _totalAllocation;
+        _allocated = _grossAllocation - _params.keeperFee;
+        allocationMap[_allocationAddress] = _allocated;
 
         // Transfer keeper fee to receiver
         allocationStore.transferOut(_params.collateralToken, _params.keeperFeeReceiver, _params.keeperFee);
 
         // Transfer net allocation to GMX vault
-        allocationStore.transferOut(_params.collateralToken, config.gmxOrderVault, _totalAllocation);
+        allocationStore.transferOut(_params.collateralToken, config.gmxOrderVault, _allocated);
 
         // Log allocation creation
         _logEvent(
             "CreateAllocation",
-            abi.encode(_params, _allocationAddress, _grossAllocation, _totalAllocation, _puppetAllocations)
+            abi.encode(_params, _allocationAddress, _grossAllocation, _allocated, _puppetAllocations)
         );
 
-        return (_allocationAddress, _totalAllocation);
+        return (_allocationAddress, _allocated);
     }
 
     /**
      * @notice Updates allocations when handling keeper fees for adjustments
      * @dev Reduces puppet allocations if they can't afford their share of keeper fee
      * @return _allocationAddress The allocation account address
-     * @return _updatedTotal The new total allocation after deductions
+     * @return _nextAllocated The updated total allocation after deducting insolvencies
      */
     function updateAllocationsForKeeperFee(
-        IERC20 _collateralToken,
-        address _trader,
-        address[] calldata _puppetList,
-        uint _allocationId,
-        uint _keeperFee,
-        address _keeperFeeReceiver
-    ) external auth returns (address _allocationAddress, uint _updatedTotal) {
-        // Calculate allocation address internally
-        _allocationAddress = getAllocationAddress(_collateralToken, _trader, _puppetList, _allocationId);
-        uint[] memory _puppetAllocations = allocationPuppetArray[_allocationAddress];
+        CallAllocation calldata _params
+    ) external auth returns (address _allocationAddress, uint _nextAllocated) {
+        bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_params.collateralToken, _params.trader);
+        bytes32 _allocationKey =
+            PositionUtils.getAllocationKey(_params.puppetList, _traderMatchingKey, _params.allocationId);
+        _allocationAddress =
+            Clones.predictDeterministicAddress(allocationAccountImplementation, _allocationKey, address(this));
+
+        uint[] memory _puppetAllocations = allocationPuppetList[_allocationAddress];
         uint _currentTotal = allocationMap[_allocationAddress];
-        uint _puppetCount = _puppetList.length;
+        uint _puppetCount = _params.puppetList.length;
 
-        if (_currentTotal == 0 || _keeperFee == 0) {
-            return (_allocationAddress, _currentTotal);
-        }
+        require(_currentTotal > 0, Error.MirrorPosition__InvalidAllocation(_allocationAddress));
+        require(_params.keeperFee > 0, Error.MirrorPosition__InvalidKeeperExecutionFeeAmount());
 
-        uint _totalReduction = 0;
-        uint[] memory _balances = allocationStore.getBalanceList(_collateralToken, _puppetList);
+        uint _totalInsolvency = 0;
+        uint[] memory _balanceList = allocationStore.getBalanceList(_params.collateralToken, _params.puppetList);
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
-            if (_puppetAllocations[_i] == 0) continue;
+            uint _allocation = _puppetAllocations[_i];
+            if (_allocation == 0) continue;
 
             // Calculate puppet's share of keeper fee proportionally
-            uint _puppetFeeShare = (_keeperFee * _puppetAllocations[_i]) / _currentTotal;
+            uint _puppetFeeShare = (_params.keeperFee * _allocation) / _currentTotal;
+            uint _balance = _balanceList[_i];
 
-            if (_balances[_i] >= _puppetFeeShare) {
-                // Puppet can afford their share
-                _balances[_i] -= _puppetFeeShare;
-            } else if (_balances[_i] > 0) {
-                // Partial payment - reduce allocation by unpaid amount
-                uint _unpaidAmount = _puppetFeeShare - _balances[_i];
-                _balances[_i] = 0;
+            // Deduct what puppet can pay from balance
+            uint _paidFromBalance = _balance > _puppetFeeShare ? _puppetFeeShare : _balance;
+            _balanceList[_i] = _balance - _paidFromBalance;
 
-                if (_puppetAllocations[_i] > _unpaidAmount) {
-                    _puppetAllocations[_i] -= _unpaidAmount;
-                    _totalReduction += _unpaidAmount;
-                } else {
-                    _totalReduction += _puppetAllocations[_i];
-                    _puppetAllocations[_i] = 0;
-                }
-            } else {
-                // Can't pay anything - reduce allocation by full fee share
-                if (_puppetAllocations[_i] > _puppetFeeShare) {
-                    _puppetAllocations[_i] -= _puppetFeeShare;
-                    _totalReduction += _puppetFeeShare;
-                } else {
-                    _totalReduction += _puppetAllocations[_i];
-                    _puppetAllocations[_i] = 0;
-                }
+            // Calculate unpaid amount that needs to be deducted from allocation
+            uint _unpaidAmount = _puppetFeeShare - _paidFromBalance;
+            if (_unpaidAmount > 0) {
+                uint _allocationReduction = _allocation > _unpaidAmount ? _unpaidAmount : _allocation;
+                _puppetAllocations[_i] = _allocation - _allocationReduction;
+                _totalInsolvency += _allocationReduction;
             }
         }
 
-        // Update storage
-        allocationStore.setBalanceList(_collateralToken, _puppetList, _balances);
-        allocationPuppetArray[_allocationAddress] = _puppetAllocations;
+        allocationStore.setBalanceList(_params.collateralToken, _params.puppetList, _balanceList);
+        allocationPuppetList[_allocationAddress] = _puppetAllocations;
 
-        _updatedTotal = _currentTotal > _totalReduction ? _currentTotal - _totalReduction : 0;
-        allocationMap[_allocationAddress] = _updatedTotal;
+        _nextAllocated = _currentTotal > _totalInsolvency ? _currentTotal - _totalInsolvency : 0;
+        allocationMap[_allocationAddress] = _nextAllocated;
 
-        // Transfer keeper fee to receiver
-        allocationStore.transferOut(_collateralToken, _keeperFeeReceiver, _keeperFee);
-
-        // Log allocation update for keeper fee handling
-        _logEvent(
-            "UpdateAllocationForKeeperFee",
-            abi.encode(_allocationAddress, _collateralToken, _keeperFee, _currentTotal, _updatedTotal, _totalReduction)
+        // Validate keeper fee doesn't exceed maximum ratio for adjustments (after accounting for insolvency)
+        require(
+            _params.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAdjustmentRatio, _nextAllocated),
+            Error.MirrorPosition__KeeperFeeExceedsCostFactor(_params.keeperFee, _nextAllocated)
         );
 
-        return (_allocationAddress, _updatedTotal);
+        allocationStore.transferOut(_params.collateralToken, _params.keeperFeeReceiver, _params.keeperFee);
+
+        _logEvent(
+            "UpdateAllocationForKeeperFee",
+            abi.encode(
+                _allocationAddress,
+                _params.collateralToken,
+                _params.keeperFee,
+                _currentTotal,
+                _nextAllocated,
+                _totalInsolvency,
+                _balanceList
+            )
+        );
+
+        return (_allocationAddress, _nextAllocated);
     }
 
     /**
@@ -293,7 +275,7 @@ contract Allocation is CoreContract {
         address _allocationAddress
     ) external auth {
         delete allocationMap[_allocationAddress];
-        delete allocationPuppetArray[_allocationAddress];
+        delete allocationPuppetList[_allocationAddress];
     }
 
     /**
@@ -338,8 +320,10 @@ contract Allocation is CoreContract {
         require(_keeperFeeReceiver != address(0), Error.MirrorPosition__InvalidKeeperExecutionFeeReceiver());
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
+        bytes32 _allocationKey =
+            PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId);
         address _allocationAddress =
-            getAllocationAddress(_callParams.collateralToken, _callParams.trader, _puppetList, _callParams.allocationId);
+            Clones.predictDeterministicAddress(allocationAccountImplementation, _allocationKey, address(this));
 
         uint _allocation = allocationMap[_allocationAddress];
         require(_allocation > 0, Error.MirrorPosition__InvalidAllocation(_allocationAddress));
@@ -392,7 +376,7 @@ contract Allocation is CoreContract {
         }
 
         uint[] memory _nextBalanceList = allocationStore.getBalanceList(_callParams.distributionToken, _puppetList);
-        uint[] memory _puppetAllocations = allocationPuppetArray[_allocationAddress];
+        uint[] memory _puppetAllocations = allocationPuppetList[_allocationAddress];
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
             _nextBalanceList[_i] += Math.mulDiv(_distributionAmount, _puppetAllocations[_i], _allocation);

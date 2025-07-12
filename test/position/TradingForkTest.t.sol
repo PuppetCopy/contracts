@@ -5,6 +5,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test} from "forge-std/src/Test.sol";
 // import {console2} from "forge-std/src/console2.sol";
 
+import {Const} from "script/Const.sol";
+
 import {KeeperRouter} from "src/keeperRouter.sol";
 import {Allocation} from "src/position/Allocation.sol";
 import {MatchingRule} from "src/position/MatchingRule.sol";
@@ -19,8 +21,6 @@ import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {Error} from "src/utils/Error.sol";
-
-import {Const} from "script/Const.sol";
 
 /**
  * @title Trading Fork Test
@@ -121,14 +121,13 @@ contract TradingForkTest is Test {
         // Set up permissions
         dictator.setAccess(allocationStore, address(allocation));
         dictator.setAccess(allocationStore, address(matchingRule));
-        dictator.setAccess(allocationStore, address(keeperRouter));
         dictator.setAccess(allocationStore, address(mirrorPosition));
 
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
         dictator.setPermission(keeperRouter, keeperRouter.requestMirror.selector, keeper);
         dictator.setPermission(keeperRouter, keeperRouter.requestAdjust.selector, keeper);
         dictator.setPermission(keeperRouter, keeperRouter.settle.selector, keeper);
-        
+
         dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, owner);
         dictator.setPermission(matchingRule, matchingRule.setRule.selector, puppet1);
         dictator.setPermission(matchingRule, matchingRule.setRule.selector, puppet2);
@@ -271,7 +270,7 @@ contract TradingForkTest is Test {
         uint allocationId = 1;
         uint keeperFee = 0; // Test with no keeper fee
 
-        Allocation.AllocationParams memory allocParams = Allocation.AllocationParams({
+        Allocation.CallAllocation memory allocParams = Allocation.CallAllocation({
             collateralToken: USDC,
             trader: trader,
             puppetList: puppetList,

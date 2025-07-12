@@ -51,7 +51,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient {
      * @return _requestKey The GMX request key for the submitted order
      */
     function requestMirror(
-        Allocation.AllocationParams calldata _allocParams,
+        Allocation.CallAllocation calldata _allocParams,
         MirrorPosition.CallPosition calldata _callParams
     ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
         (address allocationAddress, uint totalAllocation) = allocation.createAllocation(matchingRule, _allocParams);
@@ -64,22 +64,14 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient {
     /**
      * @notice Orchestrates position adjustment by coordinating Allocation and MirrorPosition
      * @param _callParams Position parameters for the trader's adjustment
-     * @param _puppetList List of puppet addresses involved in this position
-     * @param _keeperFee Keeper execution fee amount
-     * @param _keeperFeeReceiver Address to receive keeper fee
-     * @param _allocationId Allocation ID for this position
+     * @param _allocParams Allocation parameters for keeper fee handling
      * @return _requestKey The GMX request key for the submitted adjustment
      */
     function requestAdjust(
         MirrorPosition.CallPosition calldata _callParams,
-        address[] calldata _puppetList,
-        uint _keeperFee,
-        address _keeperFeeReceiver,
-        uint _allocationId
+        Allocation.CallAllocation calldata _allocParams
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
-        (address allocationAddress, uint updatedAllocation) = allocation.updateAllocationsForKeeperFee(
-            _callParams.collateralToken, _callParams.trader, _puppetList, _allocationId, _keeperFee, _keeperFeeReceiver
-        );
+        (address allocationAddress, uint updatedAllocation) = allocation.updateAllocationsForKeeperFee(_allocParams);
 
         _requestKey = mirrorPosition.requestAdjust{value: msg.value}(_callParams, allocationAddress, updatedAllocation);
 
