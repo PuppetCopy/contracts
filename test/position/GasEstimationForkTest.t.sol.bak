@@ -115,11 +115,9 @@ contract GasEstimationForkTest is Test {
                 referralCode: bytes32("PUPPET"),
                 increaseCallbackGasLimit: 2_000_000,
                 decreaseCallbackGasLimit: 2_000_000,
-                platformSettleFeeFactor: 0.1e30,
                 maxPuppetList: 50,
                 maxKeeperFeeToAllocationRatio: 0.1e30,
-                maxKeeperFeeToAdjustmentRatio: 0.1e30,
-                maxKeeperFeeToCollectDustRatio: 0.1e30
+                maxKeeperFeeToAdjustmentRatio: 0.1e30
             })
         );
 
@@ -133,12 +131,15 @@ contract GasEstimationForkTest is Test {
 
         dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, owner);
-        dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, owner);
+        // TODO: Update when Allocation contract is available in test
+        // dictator.setPermission(allocation, allocation.settle.selector, owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, owner);
-        dictator.setPermission(mirrorPosition, mirrorPosition.setTokenDustThresholdList.selector, owner);
-        dictator.setPermission(
-            mirrorPosition, mirrorPosition.initializeTraderActivityThrottle.selector, address(matchingRule)
-        );
+        // TODO: Update when Allocation contract is available in test
+        // dictator.setPermission(allocation, allocation.setTokenDustThresholdList.selector, owner);
+        // TODO: Update when Allocation contract is available
+        // dictator.setPermission(
+        //     allocation, allocation.initializeTraderActivityThrottle.selector, address(matchingRule)
+        // );
 
         dictator.setPermission(matchingRule, matchingRule.setRule.selector, owner);
         dictator.setPermission(matchingRule, matchingRule.deposit.selector, owner);
@@ -168,7 +169,8 @@ contract GasEstimationForkTest is Test {
         uint[] memory dustThresholds = new uint[](2);
         dustThresholds[0] = 1e6;
         dustThresholds[1] = 0.001e18;
-        mirrorPosition.setTokenDustThresholdList(allowedTokens, dustThresholds);
+        // TODO: Update when Allocation contract is available in test
+        // allocation.setTokenDustThresholdList(allowedTokens, dustThresholds);
 
         // Fund test accounts
         vm.deal(owner, 100 ether);
@@ -233,17 +235,18 @@ contract GasEstimationForkTest is Test {
                 puppetList[i] = allPuppets[i];
                 
                 // Set up matching rules
-                matchingRule.setRule(
-                    mirrorPosition,
-                    USDC,
-                    puppetList[i],
-                    trader,
-                    MatchingRule.Rule({
-                        allowanceRate: 1000, // 10%
-                        throttleActivity: 1 hours,
-                        expiry: block.timestamp + 30 days
-                    })
-                );
+                // TODO: Update when Allocation contract is available in test
+                // matchingRule.setRule(
+                //     allocation,
+                //     USDC,
+                //     puppetList[i],
+                //     trader,
+                //     MatchingRule.Rule({
+                //         allowanceRate: 1000, // 10%
+                //         throttleActivity: 1 hours,
+                //         expiry: block.timestamp + 30 days
+                //     })
+                // );
             }
 
             // STEP 1: Create initial position
@@ -324,17 +327,18 @@ contract GasEstimationForkTest is Test {
             matchingRule.deposit(USDC, owner, maxPuppetList[i], 1000e6);
             
             // Set up matching rule
-            matchingRule.setRule(
-                mirrorPosition,
-                USDC,
-                maxPuppetList[i],
-                trader,
-                MatchingRule.Rule({
-                    allowanceRate: 500 + (i % 1000), // Varying allocation rates
-                    throttleActivity: 1 hours,
-                    expiry: block.timestamp + 30 days
-                })
-            );
+            // TODO: Update when Allocation contract is available in test
+            // matchingRule.setRule(
+            //     allocation,
+            //     USDC,
+            //     maxPuppetList[i],
+            //     trader,
+            //     MatchingRule.Rule({
+            //         allowanceRate: 500 + (i % 1000), // Varying allocation rates
+            //         throttleActivity: 1 hours,
+            //         expiry: block.timestamp + 30 days
+            //     })
+            // );
         }
 
         // Create position with max puppets

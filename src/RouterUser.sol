@@ -4,25 +4,28 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
+import {Allocation} from "./position/Allocation.sol";
 import {MatchingRule} from "./position/MatchingRule.sol";
-
-import {MirrorPosition} from "./position/MirrorPosition.sol";
-import {AllocationStore} from "./shared/AllocationStore.sol";
 import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
 
-contract Router is ReentrancyGuardTransient {
+/**
+ * @title RouterUser
+ * @notice Handles user-facing operations for the copy trading system
+ * @dev Contains deposit, withdraw, rule setting, and offer acceptance functionality
+ */
+contract RouterUser is ReentrancyGuardTransient {
     MatchingRule public immutable matchingRule;
     FeeMarketplace public immutable feeMarketplace;
-    MirrorPosition public immutable mirrorPosition;
+    Allocation public immutable allocation;
 
-    constructor(MirrorPosition _mirrorPosition, MatchingRule _matchingRule, FeeMarketplace _feeMarketplace) {
-        require(address(_mirrorPosition) != address(0), "MirrorPosition not set correctly");
+    constructor(MatchingRule _matchingRule, FeeMarketplace _feeMarketplace, Allocation _allocation) {
         require(address(_matchingRule) != address(0), "MatchingRule not set correctly");
         require(address(_feeMarketplace) != address(0), "FeeMarketplace not set correctly");
+        require(address(_allocation) != address(0), "Allocation not set correctly");
 
-        mirrorPosition = _mirrorPosition;
         matchingRule = _matchingRule;
         feeMarketplace = _feeMarketplace;
+        allocation = _allocation;
     }
 
     /**
@@ -55,7 +58,7 @@ contract Router is ReentrancyGuardTransient {
         address trader,
         MatchingRule.Rule calldata ruleParams
     ) external nonReentrant {
-        matchingRule.setRule(mirrorPosition, collateralToken, msg.sender, trader, ruleParams);
+        matchingRule.setRule(allocation, collateralToken, msg.sender, trader, ruleParams);
     }
 
     /**

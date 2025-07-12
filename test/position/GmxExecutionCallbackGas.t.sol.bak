@@ -57,11 +57,9 @@ contract GmxExecutionCallbackGasTest is Test {
                 referralCode: bytes32("TEST"),
                 increaseCallbackGasLimit: 2_000_000,
                 decreaseCallbackGasLimit: 2_000_000,
-                platformSettleFeeFactor: 0.1e30,
                 maxPuppetList: 50,
                 maxKeeperFeeToAllocationRatio: 0.1e30,
-                maxKeeperFeeToAdjustmentRatio: 0.1e30,
-                maxKeeperFeeToCollectDustRatio: 0.1e30
+                maxKeeperFeeToAdjustmentRatio: 0.1e30
             })
         );
 

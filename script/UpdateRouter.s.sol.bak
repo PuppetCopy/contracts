@@ -6,6 +6,7 @@ import {console} from "forge-std/src/console.sol";
 
 import {Router} from "src/Router.sol";
 import {RouterProxy} from "src/RouterProxy.sol";
+import {Allocation} from "src/position/Allocation.sol";
 import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
@@ -26,15 +27,14 @@ contract UpdateRouter is BaseScript {
         MatchingRule matchingRule = MatchingRule(getDeployedAddress("MatchingRule"));
         FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
         MirrorPosition mirrorPosition = MirrorPosition(getDeployedAddress("MirrorPosition"));
+        Allocation allocation = Allocation(getDeployedAddress("Allocation"));
 
-        Router newRouter = new Router(mirrorPosition, matchingRule, feeMarketplace);
-
+        Router newRouter = new Router(mirrorPosition, matchingRule, feeMarketplace, allocation);
         routerProxy.update(address(newRouter));
-
         console.log("Router implementation deployed at:", address(newRouter));
         console.log("Seeding MatchingRule with initial rules...");
         matchingRule.setRule(
-            mirrorPosition,
+            allocation,
             IERC20(Const.usdc),
             DEPLOYER_ADDRESS,
             DEPLOYER_ADDRESS,

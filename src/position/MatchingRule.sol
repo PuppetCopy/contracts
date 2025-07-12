@@ -8,7 +8,7 @@ import {AllocationStore} from "../shared/AllocationStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {MirrorPosition} from "./MirrorPosition.sol";
+import {Allocation} from "./Allocation.sol";
 
 contract MatchingRule is CoreContract {
     struct Rule {
@@ -83,7 +83,7 @@ contract MatchingRule is CoreContract {
     }
 
     function setRule(
-        MirrorPosition mirrorPosition,
+        Allocation allocation,
         IERC20 _collateralToken,
         address _user,
         address _trader,
@@ -107,7 +107,7 @@ contract MatchingRule is CoreContract {
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_collateralToken, _trader);
         matchingRuleMap[_traderMatchingKey][_user] = _ruleParams;
-        mirrorPosition.initializeTraderActivityThrottle(_traderMatchingKey, _user);
+        allocation.initializeTraderActivityThrottle(_traderMatchingKey, _user);
 
         _logEvent("SetMatchingRule", abi.encode(_collateralToken, _traderMatchingKey, _user, _trader, _ruleParams));
     }

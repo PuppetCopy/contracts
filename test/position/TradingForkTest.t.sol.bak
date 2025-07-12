@@ -119,11 +119,9 @@ contract TradingForkTest is Test {
                 referralCode: bytes32("PUPPET"),
                 increaseCallbackGasLimit: 2_000_000,
                 decreaseCallbackGasLimit: 2_000_000,
-                platformSettleFeeFactor: 0.1e30, // 10%
                 maxPuppetList: 50,
                 maxKeeperFeeToAllocationRatio: 0.1e30, // 10%
-                maxKeeperFeeToAdjustmentRatio: 0.1e30, // 5%
-                maxKeeperFeeToCollectDustRatio: 0.1e30 // 10%
+                maxKeeperFeeToAdjustmentRatio: 0.1e30 // 5%
             })
         );
 
@@ -137,12 +135,15 @@ contract TradingForkTest is Test {
 
         dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, owner);
-        dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, owner);
+        // TODO: Update when Allocation contract is available in test
+        // dictator.setPermission(allocation, allocation.settle.selector, owner);
         dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, owner);
-        dictator.setPermission(mirrorPosition, mirrorPosition.setTokenDustThresholdList.selector, owner);
-        dictator.setPermission(
-            mirrorPosition, mirrorPosition.initializeTraderActivityThrottle.selector, address(matchingRule)
-        );
+        // TODO: Update when Allocation contract is available in test
+        // dictator.setPermission(allocation, allocation.setTokenDustThresholdList.selector, owner);
+        // TODO: Update when Allocation contract is available in test
+        // dictator.setPermission(
+        //     allocation, allocation.initializeTraderActivityThrottle.selector, address(matchingRule)
+        // );
 
         dictator.setPermission(matchingRule, matchingRule.setRule.selector, owner);
         dictator.setPermission(matchingRule, matchingRule.deposit.selector, owner);
@@ -177,7 +178,8 @@ contract TradingForkTest is Test {
         dustThresholds[0] = 1e6; // 1 USDC
         dustThresholds[1] = 0.001e18; // 0.001 ETH
 
-        mirrorPosition.setTokenDustThresholdList(allowedTokens, dustThresholds);
+        // TODO: Update when Allocation contract is available in test
+        // allocation.setTokenDustThresholdList(allowedTokens, dustThresholds);
         // Fund test accounts with real tokens
         vm.deal(owner, 100 ether);
 
@@ -314,29 +316,30 @@ contract TradingForkTest is Test {
         puppetList[1] = puppet2;
 
         // Set up asymmetric matching rules to test proportional decreases
-        matchingRule.setRule(
-            mirrorPosition,
-            USDC,
-            puppet1,
-            trader,
-            MatchingRule.Rule({
-                allowanceRate: 1000, // 10% allocation rate
-                throttleActivity: 1 hours,
-                expiry: block.timestamp + 30 days
-            })
-        );
+        // TODO: Update when Allocation contract is available in test
+        // matchingRule.setRule(
+        //     allocation,
+        //     USDC,
+        //     puppet1,
+        //     trader,
+        //     MatchingRule.Rule({
+        //         allowanceRate: 1000, // 10% allocation rate
+        //         throttleActivity: 1 hours,
+        //         expiry: block.timestamp + 30 days
+        //     })
+        // );
 
-        matchingRule.setRule(
-            mirrorPosition,
-            USDC,
-            puppet2,
-            trader,
-            MatchingRule.Rule({
-                allowanceRate: 2000, // 20% allocation rate (2x puppet1)
-                throttleActivity: 1 hours,
-                expiry: block.timestamp + 30 days
-            })
-        );
+        // matchingRule.setRule(
+        //     allocation,
+        //     USDC,
+        //     puppet2,
+        //     trader,
+        //     MatchingRule.Rule({
+        //         allowanceRate: 2000, // 20% allocation rate (2x puppet1)
+        //         throttleActivity: 1 hours,
+        //         expiry: block.timestamp + 30 days
+        //     })
+        // );
 
         // Get ETH price for realistic market conditions
         IChainlinkPriceFeedProvider.ValidatedPrice memory ethPrice =
@@ -572,17 +575,18 @@ contract TradingForkTest is Test {
         puppetList[0] = puppet1;
 
         // Set up matching rule with a small allowance rate
-        matchingRule.setRule(
-            mirrorPosition,
-            USDC,
-            puppet1,
-            trader,
-            MatchingRule.Rule({
-                allowanceRate: 400, // Only 3% allowance rate (very small)
-                throttleActivity: 1 hours,
-                expiry: block.timestamp + 30 days
-            })
-        );
+        // TODO: Update when Allocation contract is available in test
+        // matchingRule.setRule(
+        //     allocation,
+        //     USDC,
+        //     puppet1,
+        //     trader,
+        //     MatchingRule.Rule({
+        //         allowanceRate: 400, // Only 3% allowance rate (very small)
+        //         throttleActivity: 1 hours,
+        //         expiry: block.timestamp + 30 days
+        //     })
+        // );
 
         // Get current price
         IChainlinkPriceFeedProvider.ValidatedPrice memory price =

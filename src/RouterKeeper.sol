@@ -1,0 +1,138 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.29;
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
+
+import {Allocation} from "./position/Allocation.sol";
+import {MatchingRule} from "./position/MatchingRule.sol";
+import {MirrorPosition} from "./position/MirrorPosition.sol";
+import {PositionUtils} from "./position/utils/PositionUtils.sol";
+import {AllocationAccount} from "./shared/AllocationAccount.sol";
+import {AllocationStore} from "./shared/AllocationStore.sol";
+import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
+import {CoreContract} from "./utils/CoreContract.sol";
+import {IAuthority} from "./utils/interfaces/IAuthority.sol";
+
+/**
+ * @title RouterKeeper
+ * @notice Handles keeper-specific operations for the copy trading system
+ * @dev Separates keeper operations from user operations for better security and access control
+ */
+contract RouterKeeper is CoreContract, ReentrancyGuardTransient {
+    MatchingRule public immutable matchingRule;
+    FeeMarketplace public immutable feeMarketplace;
+    MirrorPosition public immutable mirrorPosition;
+    Allocation public immutable allocation;
+
+    constructor(
+        IAuthority _authority,
+        MirrorPosition _mirrorPosition,
+        MatchingRule _matchingRule,
+        FeeMarketplace _feeMarketplace,
+        Allocation _allocation
+    ) CoreContract(_authority) {
+        require(address(_mirrorPosition) != address(0), "MirrorPosition not set correctly");
+        require(address(_matchingRule) != address(0), "MatchingRule not set correctly");
+        require(address(_feeMarketplace) != address(0), "FeeMarketplace not set correctly");
+        require(address(_allocation) != address(0), "Allocation not set correctly");
+
+        mirrorPosition = _mirrorPosition;
+        matchingRule = _matchingRule;
+        feeMarketplace = _feeMarketplace;
+        allocation = _allocation;
+    }
+
+    /**
+     * @notice Orchestrates mirror position creation by coordinating Allocation and MirrorPosition
+     * @param _callParams Position parameters for the trader's action
+     * @param _allocParams Allocation parameters for puppet fund management
+     * @return _allocationAddress The allocation account address created
+     * @return _requestKey The GMX request key for the submitted order
+     */
+    function requestMirror(
+        MirrorPosition.CallPosition calldata _callParams,
+        Allocation.AllocationParams calldata _allocParams
+    ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
+        // Step 1: Create allocation with integrated fund transfers (keeper fee + GMX vault)
+        (address allocationAddress, uint totalAllocation) = allocation.createAllocation(matchingRule, _allocParams);
+
+        // Step 2: Submit GMX order through MirrorPosition (no fund transfers needed)
+        _requestKey = mirrorPosition.requestMirror{value: msg.value}(_callParams, allocationAddress, totalAllocation);
+
+        return (allocationAddress, _requestKey);
+    }
+
+    /**
+     * @notice Orchestrates position adjustment by coordinating Allocation and MirrorPosition
+     * @param _callParams Position parameters for the trader's adjustment
+     * @param _puppetList List of puppet addresses involved in this position
+     * @param _keeperFee Keeper execution fee amount
+     * @param _keeperFeeReceiver Address to receive keeper fee
+     * @param _allocationId Allocation ID for this position
+     * @return _requestKey The GMX request key for the submitted adjustment
+     */
+    function requestAdjust(
+        MirrorPosition.CallPosition calldata _callParams,
+        address[] calldata _puppetList,
+        uint _keeperFee,
+        address _keeperFeeReceiver,
+        uint _allocationId
+    ) external payable auth nonReentrant returns (bytes32 _requestKey) {
+        // Step 1: Handle keeper fee payment through Allocation (handles key calculation internally)
+        (address allocationAddress, uint updatedAllocation) = allocation.updateAllocationsForKeeperFee(
+            _callParams.collateralToken,
+            _callParams.trader,
+            _puppetList,
+            _allocationId,
+            _keeperFee,
+            _keeperFeeReceiver
+        );
+
+        // Step 2: Submit adjustment through MirrorPosition
+        _requestKey = mirrorPosition.requestAdjust{value: msg.value}(_callParams, allocationAddress, updatedAllocation);
+
+        return _requestKey;
+    }
+
+    /**
+     * @notice Settles an allocation by distributing funds back to puppets
+     * @param _settleParams Settlement parameters
+     * @param _puppetList List of puppet addresses involved
+     * @return settledBalance Total amount settled
+     * @return distributionAmount Amount distributed to puppets
+     * @return platformFeeAmount Platform fee collected
+     */
+    function settle(
+        Allocation.SettleParams calldata _settleParams,
+        address[] calldata _puppetList
+    ) external auth nonReentrant returns (uint settledBalance, uint distributionAmount, uint platformFeeAmount) {
+        return allocation.settle(feeMarketplace, _settleParams, _puppetList);
+    }
+
+    /**
+     * @notice Collects dust tokens from an allocation account
+     * @param _allocationAccount The allocation account to collect dust from
+     * @param _dustToken The token to collect
+     * @param _receiver The address to receive the dust
+     * @return dustAmount Amount of dust collected
+     */
+    function collectDust(
+        address _allocationAccount,
+        IERC20 _dustToken,
+        address _receiver
+    ) external auth nonReentrant returns (uint dustAmount) {
+        return allocation.collectDust(AllocationAccount(_allocationAccount), _dustToken, _receiver);
+    }
+
+    /**
+     * @notice Internal function to set configuration (not used but required by CoreContract)
+     * @dev RouterKeeper doesn't have its own configuration
+     */
+    function _setConfig(
+        bytes memory
+    ) internal override {
+        // RouterKeeper doesn't have configuration to set
+        // This function is required by CoreContract but not used
+    }
+}
