@@ -85,6 +85,23 @@ library Error {
     error MirrorPosition__KeeperExecutionFeeNotFullyCovered();
     error MirrorPosition__KeeperFeeExceedsSettledAmount(uint keeperFee, uint settledAmount);
 
+    error Allocation__InvalidAllocation(address allocationAddress);
+    error Allocation__InvalidKeeperExecutionFeeAmount();
+    error Allocation__InvalidKeeperExecutionFeeReceiver();
+    error Allocation__KeeperFeeExceedsAdjustmentRatio(uint keeperFee, uint allocationAmount);
+    error Allocation__KeeperFeeExceedsCostFactor(uint keeperFee, uint allocationAmount);
+    error Allocation__KeeperFeeExceedsSettledAmount(uint keeperFee, uint settledAmount);
+    error Allocation__PuppetListEmpty();
+    error Allocation__PuppetListExceedsMaximum(uint provided, uint maximum);
+    error Allocation__PuppetListMismatch(uint expected, uint provided);
+    error Allocation__InvalidReceiver();
+    error Allocation__InvalidSettledAmount(IERC20 token, uint recordedAmount, uint settledAmount);
+    error Allocation__SettlementTransferFailed(address token, address account);
+    error Allocation__DustThresholdNotSet(address token);
+    error Allocation__NoDustToCollect(address token, address account);
+    error Allocation__AmountExceedsDustThreshold(uint amount, uint threshold);
+    error Allocation__DustTransferFailed(address token, address account);
+
     error GmxExecutionCallback__FailedRefundExecutionFee();
 
     error AllocationAccount__UnauthorizedOperator();

@@ -113,7 +113,7 @@ contract Allocation is CoreContract {
         CallAllocation calldata _params
     ) external auth returns (address _allocationAddress, uint _allocated) {
         uint _puppetCount = _params.puppetList.length;
-        require(_puppetCount > 0, Error.MirrorPosition__PuppetListEmpty());
+        require(_puppetCount > 0, Error.Allocation__PuppetListEmpty());
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_params.collateralToken, _params.trader);
         bytes32 _allocationKey =
@@ -170,7 +170,7 @@ contract Allocation is CoreContract {
         // Validate keeper fee doesn't exceed maximum ratio
         require(
             _params.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _grossAllocation),
-            Error.MirrorPosition__KeeperFeeExceedsCostFactor(_params.keeperFee, _grossAllocation)
+            Error.Allocation__KeeperFeeExceedsCostFactor(_params.keeperFee, _grossAllocation)
         );
 
         // Calculate net allocation after keeper fee
@@ -207,29 +207,34 @@ contract Allocation is CoreContract {
         _allocationAddress =
             Clones.predictDeterministicAddress(allocationAccountImplementation, _allocationKey, address(this));
 
-        uint[] memory _puppetAllocations = allocationPuppetList[_allocationAddress];
         uint _currentTotal = allocationMap[_allocationAddress];
-        uint _puppetCount = _params.puppetList.length;
 
-        require(_currentTotal > 0, Error.MirrorPosition__InvalidAllocation(_allocationAddress));
-        require(_params.keeperFee > 0, Error.MirrorPosition__InvalidKeeperExecutionFeeAmount());
+        require(_currentTotal > 0, Error.Allocation__InvalidAllocation(_allocationAddress));
+        require(_params.keeperFee > 0, Error.Allocation__InvalidKeeperExecutionFeeAmount());
+        require(
+            _params.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAdjustmentRatio, _currentTotal),
+            Error.Allocation__KeeperFeeExceedsAdjustmentRatio(_params.keeperFee, _currentTotal)
+        );
 
-        uint _totalInsolvency = 0;
+        uint[] memory _puppetAllocations = allocationPuppetList[_allocationAddress];
         uint[] memory _balanceList = allocationStore.getBalanceList(_params.collateralToken, _params.puppetList);
 
+        uint _puppetCount = _params.puppetList.length;
+        require(
+            _puppetAllocations.length == _puppetCount, 
+            Error.Allocation__PuppetListMismatch(_puppetAllocations.length, _puppetCount)
+        );
+        uint _totalInsolvency = 0;
         for (uint _i = 0; _i < _puppetCount; _i++) {
             uint _allocation = _puppetAllocations[_i];
             if (_allocation == 0) continue;
 
-            // Calculate puppet's share of keeper fee proportionally
             uint _puppetFeeShare = (_params.keeperFee * _allocation) / _currentTotal;
             uint _balance = _balanceList[_i];
 
-            // Deduct what puppet can pay from balance
             uint _paidFromBalance = _balance > _puppetFeeShare ? _puppetFeeShare : _balance;
             _balanceList[_i] = _balance - _paidFromBalance;
 
-            // Calculate unpaid amount that needs to be deducted from allocation
             uint _unpaidAmount = _puppetFeeShare - _paidFromBalance;
             if (_unpaidAmount > 0) {
                 uint _allocationReduction = _allocation > _unpaidAmount ? _unpaidAmount : _allocation;
@@ -238,17 +243,16 @@ contract Allocation is CoreContract {
             }
         }
 
-        allocationStore.setBalanceList(_params.collateralToken, _params.puppetList, _balanceList);
-        allocationPuppetList[_allocationAddress] = _puppetAllocations;
-
         _nextAllocated = _currentTotal > _totalInsolvency ? _currentTotal - _totalInsolvency : 0;
-        allocationMap[_allocationAddress] = _nextAllocated;
 
-        // Validate keeper fee doesn't exceed maximum ratio for adjustments (after accounting for insolvency)
         require(
             _params.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAdjustmentRatio, _nextAllocated),
-            Error.MirrorPosition__KeeperFeeExceedsCostFactor(_params.keeperFee, _nextAllocated)
+            Error.Allocation__KeeperFeeExceedsAdjustmentRatio(_params.keeperFee, _nextAllocated)
         );
+
+        allocationStore.setBalanceList(_params.collateralToken, _params.puppetList, _balanceList);
+        allocationPuppetList[_allocationAddress] = _puppetAllocations;
+        allocationMap[_allocationAddress] = _nextAllocated;
 
         allocationStore.transferOut(_params.collateralToken, _params.keeperFeeReceiver, _params.keeperFee);
 
@@ -308,16 +312,16 @@ contract Allocation is CoreContract {
         address[] calldata _puppetList
     ) external auth returns (uint _settledAmount, uint _distributionAmount, uint _platformFeeAmount) {
         uint _puppetCount = _puppetList.length;
-        require(_puppetCount > 0, Error.MirrorPosition__PuppetListEmpty());
+        require(_puppetCount > 0, Error.Allocation__PuppetListEmpty());
         require(
             _puppetCount <= config.maxPuppetList,
-            Error.MirrorPosition__PuppetListExceedsMaximum(_puppetCount, config.maxPuppetList)
+            Error.Allocation__PuppetListExceedsMaximum(_puppetCount, config.maxPuppetList)
         );
 
         uint _keeperFee = _callParams.keeperExecutionFee;
-        require(_keeperFee > 0, Error.MirrorPosition__InvalidKeeperExecutionFeeAmount());
+        require(_keeperFee > 0, Error.Allocation__InvalidKeeperExecutionFeeAmount());
         address _keeperFeeReceiver = _callParams.keeperFeeReceiver;
-        require(_keeperFeeReceiver != address(0), Error.MirrorPosition__InvalidKeeperExecutionFeeReceiver());
+        require(_keeperFeeReceiver != address(0), Error.Allocation__InvalidKeeperExecutionFeeReceiver());
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
         bytes32 _allocationKey =
@@ -326,7 +330,7 @@ contract Allocation is CoreContract {
             Clones.predictDeterministicAddress(allocationAccountImplementation, _allocationKey, address(this));
 
         uint _allocation = allocationMap[_allocationAddress];
-        require(_allocation > 0, Error.MirrorPosition__InvalidAllocation(_allocationAddress));
+        require(_allocation > 0, Error.Allocation__InvalidAllocation(_allocationAddress));
 
         _settledAmount = _callParams.distributionToken.balanceOf(_allocationAddress);
 
@@ -337,7 +341,7 @@ contract Allocation is CoreContract {
         );
         require(
             _success,
-            Error.MirrorPosition__SettlementTransferFailed(address(_callParams.distributionToken), _allocationAddress)
+            Error.Allocation__SettlementTransferFailed(address(_callParams.distributionToken), _allocationAddress)
         );
 
         if (returnData.length > 0) {
@@ -349,13 +353,13 @@ contract Allocation is CoreContract {
 
         require(
             _recordedAmountIn >= _settledAmount,
-            Error.MirrorPosition__InvalidSettledAmount(_callParams.distributionToken, _recordedAmountIn, _settledAmount)
+            Error.Allocation__InvalidSettledAmount(_callParams.distributionToken, _recordedAmountIn, _settledAmount)
         );
 
         require(
             _callParams.keeperExecutionFee
                 < Precision.applyFactor(config.maxKeeperFeeToCollectDustRatio, _recordedAmountIn),
-            Error.MirrorPosition__KeeperFeeExceedsSettledAmount(_callParams.keeperExecutionFee, _recordedAmountIn)
+            Error.Allocation__KeeperFeeExceedsSettledAmount(_callParams.keeperExecutionFee, _recordedAmountIn)
         );
 
         _distributionAmount = _recordedAmountIn - _callParams.keeperExecutionFee;
@@ -410,17 +414,17 @@ contract Allocation is CoreContract {
         IERC20 _dustToken,
         address _receiver
     ) external auth returns (uint _dustAmount) {
-        require(_receiver != address(0), Error.MirrorPosition__InvalidReceiver());
+        require(_receiver != address(0), Error.Allocation__InvalidReceiver());
 
         _dustAmount = _dustToken.balanceOf(address(_allocationAccount));
         uint _dustThreshold = tokenDustThresholdAmountMap[_dustToken];
 
-        require(_dustThreshold > 0, Error.MirrorPosition__DustThresholdNotSet(address(_dustToken)));
+        require(_dustThreshold > 0, Error.Allocation__DustThresholdNotSet(address(_dustToken)));
         require(
-            _dustAmount > 0, Error.MirrorPosition__NoDustToCollect(address(_dustToken), address(_allocationAccount))
+            _dustAmount > 0, Error.Allocation__NoDustToCollect(address(_dustToken), address(_allocationAccount))
         );
         require(
-            _dustAmount <= _dustThreshold, Error.MirrorPosition__AmountExceedsDustThreshold(_dustAmount, _dustThreshold)
+            _dustAmount <= _dustThreshold, Error.Allocation__AmountExceedsDustThreshold(_dustAmount, _dustThreshold)
         );
 
         (bool _success, bytes memory returnData) = _allocationAccount.execute(
@@ -429,7 +433,7 @@ contract Allocation is CoreContract {
             config.allocationAccountTransferGasLimit
         );
 
-        require(_success, Error.MirrorPosition__DustTransferFailed(address(_dustToken), address(_allocationAccount)));
+        require(_success, Error.Allocation__DustTransferFailed(address(_dustToken), address(_allocationAccount)));
 
         // Validate ERC20 transfer return value
         if (returnData.length > 0) {
