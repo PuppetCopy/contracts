@@ -29,6 +29,9 @@ contract GmxExecutionCallbackGasTest is Test {
     address gmxOrderHandler = makeAddr("gmxOrderHandler");
     address trader = makeAddr("trader");
 
+    // Storage variables to avoid stack too deep
+    GmxPositionUtils.EventLogData emptyEventData;
+
     function setUp() public {
         vm.startPrank(owner);
 
@@ -49,8 +52,8 @@ contract GmxExecutionCallbackGasTest is Test {
             allocationStore,
             MirrorPosition.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(address(mockGmxRouter)),
-                callbackHandler: placeholderCallback, // Temporary address
-                gmxOrderVault: address(0x1235), // Mock address
+                callbackHandler: placeholderCallback,
+                gmxOrderVault: address(0x1235),
                 referralCode: bytes32("TEST"),
                 increaseCallbackGasLimit: 2_000_000,
                 decreaseCallbackGasLimit: 2_000_000,
@@ -108,38 +111,56 @@ contract GmxExecutionCallbackGasTest is Test {
             address(gmxExecutionCallback)
         );
 
+        // Initialize empty event data in storage
+        _initEmptyEventData();
+
         vm.stopPrank();
     }
 
-    function createMockOrder(GmxPositionUtils.OrderType orderType) internal view returns (GmxPositionUtils.Props memory) {
-        return GmxPositionUtils.Props({
-            addresses: GmxPositionUtils.Addresses({
-                account: address(0x1001),
-                receiver: address(0x1002),
-                callbackContract: address(0x1003),
-                uiFeeReceiver: address(0),
-                market: address(0x1004),
-                initialCollateralToken: IERC20(address(usdc)),
-                swapPath: new address[](0)
-            }),
-            numbers: GmxPositionUtils.Numbers({
-                orderType: orderType,
-                decreasePositionSwapType: GmxPositionUtils.DecreasePositionSwapType.NoSwap,
-                initialCollateralDeltaAmount: 100e6,
-                sizeDeltaUsd: 1000e30,
-                triggerPrice: 0,
-                acceptablePrice: 2000e30,
-                executionFee: 1e15,
-                callbackGasLimit: 100000,
-                minOutputAmount: 0,
-                updatedAtBlock: block.number
-            }),
-            flags: GmxPositionUtils.Flags({
-                isLong: true,
-                shouldUnwrapNativeToken: false,
-                isFrozen: false
-            })
-        });
+    function _initEmptyEventData() internal {
+        // Initialize all empty arrays for EventLogData
+        emptyEventData.addressItems.items = new GmxPositionUtils.AddressKeyValue[](0);
+        emptyEventData.addressItems.arrayItems = new GmxPositionUtils.AddressArrayKeyValue[](0);
+        emptyEventData.uintItems.items = new GmxPositionUtils.UintKeyValue[](0);
+        emptyEventData.uintItems.arrayItems = new GmxPositionUtils.UintArrayKeyValue[](0);
+        emptyEventData.intItems.items = new GmxPositionUtils.IntKeyValue[](0);
+        emptyEventData.intItems.arrayItems = new GmxPositionUtils.IntArrayKeyValue[](0);
+        emptyEventData.boolItems.items = new GmxPositionUtils.BoolKeyValue[](0);
+        emptyEventData.boolItems.arrayItems = new GmxPositionUtils.BoolArrayKeyValue[](0);
+        emptyEventData.bytes32Items.items = new GmxPositionUtils.Bytes32KeyValue[](0);
+        emptyEventData.bytes32Items.arrayItems = new GmxPositionUtils.Bytes32ArrayKeyValue[](0);
+        emptyEventData.bytesItems.items = new GmxPositionUtils.BytesKeyValue[](0);
+        emptyEventData.bytesItems.arrayItems = new GmxPositionUtils.BytesArrayKeyValue[](0);
+        emptyEventData.stringItems.items = new GmxPositionUtils.StringKeyValue[](0);
+        emptyEventData.stringItems.arrayItems = new GmxPositionUtils.StringArrayKeyValue[](0);
+    }
+
+    function createMockOrder(GmxPositionUtils.OrderType orderType) internal view returns (GmxPositionUtils.Props memory order) {
+        order.addresses.account = address(0x1001);
+        order.addresses.receiver = address(0x1002);
+        order.addresses.cancellationReceiver = address(0x1002);
+        order.addresses.callbackContract = address(0x1003);
+        order.addresses.uiFeeReceiver = address(0);
+        order.addresses.market = address(0x1004);
+        order.addresses.initialCollateralToken = address(usdc);
+        order.addresses.swapPath = new address[](0);
+
+        order.numbers.orderType = orderType;
+        order.numbers.decreasePositionSwapType = GmxPositionUtils.DecreasePositionSwapType.NoSwap;
+        order.numbers.sizeDeltaUsd = 1000e30;
+        order.numbers.initialCollateralDeltaAmount = 100e6;
+        order.numbers.triggerPrice = 0;
+        order.numbers.acceptablePrice = 2000e30;
+        order.numbers.executionFee = 1e15;
+        order.numbers.callbackGasLimit = 100000;
+        order.numbers.minOutputAmount = 0;
+        order.numbers.updatedAtTime = block.timestamp;
+        order.numbers.validFromTime = block.timestamp;
+
+        order.flags.isLong = true;
+        order.flags.shouldUnwrapNativeToken = false;
+        order.flags.isFrozen = false;
+        order.flags.autoCancel = false;
     }
 
     function testAfterOrderExecutionGasUsage_IncreaseOrder() public {
@@ -148,17 +169,12 @@ contract GmxExecutionCallbackGasTest is Test {
         
         vm.startPrank(gmxOrderHandler);
         
-        // Measure gas usage
         uint gasBefore = gasleft();
-        
-        // This should succeed but store an unhandled callback since there's no request
-        gmxExecutionCallback.afterOrderExecution(key, order, "");
-        
+        gmxExecutionCallback.afterOrderExecution(key, order, emptyEventData);
         uint gasUsed = gasBefore - gasleft();
         
-        console.log("Gas used for increase order callback (with unhandled storage):", gasUsed);
+        console.log("Gas used for increase order callback:", gasUsed);
         
-        // Check that the callback was stored as unhandled
         uint unhandledCount = gmxExecutionCallback.unhandledCallbackListId();
         assertEq(unhandledCount, 1, "Should have 1 unhandled callback");
         
@@ -172,124 +188,12 @@ contract GmxExecutionCallbackGasTest is Test {
         vm.startPrank(gmxOrderHandler);
         
         uint gasBefore = gasleft();
-        gmxExecutionCallback.afterOrderExecution(key, order, "");
+        gmxExecutionCallback.afterOrderExecution(key, order, emptyEventData);
         uint gasUsed = gasBefore - gasleft();
         
-        console.log("Gas used for decrease order callback (with unhandled storage):", gasUsed);
+        console.log("Gas used for decrease order callback:", gasUsed);
         
         vm.stopPrank();
-    }
-
-    function testAfterOrderExecutionGasUsage_LiquidationOrder() public {
-        bytes32 key = keccak256("test_liquidation_order");
-        GmxPositionUtils.Props memory order = createMockOrder(GmxPositionUtils.OrderType.Liquidation);
-        
-        vm.startPrank(gmxOrderHandler);
-        
-        uint gasBefore = gasleft();
-        gmxExecutionCallback.afterOrderExecution(key, order, "");
-        uint gasUsed = gasBefore - gasleft();
-        
-        console.log("Gas used for liquidation order callback (with unhandled storage):", gasUsed);
-        
-        vm.stopPrank();
-    }
-
-    function testAfterOrderExecutionGasUsage_InvalidOrderType() public {
-        bytes32 key = keccak256("test_invalid_order");
-        // Create a valid order but we'll test with an edge case order type
-        GmxPositionUtils.Props memory order = createMockOrder(GmxPositionUtils.OrderType.LimitSwap); // Not increase/decrease/liquidation
-        
-        vm.startPrank(gmxOrderHandler);
-        
-        uint gasBefore = gasleft();
-        gmxExecutionCallback.afterOrderExecution(key, order, "");
-        uint gasUsed = gasBefore - gasleft();
-        
-        console.log("Gas used for non-position order type callback:", gasUsed);
-        
-        vm.stopPrank();
-    }
-
-    function testAfterOrderExecutionWithLimitedGas() public {
-        bytes32 key = keccak256("test_limited_gas");
-        GmxPositionUtils.Props memory order = createMockOrder(GmxPositionUtils.OrderType.MarketDecrease);
-        
-        vm.startPrank(gmxOrderHandler);
-        
-        // Test with exactly 100k gas (the limit from the transaction)
-        bool success;
-        bytes memory returnData;
-        
-        (success, returnData) = address(gmxExecutionCallback).call{gas: 100000}(
-            abi.encodeWithSelector(
-                gmxExecutionCallback.afterOrderExecution.selector,
-                key,
-                order,
-                ""
-            )
-        );
-        
-        console.log("100k gas call success:", success);
-        if (!success) {
-            console.log("Revert reason length:", returnData.length);
-            if (returnData.length > 0) {
-                console.logBytes(returnData);
-            }
-        }
-        
-        // Test with progressively higher gas limits to find the minimum required
-        uint[] memory gasLimits = new uint[](8);
-        gasLimits[0] = 150000;  // 150k
-        gasLimits[1] = 200000;  // 200k
-        gasLimits[2] = 250000;  // 250k
-        gasLimits[3] = 300000;  // 300k
-        gasLimits[4] = 350000;  // 350k
-        gasLimits[5] = 400000;  // 400k
-        gasLimits[6] = 450000;  // 450k
-        gasLimits[7] = 500000;  // 500k
-        
-        for (uint i = 0; i < gasLimits.length; i++) {
-            (success, returnData) = address(gmxExecutionCallback).call{gas: gasLimits[i]}(
-                abi.encodeWithSelector(
-                    gmxExecutionCallback.afterOrderExecution.selector,
-                    key,
-                    order,
-                    ""
-                )
-            );
-            
-            console.log(string(abi.encodePacked(uint2str(gasLimits[i]/1000), "k gas call success:")), success);
-            
-            if (success) {
-                console.log("SUCCESS! Minimum gas required is approximately:", gasLimits[i]);
-                break;
-            }
-        }
-        
-        vm.stopPrank();
-    }
-    
-    function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
-        if (_i == 0) {
-            return "0";
-        }
-        uint j = _i;
-        uint len;
-        while (j != 0) {
-            len++;
-            j /= 10;
-        }
-        bytes memory bstr = new bytes(len);
-        uint k = len;
-        while (_i != 0) {
-            k = k-1;
-            uint8 temp = (48 + uint8(_i - _i / 10 * 10));
-            bytes1 b1 = bytes1(temp);
-            bstr[k] = b1;
-            _i /= 10;
-        }
-        return string(bstr);
     }
 
     function testAfterOrderCancellationGasUsage() public {
@@ -299,7 +203,7 @@ contract GmxExecutionCallbackGasTest is Test {
         vm.startPrank(gmxOrderHandler);
         
         uint gasBefore = gasleft();
-        gmxExecutionCallback.afterOrderCancellation(key, order, "");
+        gmxExecutionCallback.afterOrderCancellation(key, order, emptyEventData);
         uint gasUsed = gasBefore - gasleft();
         
         console.log("Gas used for order cancellation callback:", gasUsed);
@@ -314,33 +218,10 @@ contract GmxExecutionCallbackGasTest is Test {
         vm.startPrank(gmxOrderHandler);
         
         uint gasBefore = gasleft();
-        gmxExecutionCallback.afterOrderFrozen(key, order, "");
+        gmxExecutionCallback.afterOrderFrozen(key, order, emptyEventData);
         uint gasUsed = gasBefore - gasleft();
         
         console.log("Gas used for order frozen callback:", gasUsed);
-        
-        vm.stopPrank();
-    }
-
-    function testAfterOrderExecutionGasUsage_DirectCall() public {
-        bytes32 key = keccak256("test_direct_call");
-        GmxPositionUtils.Props memory order = createMockOrder(GmxPositionUtils.OrderType.MarketDecrease);
-        
-        vm.startPrank(gmxOrderHandler);
-        
-        // Measure gas usage for the callback without going through MirrorPosition
-        uint gasBefore = gasleft();
-        
-        // This should go through the try-catch and store unhandled callback
-        gmxExecutionCallback.afterOrderExecution(key, order, "");
-        
-        uint gasUsed = gasBefore - gasleft();
-        
-        console.log("Gas used for direct callback call:", gasUsed);
-        
-        // Check that unhandled callback was stored
-        uint unhandledCount = gmxExecutionCallback.unhandledCallbackListId();
-        console.log("Unhandled callbacks stored:", unhandledCount);
         
         vm.stopPrank();
     }

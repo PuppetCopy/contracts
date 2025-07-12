@@ -37,18 +37,18 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
      */
     function afterOrderExecution(
         bytes32 key,
-        GmxPositionUtils.Props calldata order,
-        bytes calldata /*eventData*/
+        GmxPositionUtils.Props memory order,
+        GmxPositionUtils.EventLogData memory /*eventData*/
     ) external auth {
         if (
-            GmxPositionUtils.isIncreaseOrder(order.numbers.orderType)
-                || GmxPositionUtils.isDecreaseOrder(order.numbers.orderType)
+            GmxPositionUtils.isIncreaseOrder(GmxPositionUtils.OrderType(order.numbers.orderType))
+                || GmxPositionUtils.isDecreaseOrder(GmxPositionUtils.OrderType(order.numbers.orderType))
         ) {
             try config.mirrorPosition.execute(key) {}
             catch (bytes memory err) {
                 _storeUnhandledCallback(key, err);
             }
-        } else if (GmxPositionUtils.isLiquidateOrder(order.numbers.orderType)) {
+        } else if (GmxPositionUtils.isLiquidateOrder(GmxPositionUtils.OrderType(order.numbers.orderType))) {
             try config.mirrorPosition.liquidate(order.addresses.account) {}
             catch (bytes memory err) {
                 _storeUnhandledCallback(key, err);
@@ -64,7 +64,7 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
     function afterOrderCancellation(
         bytes32 key,
         GmxPositionUtils.Props calldata, /*order*/
-        bytes calldata /*eventData*/
+        GmxPositionUtils.EventLogData calldata /*eventData*/
     ) external auth {
         _storeUnhandledCallback(key, "Cancellation not implemented");
     }
@@ -75,20 +75,19 @@ contract GmxExecutionCallback is CoreContract, IGmxOrderCallbackReceiver {
     function afterOrderFrozen(
         bytes32 key,
         GmxPositionUtils.Props calldata, /*order*/
-        bytes calldata /*eventData*/
+        GmxPositionUtils.EventLogData calldata /*eventData*/
     ) external auth {
         _storeUnhandledCallback(key, "Freezing not implemented");
     }
 
-
     function refundExecutionFee(
         bytes32 key,
-        bytes calldata /*eventData*/
+        GmxPositionUtils.EventLogData memory /*eventData*/
     ) external payable auth {
         require(msg.value > 0, "No execution fee to refund");
 
         // Refund the execution fee to the configured receiver
-        (bool success, ) = config.refundExecutionFeeReceiver.call{value: msg.value}("");
+        (bool success,) = config.refundExecutionFeeReceiver.call{value: msg.value}("");
         require(success, Error.GmxExecutionCallback__FailedRefundExecutionFee());
 
         _logEvent("RefundExecutionFee", abi.encode(key, msg.value));

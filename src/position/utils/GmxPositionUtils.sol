@@ -9,15 +9,15 @@ library GmxPositionUtils {
     bytes32 public constant COLLATERAL_AMOUNT_KEY = keccak256(abi.encode("COLLATERAL_AMOUNT"));
 
     enum OrderType {
-        MarketSwap, // 0
-        LimitSwap, // 1
-        MarketIncrease, // 2
-        LimitIncrease, // 3
-        MarketDecrease, // 4
-        LimitDecrease, // 5
-        StopLossDecrease, // 6
-        Liquidation // 7
-
+        MarketSwap,
+        LimitSwap,
+        MarketIncrease,
+        LimitIncrease,
+        MarketDecrease,
+        LimitDecrease,
+        StopLossDecrease,
+        Liquidation,
+        StopIncrease
     }
 
     enum OrderExecutionStatus {
@@ -42,42 +42,150 @@ library GmxPositionUtils {
     struct Addresses {
         address account;
         address receiver;
+        address cancellationReceiver;
         address callbackContract;
         address uiFeeReceiver;
         address market;
-        IERC20 initialCollateralToken;
+        address initialCollateralToken;
         address[] swapPath;
     }
 
     struct Numbers {
         OrderType orderType;
         DecreasePositionSwapType decreasePositionSwapType;
-        uint initialCollateralDeltaAmount;
         uint sizeDeltaUsd;
+        uint initialCollateralDeltaAmount;
         uint triggerPrice;
         uint acceptablePrice;
         uint executionFee;
         uint callbackGasLimit;
         uint minOutputAmount;
-        uint updatedAtBlock;
+        uint updatedAtTime;
+        uint validFromTime;
     }
 
     struct Flags {
         bool isLong;
         bool shouldUnwrapNativeToken;
         bool isFrozen;
+        bool autoCancel;
     }
 
-    // @dev CreateOrderParams struct used in createOrder to avoid stack
-    // too deep errors
-    //
-    // @param addresses address values
-    // @param numbers number values
-    // @param orderType for order.orderType
-    // @param decreasePositionSwapType for order.decreasePositionSwapType
-    // @param isLong for order.isLong
-    // @param shouldUnwrapNativeToken for order.shouldUnwrapNativeToken
-    // @note all params except should be part of the corresponding struct hash in all relay contracts
+    struct AddressKeyValue {
+        string key;
+        address value;
+    }
+
+    struct AddressArrayKeyValue {
+        string key;
+        address[] value;
+    }
+
+    struct UintKeyValue {
+        string key;
+        uint value;
+    }
+
+    struct UintArrayKeyValue {
+        string key;
+        uint[] value;
+    }
+
+    struct IntKeyValue {
+        string key;
+        int value;
+    }
+
+    struct IntArrayKeyValue {
+        string key;
+        int[] value;
+    }
+
+    struct BoolKeyValue {
+        string key;
+        bool value;
+    }
+
+    struct BoolArrayKeyValue {
+        string key;
+        bool[] value;
+    }
+
+    struct Bytes32KeyValue {
+        string key;
+        bytes32 value;
+    }
+
+    struct Bytes32ArrayKeyValue {
+        string key;
+        bytes32[] value;
+    }
+
+    struct BytesKeyValue {
+        string key;
+        bytes value;
+    }
+
+    struct BytesArrayKeyValue {
+        string key;
+        bytes[] value;
+    }
+
+    struct StringKeyValue {
+        string key;
+        string value;
+    }
+
+    struct StringArrayKeyValue {
+        string key;
+        string[] value;
+    }
+
+    struct AddressItems {
+        AddressKeyValue[] items;
+        AddressArrayKeyValue[] arrayItems;
+    }
+
+    struct UintItems {
+        UintKeyValue[] items;
+        UintArrayKeyValue[] arrayItems;
+    }
+
+    struct IntItems {
+        IntKeyValue[] items;
+        IntArrayKeyValue[] arrayItems;
+    }
+
+    struct BoolItems {
+        BoolKeyValue[] items;
+        BoolArrayKeyValue[] arrayItems;
+    }
+
+    struct Bytes32Items {
+        Bytes32KeyValue[] items;
+        Bytes32ArrayKeyValue[] arrayItems;
+    }
+
+    struct BytesItems {
+        BytesKeyValue[] items;
+        BytesArrayKeyValue[] arrayItems;
+    }
+
+    struct StringItems {
+        StringKeyValue[] items;
+        StringArrayKeyValue[] arrayItems;
+    }
+
+    struct EventLogData {
+        AddressItems addressItems;
+        UintItems uintItems;
+        IntItems intItems;
+        BoolItems boolItems;
+        Bytes32Items bytes32Items;
+        BytesItems bytesItems;
+        StringItems stringItems;
+    }
+
     struct CreateOrderParams {
         CreateOrderParamsAddresses addresses;
         CreateOrderParamsNumbers numbers;

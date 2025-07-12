@@ -1,0 +1,412 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.29;
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Test} from "forge-std/src/Test.sol";
+import {console} from "forge-std/src/console.sol";
+
+import {GmxExecutionCallback} from "src/position/GmxExecutionCallback.sol";
+import {MatchingRule} from "src/position/MatchingRule.sol";
+import {MirrorPosition} from "src/position/MirrorPosition.sol";
+import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
+import {AllocationStore} from "src/shared/AllocationStore.sol";
+import {Dictatorship} from "src/shared/Dictatorship.sol";
+import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
+import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
+import {TokenRouter} from "src/shared/TokenRouter.sol";
+import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+import {BankStore} from "src/utils/BankStore.sol";
+
+import {Const} from "script/Const.sol";
+
+interface IChainlinkPriceFeedProvider {
+    struct ValidatedPrice {
+        address token;
+        uint min;
+        uint max;
+        uint timestamp;
+        address provider;
+    }
+
+    function getOraclePrice(address token, bytes memory data) external view returns (ValidatedPrice memory);
+}
+
+contract GasEstimationForkTest is Test {
+    // Real Arbitrum addresses
+    IERC20 constant USDC = IERC20(Const.usdc);
+    IERC20 constant WETH = IERC20(Const.wnt);
+
+    // Test contracts
+    Dictatorship dictator;
+    TokenRouter tokenRouter;
+    PuppetToken puppetToken;
+    AllocationStore allocationStore;
+    MatchingRule matchingRule;
+    GmxExecutionCallback gmxExecutionCallback;
+    FeeMarketplace feeMarketplace;
+    FeeMarketplaceStore feeMarketplaceStore;
+    MirrorPosition mirrorPosition;
+
+    // Test users
+    address owner = makeAddr("owner");
+    address trader = makeAddr("trader");
+    address puppet1 = makeAddr("puppet1");
+    address puppet2 = makeAddr("puppet2");
+    address puppet3 = makeAddr("puppet3");
+    address puppet4 = makeAddr("puppet4");
+    address puppet5 = makeAddr("puppet5");
+
+    uint internal nextAllocationId = 0;
+
+    function getNextAllocationId() internal returns (uint) {
+        return ++nextAllocationId;
+    }
+
+    function setUp() public {
+        vm.createSelectFork(vm.envString("RPC_URL"));
+        vm.rollFork(340881246);
+
+        vm.startPrank(owner);
+
+        // Deploy core contracts
+        dictator = new Dictatorship(owner);
+        tokenRouter = new TokenRouter(dictator, TokenRouter.Config(200_000));
+        dictator.initContract(tokenRouter);
+        puppetToken = new PuppetToken();
+
+        // Deploy position contracts
+        feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
+        feeMarketplace = new FeeMarketplace(
+            dictator,
+            puppetToken,
+            feeMarketplaceStore,
+            FeeMarketplace.Config({
+                distributionTimeframe: 1 days,
+                burnBasisPoints: 10000,
+                feeDistributor: BankStore(address(0))
+            })
+        );
+        allocationStore = new AllocationStore(dictator, tokenRouter);
+        matchingRule = new MatchingRule(
+            dictator,
+            allocationStore,
+            MatchingRule.Config({
+                minExpiryDuration: 1 days,
+                minAllowanceRate: 100,
+                maxAllowanceRate: 10000,
+                minActivityThrottle: 1 hours,
+                maxActivityThrottle: 30 days
+            })
+        );
+        gmxExecutionCallback = new GmxExecutionCallback(
+            dictator,
+            GmxExecutionCallback.Config({
+                mirrorPosition: MirrorPosition(_getNextContractAddress(msg.sender)),
+                refundExecutionFeeReceiver: Const.orderflowHandler
+            })
+        );
+        mirrorPosition = new MirrorPosition(
+            dictator,
+            allocationStore,
+            MirrorPosition.Config({
+                gmxExchangeRouter: IGmxExchangeRouter(Const.gmxExchangeRouter),
+                callbackHandler: address(gmxExecutionCallback),
+                gmxOrderVault: Const.gmxOrderVault,
+                referralCode: bytes32("PUPPET"),
+                increaseCallbackGasLimit: 2_000_000,
+                decreaseCallbackGasLimit: 2_000_000,
+                platformSettleFeeFactor: 0.1e30,
+                maxPuppetList: 50,
+                maxKeeperFeeToAllocationRatio: 0.1e30,
+                maxKeeperFeeToAdjustmentRatio: 0.1e30,
+                maxKeeperFeeToCollectDustRatio: 0.1e30
+            })
+        );
+
+        // Set up permissions
+        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
+        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
+        dictator.setAccess(allocationStore, address(matchingRule));
+        dictator.setAccess(allocationStore, address(mirrorPosition));
+        dictator.setAccess(allocationStore, address(feeMarketplace));
+        dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
+
+        dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, owner);
+        dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, owner);
+        dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, owner);
+        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, owner);
+        dictator.setPermission(mirrorPosition, mirrorPosition.setTokenDustThresholdList.selector, owner);
+        dictator.setPermission(
+            mirrorPosition, mirrorPosition.initializeTraderActivityThrottle.selector, address(matchingRule)
+        );
+
+        dictator.setPermission(matchingRule, matchingRule.setRule.selector, owner);
+        dictator.setPermission(matchingRule, matchingRule.deposit.selector, owner);
+        dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, owner);
+        dictator.initContract(matchingRule);
+
+        dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
+        dictator.setPermission(feeMarketplace, feeMarketplace.setAskPrice.selector, owner);
+
+        // Set allowed tokens
+        IERC20[] memory allowedTokens = new IERC20[](2);
+        allowedTokens[0] = USDC;
+        allowedTokens[1] = WETH;
+
+        uint[] memory allowanceCaps = new uint[](2);
+        allowanceCaps[0] = 10000e6; // 10k USDC
+        allowanceCaps[1] = 10e18; // 10 ETH
+
+        matchingRule.setTokenAllowanceList(allowedTokens, allowanceCaps);
+
+        // Initialize contracts
+        dictator.initContract(feeMarketplace);
+        feeMarketplace.setAskPrice(USDC, 100e18);
+        dictator.initContract(mirrorPosition);
+
+        // Set dust thresholds
+        uint[] memory dustThresholds = new uint[](2);
+        dustThresholds[0] = 1e6;
+        dustThresholds[1] = 0.001e18;
+        mirrorPosition.setTokenDustThresholdList(allowedTokens, dustThresholds);
+
+        // Fund test accounts
+        vm.deal(owner, 100 ether);
+        
+        // Fund puppets with varying amounts
+        address[] memory puppets = new address[](5);
+        puppets[0] = puppet1;
+        puppets[1] = puppet2;
+        puppets[2] = puppet3;
+        puppets[3] = puppet4;
+        puppets[4] = puppet5;
+
+        deal(address(USDC), owner, 50000e6);
+        USDC.approve(address(tokenRouter), type(uint).max);
+        
+        for (uint i = 0; i < puppets.length; i++) {
+            matchingRule.deposit(USDC, owner, puppets[i], 1000e6); // 1000 USDC each
+        }
+
+        vm.stopPrank();
+    }
+
+    function testRequestAdjustGasEstimation() public {
+        vm.startPrank(owner);
+
+        console.log("=== PRODUCTION-LIKE GAS ESTIMATION FOR requestAdjust ===");
+        
+        // Test scenarios with different puppet counts
+        uint[] memory puppetCounts = new uint[](5);
+        puppetCounts[0] = 1;
+        puppetCounts[1] = 2;
+        puppetCounts[2] = 5;
+        puppetCounts[3] = 10;
+        puppetCounts[4] = 25;
+
+        address[] memory allPuppets = new address[](25);
+        for (uint i = 0; i < 25; i++) {
+            allPuppets[i] = address(uint160(uint(keccak256(abi.encodePacked("puppet", i)))));
+            
+            // Fund additional puppets
+            if (i >= 5) {
+                deal(address(USDC), owner, 1000e6);
+                USDC.approve(address(tokenRouter), type(uint).max);
+                matchingRule.deposit(USDC, owner, allPuppets[i], 1000e6);
+            } else {
+                allPuppets[i] = [puppet1, puppet2, puppet3, puppet4, puppet5][i];
+            }
+        }
+
+        // Get ETH price
+        IChainlinkPriceFeedProvider.ValidatedPrice memory price =
+            IChainlinkPriceFeedProvider(Const.chainlinkPriceFeedProvider).getOraclePrice(Const.wnt, "");
+
+        for (uint scenarioIndex = 0; scenarioIndex < puppetCounts.length; scenarioIndex++) {
+            uint puppetCount = puppetCounts[scenarioIndex];
+            
+            console.log("\n--- Scenario: %s puppets ---", puppetCount);
+            
+            // Create puppet list for this scenario
+            address[] memory puppetList = new address[](puppetCount);
+            for (uint i = 0; i < puppetCount; i++) {
+                puppetList[i] = allPuppets[i];
+                
+                // Set up matching rules
+                matchingRule.setRule(
+                    mirrorPosition,
+                    USDC,
+                    puppetList[i],
+                    trader,
+                    MatchingRule.Rule({
+                        allowanceRate: 1000, // 10%
+                        throttleActivity: 1 hours,
+                        expiry: block.timestamp + 30 days
+                    })
+                );
+            }
+
+            // STEP 1: Create initial position
+            uint allocationId = getNextAllocationId();
+            MirrorPosition.CallPosition memory initialParams = MirrorPosition.CallPosition({
+                collateralToken: USDC,
+                trader: trader,
+                market: Const.gmxEthUsdcMarket,
+                keeperFeeReceiver: owner,
+                isIncrease: true,
+                isLong: true,
+                executionFee: 0.001 ether,
+                collateralDelta: 200e6,
+                sizeDeltaInUsd: 2000e30,
+                acceptablePrice: price.max * 105 / 100,
+                triggerPrice: price.min,
+                keeperExecutionFee: 1e6,
+                allocationId: allocationId
+            });
+
+            // Measure gas for requestMirror
+            uint mirrorGasStart = gasleft();
+            (, bytes32 requestKey) = 
+                mirrorPosition.requestMirror{value: initialParams.executionFee}(matchingRule, initialParams, puppetList);
+            uint mirrorGasUsed = mirrorGasStart - gasleft();
+            
+            console.log("requestMirror gas used: %s", mirrorGasUsed);
+            console.log("Mirror gas per puppet: %s", mirrorGasUsed / puppetCount);
+            
+            mirrorPosition.execute(requestKey);
+
+            // STEP 2: Test requestAdjust gas usage - increase position to change leverage
+            MirrorPosition.CallPosition memory adjustParams = MirrorPosition.CallPosition({
+                collateralToken: USDC,
+                trader: trader,
+                market: Const.gmxEthUsdcMarket,
+                keeperFeeReceiver: owner,
+                isIncrease: true,
+                isLong: true,
+                executionFee: 0.001 ether,
+                collateralDelta: 100e6, // Different ratio to change leverage
+                sizeDeltaInUsd: 2000e30, // Different ratio to change leverage
+                acceptablePrice: price.max * 105 / 100,
+                triggerPrice: price.min,
+                keeperExecutionFee: 0.5e6,
+                allocationId: allocationId
+            });
+
+            // Measure gas for requestAdjust
+            uint adjustGasStart = gasleft();
+            bytes32 adjustKey = mirrorPosition.requestAdjust{value: adjustParams.executionFee}(adjustParams, puppetList);
+            uint adjustGasUsed = adjustGasStart - gasleft();
+            
+            console.log("requestAdjust gas used: %s", adjustGasUsed);
+            console.log("Adjust gas per puppet: %s", adjustGasUsed / puppetCount);
+            
+            // Compare mirror vs adjust
+            console.log("Mirror vs Adjust difference: %s", mirrorGasUsed > adjustGasUsed ? mirrorGasUsed - adjustGasUsed : adjustGasUsed - mirrorGasUsed);
+            console.log("Mirror is %s expensive than Adjust", mirrorGasUsed > adjustGasUsed ? "more" : "less");
+            
+            // Clean up for next scenario
+            mirrorPosition.execute(adjustKey);
+        }
+
+        // STEP 3: Test with production-like conditions
+        console.log("\n=== PRODUCTION STRESS TEST ===");
+        
+        // Test with maximum puppet count and realistic parameters
+        uint maxPuppetCount = 50;
+        address[] memory maxPuppetList = new address[](maxPuppetCount);
+        
+        for (uint i = 0; i < maxPuppetCount; i++) {
+            maxPuppetList[i] = address(uint160(uint(keccak256(abi.encodePacked("max_puppet", i)))));
+            
+            // Fund puppet
+            deal(address(USDC), owner, 1000e6);
+            USDC.approve(address(tokenRouter), type(uint).max);
+            matchingRule.deposit(USDC, owner, maxPuppetList[i], 1000e6);
+            
+            // Set up matching rule
+            matchingRule.setRule(
+                mirrorPosition,
+                USDC,
+                maxPuppetList[i],
+                trader,
+                MatchingRule.Rule({
+                    allowanceRate: 500 + (i % 1000), // Varying allocation rates
+                    throttleActivity: 1 hours,
+                    expiry: block.timestamp + 30 days
+                })
+            );
+        }
+
+        // Create position with max puppets
+        uint maxAllocationId = getNextAllocationId();
+        MirrorPosition.CallPosition memory maxInitialParams = MirrorPosition.CallPosition({
+            collateralToken: USDC,
+            trader: trader,
+            market: Const.gmxEthUsdcMarket,
+            keeperFeeReceiver: owner,
+            isIncrease: true,
+            isLong: true,
+            executionFee: 0.001 ether,
+            collateralDelta: 500e6,
+            sizeDeltaInUsd: 5000e30,
+            acceptablePrice: price.max * 105 / 100,
+            triggerPrice: price.min,
+            keeperExecutionFee: 2e6,
+            allocationId: maxAllocationId
+        });
+
+        (address maxAllocationAddress, bytes32 maxRequestKey) = 
+            mirrorPosition.requestMirror{value: maxInitialParams.executionFee}(matchingRule, maxInitialParams, maxPuppetList);
+        
+        mirrorPosition.execute(maxRequestKey);
+
+        // Test requestAdjust with max puppets - increase to change leverage
+        MirrorPosition.CallPosition memory maxAdjustParams = MirrorPosition.CallPosition({
+            collateralToken: USDC,
+            trader: trader,
+            market: Const.gmxEthUsdcMarket,
+            keeperFeeReceiver: owner,
+            isIncrease: true,
+            isLong: true,
+            executionFee: 0.001 ether,
+            collateralDelta: 200e6, // Different ratio to change leverage
+            sizeDeltaInUsd: 4000e30, // Different ratio to change leverage
+            acceptablePrice: price.max * 105 / 100,
+            triggerPrice: price.min,
+            keeperExecutionFee: 1e6,
+            allocationId: maxAllocationId
+        });
+
+        uint maxGasStart = gasleft();
+        bytes32 maxAdjustKey = mirrorPosition.requestAdjust{value: maxAdjustParams.executionFee}(maxAdjustParams, maxPuppetList);
+        uint maxGasUsed = maxGasStart - gasleft();
+        
+        console.log("MAX PUPPETS (50) requestAdjust gas used: %s", maxGasUsed);
+        console.log("Gas per puppet: %s", maxGasUsed / maxPuppetCount);
+        
+        // Calculate recommended gas limits based on real measurements
+        uint basePuppetGas = maxGasUsed / maxPuppetCount;
+        uint estimatedBaseGas = maxGasUsed > (maxPuppetCount * basePuppetGas) ? 
+            maxGasUsed - (maxPuppetCount * basePuppetGas) : 0;
+        
+        console.log("\n=== RECOMMENDED GAS LIMITS ===");
+        console.log("Estimated base gas: %s", estimatedBaseGas);
+        console.log("Per puppet gas overhead: %s", basePuppetGas);
+        console.log("Formula: gasLimit = %s + (puppetCount * %s)", estimatedBaseGas, basePuppetGas);
+        
+        // Recommended limits with safety buffer (30%)
+        uint safetyBuffer = 130; // 130% = 30% buffer
+        console.log("\nWith 30%% safety buffer:");
+        console.log("- 1 puppet: %s", (estimatedBaseGas + basePuppetGas) * safetyBuffer / 100);
+        console.log("- 5 puppets: %s", (estimatedBaseGas + basePuppetGas * 5) * safetyBuffer / 100);
+        console.log("- 10 puppets: %s", (estimatedBaseGas + basePuppetGas * 10) * safetyBuffer / 100);
+        console.log("- 25 puppets: %s", (estimatedBaseGas + basePuppetGas * 25) * safetyBuffer / 100);
+        console.log("- 50 puppets: %s", (estimatedBaseGas + basePuppetGas * 50) * safetyBuffer / 100);
+
+        vm.stopPrank();
+    }
+
+    function _getNextContractAddress(address user) internal view returns (address) {
+        return vm.computeCreateAddress(user, vm.getNonce(user) + 1);
+    }
+}

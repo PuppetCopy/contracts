@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.29;
 
+import {IGasFeeCallbackReceiver} from "@gmx/contracts/callback/IGasFeeCallbackReceiver.sol";
+import {IOrderCallbackReceiver} from "@gmx/contracts/callback/IOrderCallbackReceiver.sol";
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {Proxy} from "@openzeppelin/contracts/proxy/Proxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -38,11 +40,7 @@ contract DeployPosition is BaseScript {
             MatchingRule(getDeployedAddress("MatchingRule")),
             FeeMarketplace(getDeployedAddress("FeeMarketplace"))
         );
-        updateRouter(
-            MirrorPosition(getDeployedAddress("MirrorPosition")),
-            MatchingRule(getDeployedAddress("MatchingRule")),
-            FeeMarketplace(getDeployedAddress("FeeMarketplace"))
-        );
+
         vm.stopBroadcast();
     }
 
@@ -72,7 +70,7 @@ contract DeployPosition is BaseScript {
         );
 
         (MirrorPosition mirrorPosition, IERC20[] memory allowedTokenList) =
-            deployMirrorPosition(allocationStore, matchingRule, feeMarketplace);
+            createMirrorPosition(allocationStore, matchingRule, feeMarketplace);
 
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
@@ -124,7 +122,7 @@ contract DeployPosition is BaseScript {
         console.log("Router implementation updated to:", address(newRouter));
     }
 
-    function deployMirrorPosition(
+    function createMirrorPosition(
         AllocationStore allocationStore,
         MatchingRule matchingRule,
         FeeMarketplace feeMarketplace
@@ -140,6 +138,9 @@ contract DeployPosition is BaseScript {
                 refundExecutionFeeReceiver: Const.orderflowHandler
             })
         );
+
+        verifySelectorsMatch();
+
         mirrorPosition = new MirrorPosition(
             dictator,
             allocationStore,
@@ -172,6 +173,9 @@ contract DeployPosition is BaseScript {
         dictator.setPermission(gmxCallbackHandler, gmxCallbackHandler.afterOrderFrozen.selector, Const.gmxOrderHandler);
         dictator.initContract(gmxCallbackHandler);
 
+        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(gmxCallbackHandler));
+        dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, address(gmxCallbackHandler));
+
         dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, Const.orderflowHandler);
         dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, Const.orderflowHandler);
         dictator.setPermission(mirrorPosition, mirrorPosition.settle.selector, Const.orderflowHandler);
@@ -184,13 +188,22 @@ contract DeployPosition is BaseScript {
         tokenDustThresholdCapList[0] = 0.01e18;
         tokenDustThresholdCapList[1] = 1e6;
         mirrorPosition.setTokenDustThresholdList(allowedTokenList, tokenDustThresholdCapList);
-        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(gmxCallbackHandler));
-        dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, address(gmxCallbackHandler));
+
         dictator.setAccess(allocationStore, address(mirrorPosition));
         dictator.setPermission(feeMarketplace, feeMarketplace.deposit.selector, address(mirrorPosition));
 
         // return mirrorPosition;
         return (mirrorPosition, allowedTokenList);
+    }
+
+    function deployMirrorPosition(
+        AllocationStore allocationStore,
+        MatchingRule matchingRule,
+        FeeMarketplace feeMarketplace
+    ) public returns (MirrorPosition mirrorPosition, IERC20[] memory allowedTokenList) {
+        (mirrorPosition, allowedTokenList) = createMirrorPosition(allocationStore, matchingRule, feeMarketplace);
+
+        updateRouter(mirrorPosition, matchingRule, feeMarketplace);
     }
 
     function setMirrorPositionConfig() public {
@@ -214,6 +227,41 @@ contract DeployPosition is BaseScript {
                     maxKeeperFeeToCollectDustRatio: 0.1e30
                 })
             )
+        );
+    }
+
+    function verifySelectorsMatch() public {
+        console.log("\n=== Verifying Selector Compatibility ===");
+
+        GmxExecutionCallback tempCallback = new GmxExecutionCallback(
+            dictator,
+            GmxExecutionCallback.Config({
+                mirrorPosition: MirrorPosition(address(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF)),
+                refundExecutionFeeReceiver: address(0)
+            })
+        );
+
+        console.log(
+            "Matching afterOrderExecution? ",
+            IOrderCallbackReceiver.afterOrderExecution.selector == tempCallback.afterOrderExecution.selector
+                ? "YES"
+                : "NO"
+        );
+        console.log(
+            "Matching afterOrderCancellation? ",
+            IOrderCallbackReceiver.afterOrderCancellation.selector == tempCallback.afterOrderCancellation.selector
+                ? "YES"
+                : "NO"
+        );
+        console.log(
+            "Matching afterOrderFrozen? ",
+            IOrderCallbackReceiver.afterOrderFrozen.selector == tempCallback.afterOrderFrozen.selector ? "YES" : "NO"
+        );
+        console.log(
+            "Matching refundExecutionFee? ",
+            IGasFeeCallbackReceiver.refundExecutionFee.selector == tempCallback.refundExecutionFee.selector
+                ? "YES"
+                : "NO"
         );
     }
 }
