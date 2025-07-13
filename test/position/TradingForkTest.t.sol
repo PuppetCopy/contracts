@@ -97,7 +97,7 @@ contract TradingForkTest is Test {
                 referralCode: bytes32("PUPPET"),
                 increaseCallbackGasLimit: 2000000,
                 decreaseCallbackGasLimit: 2000000,
-                refundExecutionFeeReceiver: owner
+                fallbackRefundExecutionFeeReceiver: owner
             })
         );
 

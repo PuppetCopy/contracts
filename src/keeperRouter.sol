@@ -7,8 +7,9 @@ import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/Reentrancy
 import {Allocation} from "./position/Allocation.sol";
 import {MatchingRule} from "./position/MatchingRule.sol";
 import {MirrorPosition} from "./position/MirrorPosition.sol";
+import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
+import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
 import {AllocationAccount} from "./shared/AllocationAccount.sol";
-import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
@@ -17,7 +18,7 @@ import {IAuthority} from "./utils/interfaces/IAuthority.sol";
  * @notice Handles keeper-specific operations for the copy trading system
  * @dev Separates keeper operations from user operations for better security and access control
  */
-contract KeeperRouter is CoreContract, ReentrancyGuardTransient {
+contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallbackReceiver {
     MatchingRule public immutable matchingRule;
     MirrorPosition public immutable mirrorPosition;
     Allocation public immutable allocation;
@@ -50,7 +51,9 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient {
     ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
         (address allocationAddress, uint totalAllocated) = allocation.createAllocation(matchingRule, _allocParams);
 
-        _requestKey = mirrorPosition.requestMirror{value: msg.value}(_callParams, allocationAddress, totalAllocated);
+        _requestKey = mirrorPosition.requestMirror{value: msg.value}(
+            _callParams, allocationAddress, totalAllocated, address(this)
+        );
 
         return (allocationAddress, _requestKey);
     }
@@ -67,7 +70,8 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient {
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
         (address allocationAddress, uint nextAllocated) = allocation.collectKeeperFee(_allocParams);
 
-        _requestKey = mirrorPosition.requestAdjust{value: msg.value}(_callParams, allocationAddress, nextAllocated);
+        _requestKey =
+            mirrorPosition.requestAdjust{value: msg.value}(_callParams, allocationAddress, nextAllocated, address(this));
 
         return _requestKey;
     }
@@ -119,5 +123,70 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient {
     ) internal override {
         // RouterKeeper doesn't have configuration to set
         // This function is required by CoreContract but not used
+    }
+
+    /**
+     * @notice GMX callback handler for successful order execution
+     * @dev Called by GMX when an order is successfully executed
+     * @param key The request key for the executed order
+     * @param order Order details from GMX
+     */
+    function afterOrderExecution(
+        bytes32 key,
+        GmxPositionUtils.Props memory order,
+        GmxPositionUtils.EventLogData memory /*eventData*/
+    ) external auth {
+        if (
+            GmxPositionUtils.isIncreaseOrder(GmxPositionUtils.OrderType(order.numbers.orderType))
+                || GmxPositionUtils.isDecreaseOrder(GmxPositionUtils.OrderType(order.numbers.orderType))
+        ) {
+            // Call MirrorPosition.execute for successful order execution
+            mirrorPosition.execute(key);
+        } else if (GmxPositionUtils.isLiquidateOrder(GmxPositionUtils.OrderType(order.numbers.orderType))) {
+            // Handle liquidation by calling MirrorPosition.liquidate
+            mirrorPosition.liquidate(order.addresses.account);
+        }
+        // Note: Invalid order types are silently ignored to avoid reverting GMX callbacks
+    }
+
+    /**
+     * @notice GMX callback handler for order cancellation
+     * @dev Called by GMX when an order is cancelled
+     */
+    function afterOrderCancellation(
+        bytes32, /*key*/
+        GmxPositionUtils.Props calldata, /*order*/
+        GmxPositionUtils.EventLogData calldata /*eventData*/
+    ) external auth {
+        // For now, cancellations are handled silently
+        // Future implementation could add retry logic or cleanup
+    }
+
+    /**
+     * @notice GMX callback handler for frozen orders
+     * @dev Called by GMX when an order is frozen
+     */
+    function afterOrderFrozen(
+        bytes32, /*key*/
+        GmxPositionUtils.Props calldata, /*order*/
+        GmxPositionUtils.EventLogData calldata /*eventData*/
+    ) external auth {
+        // For now, frozen orders are handled silently
+        // Future implementation could add retry logic or cleanup
+    }
+
+    /**
+     * @notice GMX callback handler for execution fee refunds
+     * @dev Called by GMX when execution fees need to be refunded
+     * @param key The request key for the refunded order
+     * @param eventData Additional event data from GMX
+     */
+    function refundExecutionFee(bytes32 key, GmxPositionUtils.EventLogData memory eventData) external payable auth {
+        // Forward the refund to MirrorPosition's fallback handler
+        // This maintains compatibility while allowing future improvements
+        (bool success,) = address(mirrorPosition).call{value: msg.value}(
+            abi.encodeWithSelector(MirrorPosition.refundExecutionFee.selector, key, eventData)
+        );
+        require(success, "Failed to forward execution fee refund");
     }
 }

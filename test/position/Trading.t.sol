@@ -9,6 +9,7 @@ import {Allocation} from "src/position/Allocation.sol";
 import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
+import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {AllocationStore} from "src/shared/AllocationStore.sol";
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
@@ -86,7 +87,7 @@ contract TradingTest is BasicSetup {
                 referralCode: bytes32("PUPPET"),
                 increaseCallbackGasLimit: 2e6,
                 decreaseCallbackGasLimit: 2e6,
-                refundExecutionFeeReceiver: address(0x9999)
+                fallbackRefundExecutionFeeReceiver: address(0x9999)
             })
         );
 
@@ -110,6 +111,8 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(allocation, allocation.collectDust.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, address(keeperRouter));
+        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(keeperRouter));
+        dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, address(keeperRouter));
 
         // Initialize contracts
         dictator.initContract(allocation);
@@ -139,6 +142,8 @@ contract TradingTest is BasicSetup {
         // Owner permissions to act on behalf of users
         dictator.setPermission(matchingRule, matchingRule.deposit.selector, users.owner);
         dictator.setPermission(matchingRule, matchingRule.setRule.selector, users.owner);
+
+        dictator.setPermission(keeperRouter, keeperRouter.afterOrderExecution.selector, users.owner);
 
         // Setup puppet balances using owner permissions - owner deposits on behalf of puppets
         matchingRule.deposit(usdc, users.owner, puppet1, 1000e6);
@@ -287,9 +292,7 @@ contract TradingTest is BasicSetup {
         vm.deal(users.owner, 1 ether);
         (, bytes32 requestKey) = keeperRouter.requestMirror{value: 0.001 ether}(allocParams, initialCallParams);
 
-        // Simulate GMX executing the order
-        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, users.owner);
-        mirrorPosition.execute(requestKey);
+        executeOrder(requestKey);
 
         // Now test adjustment
         uint adjustKeeperFee = 0.5e6; // 0.5 USDC
@@ -579,8 +582,7 @@ contract TradingTest is BasicSetup {
         (, bytes32 requestKey) = keeperRouter.requestMirror{value: 0.001 ether}(allocParams, openParams);
 
         // Execute the open position
-        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, users.owner);
-        mirrorPosition.execute(requestKey);
+        executeOrder(requestKey);
 
         // Now decrease the position
         MirrorPosition.CallPosition memory decreaseParams = MirrorPosition.CallPosition({
@@ -746,6 +748,75 @@ contract TradingTest is BasicSetup {
     //----------------------------------------------------------------------------
     // Helper Functions
     //----------------------------------------------------------------------------
+
+    function executeOrder(
+        bytes32 _requestKey
+    ) internal {
+        keeperRouter.afterOrderExecution(
+            _requestKey,
+            GmxPositionUtils.Props({
+                addresses: GmxPositionUtils.Addresses({
+                    account: trader,
+                    receiver: address(0),
+                    cancellationReceiver: address(0),
+                    callbackContract: address(0),
+                    uiFeeReceiver: address(0),
+                    market: address(wnt),
+                    initialCollateralToken: address(0),
+                    swapPath: new address[](0)
+                }),
+                numbers: GmxPositionUtils.Numbers({
+                    orderType: GmxPositionUtils.OrderType.MarketIncrease,
+                    decreasePositionSwapType: GmxPositionUtils.DecreasePositionSwapType.NoSwap,
+                    sizeDeltaUsd: 0,
+                    initialCollateralDeltaAmount: 0,
+                    triggerPrice: 0,
+                    acceptablePrice: 0,
+                    executionFee: 0,
+                    callbackGasLimit: 0,
+                    minOutputAmount: 0,
+                    updatedAtTime: 0,
+                    validFromTime: 0
+                }),
+                flags: GmxPositionUtils.Flags({
+                    isLong: true,
+                    shouldUnwrapNativeToken: false,
+                    isFrozen: false,
+                    autoCancel: false
+                })
+            }),
+            GmxPositionUtils.EventLogData({
+                addressItems: GmxPositionUtils.AddressItems({
+                    items: new GmxPositionUtils.AddressKeyValue[](0),
+                    arrayItems: new GmxPositionUtils.AddressArrayKeyValue[](0)
+                }),
+                uintItems: GmxPositionUtils.UintItems({
+                    items: new GmxPositionUtils.UintKeyValue[](0),
+                    arrayItems: new GmxPositionUtils.UintArrayKeyValue[](0)
+                }),
+                intItems: GmxPositionUtils.IntItems({
+                    items: new GmxPositionUtils.IntKeyValue[](0),
+                    arrayItems: new GmxPositionUtils.IntArrayKeyValue[](0)
+                }),
+                boolItems: GmxPositionUtils.BoolItems({
+                    items: new GmxPositionUtils.BoolKeyValue[](0),
+                    arrayItems: new GmxPositionUtils.BoolArrayKeyValue[](0)
+                }),
+                bytes32Items: GmxPositionUtils.Bytes32Items({
+                    items: new GmxPositionUtils.Bytes32KeyValue[](0),
+                    arrayItems: new GmxPositionUtils.Bytes32ArrayKeyValue[](0)
+                }),
+                bytesItems: GmxPositionUtils.BytesItems({
+                    items: new GmxPositionUtils.BytesKeyValue[](0),
+                    arrayItems: new GmxPositionUtils.BytesArrayKeyValue[](0)
+                }),
+                stringItems: GmxPositionUtils.StringItems({
+                    items: new GmxPositionUtils.StringKeyValue[](0),
+                    arrayItems: new GmxPositionUtils.StringArrayKeyValue[](0)
+                })
+            })
+        );
+    }
 
     function getAllocationAddress(
         IERC20 _collateralToken,
