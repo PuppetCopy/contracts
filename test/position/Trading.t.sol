@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.29;
 
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
 import {Allocation} from "src/position/Allocation.sol";
@@ -112,6 +112,7 @@ contract TradingTest is BasicSetup {
         dictator.setAccess(allocationStore, address(allocation));
         dictator.setAccess(allocationStore, address(matchingRule));
         dictator.setAccess(allocationStore, address(keeperRouter));
+        dictator.setAccess(allocationStore, address(keeperRouter));
 
         dictator.setPermission(keeperRouter, keeperRouter.requestMirror.selector, keeper);
         dictator.setPermission(keeperRouter, keeperRouter.requestAdjust.selector, keeper);
@@ -121,6 +122,12 @@ contract TradingTest is BasicSetup {
         // Initialize contracts and set required configurations
         dictator.initContract(feeMarketplace);
         dictator.initContract(allocation);
+
+        // Permisisons used for testing
+        dictator.setPermission(matchingRule, matchingRule.deposit.selector, users.owner);
+        dictator.setPermission(matchingRule, matchingRule.setRule.selector, users.owner);
+
+        _dealERC20(usdc, users.owner, 10000e6);
 
         // Configure MatchingRule with token allowances before init
         IERC20[] memory allowedTokens = new IERC20[](1);
@@ -162,7 +169,7 @@ contract TradingTest is BasicSetup {
             trader,
             MatchingRule.Rule({
                 allowanceRate: 2000, // 20%
-                throttleActivity: 10 minutes,
+                throttleActivity: 1 hours,
                 expiry: block.timestamp + 30 days
             })
         );
@@ -444,7 +451,6 @@ contract TradingTest is BasicSetup {
         assertEq(usdc.balanceOf(keeper), keeperBalanceBefore + 5e6, "Keeper should receive dust");
     }
 
-
     function getAllocationAddress(
         IERC20 _collateralToken,
         address _trader,
@@ -454,6 +460,8 @@ contract TradingTest is BasicSetup {
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_collateralToken, _trader);
         bytes32 _allocationKey = keccak256(abi.encodePacked(_puppetList, _traderMatchingKey, _allocationId));
 
-        return Clones.predictDeterministicAddress(allocation.allocationAccountImplementation(), _allocationKey, address(allocation));
+        return Clones.predictDeterministicAddress(
+            allocation.allocationAccountImplementation(), _allocationKey, address(allocation)
+        );
     }
 }

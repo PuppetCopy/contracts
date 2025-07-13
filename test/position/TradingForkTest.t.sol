@@ -62,7 +62,7 @@ contract TradingForkTest is Test {
         dictator = new Dictatorship(owner);
         tokenRouter = new TokenRouter(dictator, TokenRouter.Config(200_000));
         dictator.initContract(tokenRouter);
-        puppetToken = new PuppetToken();
+        puppetToken = new PuppetToken(owner);
 
         // Deploy position contracts
         feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);

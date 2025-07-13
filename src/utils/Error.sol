@@ -101,6 +101,9 @@ library Error {
     error Allocation__NoDustToCollect(address token, address account);
     error Allocation__AmountExceedsDustThreshold(uint amount, uint threshold);
     error Allocation__DustTransferFailed(address token, address account);
+    error Allocation__InsufficientFundsForKeeperFee(uint puppetIndex, uint unpaidAmount, uint puppetAllocation);
+    error Allocation__KeeperFeeNotFullyCovered(uint totalPaid, uint requiredFee);
+    error Allocation__InsufficientAllocationForKeeperFee(uint allocation, uint keeperFee);
 
     error GmxExecutionCallback__FailedRefundExecutionFee();
 

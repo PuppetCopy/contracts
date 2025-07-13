@@ -7,7 +7,7 @@ import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC2
 contract PuppetToken is ERC20, ERC20Burnable {
     uint private constant TOTAL_SUPPLY = 100_000_000e18;
 
-    constructor() ERC20("Puppet Test", "PUPPET-TEST") {
-        _mint(msg.sender, TOTAL_SUPPLY);
+    constructor(address receiver) ERC20("Puppet Test", "PUPPET-TEST") {
+        _mint(receiver, TOTAL_SUPPLY);
     }
 }

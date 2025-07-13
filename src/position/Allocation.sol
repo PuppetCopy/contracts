@@ -127,69 +127,51 @@ contract Allocation is CoreContract {
         MatchingRule.Rule[] memory _rules = _matchingRule.getRuleList(_traderMatchingKey, _params.puppetList);
         uint[] memory _balances = allocationStore.getBalanceList(_params.collateralToken, _params.puppetList);
 
-        uint _estimatedFeePerPuppet = _params.keeperFee / _puppetCount;
-        uint _grossAllocation = 0;
+        uint _feePerPuppet = _params.keeperFee / _puppetCount;
+        uint _totalAllocated = 0;
 
-        // Initialize puppet allocations array
         uint[] memory _puppetAllocations = new uint[](_puppetCount);
         allocationPuppetList[_allocationAddress] = new uint[](_puppetCount);
 
-        // Calculate allocations for each puppet
         for (uint _i = 0; _i < _puppetCount; _i++) {
             address _puppet = _params.puppetList[_i];
             MatchingRule.Rule memory _rule = _rules[_i];
 
-            // Check if puppet is eligible (rule active and throttle passed)
             if (
                 _rule.expiry > block.timestamp
                     && block.timestamp >= lastActivityThrottleMap[_traderMatchingKey][_puppet]
             ) {
                 uint _puppetAllocation = Precision.applyBasisPoints(_rule.allowanceRate, _balances[_i]);
 
-                // Skip if keeper fee is too high relative to allocation
-                if (
-                    _estimatedFeePerPuppet
-                        > Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _puppetAllocation)
-                ) {
+                if (_feePerPuppet > Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _puppetAllocation)) {
                     continue;
                 }
 
                 _puppetAllocations[_i] = _puppetAllocation;
                 allocationPuppetList[_allocationAddress][_i] = _puppetAllocation;
                 _balances[_i] -= _puppetAllocation;
-                _grossAllocation += _puppetAllocation;
+                _totalAllocated += _puppetAllocation;
 
-                // Update throttle
                 lastActivityThrottleMap[_traderMatchingKey][_puppet] = block.timestamp + _rule.throttleActivity;
             }
         }
 
-        // Update balances in store
         allocationStore.setBalanceList(_params.collateralToken, _params.puppetList, _balances);
 
-        // Validate keeper fee doesn't exceed maximum ratio
         require(
-            _params.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _grossAllocation),
-            Error.Allocation__KeeperFeeExceedsCostFactor(_params.keeperFee, _grossAllocation)
+            _params.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _totalAllocated),
+            Error.Allocation__KeeperFeeExceedsCostFactor(_params.keeperFee, _totalAllocated)
         );
 
-        // Calculate net allocation after keeper fee
-        _allocated = _grossAllocation - _params.keeperFee;
+        _allocated = _totalAllocated - _params.keeperFee;
         allocationMap[_allocationAddress] = _allocated;
 
-        // Transfer keeper fee to receiver
         allocationStore.transferOut(_params.collateralToken, _params.keeperFeeReceiver, _params.keeperFee);
-
-        // Transfer net allocation to GMX vault
         allocationStore.transferOut(_params.collateralToken, config.gmxOrderVault, _allocated);
 
-        // Log allocation creation
         _logEvent(
-            "CreateAllocation",
-            abi.encode(_params, _allocationAddress, _grossAllocation, _allocated, _puppetAllocations)
+            "CreateAllocation", abi.encode(_params, _allocationAddress, _totalAllocated, _allocated, _puppetAllocations)
         );
-
-        return (_allocationAddress, _allocated);
     }
 
     /**
@@ -221,29 +203,46 @@ contract Allocation is CoreContract {
 
         uint _puppetCount = _params.puppetList.length;
         require(
-            _puppetAllocations.length == _puppetCount, 
+            _puppetAllocations.length == _puppetCount,
             Error.Allocation__PuppetListMismatch(_puppetAllocations.length, _puppetCount)
         );
-        uint _totalInsolvency = 0;
+        require(
+            _currentTotal > _params.keeperFee,
+            Error.Allocation__InsufficientAllocationForKeeperFee(_currentTotal, _params.keeperFee)
+        );
+
+        uint _remainingKeeperFeeToCollect = _params.keeperFee;
+        uint _puppetKeeperExecutionFeeInsolvency = 0;
         for (uint _i = 0; _i < _puppetCount; _i++) {
-            uint _allocation = _puppetAllocations[_i];
-            if (_allocation == 0) continue;
+            uint _puppetAllocation = _puppetAllocations[_i];
 
-            uint _puppetFeeShare = (_params.keeperFee * _allocation) / _currentTotal;
-            uint _balance = _balanceList[_i];
+            if (_puppetAllocation == 0) continue;
 
-            uint _paidFromBalance = _balance > _puppetFeeShare ? _puppetFeeShare : _balance;
-            _balanceList[_i] = _balance - _paidFromBalance;
+            // Calculate execution fee more precisely to avoid rounding errors
+            uint _remainingPuppets = _puppetCount - _i;
+            uint _executionFee = (_remainingKeeperFeeToCollect + _remainingPuppets - 1) / _remainingPuppets;
 
-            uint _unpaidAmount = _puppetFeeShare - _paidFromBalance;
-            if (_unpaidAmount > 0) {
-                uint _allocationReduction = _allocation > _unpaidAmount ? _unpaidAmount : _allocation;
-                _puppetAllocations[_i] = _allocation - _allocationReduction;
-                _totalInsolvency += _allocationReduction;
+            // Ensure we don't exceed remaining fee
+            if (_executionFee > _remainingKeeperFeeToCollect) {
+                _executionFee = _remainingKeeperFeeToCollect;
+            }
+
+            if (_balanceList[_i] >= _executionFee) {
+                _balanceList[_i] -= _executionFee;
+                _remainingKeeperFeeToCollect -= _executionFee;
+            } else {
+                _puppetAllocations[_i] = _puppetAllocation >= _executionFee ? _puppetAllocation - _executionFee : 0;
+                _puppetKeeperExecutionFeeInsolvency += _executionFee;
+                _remainingKeeperFeeToCollect -= _executionFee;
             }
         }
 
-        _nextAllocated = _currentTotal > _totalInsolvency ? _currentTotal - _totalInsolvency : 0;
+        require(
+            _remainingKeeperFeeToCollect == 0,
+            Error.Allocation__KeeperFeeNotFullyCovered(0, _remainingKeeperFeeToCollect)
+        );
+
+        _nextAllocated = _currentTotal - _puppetKeeperExecutionFeeInsolvency;
 
         require(
             _params.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAdjustmentRatio, _nextAllocated),
@@ -264,8 +263,8 @@ contract Allocation is CoreContract {
                 _params.keeperFee,
                 _currentTotal,
                 _nextAllocated,
-                _totalInsolvency,
-                _balanceList
+                _puppetKeeperExecutionFeeInsolvency,
+                _puppetAllocations
             )
         );
 
@@ -420,9 +419,7 @@ contract Allocation is CoreContract {
         uint _dustThreshold = tokenDustThresholdAmountMap[_dustToken];
 
         require(_dustThreshold > 0, Error.Allocation__DustThresholdNotSet(address(_dustToken)));
-        require(
-            _dustAmount > 0, Error.Allocation__NoDustToCollect(address(_dustToken), address(_allocationAccount))
-        );
+        require(_dustAmount > 0, Error.Allocation__NoDustToCollect(address(_dustToken), address(_allocationAccount)));
         require(
             _dustAmount <= _dustThreshold, Error.Allocation__AmountExceedsDustThreshold(_dustAmount, _dustThreshold)
         );

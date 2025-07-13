@@ -46,8 +46,15 @@ contract BasicSetup is Test {
         dictator = new Dictatorship(users.owner);
         tokenRouter = new TokenRouter(dictator, TokenRouter.Config(200_000));
         dictator.initContract(tokenRouter);
-        puppetToken = new PuppetToken();
+        puppetToken = new PuppetToken(users.owner);
         vPuppetToken = new PuppetVoteToken(dictator);
+
+        // Owner funding operations
+        puppetToken.approve(address(tokenRouter), type(uint).max);
+        usdc.mint(users.owner, 2000e6);
+        wnt.mint(users.owner, 2000e18);
+        wnt.approve(address(tokenRouter), type(uint).max);
+        usdc.approve(address(tokenRouter), type(uint).max);
 
         skip(1 hours);
     }
