@@ -5,9 +5,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {Allocate} from "./position/Allocate.sol";
-import {Settle} from "./position/Settle.sol";
 import {MatchingRule} from "./position/MatchingRule.sol";
 import {MirrorPosition} from "./position/MirrorPosition.sol";
+import {Settle} from "./position/Settle.sol";
 import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
 import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
 import {AllocationAccount} from "./shared/AllocationAccount.sol";

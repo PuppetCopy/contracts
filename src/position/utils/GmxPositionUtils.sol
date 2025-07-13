@@ -229,13 +229,15 @@ library GmxPositionUtils {
     function isIncreaseOrder(
         OrderType orderType
     ) internal pure returns (bool) {
-        return orderType == OrderType.MarketIncrease || orderType == OrderType.LimitIncrease;
+        return orderType == OrderType.MarketIncrease || orderType == OrderType.LimitIncrease
+            || orderType == OrderType.StopIncrease;
     }
 
     function isDecreaseOrder(
         OrderType orderType
     ) internal pure returns (bool) {
-        return orderType == OrderType.MarketDecrease || orderType == OrderType.Liquidation;
+        return orderType == OrderType.MarketDecrease || orderType == OrderType.LimitDecrease
+            || orderType == OrderType.StopLossDecrease;
     }
 
     function isLiquidateOrder(

@@ -17,8 +17,12 @@ import {PositionUtils} from "./utils/PositionUtils.sol";
  * @notice Interface for reading allocation data from Allocate contract
  */
 interface IAllocate {
-    function getAllocation(address _allocationAddress) external view returns (uint);
-    function getPuppetAllocationList(address _allocationAddress) external view returns (uint[] memory);
+    function getAllocation(
+        address _allocationAddress
+    ) external view returns (uint);
+    function getPuppetAllocationList(
+        address _allocationAddress
+    ) external view returns (uint[] memory);
 }
 
 /**
@@ -79,9 +83,9 @@ contract Settle is CoreContract {
      * @dev This function is called by a Keeper when funds related to a closed or partially closed
      * GMX position (identified by the allocation instance) are available in the AllocationAccount.
      * It retrieves the specified `distributeToken` balance from the account, transfers it to the
-     * central `AllocationStore`, deducts a Keeper fee (paid to msg.sender) and a platform fee
-     * (sent to FeeMarketplace), and distributes the remaining amount to the participating Puppets'
-     * balances within the `AllocationStore` based on their original contribution ratios (`allocationPuppetMap`).
+     * central `AllocationStore`, deducts a Keeper fee (paid to msg.sender) and a platform fee and distributes the
+     * remaining amount to the participating Puppets' balances within the `AllocationStore` based on their original
+     * contribution ratios (`allocationPuppetMap`).
      *
      * IMPORTANT: Settlement on GMX might occur in stages or involve multiple token types (e.g.,
      * collateral returned separately from PnL or fees). This function processes only the currently
