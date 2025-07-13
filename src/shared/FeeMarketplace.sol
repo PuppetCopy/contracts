@@ -4,6 +4,7 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {TokenRouter} from "../shared/TokenRouter.sol";
 import {PuppetToken} from "../tokenomics/PuppetToken.sol";
 import {BankStore} from "../utils/BankStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
@@ -38,17 +39,17 @@ contract FeeMarketplace is CoreContract {
         uint burnBasisPoints;
     }
 
-    /// @notice Holds fee tokens
-    FeeMarketplaceStore public immutable store;
-
     /// @notice Protocol token used for purchases
     PuppetToken public immutable protocolToken;
+
+    /// @notice Holds fee tokens
+    FeeMarketplaceStore public immutable store;
 
     /// @notice Fixed price to redeem any amount of each fee token
     mapping(IERC20 => uint) public askAmount;
 
     /// @notice Currently unlocked balance per fee token
-    mapping(IERC20 => uint) public accruedFee;
+    mapping(IERC20 => uint) public unclockedFees;
 
     /// @notice Last unlock calculation timestamp per fee token
     mapping(IERC20 => uint) public lastDistributionTimestamp;
@@ -65,8 +66,8 @@ contract FeeMarketplace is CoreContract {
         FeeMarketplaceStore _store,
         Config memory _config
     ) CoreContract(_authority) {
-        store = _store;
         protocolToken = _protocolToken;
+        store = _store;
 
         _setConfig(abi.encode(_config));
     }
@@ -80,14 +81,14 @@ contract FeeMarketplace is CoreContract {
         IERC20 feeToken
     ) public view returns (uint pending) {
         uint totalDeposited = store.getTokenBalance(feeToken);
-        uint alreadyUnlocked = accruedFee[feeToken];
+        uint unlockedAmount = unclockedFees[feeToken];
 
-        if (totalDeposited <= alreadyUnlocked) return 0;
+        if (totalDeposited <= unlockedAmount) return 0;
 
-        uint netNewDeposits = totalDeposited - alreadyUnlocked;
+        uint newDepositAmount = totalDeposited - unlockedAmount;
         uint timeElapsed = block.timestamp - lastDistributionTimestamp[feeToken];
 
-        pending = Math.min((netNewDeposits * timeElapsed) / config.distributionTimeframe, netNewDeposits);
+        pending = Math.min((newDepositAmount * timeElapsed) / config.distributionTimeframe, newDepositAmount);
     }
 
     /**
@@ -98,21 +99,36 @@ contract FeeMarketplace is CoreContract {
     function getTotalUnlocked(
         IERC20 feeToken
     ) public view returns (uint) {
-        return accruedFee[feeToken] + getPendingUnlock(feeToken);
+        return unclockedFees[feeToken] + getPendingUnlock(feeToken);
     }
 
     /**
      * @notice Deposits fee tokens into the marketplace.
      * @param _feeToken The fee token to deposit.
+     * @param _depositor The address depositing the tokens.
+     * @param _amount The amount of tokens to deposit.
      */
-    function deposit(
-        IERC20 _feeToken
-    ) external auth {
-        // Update the fee token's unlocked balance before processing the deposit.
+    function deposit(IERC20 _feeToken, address _depositor, uint _amount) external auth {
+        require(_amount > 0, Error.FeeMarketplace__ZeroDeposit());
+        
         _updateUnlockedBalance(_feeToken);
 
-        // Record newly transferred tokens
-        uint _amount = store.recordTransferIn(_feeToken);
+        store.transferIn(_feeToken, _depositor, _amount);
+
+        _logEvent("Deposit", abi.encode(_feeToken, _amount));
+    }
+
+    /**
+     * @notice Records unaccounted transferred tokens to the store and syncs internal accounting.
+     * @param _feeToken The fee token to record.
+     * @return _amount The actual amount transferred.
+     */
+    function recordTransferIn(
+        IERC20 _feeToken
+    ) external auth returns (uint _amount) {
+        _updateUnlockedBalance(_feeToken);
+
+        _amount = store.recordTransferIn(_feeToken);
         require(_amount > 0, Error.FeeMarketplace__ZeroDeposit());
 
         _logEvent("Deposit", abi.encode(_feeToken, _amount));
@@ -133,13 +149,11 @@ contract FeeMarketplace is CoreContract {
         // Update the fee token's unlocked balance before redemption.
         _updateUnlockedBalance(_feeToken);
 
-        uint _accuredFees = accruedFee[_feeToken];
+        uint _accuredFees = unclockedFees[_feeToken];
         require(_accuredFees >= _purchaseAmount, Error.FeeMarketplace__InsufficientUnlockedBalance(_accuredFees));
 
-        // Transfer protocol tokens from depositor
         store.transferIn(protocolToken, _depositor, _currentAskAmount);
 
-        // Burn the designated portion of protocol tokens.
         uint _burnAmount;
         uint _distributeAmount = _currentAskAmount;
         if (config.burnBasisPoints > 0) {
@@ -148,13 +162,8 @@ contract FeeMarketplace is CoreContract {
             _distributeAmount -= _burnAmount;
         }
 
-        // Add remaining tokens to distribution balance
         distributionBalance += _distributeAmount;
-
-        // Deduct the redeemed fee tokens from the unlocked balance.
-        accruedFee[_feeToken] = _accuredFees - _purchaseAmount;
-
-        // Transfer fee tokens out to the receiver.
+        unclockedFees[_feeToken] -= _purchaseAmount;
         store.transferOut(_feeToken, _receiver, _purchaseAmount);
 
         _logEvent("AcceptOffer", abi.encode(_feeToken, _receiver, _purchaseAmount, _burnAmount, _distributeAmount));
@@ -179,7 +188,10 @@ contract FeeMarketplace is CoreContract {
     function collectDistribution(address _receiver, uint _amount) external auth {
         require(_receiver != address(0), Error.FeeMarketplace__InvalidReceiver());
         require(_amount > 0, Error.FeeMarketplace__InvalidAmount());
-        require(_amount <= distributionBalance, Error.FeeMarketplace__InsufficientDistributionBalance(_amount, distributionBalance));
+        require(
+            _amount <= distributionBalance,
+            Error.FeeMarketplace__InsufficientDistributionBalance(_amount, distributionBalance)
+        );
 
         distributionBalance -= _amount;
         store.transferOut(protocolToken, _receiver, _amount);
@@ -194,7 +206,7 @@ contract FeeMarketplace is CoreContract {
     ) internal {
         uint pendingUnlock = getPendingUnlock(_feeToken);
         if (pendingUnlock > 0) {
-            accruedFee[_feeToken] += pendingUnlock;
+            unclockedFees[_feeToken] += pendingUnlock;
         }
         lastDistributionTimestamp[_feeToken] = block.timestamp;
     }
