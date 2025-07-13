@@ -32,8 +32,6 @@ contract BasicSetup is Test {
     PuppetVoteToken vPuppetToken;
 
     function setUp() public virtual {
-        vm.deal(users.owner, 100 ether);
-
         users = Users({
             owner: _createUser("Owner"), //
             alice: _createUser("Alice"),
@@ -41,6 +39,7 @@ contract BasicSetup is Test {
             yossi: _createUser("Yossi")
         });
 
+        vm.deal(users.owner, 100 ether);
         vm.startPrank(users.owner);
 
         dictator = new Dictatorship(users.owner);

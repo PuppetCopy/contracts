@@ -134,7 +134,7 @@ contract TradingForkTest is Test {
         dictator.setPermission(allocation, allocation.initializeTraderActivityThrottle.selector, address(matchingRule));
 
         dictator.setPermission(allocation, allocation.createAllocation.selector, address(keeperRouter));
-        dictator.setPermission(allocation, allocation.updateAllocationsForKeeperFee.selector, address(keeperRouter));
+        dictator.setPermission(allocation, allocation.collectKeeperFee.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, address(keeperRouter));
 

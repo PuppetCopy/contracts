@@ -203,17 +203,27 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
 
         // Calculate trader's new target leverage
         uint _currentPuppetLeverage = Precision.toBasisPoints(_position.size, _currentAllocation);
-        uint _traderTargetLeverage;
+
+        uint newTraderSize;
+        uint newTraderCollateral;
 
         if (_params.isIncrease) {
-            _traderTargetLeverage = Precision.toBasisPoints(
-                _position.traderSize + _params.sizeDeltaInUsd, _position.traderCollateral + _params.collateralDelta
-            );
+            newTraderSize = _position.traderSize + _params.sizeDeltaInUsd;
+            newTraderCollateral = _position.traderCollateral + _params.collateralDelta;
+        } else {
+            newTraderSize =
+                _position.traderSize > _params.sizeDeltaInUsd ? _position.traderSize - _params.sizeDeltaInUsd : 0;
+            newTraderCollateral = _position.traderCollateral > _params.collateralDelta
+                ? _position.traderCollateral - _params.collateralDelta
+                : 0;
+        }
+
+        uint _traderTargetLeverage;
+        if (_params.isIncrease) {
+            _traderTargetLeverage = Precision.toBasisPoints(newTraderSize, newTraderCollateral);
         } else {
             if (_position.traderSize > _params.sizeDeltaInUsd && _position.traderCollateral > _params.collateralDelta) {
-                _traderTargetLeverage = Precision.toBasisPoints(
-                    _position.traderSize - _params.sizeDeltaInUsd, _position.traderCollateral - _params.collateralDelta
-                );
+                _traderTargetLeverage = Precision.toBasisPoints(newTraderSize, newTraderCollateral);
             } else {
                 _traderTargetLeverage = 0;
             }
@@ -223,31 +233,27 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         require(_currentPuppetLeverage > 0, Error.MirrorPosition__InvalidCurrentLeverage());
 
         // Calculate size delta and submit order
+        bool isIncrease = _traderTargetLeverage > _currentPuppetLeverage;
         uint _sizeDelta;
-        if (_traderTargetLeverage > _currentPuppetLeverage) {
+
+        if (isIncrease) {
             _sizeDelta =
                 Math.mulDiv(_position.size, (_traderTargetLeverage - _currentPuppetLeverage), _currentPuppetLeverage);
-            _requestKey = _submitOrder(
-                _params,
-                _allocationAddress,
-                GmxPositionUtils.OrderType.MarketIncrease,
-                config.increaseCallbackGasLimit,
-                _sizeDelta,
-                0
-            );
+        } else if (_traderTargetLeverage == 0) {
+            _sizeDelta = _position.size; // Close entire position
         } else {
-            _sizeDelta = (_traderTargetLeverage == 0)
-                ? _position.size
-                : Math.mulDiv(_position.size, (_currentPuppetLeverage - _traderTargetLeverage), _currentPuppetLeverage);
-            _requestKey = _submitOrder(
-                _params,
-                _allocationAddress,
-                GmxPositionUtils.OrderType.MarketDecrease,
-                config.decreaseCallbackGasLimit,
-                _sizeDelta,
-                0
-            );
+            _sizeDelta =
+                Math.mulDiv(_position.size, (_currentPuppetLeverage - _traderTargetLeverage), _currentPuppetLeverage);
         }
+
+        _requestKey = _submitOrder(
+            _params,
+            _allocationAddress,
+            isIncrease ? GmxPositionUtils.OrderType.MarketIncrease : GmxPositionUtils.OrderType.MarketDecrease,
+            isIncrease ? config.increaseCallbackGasLimit : config.decreaseCallbackGasLimit,
+            _sizeDelta,
+            0
+        );
 
         // Store request details for execute callback
         requestAdjustmentMap[_requestKey] = RequestAdjustment({
