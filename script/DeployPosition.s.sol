@@ -10,7 +10,7 @@
 
 // import {keeperRouter} from "src/keeperRouter.sol";
 // import {RouterProxy} from "src/utils/RouterProxy.sol";
-// import {Allocation} from "src/position/Allocation.sol";
+// import {Allocate} from "src/position/Allocate.sol";
 // import {MatchingRule} from "src/position/MatchingRule.sol";
 // import {MirrorPosition} from "src/position/MirrorPosition.sol";
 // import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";

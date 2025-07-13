@@ -4,7 +4,8 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-import {Allocation} from "./position/Allocation.sol";
+import {Allocate} from "./position/Allocate.sol";
+import {Settle} from "./position/Settle.sol";
 import {MatchingRule} from "./position/MatchingRule.sol";
 import {MirrorPosition} from "./position/MirrorPosition.sol";
 import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
@@ -21,21 +22,25 @@ import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallbackReceiver {
     MatchingRule public immutable matchingRule;
     MirrorPosition public immutable mirrorPosition;
-    Allocation public immutable allocation;
+    Allocate public immutable allocate;
+    Settle public immutable settle;
 
     constructor(
         IAuthority _authority,
         MirrorPosition _mirrorPosition,
         MatchingRule _matchingRule,
-        Allocation _allocation
+        Allocate _allocate,
+        Settle _settle
     ) CoreContract(_authority) {
         require(address(_mirrorPosition) != address(0), "MirrorPosition not set correctly");
         require(address(_matchingRule) != address(0), "MatchingRule not set correctly");
-        require(address(_allocation) != address(0), "Allocation not set correctly");
+        require(address(_allocate) != address(0), "Allocate not set correctly");
+        require(address(_settle) != address(0), "Settle not set correctly");
 
         mirrorPosition = _mirrorPosition;
         matchingRule = _matchingRule;
-        allocation = _allocation;
+        allocate = _allocate;
+        settle = _settle;
     }
 
     /**
@@ -46,10 +51,10 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
      * @return _requestKey The GMX request key for the submitted order
      */
     function requestMirror(
-        Allocation.CallAllocation calldata _allocParams,
+        Allocate.CallAllocation calldata _allocParams,
         MirrorPosition.CallPosition calldata _callParams
     ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
-        (address allocationAddress, uint totalAllocated) = allocation.createAllocation(matchingRule, _allocParams);
+        (address allocationAddress, uint totalAllocated) = allocate.createAllocation(matchingRule, _allocParams);
 
         _requestKey = mirrorPosition.requestMirror{value: msg.value}(
             _callParams, allocationAddress, totalAllocated, address(this)
@@ -66,9 +71,9 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
      */
     function requestAdjust(
         MirrorPosition.CallPosition calldata _callParams,
-        Allocation.CallAllocation calldata _allocParams
+        Allocate.CallAllocation calldata _allocParams
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
-        (address allocationAddress, uint nextAllocated) = allocation.collectKeeperFee(_allocParams);
+        (address allocationAddress, uint nextAllocated) = allocate.collectKeeperFee(_allocParams);
 
         _requestKey =
             mirrorPosition.requestAdjust{value: msg.value}(_callParams, allocationAddress, nextAllocated, address(this));
@@ -84,11 +89,11 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
      * @return distributionAmount Amount distributed to puppets
      * @return platformFeeAmount Platform fee collected
      */
-    function settle(
-        Allocation.CallSettle calldata _settleParams,
+    function settleAllocation(
+        Settle.CallSettle calldata _settleParams,
         address[] calldata _puppetList
     ) external auth nonReentrant returns (uint settledBalance, uint distributionAmount, uint platformFeeAmount) {
-        return allocation.settle(_settleParams, _puppetList);
+        return settle.settle(_settleParams, _puppetList);
     }
 
     /**
@@ -103,7 +108,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         IERC20 _dustToken,
         address _receiver
     ) external auth nonReentrant returns (uint dustAmount) {
-        return allocation.collectDust(AllocationAccount(_allocationAccount), _dustToken, _receiver);
+        return settle.collectDust(AllocationAccount(_allocationAccount), _dustToken, _receiver);
     }
 
     /**

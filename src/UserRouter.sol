@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-import {Allocation} from "./position/Allocation.sol";
+import {Allocate} from "./position/Allocate.sol";
 import {MatchingRule} from "./position/MatchingRule.sol";
 import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
 
@@ -16,16 +16,16 @@ import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
 contract UserRouter is ReentrancyGuardTransient {
     MatchingRule public immutable matchingRule;
     FeeMarketplace public immutable feeMarketplace;
-    Allocation public immutable allocation;
+    Allocate public immutable allocate;
 
-    constructor(MatchingRule _matchingRule, FeeMarketplace _feeMarketplace, Allocation _allocation) {
+    constructor(MatchingRule _matchingRule, FeeMarketplace _feeMarketplace, Allocate _allocate) {
         require(address(_matchingRule) != address(0), "MatchingRule not set correctly");
         require(address(_feeMarketplace) != address(0), "FeeMarketplace not set correctly");
-        require(address(_allocation) != address(0), "Allocation not set correctly");
+        require(address(_allocate) != address(0), "Allocate not set correctly");
 
         matchingRule = _matchingRule;
         feeMarketplace = _feeMarketplace;
-        allocation = _allocation;
+        allocate = _allocate;
     }
 
     /**
@@ -58,7 +58,7 @@ contract UserRouter is ReentrancyGuardTransient {
         address trader,
         MatchingRule.Rule calldata ruleParams
     ) external nonReentrant {
-        matchingRule.setRule(allocation, collateralToken, msg.sender, trader, ruleParams);
+        matchingRule.setRule(allocate, collateralToken, msg.sender, trader, ruleParams);
     }
 
     /**

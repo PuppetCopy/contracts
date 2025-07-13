@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/src/console.sol";
 
 import {UserRouter} from "src/UserRouter.sol";
-import {Allocation} from "src/position/Allocation.sol";
+import {Allocate} from "src/position/Allocate.sol";
 import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
@@ -26,14 +26,14 @@ contract UpdateRouter is BaseScript {
         RouterProxy routerProxy = RouterProxy(payable(getDeployedAddress("RouterProxy")));
         MatchingRule matchingRule = MatchingRule(getDeployedAddress("MatchingRule"));
         FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
-        Allocation allocation = Allocation(getDeployedAddress("Allocation"));
+        Allocate allocate = Allocate(getDeployedAddress("Allocate"));
 
-        UserRouter newRouter = new UserRouter(matchingRule, feeMarketplace, allocation);
+        UserRouter newRouter = new UserRouter(matchingRule, feeMarketplace, allocate);
         routerProxy.update(address(newRouter));
         console.log("UserRouter implementation deployed at:", address(newRouter));
         console.log("Seeding MatchingRule with initial rules...");
         matchingRule.setRule(
-            allocation,
+            allocate,
             IERC20(Const.usdc),
             DEPLOYER_ADDRESS,
             DEPLOYER_ADDRESS,

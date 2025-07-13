@@ -8,7 +8,8 @@ import {Test} from "forge-std/src/Test.sol";
 import {Const} from "script/Const.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
-import {Allocation} from "src/position/Allocation.sol";
+import {Allocate} from "src/position/Allocate.sol";
+import {Settle} from "src/position/Settle.sol";
 import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
@@ -34,7 +35,8 @@ contract TradingForkTest is Test {
     TokenRouter tokenRouter;
     PuppetToken puppetToken;
     AllocationStore allocationStore;
-    Allocation allocation;
+    Allocate allocate;
+    Settle settle;
     MatchingRule matchingRule;
     MirrorPosition mirrorPosition;
     KeeperRouter keeperRouter;

@@ -5,9 +5,11 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
-import {Allocation} from "src/position/Allocation.sol";
+import {Allocate} from "src/position/Allocate.sol";
+
 import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
+import {IAllocate, Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
@@ -26,7 +28,8 @@ import {MockGmxExchangeRouter} from "../mock/MockGmxExchangeRouter.sol";
  */
 contract TradingTest is BasicSetup {
     AllocationStore allocationStore;
-    Allocation allocation;
+    Allocate allocate;
+    Settle settle;
     MatchingRule matchingRule;
     MirrorPosition mirrorPosition;
     KeeperRouter keeperRouter;
@@ -49,17 +52,28 @@ contract TradingTest is BasicSetup {
         // Deploy core contracts
         allocationStore = new AllocationStore(dictator, tokenRouter);
 
-        allocation = new Allocation(
+        allocate = new Allocate(
             dictator,
             allocationStore,
-            Allocation.Config({
+            Allocate.Config({
+                transferOutGasLimit: 200_000,
+                maxPuppetList: 50,
+                maxKeeperFeeToAllocationRatio: 0.1e30, // 10%
+                maxKeeperFeeToAdjustmentRatio: 0.1e30, // 10%
+                gmxOrderVault: address(0x1234) // Mock GMX OrderVault
+            })
+        );
+
+        settle = new Settle(
+            dictator,
+            allocationStore,
+            allocate.allocationAccountImplementation(),
+            IAllocate(address(allocate)),
+            Settle.Config({
                 transferOutGasLimit: 200_000,
                 platformSettleFeeFactor: 0.05e30, // 5%
                 maxKeeperFeeToCollectDustRatio: 0.1e30, // 10%
                 maxPuppetList: 50,
-                maxKeeperFeeToAllocationRatio: 0.1e30, // 10%
-                maxKeeperFeeToAdjustmentRatio: 0.1e30, // 10%
-                gmxOrderVault: address(0x1234), // Mock GMX OrderVault
                 allocationAccountTransferGasLimit: 100000
             })
         );
@@ -91,31 +105,33 @@ contract TradingTest is BasicSetup {
             })
         );
 
-        keeperRouter = new KeeperRouter(dictator, mirrorPosition, matchingRule, allocation);
+        keeperRouter = new KeeperRouter(dictator, mirrorPosition, matchingRule, allocate, settle);
 
         // Set up permissions for owner to act on behalf of users
-        dictator.setAccess(allocationStore, address(allocation));
         dictator.setAccess(allocationStore, address(matchingRule));
+        dictator.setAccess(allocationStore, address(allocate));
         dictator.setAccess(allocationStore, address(mirrorPosition));
+        dictator.setAccess(allocationStore, address(settle));
 
         // TokenRouter permissions for stores
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
 
-        // MatchingRule needs permission to call allocation functions
-        dictator.setPermission(allocation, allocation.initializeTraderActivityThrottle.selector, address(matchingRule));
+        // MatchingRule needs permission to call allocate functions
+        dictator.setPermission(allocate, allocate.initializeTraderActivityThrottle.selector, address(matchingRule));
 
-        // KeeperRouter needs permission to call allocation and mirrorPosition functions
-        dictator.setPermission(allocation, allocation.createAllocation.selector, address(keeperRouter));
-        dictator.setPermission(allocation, allocation.collectKeeperFee.selector, address(keeperRouter));
-        dictator.setPermission(allocation, allocation.settle.selector, address(keeperRouter));
-        dictator.setPermission(allocation, allocation.collectDust.selector, address(keeperRouter));
+        // KeeperRouter needs permission to call allocate and settle functions
+        dictator.setPermission(allocate, allocate.createAllocation.selector, address(keeperRouter));
+        dictator.setPermission(allocate, allocate.collectKeeperFee.selector, address(keeperRouter));
+        dictator.setPermission(settle, settle.settle.selector, address(keeperRouter));
+        dictator.setPermission(settle, settle.collectDust.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, address(keeperRouter));
 
         // Initialize contracts
-        dictator.initContract(allocation);
+        dictator.initContract(allocate);
+        dictator.initContract(settle);
         dictator.initContract(matchingRule);
         dictator.initContract(mirrorPosition);
         dictator.initContract(keeperRouter);
@@ -131,11 +147,11 @@ contract TradingTest is BasicSetup {
 
         // Test setup: mint USDC to owner and approve for matchingRule
         // Owner permissions for dust collection
-        dictator.setPermission(allocation, allocation.setTokenDustThresholdList.selector, users.owner);
+        dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, users.owner);
 
         dictator.setPermission(keeperRouter, keeperRouter.requestMirror.selector, users.owner);
         dictator.setPermission(keeperRouter, keeperRouter.requestAdjust.selector, users.owner);
-        dictator.setPermission(keeperRouter, keeperRouter.settle.selector, users.owner);
+        dictator.setPermission(keeperRouter, keeperRouter.settleAllocation.selector, users.owner);
         dictator.setPermission(keeperRouter, keeperRouter.collectDust.selector, users.owner);
         dictator.setPermission(keeperRouter, keeperRouter.collectDust.selector, users.owner);
 
@@ -151,7 +167,7 @@ contract TradingTest is BasicSetup {
 
         // Set up trading rules using owner permissions
         matchingRule.setRule(
-            allocation,
+            allocate,
             usdc,
             puppet1,
             trader,
@@ -163,7 +179,7 @@ contract TradingTest is BasicSetup {
         );
 
         matchingRule.setRule(
-            allocation,
+            allocate,
             usdc,
             puppet2,
             trader,
@@ -187,7 +203,7 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint keeperFee = 1e6; // 1 USDC
 
-        Allocation.CallAllocation memory allocParams = Allocation.CallAllocation({
+        Allocate.CallAllocation memory allocParams = Allocate.CallAllocation({
             collateralToken: usdc,
             trader: trader,
             puppetList: puppetList,
@@ -214,7 +230,7 @@ contract TradingTest is BasicSetup {
             keeperRouter.requestMirror{value: 0.001 ether}(allocParams, callParams);
 
         // Verify allocation was created
-        assertGt(allocation.getAllocation(allocationAddress), 0, "Allocation should be created");
+        assertGt(allocate.getAllocation(allocationAddress), 0, "Allocation should be created");
 
         // Verify request was submitted to GMX
         assertNotEq(requestKey, bytes32(0), "Request key should be generated");
@@ -231,7 +247,7 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint keeperFee = 10000e6; // Excessive keeper fee
 
-        Allocation.CallAllocation memory allocParams = Allocation.CallAllocation({
+        Allocate.CallAllocation memory allocParams = Allocate.CallAllocation({
             collateralToken: usdc,
             trader: trader,
             puppetList: puppetList,
@@ -267,7 +283,7 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint keeperFee = 1e6; // 1 USDC
 
-        Allocation.CallAllocation memory allocParams = Allocation.CallAllocation({
+        Allocate.CallAllocation memory allocParams = Allocate.CallAllocation({
             collateralToken: usdc,
             trader: trader,
             puppetList: puppetList,
@@ -311,7 +327,7 @@ contract TradingTest is BasicSetup {
             triggerPrice: 0
         });
 
-        Allocation.CallAllocation memory adjustAllocParams = Allocation.CallAllocation({
+        Allocate.CallAllocation memory adjustAllocParams = Allocate.CallAllocation({
             collateralToken: usdc,
             trader: trader,
             puppetList: puppetList,
@@ -341,7 +357,7 @@ contract TradingTest is BasicSetup {
         // Simulate profit by sending tokens to allocation account - owner can mint
         usdc.mint(allocationAddress, 500e6);
 
-        Allocation.CallSettle memory settleParams = Allocation.CallSettle({
+        Settle.CallSettle memory settleParams = Settle.CallSettle({
             collateralToken: usdc,
             distributionToken: usdc,
             keeperFeeReceiver: users.owner,
@@ -354,7 +370,7 @@ contract TradingTest is BasicSetup {
         uint puppet2BalanceBefore = allocationStore.userBalanceMap(usdc, puppet2);
 
         (uint settledAmount, uint distributionAmount, uint platformFeeAmount) =
-            keeperRouter.settle(settleParams, puppetList);
+            keeperRouter.settleAllocation(settleParams, puppetList);
 
         // Verify settlement occurred
         assertGt(settledAmount, 0, "Should have settled some amount");
@@ -384,7 +400,7 @@ contract TradingTest is BasicSetup {
         uint[] memory thresholds = new uint[](1);
         thresholds[0] = 10e6; // 10 USDC dust threshold
 
-        allocation.setTokenDustThresholdList(tokens, thresholds);
+        settle.setTokenDustThresholdList(tokens, thresholds);
 
         // Send small amount (dust) to allocation account - owner can mint
         usdc.mint(allocationAddress, 5e6); // 5 USDC < 10 USDC threshold
@@ -405,7 +421,7 @@ contract TradingTest is BasicSetup {
         address[] memory emptyPuppetList = new address[](0);
         uint allocationId = getNextAllocationId();
 
-        Allocation.CallAllocation memory allocParams = Allocation.CallAllocation({
+        Allocate.CallAllocation memory allocParams = Allocate.CallAllocation({
             collateralToken: usdc,
             trader: trader,
             puppetList: emptyPuppetList,
@@ -443,7 +459,7 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint keeperFee = 0; // No keeper fee since we expect no allocation
 
-        Allocation.CallAllocation memory allocParams = Allocation.CallAllocation({
+        Allocate.CallAllocation memory allocParams = Allocate.CallAllocation({
             collateralToken: usdc,
             trader: trader,
             puppetList: puppetList,
@@ -483,7 +499,7 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint keeperFee = 0; // No keeper fee to avoid exceeding cost factor on reduced allocation
 
-        Allocation.CallAllocation memory allocParams = Allocation.CallAllocation({
+        Allocate.CallAllocation memory allocParams = Allocate.CallAllocation({
             collateralToken: usdc,
             trader: trader,
             puppetList: puppetList,
@@ -512,7 +528,7 @@ contract TradingTest is BasicSetup {
         (address allocationAddress,) = keeperRouter.requestMirror{value: 0.001 ether}(allocParams, callParams);
 
         // Should get allocation only from puppet1 since puppet2 is still throttled
-        uint allocatedAmount = allocation.getAllocation(allocationAddress);
+        uint allocatedAmount = allocate.getAllocation(allocationAddress);
         uint puppet1Expected = 1000e6 * 2000 / 10000; // 20% of 1000 USDC = 200 USDC
         // But puppet1's balance has been reduced from previous test (200e6 initial balance from BasicSetup + allocation
         // used)
@@ -537,7 +553,7 @@ contract TradingTest is BasicSetup {
         uint[] memory thresholds = new uint[](1);
         thresholds[0] = 10e6; // 10 USDC dust threshold
 
-        allocation.setTokenDustThresholdList(tokens, thresholds);
+        settle.setTokenDustThresholdList(tokens, thresholds);
 
         // Send amount above threshold
         usdc.mint(allocationAddress, 15e6); // 15 USDC > 10 USDC threshold
@@ -556,7 +572,7 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint keeperFee = 1e6;
 
-        Allocation.CallAllocation memory allocParams = Allocation.CallAllocation({
+        Allocate.CallAllocation memory allocParams = Allocate.CallAllocation({
             collateralToken: usdc,
             trader: trader,
             puppetList: puppetList,
@@ -598,7 +614,7 @@ contract TradingTest is BasicSetup {
             triggerPrice: 0
         });
 
-        Allocation.CallAllocation memory adjustAllocParams = Allocation.CallAllocation({
+        Allocate.CallAllocation memory adjustAllocParams = Allocate.CallAllocation({
             collateralToken: usdc,
             trader: trader,
             puppetList: puppetList,
@@ -623,7 +639,7 @@ contract TradingTest is BasicSetup {
 
         // Set rule for puppet2 to follow trader2
         matchingRule.setRule(
-            allocation,
+            allocate,
             usdc,
             puppet2,
             trader2,
@@ -638,7 +654,7 @@ contract TradingTest is BasicSetup {
         uint allocationId1 = getNextAllocationId();
         uint allocationId2 = getNextAllocationId();
 
-        Allocation.CallAllocation memory allocParams1 = Allocation.CallAllocation({
+        Allocate.CallAllocation memory allocParams1 = Allocate.CallAllocation({
             collateralToken: usdc,
             trader: trader,
             puppetList: puppetList1,
@@ -647,7 +663,7 @@ contract TradingTest is BasicSetup {
             keeperFeeReceiver: users.owner
         });
 
-        Allocation.CallAllocation memory allocParams2 = Allocation.CallAllocation({
+        Allocate.CallAllocation memory allocParams2 = Allocate.CallAllocation({
             collateralToken: usdc,
             trader: trader2,
             puppetList: puppetList2,
@@ -680,8 +696,8 @@ contract TradingTest is BasicSetup {
         (address allocation2,) = keeperRouter.requestMirror{value: 0.001 ether}(allocParams2, callParams);
 
         // Verify both allocations were created
-        assertGt(allocation.getAllocation(allocation1), 0, "Trader1 allocation should exist");
-        assertGt(allocation.getAllocation(allocation2), 0, "Trader2 allocation should exist");
+        assertGt(allocate.getAllocation(allocation1), 0, "Trader1 allocation should exist");
+        assertGt(allocate.getAllocation(allocation2), 0, "Trader2 allocation should exist");
         assertNotEq(allocation1, allocation2, "Allocations should be different");
 
         // Simulate profits by sending tokens to both allocation accounts
@@ -693,7 +709,7 @@ contract TradingTest is BasicSetup {
         uint puppet2BalanceBefore = allocationStore.userBalanceMap(usdc, puppet2);
 
         // Settle trader1's position (puppet1 gets the profit)
-        Allocation.CallSettle memory settleParams1 = Allocation.CallSettle({
+        Settle.CallSettle memory settleParams1 = Settle.CallSettle({
             collateralToken: usdc,
             distributionToken: usdc,
             keeperFeeReceiver: users.owner,
@@ -702,10 +718,11 @@ contract TradingTest is BasicSetup {
             keeperExecutionFee: 0.1e6 // 0.1 USDC keeper fee
         });
 
-        (uint settled1, uint distributed1, uint platformFee1) = keeperRouter.settle(settleParams1, puppetList1);
+        (uint settled1, uint distributed1, uint platformFee1) =
+            keeperRouter.settleAllocation(settleParams1, puppetList1);
 
         // Settle trader2's position (puppet2 gets the profit)
-        Allocation.CallSettle memory settleParams2 = Allocation.CallSettle({
+        Settle.CallSettle memory settleParams2 = Settle.CallSettle({
             collateralToken: usdc,
             distributionToken: usdc,
             keeperFeeReceiver: users.owner,
@@ -714,7 +731,8 @@ contract TradingTest is BasicSetup {
             keeperExecutionFee: 0.1e6 // 0.1 USDC keeper fee
         });
 
-        (uint settled2, uint distributed2, uint platformFee2) = keeperRouter.settle(settleParams2, puppetList2);
+        (uint settled2, uint distributed2, uint platformFee2) =
+            keeperRouter.settleAllocation(settleParams2, puppetList2);
 
         // Verify settlements occurred
         assertEq(settled1, 100e6, "Should settle full trader1 profit");
@@ -828,7 +846,7 @@ contract TradingTest is BasicSetup {
         bytes32 _allocationKey = keccak256(abi.encodePacked(_puppetList, _traderMatchingKey, _allocationId));
 
         return Clones.predictDeterministicAddress(
-            allocation.allocationAccountImplementation(), _allocationKey, address(allocation)
+            allocate.allocationAccountImplementation(), _allocationKey, address(allocate)
         );
     }
 }
