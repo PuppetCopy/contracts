@@ -20,6 +20,7 @@ contract VotingEscrow is CoreContract {
     uint public constant MAXTIME = 106 weeks; // about 2 years
 
     struct Config {
+        uint transferOutGasLimit;
         uint baseMultiplier;
     }
 
@@ -113,7 +114,7 @@ contract VotingEscrow is CoreContract {
 
         vested.accrued -= amount;
         vestMap[user] = vested;
-        store.transferOut(token, receiver, amount);
+        store.transferOut(config.transferOutGasLimit, token, receiver, amount);
 
         _logEvent("Claim", abi.encode(user, receiver, amount));
     }

@@ -4,8 +4,6 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Error} from "../utils/Error.sol";
-import {CallUtils} from "./CallUtils.sol";
-import {ErrorUtils} from "./ErrorUtils.sol";
 import {IWNT} from "./interfaces/IWNT.sol";
 
 /**
@@ -26,7 +24,7 @@ library TransferUtils {
      */
     function sendNativeToken(IWNT wnt, address holdingAddress, uint gasLimit, address receiver, uint amount) internal {
         if (amount == 0) return;
-        CallUtils.validateDestination(receiver);
+        validateDestination(receiver);
 
         bool success;
         // use an assembly call to avoid loading large data into memory
@@ -70,11 +68,11 @@ library TransferUtils {
         uint amount
     ) internal {
         if (amount == 0) return;
-        CallUtils.validateDestination(receiver);
+        validateDestination(receiver);
 
         wnt.deposit{value: amount}();
 
-        transfer(gasLimit, holdingAddress, wnt, receiver, amount);
+        transferWithFallback(gasLimit, holdingAddress, wnt, receiver, amount);
     }
 
     /**
@@ -100,7 +98,7 @@ library TransferUtils {
         uint amount
     ) internal {
         if (amount == 0) return;
-        CallUtils.validateDestination(receiver);
+        validateDestination(receiver);
 
         wnt.withdraw(amount);
 
@@ -140,34 +138,50 @@ library TransferUtils {
      * @param receiver The address of the recipient of the `token` transfer.
      * @param amount The amount of `token` to transfer.
      */
-    function transfer(uint gasLimit, address holdingAddress, IERC20 token, address receiver, uint amount) internal {
+    function transferWithFallback(
+        uint gasLimit,
+        address holdingAddress,
+        IERC20 token,
+        address receiver,
+        uint amount
+    ) internal {
         if (amount == 0) return;
-        CallUtils.validateDestination(receiver);
+        validateDestination(receiver);
 
-        require(gasLimit > 0, Error.TransferUtils__EmptyTokenTranferGasLimit(token));
-
-        (bool success0, /* bytes memory returndata */ ) =
-            nonRevertingTransferWithGasLimit(token, receiver, amount, gasLimit);
-
-        if (success0) return;
+        // Try transfer to primary receiver using improved internal method
+        if (_callOptionalReturnBool(gasLimit, token, abi.encodeCall(token.transfer, (receiver, amount)))) {
+            return;
+        }
 
         require(holdingAddress != address(0), Error.TransferUtils__EmptyHoldingAddress());
 
-        // in case transfers to the receiver fail due to blacklisting or other reasons
-        // send the tokens to a holding address to avoid possible gaming through reverting
-        // transfers
-        (bool success1, bytes memory returndata) =
-            nonRevertingTransferWithGasLimit(token, holdingAddress, amount, gasLimit);
+        // Fallback: transfer to holding address to avoid gaming through reverting
+        require(
+            _callOptionalReturnBool(gasLimit, token, abi.encodeCall(token.transfer, (holdingAddress, amount))),
+            Error.TransferUtils__TokenTransferError(token, holdingAddress, amount)
+        );
+    }
 
-        if (success1) return;
+    /**
+     * @dev Transfer `value` amount of `token` from the calling contract to `to`. If `token` returns no value,
+     * non-reverting calls are assumed to be successful. Reverts on transfer failure.
+     */
+    function transferStrictly(uint gasLimit, IERC20 token, address to, uint value) internal {
+        require(
+            _callOptionalReturnBool(gasLimit, token, abi.encodeCall(token.transfer, (to, value))),
+            Error.TransferUtils__TokenTransferError(token, to, value)
+        );
+    }
 
-        (string memory reason, /* bool hasRevertMessage */ ) = ErrorUtils.getRevertMessage(returndata);
-        emit Error.TransferUtils__TokenTransferReverted(reason, returndata);
-
-        // throw custom errors to prevent spoofing of errors
-        // this is necessary because contracts like DepositHandler, WithdrawalHandler, OrderHandler
-        // do not cancel requests for specific errors
-        revert Error.TransferUtils__TokenTransferError(token, receiver, amount);
+    /**
+     * @dev Transfer `value` amount of `token` from `from` to `to`, spending the approval given by `from` to the
+     * calling contract. If `token` returns no value, non-reverting calls are assumed to be successful.
+     */
+    function transferStrictlyFrom(uint gasLimit, IERC20 token, address from, address to, uint value) internal {
+        require(
+            _callOptionalReturnBool(gasLimit, token, abi.encodeCall(token.transferFrom, (from, to, value))),
+            Error.TransferUtils__TokenTransferFromError(token, from, to, value)
+        );
     }
 
     /**
@@ -196,7 +210,7 @@ library TransferUtils {
             if (returndata.length == 0) {
                 // only check isContract if the call was successful and the return data is empty
                 // otherwise we already know that it was a contract
-                if (CallUtils.isContract(address(token)) == false) {
+                if (isContract(address(token)) == false) {
                     return (false, "Call to non-contract");
                 }
             }
@@ -213,5 +227,79 @@ library TransferUtils {
         }
 
         return (false, returndata);
+    }
+
+    /**
+     * @dev Imitates a Solidity high-level call (i.e. a regular function call to a contract), relaxing the requirement
+     * on the return value: the return value is optional (but if data is returned, it must not be false).
+     * @param token The token targeted by the call.
+     * @param data The call data (encoded using abi.encode or one of its variants).
+     *
+     * This is a variant of {_callOptionalReturnBool} that reverts if call fails to meet the requirements.
+     */
+    function _callOptionalReturn(uint gasLimit, IERC20 token, bytes memory data) private {
+        uint returnSize;
+        uint returnValue;
+        assembly ("memory-safe") {
+            let success := call(gasLimit, token, 0, add(data, 0x20), mload(data), 0, 0x20)
+            // bubble errors
+            if iszero(success) {
+                let ptr := mload(0x40)
+                returndatacopy(ptr, 0, returndatasize())
+                revert(ptr, returndatasize())
+            }
+            returnSize := returndatasize()
+            returnValue := mload(0)
+        }
+
+        if (returnSize == 0 ? address(token).code.length == 0 : returnValue != 1) {
+            revert Error.TransferUtils__SafeERC20FailedOperation(token);
+        }
+    }
+
+    /**
+     * @dev Imitates a Solidity high-level call (i.e. a regular function call to a contract), relaxing the requirement
+     * on the return value: the return value is optional (but if data is returned, it must not be false).
+     * @param token The token targeted by the call.
+     * @param data The call data (encoded using abi.encode or one of its variants).
+     *
+     * This is a variant of {_callOptionalReturn} that silently catches all reverts and returns a bool instead.
+     */
+    function _callOptionalReturnBool(uint gasLimit, IERC20 token, bytes memory data) private returns (bool) {
+        bool success;
+        uint returnSize;
+        uint returnValue;
+        assembly ("memory-safe") {
+            success := call(gasLimit, token, 0, add(data, 0x20), mload(data), 0, 0x20)
+            returnSize := returndatasize()
+            returnValue := mload(0)
+        }
+        return success && (returnSize == 0 ? address(token).code.length > 0 : returnValue == 1);
+    }
+
+    // validateDestination
+    /**
+     * @dev Validates that the destination address is not the zero address.
+     * @param receiver The address to validate.
+     */
+    function validateDestination(
+        address receiver
+    ) internal pure {
+        require(receiver != address(0), Error.TransferUtils__InvalidReceiver());
+    }
+
+    /**
+     * @dev Checks if the given address is a contract.
+     * @param account The address to check.
+     * @return True if the address is a contract, false otherwise.
+     */
+    function isContract(
+        address account
+    ) internal view returns (bool) {
+        uint size;
+        assembly ("memory-safe") {
+            size := extcodesize(account)
+        }
+        return size > 0;
     }
 }

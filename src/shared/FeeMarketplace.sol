@@ -33,6 +33,7 @@ contract FeeMarketplace is CoreContract {
      * @param burnBasisPoints Protocol tokens to burn (basis points: 100 = 1%)
      */
     struct Config {
+        uint transferOutGasLimit;
         uint distributionTimeframe;
         uint burnBasisPoints;
     }
@@ -162,7 +163,7 @@ contract FeeMarketplace is CoreContract {
 
         distributionBalance += _distributeAmount;
         unclockedFees[_feeToken] -= _purchaseAmount;
-        store.transferOut(_feeToken, _receiver, _purchaseAmount);
+        store.transferOut(config.transferOutGasLimit, _feeToken, _receiver, _purchaseAmount);
 
         _logEvent("AcceptOffer", abi.encode(_feeToken, _receiver, _purchaseAmount, _burnAmount, _distributeAmount));
     }
@@ -192,7 +193,7 @@ contract FeeMarketplace is CoreContract {
         );
 
         distributionBalance -= _amount;
-        store.transferOut(protocolToken, _receiver, _amount);
+        store.transferOut(config.transferOutGasLimit, protocolToken, _receiver, _amount);
     }
 
     /**

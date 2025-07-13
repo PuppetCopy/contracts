@@ -58,6 +58,7 @@ contract TradingTest is BasicSetup {
             puppetToken,
             feeMarketplaceStore,
             FeeMarketplace.Config({
+                transferOutGasLimit: 200_000,
                 distributionTimeframe: 1 days,
                 burnBasisPoints: 5000 // 50% burn
             })
@@ -67,6 +68,7 @@ contract TradingTest is BasicSetup {
             dictator,
             allocationStore,
             Allocation.Config({
+                transferOutGasLimit: 200_000,
                 platformSettleFeeFactor: 0.05e30, // 5%
                 maxKeeperFeeToCollectDustRatio: 0.1e30, // 10%
                 maxPuppetList: 50,
@@ -81,6 +83,7 @@ contract TradingTest is BasicSetup {
             dictator,
             allocationStore,
             MatchingRule.Config({
+                transferOutGasLimit: 200_000,
                 minExpiryDuration: 1 hours,
                 minAllowanceRate: 100, // 1%
                 maxAllowanceRate: 10000, // 100%

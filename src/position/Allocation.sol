@@ -21,6 +21,7 @@ import {PositionUtils} from "./utils/PositionUtils.sol";
  */
 contract Allocation is CoreContract {
     struct Config {
+        uint transferOutGasLimit;
         uint platformSettleFeeFactor;
         uint maxKeeperFeeToCollectDustRatio;
         uint maxPuppetList;
@@ -165,8 +166,12 @@ contract Allocation is CoreContract {
         _allocated = _totalAllocated - _params.keeperFee;
         allocationMap[_allocationAddress] = _allocated;
 
-        allocationStore.transferOut(_params.collateralToken, _params.keeperFeeReceiver, _params.keeperFee);
-        allocationStore.transferOut(_params.collateralToken, config.gmxOrderVault, _allocated);
+        allocationStore.transferOut(
+            config.transferOutGasLimit, _params.collateralToken, _params.keeperFeeReceiver, _params.keeperFee
+        );
+        allocationStore.transferOut(
+            config.transferOutGasLimit, _params.collateralToken, config.gmxOrderVault, _allocated
+        );
 
         _logEvent(
             "CreateAllocation", abi.encode(_params, _allocationAddress, _totalAllocated, _allocated, _puppetAllocations)
@@ -250,7 +255,9 @@ contract Allocation is CoreContract {
         allocationPuppetList[_allocationAddress] = _allocationList;
         allocationMap[_allocationAddress] = _nextAllocated;
 
-        allocationStore.transferOut(_params.collateralToken, _params.keeperFeeReceiver, _params.keeperFee);
+        allocationStore.transferOut(
+            config.transferOutGasLimit, _params.collateralToken, _params.keeperFeeReceiver, _params.keeperFee
+        );
 
         _logEvent(
             "UpdateAllocationForKeeperFee",
@@ -360,7 +367,10 @@ contract Allocation is CoreContract {
         _distributionAmount = _recordedAmountIn - _callParams.keeperExecutionFee;
 
         allocationStore.transferOut(
-            _callParams.distributionToken, _callParams.keeperFeeReceiver, _callParams.keeperExecutionFee
+            config.transferOutGasLimit,
+            _callParams.distributionToken,
+            _callParams.keeperFeeReceiver,
+            _callParams.keeperExecutionFee
         );
 
         // Calculate platform fee from distribution amount
@@ -433,7 +443,7 @@ contract Allocation is CoreContract {
             require(abi.decode(returnData, (bool)), "ERC20 transfer returned false");
         }
 
-        allocationStore.transferOut(_dustToken, _receiver, _dustAmount);
+        allocationStore.transferOut(config.transferOutGasLimit, _dustToken, _receiver, _dustAmount);
 
         // Log dust collection event
         _logEvent("CollectDust", abi.encode(_allocationAccount, _dustToken, _receiver, _dustAmount));
@@ -454,7 +464,7 @@ contract Allocation is CoreContract {
         require(_amount <= platformFeeMap[_token], "Amount exceeds accumulated fees");
 
         platformFeeMap[_token] -= _amount;
-        allocationStore.transferOut(_token, _receiver, _amount);
+        allocationStore.transferOut(config.transferOutGasLimit, _token, _receiver, _amount);
 
         _logEvent("CollectFees", abi.encode(_token, _receiver, _amount));
     }

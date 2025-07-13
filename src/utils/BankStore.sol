@@ -4,8 +4,10 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {TokenRouter} from "../shared/TokenRouter.sol";
+
 import {Error} from "./../utils/Error.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
+import {TransferUtils} from "./TransferUtils.sol";
 import {Access} from "./auth/Access.sol";
 
 /**
@@ -58,27 +60,19 @@ abstract contract BankStore is Access {
     }
 
     /**
-     * @notice Transfers tokens from another BankStore to this contract
-     * @param _token The ERC20 token address to transfer
-     * @param _bank The source BankStore to transfer from
-     * @param _value The amount of tokens to transfer
-     */
-    function interTransferIn(IERC20 _token, BankStore _bank, uint _value) external auth {
-        _bank.transferOut(_token, address(this), _value);
-        tokenBalanceMap[_token] += _value;
-    }
-
-    /**
      * @notice Transfers tokens from this contract to another address
      * @dev Requires sufficient balance in the tokenBalanceMap
+     * @param gasLimit The maximum amount of gas that the transfer can consume
      * @param _token The ERC20 token address to transfer
      * @param _receiver The address to receive the tokens
      * @param _value The amount of tokens to transfer
      */
-    function transferOut(IERC20 _token, address _receiver, uint _value) public auth {
-        _token.transfer(_receiver, _value);
+    function transferOut(uint gasLimit, IERC20 _token, address _receiver, uint _value) public auth {
         require(tokenBalanceMap[_token] >= _value, Error.BankStore__InsufficientBalance());
+
         tokenBalanceMap[_token] -= _value;
+
+        TransferUtils.transferStrictly(gasLimit, _token, _receiver, _value);
     }
 
     /**

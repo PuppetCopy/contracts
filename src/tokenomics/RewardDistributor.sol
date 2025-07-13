@@ -14,13 +14,14 @@ import {RewardStore} from "./RewardStore.sol";
 contract RewardDistributor is CoreContract {
     /// @notice Configuration parameters
     struct Config {
-        uint distributionWindow; // Time window for reward distribution (in seconds)
+        uint transferOutGasLimit;
+        uint distributionWindow;
     }
 
     /// @notice Reward tracking structure per user
     struct UserRewards {
-        uint cumulativeRewardCheckpoint; // Last checkpoint of cumulative rewards per token
-        uint accrued; // Accrued rewards waiting to be claimed
+        uint cumulativeRewardCheckpoint;
+        uint accrued;
     }
 
     // Immutable contract references
@@ -103,7 +104,7 @@ contract RewardDistributor is CoreContract {
         _userReward.accrued -= _amount;
 
         userRewardMap[_user] = _userReward;
-        store.transferOut(rewardToken, _receiver, _amount);
+        store.transferOut(config.transferOutGasLimit, rewardToken, _receiver, _amount);
 
         _logEvent("Claim", abi.encode(_user, _receiver, _amount));
     }

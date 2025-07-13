@@ -13,7 +13,8 @@
     "docgen": "forge doc --out '.docgen' --build",
     "gas-report": "forge test --match-contract TradingTest --gas-report",
     "lint:sol": "forge fmt --check",
-    "lint:fmt": "forge fmt"
+    "lint:fmt": "forge fmt",
+    "lint": "forge lint src --severity high --severity med"
   },
   "files": [
     "./src",

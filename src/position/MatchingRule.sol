@@ -18,6 +18,7 @@ contract MatchingRule is CoreContract {
     }
 
     struct Config {
+        uint transferOutGasLimit;
         uint minExpiryDuration;
         uint minAllowanceRate;
         uint maxAllowanceRate;
@@ -77,7 +78,7 @@ contract MatchingRule is CoreContract {
         uint nextBalance = balance - _amount;
 
         store.setUserBalance(_collateralToken, _user, nextBalance);
-        store.transferOut(_collateralToken, _receiver, _amount);
+        store.transferOut(config.transferOutGasLimit, _collateralToken, _receiver, _amount);
 
         _logEvent("Withdraw", abi.encode(_collateralToken, _user, _receiver, nextBalance, _amount));
     }

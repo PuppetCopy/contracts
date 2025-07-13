@@ -3,9 +3,9 @@ pragma solidity ^0.8.29;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {CallUtils} from "../utils/CallUtils.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
+import {TransferUtils} from "../utils/TransferUtils.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 
 /**
@@ -33,9 +33,7 @@ contract TokenRouter is CoreContract {
      * @param amount the amount to transfer
      */
     function transfer(IERC20 token, address from, address to, uint amount) external auth {
-        CallUtils.callTarget(
-            config.transferGasLimit, address(token), abi.encodeCall(token.transferFrom, (from, to, amount))
-        );
+        TransferUtils.transferStrictlyFrom(config.transferGasLimit, token, from, to, amount);
     }
 
     function _setConfig(

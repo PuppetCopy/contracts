@@ -4,14 +4,11 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 library Error {
-    error CallUtils__EmptyReceiver();
-    error CallUtils__AddressEmptyCode(address target);
-    error CallUtils__FailedInnerCall();
-    error CallUtils__SafeERC20FailedOperation(address token);
-
-    error TransferUtils__EmptyTokenTranferGasLimit(IERC20 token);
     error TransferUtils__TokenTransferError(IERC20 token, address receiver, uint amount);
+    error TransferUtils__TokenTransferFromError(IERC20 token, address from, address to, uint amount);
     error TransferUtils__EmptyHoldingAddress();
+    error TransferUtils__SafeERC20FailedOperation(IERC20 token);
+    error TransferUtils__InvalidReceiver();
 
     event TransferUtils__TokenTransferReverted(string reason, bytes returndata);
 

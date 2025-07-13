@@ -20,6 +20,7 @@ contract FeeMarketplaceTest is BasicSetup {
             puppetToken,
             feeMarketplaceStore,
             FeeMarketplace.Config({
+                transferOutGasLimit: 200_000,
                 distributionTimeframe: 1 days,
                 burnBasisPoints: 10000 // 100% burn
             })
@@ -166,7 +167,7 @@ contract FeeMarketplaceTest is BasicSetup {
 
         // Update config: increase distribution timeframe to 2 days.
         FeeMarketplace.Config memory newConfig =
-            FeeMarketplace.Config({distributionTimeframe: 2 days, burnBasisPoints: 10000});
+            FeeMarketplace.Config({transferOutGasLimit: 200_000, distributionTimeframe: 2 days, burnBasisPoints: 10000});
         dictator.setConfig(feeMarketplace, abi.encode(newConfig));
         skip(1 days); // Now only about 50% (50e6) should have unlocked.
         uint pending = feeMarketplace.getPendingUnlock(usdc);
@@ -214,6 +215,7 @@ contract FeeMarketplaceTest is BasicSetup {
     function testPartialBurnWithDistribution() public {
         // Change config: 50% burn, remaining for distribution.
         FeeMarketplace.Config memory newConfig = FeeMarketplace.Config({
+            transferOutGasLimit: 200_000,
             distributionTimeframe: 1 days,
             burnBasisPoints: 5000 // 50% burn.
         });
@@ -238,6 +240,7 @@ contract FeeMarketplaceTest is BasicSetup {
     function testCollectDistribution() public {
         // Set up partial burn config
         FeeMarketplace.Config memory newConfig = FeeMarketplace.Config({
+            transferOutGasLimit: 200_000,
             distributionTimeframe: 1 days,
             burnBasisPoints: 5000 // 50% burn
         });
