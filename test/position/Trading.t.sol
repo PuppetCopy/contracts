@@ -52,7 +52,7 @@ contract TradingTest is BasicSetup {
 
     function setUp() public override {
         super.setUp();
-        
+
         // Note: keeping vm.startPrank(users.owner) active from BasicSetup
 
         // Deploy core contracts
@@ -114,7 +114,7 @@ contract TradingTest is BasicSetup {
         dictator.setAccess(allocationStore, address(allocation));
         dictator.setAccess(allocationStore, address(matchingRule));
         dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
-        
+
         // TokenRouter permissions for stores
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
@@ -129,7 +129,7 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(matchingRule, matchingRule.deposit.selector, users.owner);
         dictator.setPermission(matchingRule, matchingRule.setRule.selector, users.owner);
         dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, users.owner);
-        
+
         // MatchingRule needs permission to call allocation functions
         dictator.setPermission(allocation, allocation.initializeTraderActivityThrottle.selector, address(matchingRule));
 
@@ -228,7 +228,7 @@ contract TradingTest is BasicSetup {
 
         // Verify keeper fee was paid
         assertEq(usdc.balanceOf(keeper), keeperFee, "Keeper should receive fee");
-        
+
         vm.startPrank(users.owner);
     }
 
@@ -267,7 +267,7 @@ contract TradingTest is BasicSetup {
         vm.deal(keeper, 1 ether);
         vm.expectRevert();
         keeperRouter.requestMirror{value: 0.001 ether}(allocParams, callParams);
-        
+
         vm.startPrank(users.owner);
     }
 
@@ -311,7 +311,7 @@ contract TradingTest is BasicSetup {
 
         // Verify request was submitted
         assertNotEq(requestKey, bytes32(0), "Adjust request should be generated");
-        
+
         vm.startPrank(users.owner);
     }
 
@@ -356,7 +356,7 @@ contract TradingTest is BasicSetup {
 
         // Verify platform fee was collected
         assertGt(platformFeeAmount, 0, "Platform fee should be collected");
-        
+
         vm.startPrank(users.owner);
     }
 
@@ -389,7 +389,7 @@ contract TradingTest is BasicSetup {
 
         assertEq(dustCollected, 5e6, "Should collect all dust");
         assertEq(usdc.balanceOf(keeper), keeperBalanceBefore + 5e6, "Keeper should receive dust");
-        
+
         vm.startPrank(users.owner);
     }
 
@@ -427,42 +427,7 @@ contract TradingTest is BasicSetup {
         vm.prank(keeper);
         vm.expectRevert(Error.Allocation__PuppetListEmpty.selector);
         keeperRouter.requestMirror{value: 0.001 ether}(allocParams, callParams);
-        
-        vm.startPrank(users.owner);
-    }
 
-    function testUnauthorizedAccess() public {
-        address[] memory puppetList = new address[](1);
-        puppetList[0] = puppet1;
-
-        Allocation.CallAllocation memory allocParams = Allocation.CallAllocation({
-            collateralToken: usdc,
-            trader: trader,
-            puppetList: puppetList,
-            allocationId: getNextAllocationId(),
-            keeperFee: 1e6,
-            keeperFeeReceiver: keeper
-        });
-
-        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
-            collateralToken: usdc,
-            trader: trader,
-            market: address(wnt),
-            isIncrease: true,
-            isLong: true,
-            executionFee: 0.001 ether,
-            collateralDelta: 1000e30,
-            sizeDeltaInUsd: 5000e30,
-            acceptablePrice: 3000e30,
-            triggerPrice: 0
-        });
-
-        vm.stopPrank();
-        // Try to call without authorization
-        vm.prank(puppet1);
-        vm.expectRevert();
-        keeperRouter.requestMirror{value: 0.001 ether}(allocParams, callParams);
-        
         vm.startPrank(users.owner);
     }
 

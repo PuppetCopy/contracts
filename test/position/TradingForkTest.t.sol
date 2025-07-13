@@ -244,7 +244,7 @@ contract TradingForkTest is Test {
         vm.stopPrank();
     }
 
-    function testForkEnvironmentSetup() public {
+    function testForkEnvironmentSetup() public view {
         // Verify fork setup is correct
         assertEq(block.chainid, 42161, "Should be on Arbitrum");
         assertGt(block.number, 21000000, "Should be at a reasonable fork block");

@@ -39,7 +39,7 @@ contract MockGmxExchangeRouter is IGmxExchangeRouter {
 
     // The following functions are not relevant for the mock and can be left unimplemented
     function multicall(
-        bytes[] calldata data
+        bytes[] calldata /* data */
     ) external payable override returns (bytes[] memory results) {
         // Left unimplemented for brevity
         results = new bytes[](0);
@@ -64,18 +64,18 @@ contract MockGmxExchangeRouter is IGmxExchangeRouter {
     }
 
     function claimFundingFees(
-        address[] memory markets,
-        address[] memory tokens,
-        address receiver
+        address[] memory /* markets */,
+        address[] memory /* tokens */,
+        address /* receiver */
     ) external payable override returns (uint[] memory) {
         // Left unimplemented for brevity
         return new uint[](0);
     }
 
     function claimAffiliateRewards(
-        address[] memory markets,
-        address[] memory tokens,
-        address receiver
+        address[] memory /* markets */,
+        address[] memory /* tokens */,
+        address /* receiver */
     ) external payable override returns (uint[] memory) {
         // Left unimplemented for brevity
         return new uint[](0);
