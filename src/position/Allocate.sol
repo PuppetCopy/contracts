@@ -255,16 +255,6 @@ contract Allocate is CoreContract {
     }
 
     /**
-     * @notice Clears allocation data (used after position is closed)
-     */
-    function clearAllocation(
-        address _allocationAddress
-    ) external auth {
-        delete allocationMap[_allocationAddress];
-        delete allocationPuppetList[_allocationAddress];
-    }
-
-    /**
      * @notice Internal function to set configuration
      * @dev Required by CoreContract
      */

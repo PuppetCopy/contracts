@@ -6,10 +6,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
 import {Allocate} from "src/position/Allocate.sol";
-
 import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
-import {IAllocate, Settle} from "src/position/Settle.sol";
+import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
@@ -67,12 +66,10 @@ contract TradingTest is BasicSetup {
         settle = new Settle(
             dictator,
             allocationStore,
-            allocate.allocationAccountImplementation(),
-            IAllocate(address(allocate)),
             Settle.Config({
                 transferOutGasLimit: 200_000,
                 platformSettleFeeFactor: 0.05e30, // 5%
-                maxKeeperFeeToCollectDustRatio: 0.1e30, // 10%
+                maxKeeperFeeToSettleRatio: 0.1e30, // 10%
                 maxPuppetList: 50,
                 allocationAccountTransferGasLimit: 100000
             })
@@ -337,7 +334,7 @@ contract TradingTest is BasicSetup {
         });
 
         vm.deal(users.owner, 1 ether);
-        bytes32 adjustRequestKey = keeperRouter.requestAdjust{value: 0.001 ether}(callParams, adjustAllocParams);
+        bytes32 adjustRequestKey = keeperRouter.requestAdjust{value: 0.001 ether}(adjustAllocParams, callParams);
 
         // Verify request was submitted
         assertNotEq(adjustRequestKey, bytes32(0), "Adjust request should be generated");
@@ -623,7 +620,7 @@ contract TradingTest is BasicSetup {
             keeperFeeReceiver: users.owner
         });
 
-        bytes32 decreaseRequestKey = keeperRouter.requestAdjust{value: 0.001 ether}(decreaseParams, adjustAllocParams);
+        bytes32 decreaseRequestKey = keeperRouter.requestAdjust{value: 0.001 ether}(adjustAllocParams, decreaseParams);
         assertNotEq(decreaseRequestKey, bytes32(0), "Decrease request should be generated");
     }
 

@@ -11,19 +11,8 @@ import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
+import {Allocate} from "./Allocate.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
-
-/**
- * @notice Interface for reading allocation data from Allocate contract
- */
-interface IAllocate {
-    function getAllocation(
-        address _allocationAddress
-    ) external view returns (uint);
-    function getPuppetAllocationList(
-        address _allocationAddress
-    ) external view returns (uint[] memory);
-}
 
 /**
  * @title Settle
@@ -34,7 +23,7 @@ contract Settle is CoreContract {
     struct Config {
         uint transferOutGasLimit;
         uint platformSettleFeeFactor;
-        uint maxKeeperFeeToCollectDustRatio;
+        uint maxKeeperFeeToSettleRatio;
         uint maxPuppetList;
         uint allocationAccountTransferGasLimit;
     }
@@ -49,7 +38,6 @@ contract Settle is CoreContract {
     }
 
     AllocationStore public immutable allocationStore;
-    address public immutable allocationAccountImplementation;
 
     Config public config;
     IERC20[] public tokenDustThresholdList;
@@ -58,19 +46,12 @@ contract Settle is CoreContract {
     mapping(IERC20 token => uint accumulatedFees) public platformFeeMap;
     mapping(IERC20 token => uint) public tokenDustThresholdAmountMap;
 
-    // Interface for reading allocation data
-    IAllocate public immutable allocate;
-
     constructor(
         IAuthority _authority,
         AllocationStore _allocationStore,
-        address _allocationAccountImplementation,
-        IAllocate _allocate,
         Config memory _config
     ) CoreContract(_authority) {
         allocationStore = _allocationStore;
-        allocationAccountImplementation = _allocationAccountImplementation;
-        allocate = _allocate;
         _setConfig(abi.encode(_config));
     }
 
@@ -104,6 +85,7 @@ contract Settle is CoreContract {
      * @return _platformFeeAmount Platform fee taken
      */
     function settle(
+        Allocate _allocate,
         CallSettle calldata _callParams,
         address[] calldata _puppetList
     ) external auth returns (uint _settledAmount, uint _distributionAmount, uint _platformFeeAmount) {
@@ -122,10 +104,11 @@ contract Settle is CoreContract {
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
         bytes32 _allocationKey =
             PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId);
-        address _allocationAddress =
-            Clones.predictDeterministicAddress(allocationAccountImplementation, _allocationKey, address(allocate));
+        address _allocationAddress = Clones.predictDeterministicAddress(
+            _allocate.allocationAccountImplementation(), _allocationKey, address(_allocate)
+        );
 
-        uint _allocation = allocate.getAllocation(_allocationAddress);
+        uint _allocation = _allocate.getAllocation(_allocationAddress);
         require(_allocation > 0, Error.Allocation__InvalidAllocation(_allocationAddress));
 
         _settledAmount = _callParams.distributionToken.balanceOf(_allocationAddress);
@@ -154,7 +137,7 @@ contract Settle is CoreContract {
 
         require(
             _callParams.keeperExecutionFee
-                < Precision.applyFactor(config.maxKeeperFeeToCollectDustRatio, _recordedAmountIn),
+                < Precision.applyFactor(config.maxKeeperFeeToSettleRatio, _recordedAmountIn),
             Error.Allocation__KeeperFeeExceedsSettledAmount(_callParams.keeperExecutionFee, _recordedAmountIn)
         );
 
@@ -179,7 +162,7 @@ contract Settle is CoreContract {
         }
 
         uint[] memory _nextBalanceList = allocationStore.getBalanceList(_callParams.distributionToken, _puppetList);
-        uint[] memory _puppetAllocations = allocate.getPuppetAllocationList(_allocationAddress);
+        uint[] memory _puppetAllocations = _allocate.getPuppetAllocationList(_allocationAddress);
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
             _nextBalanceList[_i] += Math.mulDiv(_distributionAmount, _puppetAllocations[_i], _allocation);
@@ -306,7 +289,7 @@ contract Settle is CoreContract {
         Config memory _config = abi.decode(_data, (Config));
 
         require(_config.platformSettleFeeFactor > 0, "Invalid Platform Settle Fee Factor");
-        require(_config.maxKeeperFeeToCollectDustRatio > 0, "Invalid Max Keeper Fee To Collect Dust Ratio");
+        require(_config.maxKeeperFeeToSettleRatio > 0, "Invalid Max Keeper Fee To Settle Ratio");
         require(_config.maxPuppetList > 0, "Invalid Max Puppet List");
         require(_config.allocationAccountTransferGasLimit > 0, "Invalid Token Transfer Gas Limit");
 

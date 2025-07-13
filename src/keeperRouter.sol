@@ -70,8 +70,8 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
      * @return _requestKey The GMX request key for the submitted adjustment
      */
     function requestAdjust(
-        MirrorPosition.CallPosition calldata _callParams,
-        Allocate.CallAllocation calldata _allocParams
+        Allocate.CallAllocation calldata _allocParams,
+        MirrorPosition.CallPosition calldata _callParams
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
         (address allocationAddress, uint nextAllocated) = allocate.collectKeeperFee(_allocParams);
 
@@ -93,7 +93,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         Settle.CallSettle calldata _settleParams,
         address[] calldata _puppetList
     ) external auth nonReentrant returns (uint settledBalance, uint distributionAmount, uint platformFeeAmount) {
-        return settle.settle(_settleParams, _puppetList);
+        return settle.settle(allocate, _settleParams, _puppetList);
     }
 
     /**
