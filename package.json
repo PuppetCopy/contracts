@@ -3,7 +3,7 @@
   "license": "BSL-1.1",
   "packageManager": "bun@1.2.12",
   "scripts": {
-    "test": "forge test --match-contract TradingTest -vvvvv",
+    "test": "forge test --match-contract FeeMarketplaceTest -vvvvv",
     "test:target": "bun run test --match-test testPositionSettlementWithLoss",
     "test:fork": "forge test --match-contract TradingForkTest -vvvvv --fork-url=arbitrum",
     "build": "forge build --sizes",

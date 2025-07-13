@@ -151,7 +151,6 @@ contract Allocation is CoreContract {
                 allocationPuppetList[_allocationAddress][_i] = _puppetAllocation;
                 _balances[_i] -= _puppetAllocation;
                 _totalAllocated += _puppetAllocation;
-
                 lastActivityThrottleMap[_traderMatchingKey][_puppet] = block.timestamp + _rule.throttleActivity;
             }
         }
@@ -180,7 +179,7 @@ contract Allocation is CoreContract {
      * @return _allocationAddress The allocation account address
      * @return _nextAllocated The updated total allocation after deducting insolvencies
      */
-    function updateAllocationsForKeeperFee(
+    function collectKeeperFee(
         CallAllocation calldata _params
     ) external auth returns (address _allocationAddress, uint _nextAllocated) {
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_params.collateralToken, _params.trader);
@@ -200,7 +199,6 @@ contract Allocation is CoreContract {
 
         uint[] memory _allocationList = allocationPuppetList[_allocationAddress];
         uint[] memory _balanceList = allocationStore.getBalanceList(_params.collateralToken, _params.puppetList);
-
         uint _puppetCount = _params.puppetList.length;
         require(
             _allocationList.length == _puppetCount,

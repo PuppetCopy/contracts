@@ -116,29 +116,29 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
      * (`allocationMap`) and the GMX request details (`requestAdjustmentMap`),
      * which are necessary for future adjustments or settlement via the `execute` function upon GMX callback.
      * Emits a `Mirror` event with key details.
-     * @param _callParams Position parameters for the trader's action
+     * @param _params Position parameters for the trader's action
      * @param _allocationAddress The allocation account address created
      * @param _netAllocation The net allocation amount after deducting the keeper fee
      * @return _requestKey The unique key returned by GMX identifying the created order request
      */
     function requestMirror(
-        CallPosition calldata _callParams,
+        CallPosition calldata _params,
         address _allocationAddress,
         uint _netAllocation
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
-        require(_callParams.isIncrease, Error.MirrorPosition__InitialMustBeIncrease());
-        require(_callParams.collateralDelta > 0, Error.MirrorPosition__InvalidCollateralDelta());
-        require(_callParams.sizeDeltaInUsd > 0, Error.MirrorPosition__InvalidSizeDelta());
+        require(_params.isIncrease, Error.MirrorPosition__InitialMustBeIncrease());
+        require(_params.collateralDelta > 0, Error.MirrorPosition__InvalidCollateralDelta());
+        require(_params.sizeDeltaInUsd > 0, Error.MirrorPosition__InvalidSizeDelta());
         require(_allocationAddress != address(0), Error.MirrorPosition__InvalidAllocation(_allocationAddress));
         require(_netAllocation > 0, "Invalid net allocation");
 
         // Calculate position size proportional to trader's leverage
-        uint _traderTargetLeverage = Precision.toBasisPoints(_callParams.sizeDeltaInUsd, _callParams.collateralDelta);
-        uint _sizeDelta = Math.mulDiv(_callParams.sizeDeltaInUsd, _netAllocation, _callParams.collateralDelta);
+        uint _traderTargetLeverage = Precision.toBasisPoints(_params.sizeDeltaInUsd, _params.collateralDelta);
+        uint _sizeDelta = Math.mulDiv(_params.sizeDeltaInUsd, _netAllocation, _params.collateralDelta);
 
         // Submit GMX order
         _requestKey = _submitOrder(
-            _callParams,
+            _params,
             _allocationAddress,
             GmxPositionUtils.OrderType.MarketIncrease,
             config.increaseCallbackGasLimit,
@@ -151,14 +151,14 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
             allocationAddress: _allocationAddress,
             traderIsIncrease: true,
             traderTargetLeverage: _traderTargetLeverage,
-            traderSizeDelta: _callParams.sizeDeltaInUsd,
-            traderCollateralDelta: _callParams.collateralDelta,
+            traderSizeDelta: _params.sizeDeltaInUsd,
+            traderCollateralDelta: _params.collateralDelta,
             sizeDelta: _sizeDelta
         });
 
         _logEvent(
             "RequestMirror",
-            abi.encode(_callParams, _requestKey, _allocationAddress, _netAllocation, _sizeDelta, _traderTargetLeverage)
+            abi.encode(_params, _requestKey, _allocationAddress, _netAllocation, _sizeDelta, _traderTargetLeverage)
         );
     }
 
@@ -182,21 +182,18 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
      * Details about the adjustment request are stored (`requestAdjustmentMap`) for processing when GMX confirms the
      * order execution via the `execute` function callback. If puppet allocations were reduced due to fee handling,
      * the total allocation (`allocationMap`) is updated. Emits an `Adjust` event.
-     * @param _callParams Structure containing details of the trader's adjustment action (deltas must be > 0),
+     * @param _params Structure containing details of the trader's adjustment action (deltas must be > 0),
      * market, collateral, GMX execution fee, keeper fee, and keeper fee receiver.
      * @param _allocationAddress The allocation account address associated with the position being adjusted.
      * @param _currentAllocation The current total allocation amount for the position.
      * @return _requestKey The unique key returned by GMX identifying the created adjustment order request.
      */
     function requestAdjust(
-        CallPosition calldata _callParams,
+        CallPosition calldata _params,
         address _allocationAddress,
         uint _currentAllocation
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
-        require(
-            _callParams.collateralDelta > 0 || _callParams.sizeDeltaInUsd > 0,
-            Error.MirrorPosition__NoAdjustmentRequired()
-        );
+        require(_params.collateralDelta > 0 || _params.sizeDeltaInUsd > 0, Error.MirrorPosition__NoAdjustmentRequired());
         require(_allocationAddress != address(0), Error.MirrorPosition__InvalidAllocation(_allocationAddress));
         require(_currentAllocation > 0, "Invalid current allocation");
 
@@ -208,19 +205,14 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         uint _currentPuppetLeverage = Precision.toBasisPoints(_position.size, _currentAllocation);
         uint _traderTargetLeverage;
 
-        if (_callParams.isIncrease) {
+        if (_params.isIncrease) {
             _traderTargetLeverage = Precision.toBasisPoints(
-                _position.traderSize + _callParams.sizeDeltaInUsd,
-                _position.traderCollateral + _callParams.collateralDelta
+                _position.traderSize + _params.sizeDeltaInUsd, _position.traderCollateral + _params.collateralDelta
             );
         } else {
-            if (
-                _position.traderSize > _callParams.sizeDeltaInUsd
-                    && _position.traderCollateral > _callParams.collateralDelta
-            ) {
+            if (_position.traderSize > _params.sizeDeltaInUsd && _position.traderCollateral > _params.collateralDelta) {
                 _traderTargetLeverage = Precision.toBasisPoints(
-                    _position.traderSize - _callParams.sizeDeltaInUsd,
-                    _position.traderCollateral - _callParams.collateralDelta
+                    _position.traderSize - _params.sizeDeltaInUsd, _position.traderCollateral - _params.collateralDelta
                 );
             } else {
                 _traderTargetLeverage = 0;
@@ -236,7 +228,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
             _sizeDelta =
                 Math.mulDiv(_position.size, (_traderTargetLeverage - _currentPuppetLeverage), _currentPuppetLeverage);
             _requestKey = _submitOrder(
-                _callParams,
+                _params,
                 _allocationAddress,
                 GmxPositionUtils.OrderType.MarketIncrease,
                 config.increaseCallbackGasLimit,
@@ -248,7 +240,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
                 ? _position.size
                 : Math.mulDiv(_position.size, (_currentPuppetLeverage - _traderTargetLeverage), _currentPuppetLeverage);
             _requestKey = _submitOrder(
-                _callParams,
+                _params,
                 _allocationAddress,
                 GmxPositionUtils.OrderType.MarketDecrease,
                 config.decreaseCallbackGasLimit,
@@ -260,18 +252,16 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         // Store request details for execute callback
         requestAdjustmentMap[_requestKey] = RequestAdjustment({
             allocationAddress: _allocationAddress,
-            traderIsIncrease: _callParams.isIncrease,
+            traderIsIncrease: _params.isIncrease,
             traderTargetLeverage: _traderTargetLeverage,
-            traderSizeDelta: _callParams.sizeDeltaInUsd,
-            traderCollateralDelta: _callParams.collateralDelta,
+            traderSizeDelta: _params.sizeDeltaInUsd,
+            traderCollateralDelta: _params.collateralDelta,
             sizeDelta: _sizeDelta
         });
 
         _logEvent(
             "RequestAdjust",
-            abi.encode(
-                _callParams, _requestKey, _allocationAddress, _currentAllocation, _sizeDelta, _traderTargetLeverage
-            )
+            abi.encode(_params, _requestKey, _allocationAddress, _currentAllocation, _sizeDelta, _traderTargetLeverage)
         );
     }
 

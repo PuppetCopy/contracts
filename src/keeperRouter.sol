@@ -71,7 +71,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient {
         MirrorPosition.CallPosition calldata _callParams,
         Allocation.CallAllocation calldata _allocParams
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
-        (address allocationAddress, uint nextAllocated) = allocation.updateAllocationsForKeeperFee(_allocParams);
+        (address allocationAddress, uint nextAllocated) = allocation.collectKeeperFee(_allocParams);
 
         _requestKey = mirrorPosition.requestAdjust{value: msg.value}(_callParams, allocationAddress, nextAllocated);
 

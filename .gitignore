@@ -8,6 +8,7 @@ coverage
 coverage.json
 broadcast
 cache/
+/CLAUDE.md
 
 # foundry files
 forge-artifacts/
