@@ -27,8 +27,6 @@ contract TradingTest is BasicSetup {
     AllocationStore allocationStore;
     Allocation allocation;
     MatchingRule matchingRule;
-    FeeMarketplace feeMarketplace;
-    FeeMarketplaceStore feeMarketplaceStore;
     MirrorPosition mirrorPosition;
     KeeperRouter keeperRouter;
     MockGmxExchangeRouter mockGmxExchangeRouter;
@@ -39,7 +37,6 @@ contract TradingTest is BasicSetup {
     address trader = makeAddr("trader");
     address puppet1 = makeAddr("puppet1");
     address puppet2 = makeAddr("puppet2");
-    address keeper = makeAddr("keeper");
 
     function getNextAllocationId() internal returns (uint) {
         return ++nextAllocationId;
@@ -48,21 +45,8 @@ contract TradingTest is BasicSetup {
     function setUp() public override {
         super.setUp();
 
-        // Note: keeping vm.startPrank(users.owner) active from BasicSetup
-
         // Deploy core contracts
         allocationStore = new AllocationStore(dictator, tokenRouter);
-        feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
-        feeMarketplace = new FeeMarketplace(
-            dictator,
-            puppetToken,
-            feeMarketplaceStore,
-            FeeMarketplace.Config({
-                transferOutGasLimit: 200_000,
-                distributionTimeframe: 1 days,
-                burnBasisPoints: 5000 // 50% burn
-            })
-        );
 
         allocation = new Allocation(
             dictator,
@@ -100,53 +84,61 @@ contract TradingTest is BasicSetup {
                 gmxExchangeRouter: IGmxExchangeRouter(address(mockGmxExchangeRouter)),
                 gmxOrderVault: address(0x1234),
                 referralCode: bytes32("PUPPET"),
-                increaseCallbackGasLimit: 2000000,
-                decreaseCallbackGasLimit: 2000000,
+                increaseCallbackGasLimit: 2e6,
+                decreaseCallbackGasLimit: 2e6,
                 refundExecutionFeeReceiver: address(0x9999)
             })
         );
 
-        keeperRouter = new KeeperRouter(dictator, mirrorPosition, matchingRule, feeMarketplace, allocation);
+        keeperRouter = new KeeperRouter(dictator, mirrorPosition, matchingRule, allocation);
 
         // Set up permissions for owner to act on behalf of users
         dictator.setAccess(allocationStore, address(allocation));
         dictator.setAccess(allocationStore, address(matchingRule));
-        dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
+        dictator.setAccess(allocationStore, address(mirrorPosition));
 
         // TokenRouter permissions for stores
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
-        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
-
-        // Keeper permissions
-        dictator.setPermission(keeperRouter, keeperRouter.requestMirror.selector, keeper);
-        dictator.setPermission(keeperRouter, keeperRouter.requestAdjust.selector, keeper);
-        dictator.setPermission(keeperRouter, keeperRouter.settle.selector, keeper);
-        dictator.setPermission(keeperRouter, keeperRouter.collectDust.selector, keeper);
-
-        // Owner permissions to act on behalf of users
-        dictator.setPermission(matchingRule, matchingRule.deposit.selector, users.owner);
-        dictator.setPermission(matchingRule, matchingRule.setRule.selector, users.owner);
-        dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, users.owner);
 
         // MatchingRule needs permission to call allocation functions
         dictator.setPermission(allocation, allocation.initializeTraderActivityThrottle.selector, address(matchingRule));
 
+        // KeeperRouter needs permission to call allocation and mirrorPosition functions
+        dictator.setPermission(allocation, allocation.createAllocation.selector, address(keeperRouter));
+        dictator.setPermission(allocation, allocation.collectKeeperFee.selector, address(keeperRouter));
+        dictator.setPermission(allocation, allocation.settle.selector, address(keeperRouter));
+        dictator.setPermission(allocation, allocation.collectDust.selector, address(keeperRouter));
+        dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, address(keeperRouter));
+        dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, address(keeperRouter));
+
         // Initialize contracts
-        dictator.initContract(feeMarketplace);
         dictator.initContract(allocation);
         dictator.initContract(matchingRule);
         dictator.initContract(mirrorPosition);
         dictator.initContract(keeperRouter);
 
         // Stop current prank and restart for user operations
-        vm.stopPrank();
-        vm.startPrank(users.owner);
         IERC20[] memory allowedTokens = new IERC20[](1);
         allowedTokens[0] = usdc;
         uint[] memory allowanceCaps = new uint[](1);
         allowanceCaps[0] = 10000e6; // 10000 USDC cap
 
+        dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, users.owner);
         matchingRule.setTokenAllowanceList(allowedTokens, allowanceCaps);
+
+        // Test setup: mint USDC to owner and approve for matchingRule
+        // Owner permissions for dust collection
+        dictator.setPermission(allocation, allocation.setTokenDustThresholdList.selector, users.owner);
+
+        dictator.setPermission(keeperRouter, keeperRouter.requestMirror.selector, users.owner);
+        dictator.setPermission(keeperRouter, keeperRouter.requestAdjust.selector, users.owner);
+        dictator.setPermission(keeperRouter, keeperRouter.settle.selector, users.owner);
+        dictator.setPermission(keeperRouter, keeperRouter.collectDust.selector, users.owner);
+        dictator.setPermission(keeperRouter, keeperRouter.collectDust.selector, users.owner);
+
+        // Owner permissions to act on behalf of users
+        dictator.setPermission(matchingRule, matchingRule.deposit.selector, users.owner);
+        dictator.setPermission(matchingRule, matchingRule.setRule.selector, users.owner);
 
         // Setup puppet balances using owner permissions - owner deposits on behalf of puppets
         matchingRule.deposit(usdc, users.owner, puppet1, 1000e6);
@@ -196,7 +188,7 @@ contract TradingTest is BasicSetup {
             puppetList: puppetList,
             allocationId: allocationId,
             keeperFee: keeperFee,
-            keeperFeeReceiver: keeper
+            keeperFeeReceiver: users.owner
         });
 
         MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
@@ -212,9 +204,7 @@ contract TradingTest is BasicSetup {
             triggerPrice: 0
         });
 
-        vm.stopPrank();
-        vm.prank(keeper);
-        vm.deal(keeper, 1 ether);
+        vm.deal(users.owner, 1 ether);
         (address allocationAddress, bytes32 requestKey) =
             keeperRouter.requestMirror{value: 0.001 ether}(allocParams, callParams);
 
@@ -225,9 +215,7 @@ contract TradingTest is BasicSetup {
         assertNotEq(requestKey, bytes32(0), "Request key should be generated");
 
         // Verify keeper fee was paid
-        assertEq(usdc.balanceOf(keeper), keeperFee, "Keeper should receive fee");
-
-        vm.startPrank(users.owner);
+        assertEq(usdc.balanceOf(users.owner), keeperFee, "Keeper should receive fee");
     }
 
     function testRequestMirrorInsufficientFunds() public {
@@ -244,7 +232,7 @@ contract TradingTest is BasicSetup {
             puppetList: puppetList,
             allocationId: allocationId,
             keeperFee: keeperFee,
-            keeperFeeReceiver: keeper
+            keeperFeeReceiver: users.owner
         });
 
         MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
@@ -260,13 +248,9 @@ contract TradingTest is BasicSetup {
             triggerPrice: 0
         });
 
-        vm.stopPrank();
-        vm.prank(keeper);
-        vm.deal(keeper, 1 ether);
+        vm.deal(users.owner, 1 ether);
         vm.expectRevert();
         keeperRouter.requestMirror{value: 0.001 ether}(allocParams, callParams);
-
-        vm.startPrank(users.owner);
     }
 
     function testRequestAdjustSuccess() public {
@@ -299,18 +283,14 @@ contract TradingTest is BasicSetup {
             puppetList: puppetList,
             allocationId: allocationId,
             keeperFee: keeperFee,
-            keeperFeeReceiver: keeper
+            keeperFeeReceiver: users.owner
         });
 
-        vm.stopPrank();
-        vm.prank(keeper);
-        vm.deal(keeper, 1 ether);
+        vm.deal(users.owner, 1 ether);
         bytes32 requestKey = keeperRouter.requestAdjust{value: 0.001 ether}(callParams, allocParams);
 
         // Verify request was submitted
         assertNotEq(requestKey, bytes32(0), "Adjust request should be generated");
-
-        vm.startPrank(users.owner);
     }
 
     function testSettleSuccess() public {
@@ -330,7 +310,7 @@ contract TradingTest is BasicSetup {
         Allocation.CallSettle memory settleParams = Allocation.CallSettle({
             collateralToken: usdc,
             distributionToken: usdc,
-            keeperFeeReceiver: keeper,
+            keeperFeeReceiver: users.owner,
             trader: trader,
             allocationId: allocationId,
             keeperExecutionFee: 0.1e6
@@ -339,8 +319,6 @@ contract TradingTest is BasicSetup {
         uint puppet1BalanceBefore = allocationStore.userBalanceMap(usdc, puppet1);
         uint puppet2BalanceBefore = allocationStore.userBalanceMap(usdc, puppet2);
 
-        vm.stopPrank();
-        vm.prank(keeper);
         (uint settledAmount, uint distributionAmount, uint platformFeeAmount) =
             keeperRouter.settle(settleParams, puppetList);
 
@@ -354,8 +332,6 @@ contract TradingTest is BasicSetup {
 
         // Verify platform fee was collected
         assertGt(platformFeeAmount, 0, "Platform fee should be collected");
-
-        vm.startPrank(users.owner);
     }
 
     function testCollectDust() public {
@@ -379,16 +355,12 @@ contract TradingTest is BasicSetup {
         // Send small amount (dust) to allocation account - owner can mint
         usdc.mint(allocationAddress, 5e6); // 5 USDC < 10 USDC threshold
 
-        uint keeperBalanceBefore = usdc.balanceOf(keeper);
+        uint keeperBalanceBefore = usdc.balanceOf(users.owner);
 
-        vm.stopPrank();
-        vm.prank(keeper);
-        uint dustCollected = keeperRouter.collectDust(allocationAddress, usdc, keeper);
+        uint dustCollected = keeperRouter.collectDust(allocationAddress, usdc, users.owner);
 
         assertEq(dustCollected, 5e6, "Should collect all dust");
-        assertEq(usdc.balanceOf(keeper), keeperBalanceBefore + 5e6, "Keeper should receive dust");
-
-        vm.startPrank(users.owner);
+        assertEq(usdc.balanceOf(users.owner), keeperBalanceBefore + 5e6, "Keeper should receive dust");
     }
 
     //----------------------------------------------------------------------------
@@ -405,7 +377,7 @@ contract TradingTest is BasicSetup {
             puppetList: emptyPuppetList,
             allocationId: allocationId,
             keeperFee: 1e6,
-            keeperFeeReceiver: keeper
+            keeperFeeReceiver: users.owner
         });
 
         MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
@@ -421,12 +393,9 @@ contract TradingTest is BasicSetup {
             triggerPrice: 0
         });
 
-        vm.stopPrank();
-        vm.prank(keeper);
+        vm.deal(users.owner, 1 ether);
         vm.expectRevert(Error.Allocation__PuppetListEmpty.selector);
         keeperRouter.requestMirror{value: 0.001 ether}(allocParams, callParams);
-
-        vm.startPrank(users.owner);
     }
 
     //----------------------------------------------------------------------------

@@ -239,8 +239,8 @@ contract DeployPosition is BaseScript {
                     callbackHandler: address(gmxCallbackHandler),
                     gmxOrderVault: Const.gmxOrderVault,
                     referralCode: Const.referralCode,
-                    increaseCallbackGasLimit: 100_000,
-                    decreaseCallbackGasLimit: 100_000,
+                increaseCallbackGasLimit: 2e6,
+                decreaseCallbackGasLimit: 2e6,
                     maxPuppetList: 100,
                     maxKeeperFeeToAllocationRatio: 0.1e30,
                     maxKeeperFeeToAdjustmentRatio: 0.1e30

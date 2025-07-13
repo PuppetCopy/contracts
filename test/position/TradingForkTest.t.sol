@@ -36,8 +36,6 @@ contract TradingForkTest is Test {
     AllocationStore allocationStore;
     Allocation allocation;
     MatchingRule matchingRule;
-    FeeMarketplace feeMarketplace;
-    FeeMarketplaceStore feeMarketplaceStore;
     MirrorPosition mirrorPosition;
     KeeperRouter keeperRouter;
 
@@ -60,19 +58,6 @@ contract TradingForkTest is Test {
         tokenRouter = new TokenRouter(dictator, TokenRouter.Config(200_000));
         dictator.initContract(tokenRouter);
         puppetToken = new PuppetToken(owner);
-
-        // Deploy position contracts
-        feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
-        feeMarketplace = new FeeMarketplace(
-            dictator,
-            puppetToken,
-            feeMarketplaceStore,
-            FeeMarketplace.Config({
-                transferOutGasLimit: 200_000,
-                distributionTimeframe: 1 days,
-                burnBasisPoints: 5000 // 50% burn
-            })
-        );
 
         allocationStore = new AllocationStore(dictator, tokenRouter);
 
@@ -116,7 +101,7 @@ contract TradingForkTest is Test {
             })
         );
 
-        keeperRouter = new KeeperRouter(dictator, mirrorPosition, matchingRule, feeMarketplace, allocation);
+        keeperRouter = new KeeperRouter(dictator, mirrorPosition, matchingRule, allocation);
 
         // Set up permissions
         dictator.setAccess(allocationStore, address(allocation));
@@ -139,7 +124,6 @@ contract TradingForkTest is Test {
         dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, address(keeperRouter));
 
         // Initialize contracts
-        dictator.initContract(feeMarketplace);
         dictator.initContract(allocation);
         dictator.initContract(matchingRule);
 

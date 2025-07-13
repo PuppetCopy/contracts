@@ -282,6 +282,7 @@ contract FeeMarketplaceTest is BasicSetup {
     function testZeroDepositReverts() public {
         // With the new deposit signature, zero amounts should be handled gracefully
         // The transfer layer silently returns on zero amounts
+        vm.expectRevert(Error.FeeMarketplace__ZeroDeposit.selector);
         feeMarketplace.deposit(usdc, users.owner, 0);
 
         // Verify no tokens were actually deposited
