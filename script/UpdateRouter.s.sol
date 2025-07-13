@@ -4,13 +4,13 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/src/console.sol";
 
-import {Router} from "src/Router.sol";
-import {RouterProxy} from "src/RouterProxy.sol";
+import {UserRouter} from "src/UserRouter.sol";
 import {Allocation} from "src/position/Allocation.sol";
 import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
+import {RouterProxy} from "src/utils/RouterProxy.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
 import {Const} from "./Const.sol";
@@ -26,12 +26,11 @@ contract UpdateRouter is BaseScript {
         RouterProxy routerProxy = RouterProxy(payable(getDeployedAddress("RouterProxy")));
         MatchingRule matchingRule = MatchingRule(getDeployedAddress("MatchingRule"));
         FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
-        MirrorPosition mirrorPosition = MirrorPosition(getDeployedAddress("MirrorPosition"));
         Allocation allocation = Allocation(getDeployedAddress("Allocation"));
 
-        Router newRouter = new Router(mirrorPosition, matchingRule, feeMarketplace, allocation);
+        UserRouter newRouter = new UserRouter(matchingRule, feeMarketplace, allocation);
         routerProxy.update(address(newRouter));
-        console.log("Router implementation deployed at:", address(newRouter));
+        console.log("UserRouter implementation deployed at:", address(newRouter));
         console.log("Seeding MatchingRule with initial rules...");
         matchingRule.setRule(
             allocation,

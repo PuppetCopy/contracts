@@ -214,8 +214,8 @@ contract TradingTest is BasicSetup {
         // Verify request was submitted to GMX
         assertNotEq(requestKey, bytes32(0), "Request key should be generated");
 
-        // Verify keeper fee was paid
-        assertEq(usdc.balanceOf(users.owner), keeperFee, "Keeper should receive fee");
+        // Verify keeper fee was paid (owner had 200e6 initial balance from BasicSetup)
+        assertEq(usdc.balanceOf(users.owner), 200e6 + keeperFee, "Keeper should receive fee");
     }
 
     function testRequestMirrorInsufficientFunds() public {
@@ -254,28 +254,13 @@ contract TradingTest is BasicSetup {
     }
 
     function testRequestAdjustSuccess() public {
-        // First create an allocation
-        testRequestMirrorSuccess();
-
+        // First create an allocation and mirror position
         address[] memory puppetList = new address[](2);
         puppetList[0] = puppet1;
         puppetList[1] = puppet2;
 
-        uint allocationId = 1; // From the previous test
-        uint keeperFee = 0.5e6; // 0.5 USDC
-
-        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
-            collateralToken: usdc,
-            trader: trader,
-            market: address(wnt),
-            isIncrease: true,
-            isLong: true,
-            executionFee: 0.001 ether,
-            collateralDelta: 500e30,
-            sizeDeltaInUsd: 2500e30,
-            acceptablePrice: 3100e30,
-            triggerPrice: 0
-        });
+        uint allocationId = getNextAllocationId();
+        uint keeperFee = 1e6; // 1 USDC
 
         Allocation.CallAllocation memory allocParams = Allocation.CallAllocation({
             collateralToken: usdc,
@@ -286,11 +271,57 @@ contract TradingTest is BasicSetup {
             keeperFeeReceiver: users.owner
         });
 
+        MirrorPosition.CallPosition memory initialCallParams = MirrorPosition.CallPosition({
+            collateralToken: usdc,
+            trader: trader,
+            market: address(wnt),
+            isIncrease: true,
+            isLong: true,
+            executionFee: 0.001 ether,
+            collateralDelta: 1000e30,
+            sizeDeltaInUsd: 5000e30,
+            acceptablePrice: 3000e30,
+            triggerPrice: 0
+        });
+
         vm.deal(users.owner, 1 ether);
-        bytes32 requestKey = keeperRouter.requestAdjust{value: 0.001 ether}(callParams, allocParams);
+        (, bytes32 requestKey) = keeperRouter.requestMirror{value: 0.001 ether}(allocParams, initialCallParams);
+
+        // Simulate GMX executing the order
+        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, users.owner);
+        mirrorPosition.execute(requestKey);
+
+        // Now test adjustment
+        uint adjustKeeperFee = 0.5e6; // 0.5 USDC
+
+        // Adjust position - trader increases leverage by adding more size without proportional collateral
+        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
+            collateralToken: usdc,
+            trader: trader,
+            market: address(wnt),
+            isIncrease: true,
+            isLong: true,
+            executionFee: 0.001 ether,
+            collateralDelta: 100e30, // Small collateral increase
+            sizeDeltaInUsd: 3000e30, // Large size increase (changes leverage)
+            acceptablePrice: 3100e30,
+            triggerPrice: 0
+        });
+
+        Allocation.CallAllocation memory adjustAllocParams = Allocation.CallAllocation({
+            collateralToken: usdc,
+            trader: trader,
+            puppetList: puppetList,
+            allocationId: allocationId,
+            keeperFee: adjustKeeperFee,
+            keeperFeeReceiver: users.owner
+        });
+
+        vm.deal(users.owner, 1 ether);
+        bytes32 adjustRequestKey = keeperRouter.requestAdjust{value: 0.001 ether}(callParams, adjustAllocParams);
 
         // Verify request was submitted
-        assertNotEq(requestKey, bytes32(0), "Adjust request should be generated");
+        assertNotEq(adjustRequestKey, bytes32(0), "Adjust request should be generated");
     }
 
     function testSettleSuccess() public {
@@ -355,12 +386,12 @@ contract TradingTest is BasicSetup {
         // Send small amount (dust) to allocation account - owner can mint
         usdc.mint(allocationAddress, 5e6); // 5 USDC < 10 USDC threshold
 
-        uint keeperBalanceBefore = usdc.balanceOf(users.owner);
+        uint ownerBalanceBefore = usdc.balanceOf(users.owner);
 
         uint dustCollected = keeperRouter.collectDust(allocationAddress, usdc, users.owner);
 
         assertEq(dustCollected, 5e6, "Should collect all dust");
-        assertEq(usdc.balanceOf(users.owner), keeperBalanceBefore + 5e6, "Keeper should receive dust");
+        assertEq(usdc.balanceOf(users.owner), ownerBalanceBefore + 5e6, "Owner should receive dust");
     }
 
     //----------------------------------------------------------------------------
@@ -396,6 +427,320 @@ contract TradingTest is BasicSetup {
         vm.deal(users.owner, 1 ether);
         vm.expectRevert(Error.Allocation__PuppetListEmpty.selector);
         keeperRouter.requestMirror{value: 0.001 ether}(allocParams, callParams);
+    }
+
+    function testExpiredRule() public {
+        address[] memory puppetList = new address[](2);
+        puppetList[0] = puppet1;
+        puppetList[1] = puppet2;
+
+        // Fast forward time to expire the rules
+        vm.warp(block.timestamp + 31 days);
+
+        uint allocationId = getNextAllocationId();
+        uint keeperFee = 0; // No keeper fee since we expect no allocation
+
+        Allocation.CallAllocation memory allocParams = Allocation.CallAllocation({
+            collateralToken: usdc,
+            trader: trader,
+            puppetList: puppetList,
+            allocationId: allocationId,
+            keeperFee: keeperFee,
+            keeperFeeReceiver: users.owner
+        });
+
+        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
+            collateralToken: usdc,
+            trader: trader,
+            market: address(wnt),
+            isIncrease: true,
+            isLong: true,
+            executionFee: 0.001 ether,
+            collateralDelta: 1000e30,
+            sizeDeltaInUsd: 5000e30,
+            acceptablePrice: 3000e30,
+            triggerPrice: 0
+        });
+
+        vm.deal(users.owner, 1 ether);
+        // Should revert because no valid puppets means no allocation, and keeper fee check fails
+        vm.expectRevert();
+        keeperRouter.requestMirror{value: 0.001 ether}(allocParams, callParams);
+    }
+
+    function testThrottleActivity() public {
+        // First mirror position
+        testRequestMirrorSuccess();
+
+        address[] memory puppetList = new address[](2);
+        puppetList[0] = puppet1;
+        puppetList[1] = puppet2;
+
+        // Try to create another position immediately (should be throttled)
+        uint allocationId = getNextAllocationId();
+        uint keeperFee = 0; // No keeper fee to avoid exceeding cost factor on reduced allocation
+
+        Allocation.CallAllocation memory allocParams = Allocation.CallAllocation({
+            collateralToken: usdc,
+            trader: trader,
+            puppetList: puppetList,
+            allocationId: allocationId,
+            keeperFee: keeperFee,
+            keeperFeeReceiver: users.owner
+        });
+
+        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
+            collateralToken: usdc,
+            trader: trader,
+            market: address(wnt),
+            isIncrease: true,
+            isLong: true,
+            executionFee: 0.001 ether,
+            collateralDelta: 1000e30,
+            sizeDeltaInUsd: 5000e30,
+            acceptablePrice: 3000e30,
+            triggerPrice: 0
+        });
+
+        vm.deal(users.owner, 1 ether);
+        // For this test, let's advance time just past puppet1's throttle (1 hour) but not puppet2's (2 hours)
+        vm.warp(block.timestamp + 1.5 hours);
+
+        (address allocationAddress,) = keeperRouter.requestMirror{value: 0.001 ether}(allocParams, callParams);
+
+        // Should get allocation only from puppet1 since puppet2 is still throttled
+        uint allocatedAmount = allocation.getAllocation(allocationAddress);
+        uint puppet1Expected = 1000e6 * 2000 / 10000; // 20% of 1000 USDC = 200 USDC
+        // But puppet1's balance has been reduced from previous test (200e6 initial balance from BasicSetup + allocation
+        // used)
+        // So let's just verify it's greater than 0 and less than expected
+        assertGt(allocatedAmount, 0, "Should have some allocation from puppet1");
+        assertLt(allocatedAmount, puppet1Expected, "Should be less than full expected due to reduced balance");
+    }
+
+    function testDustThresholdTooHigh() public {
+        // Create an allocation first
+        testRequestMirrorSuccess();
+
+        address[] memory puppetList = new address[](2);
+        puppetList[0] = puppet1;
+        puppetList[1] = puppet2;
+
+        address allocationAddress = getAllocationAddress(usdc, trader, puppetList, 1);
+
+        // Set dust threshold
+        IERC20[] memory tokens = new IERC20[](1);
+        tokens[0] = usdc;
+        uint[] memory thresholds = new uint[](1);
+        thresholds[0] = 10e6; // 10 USDC dust threshold
+
+        allocation.setTokenDustThresholdList(tokens, thresholds);
+
+        // Send amount above threshold
+        usdc.mint(allocationAddress, 15e6); // 15 USDC > 10 USDC threshold
+
+        // Should revert when trying to collect
+        vm.expectRevert();
+        keeperRouter.collectDust(allocationAddress, usdc, users.owner);
+    }
+
+    function testDecreasePosition() public {
+        // First create and execute a position
+        address[] memory puppetList = new address[](2);
+        puppetList[0] = puppet1;
+        puppetList[1] = puppet2;
+
+        uint allocationId = getNextAllocationId();
+        uint keeperFee = 1e6;
+
+        Allocation.CallAllocation memory allocParams = Allocation.CallAllocation({
+            collateralToken: usdc,
+            trader: trader,
+            puppetList: puppetList,
+            allocationId: allocationId,
+            keeperFee: keeperFee,
+            keeperFeeReceiver: users.owner
+        });
+
+        MirrorPosition.CallPosition memory openParams = MirrorPosition.CallPosition({
+            collateralToken: usdc,
+            trader: trader,
+            market: address(wnt),
+            isIncrease: true,
+            isLong: true,
+            executionFee: 0.001 ether,
+            collateralDelta: 1000e30,
+            sizeDeltaInUsd: 5000e30,
+            acceptablePrice: 3000e30,
+            triggerPrice: 0
+        });
+
+        vm.deal(users.owner, 2 ether);
+        (, bytes32 requestKey) = keeperRouter.requestMirror{value: 0.001 ether}(allocParams, openParams);
+
+        // Execute the open position
+        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, users.owner);
+        mirrorPosition.execute(requestKey);
+
+        // Now decrease the position
+        MirrorPosition.CallPosition memory decreaseParams = MirrorPosition.CallPosition({
+            collateralToken: usdc,
+            trader: trader,
+            market: address(wnt),
+            isIncrease: false, // Decrease
+            isLong: true,
+            executionFee: 0.001 ether,
+            collateralDelta: 300e30, // Remove some collateral
+            sizeDeltaInUsd: 2000e30, // Reduce size
+            acceptablePrice: 2900e30,
+            triggerPrice: 0
+        });
+
+        Allocation.CallAllocation memory adjustAllocParams = Allocation.CallAllocation({
+            collateralToken: usdc,
+            trader: trader,
+            puppetList: puppetList,
+            allocationId: allocationId,
+            keeperFee: 0.5e6,
+            keeperFeeReceiver: users.owner
+        });
+
+        bytes32 decreaseRequestKey = keeperRouter.requestAdjust{value: 0.001 ether}(decreaseParams, adjustAllocParams);
+        assertNotEq(decreaseRequestKey, bytes32(0), "Decrease request should be generated");
+    }
+
+    function testMultipleTraders() public {
+        address trader2 = makeAddr("trader2");
+
+        // Puppet1 follows trader1, puppet2 follows trader2
+        address[] memory puppetList1 = new address[](1);
+        puppetList1[0] = puppet1;
+
+        address[] memory puppetList2 = new address[](1);
+        puppetList2[0] = puppet2;
+
+        // Set rule for puppet2 to follow trader2
+        matchingRule.setRule(
+            allocation,
+            usdc,
+            puppet2,
+            trader2,
+            MatchingRule.Rule({
+                allowanceRate: 1000, // 10%
+                throttleActivity: 1 hours,
+                expiry: block.timestamp + 30 days
+            })
+        );
+
+        // Create positions for both traders
+        uint allocationId1 = getNextAllocationId();
+        uint allocationId2 = getNextAllocationId();
+
+        Allocation.CallAllocation memory allocParams1 = Allocation.CallAllocation({
+            collateralToken: usdc,
+            trader: trader,
+            puppetList: puppetList1,
+            allocationId: allocationId1,
+            keeperFee: 0.5e6,
+            keeperFeeReceiver: users.owner
+        });
+
+        Allocation.CallAllocation memory allocParams2 = Allocation.CallAllocation({
+            collateralToken: usdc,
+            trader: trader2,
+            puppetList: puppetList2,
+            allocationId: allocationId2,
+            keeperFee: 0.5e6,
+            keeperFeeReceiver: users.owner
+        });
+
+        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
+            collateralToken: usdc,
+            trader: address(0), // Will be set per trader
+            market: address(wnt),
+            isIncrease: true,
+            isLong: true,
+            executionFee: 0.001 ether,
+            collateralDelta: 500e30,
+            sizeDeltaInUsd: 2000e30,
+            acceptablePrice: 3000e30,
+            triggerPrice: 0
+        });
+
+        vm.deal(users.owner, 2 ether);
+
+        // Create position for trader1
+        callParams.trader = trader;
+        (address allocation1,) = keeperRouter.requestMirror{value: 0.001 ether}(allocParams1, callParams);
+
+        // Create position for trader2
+        callParams.trader = trader2;
+        (address allocation2,) = keeperRouter.requestMirror{value: 0.001 ether}(allocParams2, callParams);
+
+        // Verify both allocations were created
+        assertGt(allocation.getAllocation(allocation1), 0, "Trader1 allocation should exist");
+        assertGt(allocation.getAllocation(allocation2), 0, "Trader2 allocation should exist");
+        assertNotEq(allocation1, allocation2, "Allocations should be different");
+
+        // Simulate profits by sending tokens to both allocation accounts
+        usdc.mint(allocation1, 100e6); // 100 USDC profit for trader1's position
+        usdc.mint(allocation2, 80e6); // 80 USDC profit for trader2's position
+
+        // Record initial balances
+        uint puppet1BalanceBefore = allocationStore.userBalanceMap(usdc, puppet1);
+        uint puppet2BalanceBefore = allocationStore.userBalanceMap(usdc, puppet2);
+
+        // Settle trader1's position (puppet1 gets the profit)
+        Allocation.CallSettle memory settleParams1 = Allocation.CallSettle({
+            collateralToken: usdc,
+            distributionToken: usdc,
+            keeperFeeReceiver: users.owner,
+            trader: trader,
+            allocationId: allocationId1,
+            keeperExecutionFee: 0.1e6 // 0.1 USDC keeper fee
+        });
+
+        (uint settled1, uint distributed1, uint platformFee1) = keeperRouter.settle(settleParams1, puppetList1);
+
+        // Settle trader2's position (puppet2 gets the profit)
+        Allocation.CallSettle memory settleParams2 = Allocation.CallSettle({
+            collateralToken: usdc,
+            distributionToken: usdc,
+            keeperFeeReceiver: users.owner,
+            trader: trader2,
+            allocationId: allocationId2,
+            keeperExecutionFee: 0.1e6 // 0.1 USDC keeper fee
+        });
+
+        (uint settled2, uint distributed2, uint platformFee2) = keeperRouter.settle(settleParams2, puppetList2);
+
+        // Verify settlements occurred
+        assertEq(settled1, 100e6, "Should settle full trader1 profit");
+        assertEq(settled2, 80e6, "Should settle full trader2 profit");
+        assertGt(distributed1, 0, "Should distribute trader1 profits");
+        assertGt(distributed2, 0, "Should distribute trader2 profits");
+        assertGt(platformFee1, 0, "Should collect platform fee from trader1");
+        assertGt(platformFee2, 0, "Should collect platform fee from trader2");
+
+        // Verify puppet balances increased appropriately
+        uint puppet1BalanceAfter = allocationStore.userBalanceMap(usdc, puppet1);
+        uint puppet2BalanceAfter = allocationStore.userBalanceMap(usdc, puppet2);
+
+        assertGt(puppet1BalanceAfter, puppet1BalanceBefore, "Puppet1 should receive trader1 profits");
+        assertGt(puppet2BalanceAfter, puppet2BalanceBefore, "Puppet2 should receive trader2 profits");
+
+        // Verify profits are proportional to their allocations
+        // Puppet1 got profits from trader1, puppet2 got profits from trader2
+        uint puppet1ProfitShare = puppet1BalanceAfter - puppet1BalanceBefore;
+        uint puppet2ProfitShare = puppet2BalanceAfter - puppet2BalanceBefore;
+
+        assertGt(puppet1ProfitShare, 0, "Puppet1 should have positive profit share");
+        assertGt(puppet2ProfitShare, 0, "Puppet2 should have positive profit share");
+
+        // Both puppets should have received their respective trader's profits
+        // (minus keeper fees and platform fees)
+        assertLt(puppet1ProfitShare, 100e6, "Puppet1 profit should be less than gross due to fees");
+        assertLt(puppet2ProfitShare, 80e6, "Puppet2 profit should be less than gross due to fees");
     }
 
     //----------------------------------------------------------------------------

@@ -266,95 +266,6 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         );
     }
 
-    /**
-     * @notice Finalizes the state update after a GMX order execution.
-     * @dev This function is called by the `GmxExecutionCallback` contract via its `afterOrderExecution` function,
-     * which is triggered by GMX's callback mechanism upon successful order execution (increase or decrease).
-     * It uses the GMX request key (`_requestKey`) to retrieve the details of the intended adjustment stored
-     * during the `mirror` or `adjust` call. It updates the internal position state (`positionMap`) to reflect
-     * the executed changes in size and collateral, based on the stored `RequestAdjustment` data.
-     * If the adjustment results in closing the position (target leverage becomes zero or size becomes zero),
-     * it cleans up the position data. Finally, it removes the processed `RequestAdjustment` record and emits
-     * an `Execute` event.
-     * @param _requestKey The unique key provided by GMX identifying the executed order request.
-     */
-    function execute(
-        bytes32 _requestKey
-    ) external auth {
-        RequestAdjustment memory _request = requestAdjustmentMap[_requestKey];
-        require(_request.allocationAddress != address(0), Error.MirrorPosition__ExecutionRequestMissing(_requestKey));
-
-        Position memory _position = positionMap[_request.allocationAddress];
-
-        delete requestAdjustmentMap[_requestKey];
-
-        if (_request.traderTargetLeverage == 0) {
-            delete positionMap[_request.allocationAddress];
-            _logEvent("Execute", abi.encode(_request.allocationAddress, _requestKey, 0, 0, 0, 0));
-            return;
-        }
-
-        // Update trader position state
-        if (_request.traderIsIncrease) {
-            _position.traderSize += _request.traderSizeDelta;
-            _position.traderCollateral += _request.traderCollateralDelta;
-        } else {
-            _position.traderSize =
-                (_position.traderSize > _request.traderSizeDelta) ? _position.traderSize - _request.traderSizeDelta : 0;
-            _position.traderCollateral = (_position.traderCollateral > _request.traderCollateralDelta)
-                ? _position.traderCollateral - _request.traderCollateralDelta
-                : 0;
-        }
-
-        // Update puppet position size
-        if (_request.traderTargetLeverage > 0) {
-            if (_request.traderIsIncrease) {
-                _position.size += _request.sizeDelta;
-            } else {
-                _position.size = (_position.size > _request.sizeDelta) ? _position.size - _request.sizeDelta : 0;
-            }
-        }
-
-        if (_position.size == 0) {
-            delete positionMap[_request.allocationAddress];
-            _logEvent(
-                "Execute",
-                abi.encode(
-                    _request.allocationAddress,
-                    _requestKey,
-                    _position.traderSize,
-                    _position.traderCollateral,
-                    0,
-                    _request.traderTargetLeverage
-                )
-            );
-        } else {
-            positionMap[_request.allocationAddress] = _position;
-            _logEvent(
-                "Execute",
-                abi.encode(
-                    _request.allocationAddress,
-                    _requestKey,
-                    _position.traderSize,
-                    _position.traderCollateral,
-                    _position.size,
-                    _request.traderTargetLeverage
-                )
-            );
-        }
-    }
-
-    function liquidate(
-        address _allocationAddress
-    ) external auth {
-        Position memory _position = positionMap[_allocationAddress];
-        require(_position.size > 0, Error.MirrorPosition__PositionNotFound(_allocationAddress));
-
-        delete positionMap[_allocationAddress];
-
-        _logEvent("Liquidate", abi.encode(_allocationAddress));
-    }
-
     function _submitOrder(
         CallPosition calldata _order,
         address _allocationAddress,
@@ -412,9 +323,12 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
         require(gmxRequestKey != bytes32(0), Error.MirrorPosition__OrderCreationFailed());
     }
 
-    /// @notice  Sets the configuration parameters via governance
-    /// @param _data The encoded configuration data
-    /// @dev Emits a SetConfig event upon successful execution
+    /**
+     * @notice Sets the configuration for the MirrorPosition contract.
+     * @dev This function is called during contract initialization to set the configuration parameters.
+     * It validates the provided configuration values to ensure they meet the required criteria.
+     * @param _data The encoded configuration data containing the `Config` struct.
+     */
     function _setConfig(
         bytes memory _data
     ) internal override {
@@ -434,25 +348,91 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient, IGmxOrderCall
      * @notice Called after an order is executed.
      */
     function afterOrderExecution(
-        bytes32 key,
+        bytes32 _requestKey,
         GmxPositionUtils.Props memory order,
         GmxPositionUtils.EventLogData memory /*eventData*/
     ) external auth {
+        RequestAdjustment memory _request = requestAdjustmentMap[_requestKey];
+
+        if (_request.allocationAddress == address(0)) {
+            _storeUnhandledCallback(_requestKey, "Request not found");
+            return;
+        }
+
         if (
             GmxPositionUtils.isIncreaseOrder(GmxPositionUtils.OrderType(order.numbers.orderType))
                 || GmxPositionUtils.isDecreaseOrder(GmxPositionUtils.OrderType(order.numbers.orderType))
         ) {
-            try this.execute(key) {}
-            catch (bytes memory err) {
-                _storeUnhandledCallback(key, err);
+            Position memory _position = positionMap[_request.allocationAddress];
+
+            delete requestAdjustmentMap[_requestKey];
+
+            if (_request.traderTargetLeverage == 0) {
+                delete positionMap[_request.allocationAddress];
+                _logEvent("Execute", abi.encode(_request.allocationAddress, _requestKey, 0, 0, 0, 0));
+                return;
+            }
+
+            // Update trader position state
+            if (_request.traderIsIncrease) {
+                _position.traderSize += _request.traderSizeDelta;
+                _position.traderCollateral += _request.traderCollateralDelta;
+            } else {
+                _position.traderSize = (_position.traderSize > _request.traderSizeDelta)
+                    ? _position.traderSize - _request.traderSizeDelta
+                    : 0;
+                _position.traderCollateral = (_position.traderCollateral > _request.traderCollateralDelta)
+                    ? _position.traderCollateral - _request.traderCollateralDelta
+                    : 0;
+            }
+
+            // Update puppet position size
+            if (_request.traderTargetLeverage > 0) {
+                if (_request.traderIsIncrease) {
+                    _position.size += _request.sizeDelta;
+                } else {
+                    _position.size = (_position.size > _request.sizeDelta) ? _position.size - _request.sizeDelta : 0;
+                }
+            }
+
+            if (_position.size == 0) {
+                delete positionMap[_request.allocationAddress];
+                _logEvent(
+                    "Execute",
+                    abi.encode(
+                        _request.allocationAddress,
+                        _requestKey,
+                        _position.traderSize,
+                        _position.traderCollateral,
+                        0,
+                        _request.traderTargetLeverage
+                    )
+                );
+            } else {
+                positionMap[_request.allocationAddress] = _position;
+                _logEvent(
+                    "Execute",
+                    abi.encode(
+                        _request.allocationAddress,
+                        _requestKey,
+                        _position.traderSize,
+                        _position.traderCollateral,
+                        _position.size,
+                        _request.traderTargetLeverage
+                    )
+                );
             }
         } else if (GmxPositionUtils.isLiquidateOrder(GmxPositionUtils.OrderType(order.numbers.orderType))) {
-            try this.liquidate(order.addresses.account) {}
-            catch (bytes memory err) {
-                _storeUnhandledCallback(key, err);
-            }
+            address _allocationAddress = requestAdjustmentMap[_requestKey].allocationAddress;
+
+            Position memory _position = positionMap[_allocationAddress];
+            require(_position.size > 0, Error.MirrorPosition__PositionNotFound(_allocationAddress));
+
+            delete positionMap[_allocationAddress];
+
+            _logEvent("Liquidate", abi.encode(_allocationAddress));
         } else {
-            _storeUnhandledCallback(key, "Invalid order type");
+            _storeUnhandledCallback(_requestKey, "Invalid order type");
         }
     }
 
