@@ -9,6 +9,7 @@ library Error {
     error TransferUtils__EmptyHoldingAddress();
     error TransferUtils__SafeERC20FailedOperation(IERC20 token);
     error TransferUtils__InvalidReceiver();
+    error TransferUtils__EmptyTokenTransferGasLimit(IERC20 token);
 
     event TransferUtils__TokenTransferReverted(string reason, bytes returndata);
 

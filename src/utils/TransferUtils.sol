@@ -8,23 +8,25 @@ import {IWNT} from "./interfaces/IWNT.sol";
 
 /**
  * @title TransferUtils
- * @dev Library for token functions, helps with transferring of tokens and
- * native token functions
+ * @dev Library for secure token transfers with gas limiting and fallback mechanisms.
+ * Provides functions for both ERC20 tokens and native token operations with protection
+ * against gas griefing attacks and fallback handling for blacklisted receivers.
  */
 library TransferUtils {
     /**
-     * @dev Deposits the specified amount of native token and sends the
-     * corresponding amount of wrapped native token to the specified receiver address.
+     * @dev Sends native token to receiver with fallback to wrapped token transfer.
+     * First attempts direct native token transfer, if that fails, wraps the token
+     * and sends wrapped tokens using the fallback mechanism.
      *
-     * @param wnt the address of the wrapped native token contract
-     * @param holdingAddress the address of the holding account where the native token is held
-     * @param gasLimit the maximum amount of gas that the native token transfer can consume
-     * @param receiver the address of the recipient of the wrapped native token transfer
-     * @param amount the amount of native token to deposit and the amount of wrapped native token to send
+     * @param wnt The wrapped native token contract
+     * @param holdingAddress Fallback address if receiver transfer fails
+     * @param gasLimit Maximum gas for the native token transfer
+     * @param receiver Recipient of the native/wrapped token transfer
+     * @param amount Amount of native token to send
      */
     function sendNativeToken(IWNT wnt, address holdingAddress, uint gasLimit, address receiver, uint amount) internal {
         if (amount == 0) return;
-        validateDestination(receiver);
+        require(receiver != address(0), Error.TransferUtils__InvalidReceiver());
 
         bool success;
         // use an assembly call to avoid loading large data into memory
@@ -50,15 +52,15 @@ library TransferUtils {
     }
 
     /**
-     * Deposits the specified amount of native token and sends the specified
-     * amount of wrapped native token to the specified receiver address.
+     * @dev Deposits native token and transfers wrapped tokens with fallback protection.
+     * Wraps the native token and uses the secure transfer mechanism with fallback
+     * to prevent gaming through reverting transfers.
      *
-     * @param wnt the address of the wrapped native token contract
-     * @param holdingAddress in case transfers to the receiver fail due to blacklisting or other reasons
-     *  send the tokens to a holding address to avoid possible gaming through reverting
-     * @param gasLimit the maximum amount of gas that the native token transfer can consume
-     * @param receiver the address of the recipient of the wrapped native token transfer
-     * @param amount the amount of native token to deposit and the amount of wrapped native token to send
+     * @param wnt The wrapped native token contract
+     * @param holdingAddress Fallback address for failed transfers (prevents gaming)
+     * @param gasLimit Maximum gas for token transfers
+     * @param receiver Primary recipient of wrapped tokens
+     * @param amount Amount to deposit and transfer
      */
     function depositAndSendWnt(
         IWNT wnt,
@@ -68,7 +70,7 @@ library TransferUtils {
         uint amount
     ) internal {
         if (amount == 0) return;
-        validateDestination(receiver);
+        require(receiver != address(0), Error.TransferUtils__InvalidReceiver());
 
         wnt.deposit{value: amount}();
 
@@ -76,19 +78,16 @@ library TransferUtils {
     }
 
     /**
-     * @dev Withdraws the specified amount of wrapped native token and sends the
-     * corresponding amount of native token to the specified receiver address.
+     * @dev Withdraws wrapped tokens and sends native tokens with fallback protection.
+     * Unwraps tokens and attempts native transfer. If native transfer fails,
+     * re-wraps and sends wrapped tokens to prevent gaming through reverting.
+     * Gas limit prevents griefing attacks.
      *
-     * limit the amount of gas forwarded so that a user cannot intentionally
-     * construct a token call that would consume all gas and prevent necessary
-     * actions like request cancellation from being executed
-     *
-     * @param wnt the address of the WNT contract to withdraw the wrapped native token from
-     * * @param gasLimit the maximum amount of gas that the native token transfer can consume
-     * @param holdingAddress in case transfers to the receiver fail due to blacklisting or other reasons
-     *  send the tokens to a holding address to avoid possible gaming through reverting
-     * @param receiver the address of the recipient of the native token transfer
-     * @param amount the amount of wrapped native token to withdraw and the amount of native token to send
+     * @param wnt The wrapped native token contract
+     * @param gasLimit Maximum gas for native token transfer (prevents griefing)
+     * @param holdingAddress Fallback address for failed transfers (prevents gaming)
+     * @param receiver Primary recipient of native tokens
+     * @param amount Amount to withdraw and send
      */
     function withdrawAndSendNativeToken(
         IWNT wnt,
@@ -98,7 +97,7 @@ library TransferUtils {
         uint amount
     ) internal {
         if (amount == 0) return;
-        validateDestination(receiver);
+        require(receiver != address(0), Error.TransferUtils__InvalidReceiver());
 
         wnt.withdraw(amount);
 
@@ -126,17 +125,16 @@ library TransferUtils {
     }
 
     /**
-     * @dev Transfers the specified amount of `token` from the caller to `receiver`.
-     * limit the amount of gas forwarded so that a user cannot intentionally
-     * construct a token call that would consume all gas and prevent necessary
-     * actions like request cancellation from being executed
+     * @dev Securely transfers ERC20 tokens with fallback mechanism.
+     * Attempts transfer to primary receiver first. If that fails (e.g. blacklisting),
+     * transfers to holding address to prevent gaming through reverting transactions.
+     * Gas limiting prevents griefing attacks.
      *
-     * @param gasLimit The maximum amount of gas that the token transfer can consume.
-     * @param holdingAddress in case transfers to the receiver fail due to blacklisting or other reasons
-     *  send the tokens to a holding address to avoid possible gaming through reverting
-     * @param token The address of the ERC20 token that is being transferred.
-     * @param receiver The address of the recipient of the `token` transfer.
-     * @param amount The amount of `token` to transfer.
+     * @param gasLimit Maximum gas for token transfers (prevents griefing)
+     * @param holdingAddress Fallback address for failed transfers (prevents gaming)
+     * @param token The ERC20 token contract
+     * @param receiver Primary recipient of tokens
+     * @param amount Amount of tokens to transfer
      */
     function transferWithFallback(
         uint gasLimit,
@@ -146,7 +144,9 @@ library TransferUtils {
         uint amount
     ) internal {
         if (amount == 0) return;
-        validateDestination(receiver);
+        require(receiver != address(0), Error.TransferUtils__InvalidReceiver());
+
+        require(gasLimit > 0, Error.TransferUtils__EmptyTokenTransferGasLimit(token));
 
         // Try transfer to primary receiver using improved internal method
         if (_callOptionalReturnBool(gasLimit, token, abi.encodeCall(token.transfer, (receiver, amount)))) {
@@ -163,8 +163,14 @@ library TransferUtils {
     }
 
     /**
-     * @dev Transfer `value` amount of `token` from the calling contract to `to`. If `token` returns no value,
-     * non-reverting calls are assumed to be successful. Reverts on transfer failure.
+     * @dev Strictly transfers ERC20 tokens with gas limiting.
+     * Handles both returning and non-returning ERC20 tokens correctly.
+     * Reverts if transfer fails - no fallback mechanism.
+     *
+     * @param gasLimit Maximum gas for the transfer
+     * @param token The ERC20 token contract
+     * @param to Recipient address
+     * @param value Amount to transfer
      */
     function transferStrictly(uint gasLimit, IERC20 token, address to, uint value) internal {
         require(
@@ -174,8 +180,15 @@ library TransferUtils {
     }
 
     /**
-     * @dev Transfer `value` amount of `token` from `from` to `to`, spending the approval given by `from` to the
-     * calling contract. If `token` returns no value, non-reverting calls are assumed to be successful.
+     * @dev Strictly transfers ERC20 tokens using transferFrom with gas limiting.
+     * Handles both returning and non-returning ERC20 tokens correctly.
+     * Reverts if transfer fails - no fallback mechanism.
+     *
+     * @param gasLimit Maximum gas for the transfer
+     * @param token The ERC20 token contract
+     * @param from Address to transfer from (must have approved this contract)
+     * @param to Recipient address
+     * @param value Amount to transfer
      */
     function transferStrictlyFrom(uint gasLimit, IERC20 token, address from, address to, uint value) internal {
         require(
@@ -185,57 +198,13 @@ library TransferUtils {
     }
 
     /**
-     * @dev Transfers the specified amount of ERC20 token to the specified receiver
-     * address, with a gas limit to prevent the transfer from consuming all available gas.
-     * adapted from
-     * https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol
+     * @dev Internal function for secure ERC20 calls that reverts on failure.
+     * Handles both returning and non-returning ERC20 tokens. Based on OpenZeppelin's SafeERC20.
+     * Reverts if the call fails or returns false.
      *
-     * @param token the ERC20 contract to transfer the tokens from
-     * @param to the address of the recipient of the token transfer
-     * @param amount the amount of tokens to transfer
-     * @param gasLimit the maximum amount of gas that the token transfer can consume
-     * @return a tuple containing a boolean indicating the success or failure of the
-     * token transfer, and a bytes value containing the return data from the token transfer
-     */
-    function nonRevertingTransferWithGasLimit(
-        IERC20 token,
-        address to,
-        uint amount,
-        uint gasLimit
-    ) internal returns (bool, bytes memory) {
-        bytes memory data = abi.encodeWithSelector(token.transfer.selector, to, amount);
-        (bool success, bytes memory returndata) = address(token).call{gas: gasLimit}(data);
-
-        if (success) {
-            if (returndata.length == 0) {
-                // only check isContract if the call was successful and the return data is empty
-                // otherwise we already know that it was a contract
-                if (isContract(address(token)) == false) {
-                    return (false, "Call to non-contract");
-                }
-            }
-
-            // some tokens do not revert on a failed transfer, they will return a boolean instead
-            // validate that the returned boolean is true, otherwise indicate that the token transfer failed
-            if (returndata.length > 0 && !abi.decode(returndata, (bool))) {
-                return (false, returndata);
-            }
-
-            // transfers on some tokens do not return a boolean value, they will just revert if a transfer fails
-            // for these tokens, if success is true then the transfer should have completed
-            return (true, returndata);
-        }
-
-        return (false, returndata);
-    }
-
-    /**
-     * @dev Imitates a Solidity high-level call (i.e. a regular function call to a contract), relaxing the requirement
-     * on the return value: the return value is optional (but if data is returned, it must not be false).
-     * @param token The token targeted by the call.
-     * @param data The call data (encoded using abi.encode or one of its variants).
-     *
-     * This is a variant of {_callOptionalReturnBool} that reverts if call fails to meet the requirements.
+     * @param gasLimit Maximum gas for the call
+     * @param token The ERC20 token contract
+     * @param data The encoded call data (e.g., transfer, transferFrom)
      */
     function _callOptionalReturn(uint gasLimit, IERC20 token, bytes memory data) private {
         uint returnSize;
@@ -258,12 +227,14 @@ library TransferUtils {
     }
 
     /**
-     * @dev Imitates a Solidity high-level call (i.e. a regular function call to a contract), relaxing the requirement
-     * on the return value: the return value is optional (but if data is returned, it must not be false).
-     * @param token The token targeted by the call.
-     * @param data The call data (encoded using abi.encode or one of its variants).
+     * @dev Internal function for secure ERC20 calls that returns success status.
+     * Handles both returning and non-returning ERC20 tokens. Based on OpenZeppelin's SafeERC20.
+     * Returns false if the call fails or returns false, true otherwise.
      *
-     * This is a variant of {_callOptionalReturn} that silently catches all reverts and returns a bool instead.
+     * @param gasLimit Maximum gas for the call
+     * @param token The ERC20 token contract
+     * @param data The encoded call data (e.g., transfer, transferFrom)
+     * @return success True if call succeeded and returned true (or no data), false otherwise
      */
     function _callOptionalReturnBool(uint gasLimit, IERC20 token, bytes memory data) private returns (bool) {
         bool success;
@@ -275,31 +246,5 @@ library TransferUtils {
             returnValue := mload(0)
         }
         return success && (returnSize == 0 ? address(token).code.length > 0 : returnValue == 1);
-    }
-
-    // validateDestination
-    /**
-     * @dev Validates that the destination address is not the zero address.
-     * @param receiver The address to validate.
-     */
-    function validateDestination(
-        address receiver
-    ) internal pure {
-        require(receiver != address(0), Error.TransferUtils__InvalidReceiver());
-    }
-
-    /**
-     * @dev Checks if the given address is a contract.
-     * @param account The address to check.
-     * @return True if the address is a contract, false otherwise.
-     */
-    function isContract(
-        address account
-    ) internal view returns (bool) {
-        uint size;
-        assembly ("memory-safe") {
-            size := extcodesize(account)
-        }
-        return size > 0;
     }
 }
