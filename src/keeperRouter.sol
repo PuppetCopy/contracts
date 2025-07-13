@@ -19,7 +19,6 @@ import {IAuthority} from "./utils/interfaces/IAuthority.sol";
  */
 contract KeeperRouter is CoreContract, ReentrancyGuardTransient {
     MatchingRule public immutable matchingRule;
-    FeeMarketplace public immutable feeMarketplace;
     MirrorPosition public immutable mirrorPosition;
     Allocation public immutable allocation;
 
@@ -27,17 +26,14 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient {
         IAuthority _authority,
         MirrorPosition _mirrorPosition,
         MatchingRule _matchingRule,
-        FeeMarketplace _feeMarketplace,
         Allocation _allocation
     ) CoreContract(_authority) {
         require(address(_mirrorPosition) != address(0), "MirrorPosition not set correctly");
         require(address(_matchingRule) != address(0), "MatchingRule not set correctly");
-        require(address(_feeMarketplace) != address(0), "FeeMarketplace not set correctly");
         require(address(_allocation) != address(0), "Allocation not set correctly");
 
         mirrorPosition = _mirrorPosition;
         matchingRule = _matchingRule;
-        feeMarketplace = _feeMarketplace;
         allocation = _allocation;
     }
 

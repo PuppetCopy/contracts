@@ -120,9 +120,7 @@ contract Allocation is CoreContract {
         bytes32 _allocationKey =
             PositionUtils.getAllocationKey(_params.puppetList, _traderMatchingKey, _params.allocationId);
 
-        _allocationAddress =
-            Clones.predictDeterministicAddress(allocationAccountImplementation, _allocationKey, address(this));
-        Clones.cloneDeterministic(allocationAccountImplementation, _allocationKey);
+        _allocationAddress = Clones.cloneDeterministic(allocationAccountImplementation, _allocationKey);
 
         // Get rules and balances
         MatchingRule.Rule[] memory _rules = _matchingRule.getRuleList(_traderMatchingKey, _params.puppetList);
