@@ -46,9 +46,12 @@
 //         uint amount = 100e18; // The locked amount
 
 //         assertEq(veLogic.getVestedBonus(amount, 0), 0, "Bonus amount should be zero for zero duration");
-//         assertEq(veLogic.getVestedBonus(amount, MAXTIME / 2), 2.5e18, "Bonus amount should be zero for half duration");
-//         assertEq(veLogic.getVestedBonus(amount, 1 * MAXTIME), 10e18, "Bonus amount should be zero for full duration");
-//         assertEq(veLogic.getVestedBonus(amount, 2 * MAXTIME), 40e18, "Bonus amount should be zero for double duration");
+//         assertEq(veLogic.getVestedBonus(amount, MAXTIME / 2), 2.5e18, "Bonus amount should be zero for half
+// duration");
+//         assertEq(veLogic.getVestedBonus(amount, 1 * MAXTIME), 10e18, "Bonus amount should be zero for full
+// duration");
+//         assertEq(veLogic.getVestedBonus(amount, 2 * MAXTIME), 40e18, "Bonus amount should be zero for double
+// duration");
 //     }
 
 //     function testLock() public {
@@ -101,7 +104,8 @@
 //         assertEq(veLogic.getClaimable(users.alice), 0, "Alice should have no claimable tokens after claiming");
 
 //         // Check that Alice received her tokens
-//         assertEq(puppetToken.balanceOf(users.alice), claimableAmount, "Alice should have received her claimed tokens");
+//         assertEq(puppetToken.balanceOf(users.alice), claimableAmount, "Alice should have received her claimed
+// tokens");
 //     }
 
 //     function testRelockAndClaim() public {
@@ -137,7 +141,8 @@
 //         veRouter.claim(amount);
 
 //         assertEq(vPuppetToken.totalSupply(), 0, "vPuppet supply should be back to 0 after burning");
-//         assertEq(puppetToken.balanceOf(users.alice), amount + bonus, "Alice should have received her claimed tokens");
+//         assertEq(puppetToken.balanceOf(users.alice), amount + bonus, "Alice should have received her claimed
+// tokens");
 //     }
 
 //     function testLockExceedMaxTimeReverts() public {

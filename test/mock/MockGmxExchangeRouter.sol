@@ -64,8 +64,8 @@ contract MockGmxExchangeRouter is IGmxExchangeRouter {
     }
 
     function claimFundingFees(
-        address[] memory /* markets */,
-        address[] memory /* tokens */,
+        address[] memory, /* markets */
+        address[] memory, /* tokens */
         address /* receiver */
     ) external payable override returns (uint[] memory) {
         // Left unimplemented for brevity
@@ -73,8 +73,8 @@ contract MockGmxExchangeRouter is IGmxExchangeRouter {
     }
 
     function claimAffiliateRewards(
-        address[] memory /* markets */,
-        address[] memory /* tokens */,
+        address[] memory, /* markets */
+        address[] memory, /* tokens */
         address /* receiver */
     ) external payable override returns (uint[] memory) {
         // Left unimplemented for brevity

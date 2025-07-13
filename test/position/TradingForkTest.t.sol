@@ -12,15 +12,12 @@ import {Allocation} from "src/position/Allocation.sol";
 import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
-import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
-import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {AllocationStore} from "src/shared/AllocationStore.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
-import {Error} from "src/utils/Error.sol";
 
 /**
  * @title Trading Fork Test

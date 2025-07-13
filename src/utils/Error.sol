@@ -3,8 +3,6 @@ pragma solidity ^0.8.29;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {GmxPositionUtils} from "../position/utils/GmxPositionUtils.sol";
-
 library Error {
     error CallUtils__EmptyReceiver();
     error CallUtils__AddressEmptyCode(address target);

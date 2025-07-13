@@ -4,9 +4,7 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {TokenRouter} from "../shared/TokenRouter.sol";
 import {PuppetToken} from "../tokenomics/PuppetToken.sol";
-import {BankStore} from "../utils/BankStore.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
 import {Precision} from "../utils/Precision.sol";
@@ -110,7 +108,7 @@ contract FeeMarketplace is CoreContract {
      */
     function deposit(IERC20 _feeToken, address _depositor, uint _amount) external auth {
         require(_amount > 0, Error.FeeMarketplace__ZeroDeposit());
-        
+
         _updateUnlockedBalance(_feeToken);
 
         store.transferIn(_feeToken, _depositor, _amount);

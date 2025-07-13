@@ -1,15 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.29;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
-import {TokenRouter} from "src/shared/TokenRouter.sol";
-import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
-import {BankStore} from "src/utils/BankStore.sol";
 import {Error} from "src/utils/Error.sol";
-import {IAuthority} from "src/utils/interfaces/IAuthority.sol";
 
 import {BasicSetup} from "../base/BasicSetup.t.sol";
 
@@ -286,7 +280,7 @@ contract FeeMarketplaceTest is BasicSetup {
         // With the new deposit signature, zero amounts should be handled gracefully
         // The transfer layer silently returns on zero amounts
         feeMarketplace.deposit(usdc, users.owner, 0);
-        
+
         // Verify no tokens were actually deposited
         assertEq(usdc.balanceOf(address(feeMarketplaceStore)), 0, "No tokens should be deposited for zero amount");
     }

@@ -24,8 +24,10 @@
 //         // However, an attacker (some authorized protocol) called Bob front-runs the call to the mint function
 //         puppetToken.mint(users.bob, 0); // This resets the lastMintTime which means that the call now should revert
 
-//         // Normally Alice should be Able to mint up to 4 * getEmissionRateLimit(). but it doesnt work since _decayRate
-//         // is now equal to 0. Alice can only mint a max equal to getEmissionRateLimit() even after 3 epochs of nothing
+//         // Normally Alice should be Able to mint up to 4 * getEmissionRateLimit(). but it doesnt work since
+// _decayRate
+//         // is now equal to 0. Alice can only mint a max equal to getEmissionRateLimit() even after 3 epochs of
+// nothing
 //         // minted
 //         uint amountToMint = 2 * puppetToken.getEmissionRateLimit();
 //         vm.expectRevert(

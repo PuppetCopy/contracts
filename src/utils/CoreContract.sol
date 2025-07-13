@@ -3,7 +3,6 @@ pragma solidity ^0.8.29;
 
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
-import {Error} from "../utils/Error.sol";
 import {Permission} from "./auth/Permission.sol";
 import {IAuthority} from "./interfaces/IAuthority.sol";
 

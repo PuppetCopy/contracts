@@ -9,7 +9,7 @@ interface IGmxExchangeRouter {
         bytes[] calldata data
     ) external payable returns (bytes[] memory results);
 
-        function sendWnt(address receiver, uint amount) external payable;
+    function sendWnt(address receiver, uint amount) external payable;
     function sendNativeToken(address receiver, uint amount) external payable;
     /// @dev Sends the given amount of tokens to the given address
     function sendTokens(address token, address receiver, uint amount) external payable;

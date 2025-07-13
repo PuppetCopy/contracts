@@ -5,7 +5,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {BankStore} from "./../utils/BankStore.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
-import {AllocationAccount} from "./AllocationAccount.sol";
 import {TokenRouter} from "./TokenRouter.sol";
 
 contract AllocationStore is BankStore {

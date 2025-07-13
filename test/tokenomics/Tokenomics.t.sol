@@ -93,7 +93,8 @@
 //         dictator.initContract(
 //             tokenomicsRouter,
 //             abi.encode(
-//                 TokenomicsRouter.Config({contributeLogic: contributeLogic, rewardLogic: rewardLogic, veLogic: veLogic})
+//                 TokenomicsRouter.Config({contributeLogic: contributeLogic, rewardLogic: rewardLogic, veLogic:
+// veLogic})
 //             )
 //         );
 //     }
@@ -232,7 +233,8 @@
 //         // Claim rewards after lock expired
 //         uint rewardsAfterUnlock = rewardLogic.getClaimable(users.alice);
 //         claimAssert(users.alice, rewardsAfterUnlock);
-//         assertEq(rewardLogic.getClaimable(users.alice), 0, "Alice should have claimed all rewards after lock expired");
+//         assertEq(rewardLogic.getClaimable(users.alice), 0, "Alice should have claimed all rewards after lock
+// expired");
 //     }
 
 //     function testLockRewardsWithRewardPerTokenCalculation() public {

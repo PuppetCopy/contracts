@@ -7,9 +7,7 @@ import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/Reentrancy
 import {Allocation} from "./position/Allocation.sol";
 import {MatchingRule} from "./position/MatchingRule.sol";
 import {MirrorPosition} from "./position/MirrorPosition.sol";
-import {PositionUtils} from "./position/utils/PositionUtils.sol";
 import {AllocationAccount} from "./shared/AllocationAccount.sol";
-import {AllocationStore} from "./shared/AllocationStore.sol";
 import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
