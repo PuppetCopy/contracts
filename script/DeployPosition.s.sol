@@ -224,8 +224,20 @@ contract DeployPosition is BaseScript {
     ) internal returns (KeeperRouter) {
         console.log("\n--- Deploying KeeperRouter ---");
 
-        // Deploy contract
-        KeeperRouter keeperRouter = new KeeperRouter(dictator, mirrorPosition, matchingRule, allocate, settle);
+        // Deploy contract with empirical gas configuration
+        KeeperRouter keeperRouter = new KeeperRouter(
+            dictator, 
+            mirrorPosition, 
+            matchingRule, 
+            allocate, 
+            settle,
+            KeeperRouter.Config({
+                mirrorBaseGasLimit: 1_300_853,  // Based on empirical single-puppet test  
+                mirrorPerPuppetGasLimit: 30_000, // Conservative estimate for additional puppets
+                adjustBaseGasLimit: 910_663,     // Keep existing (need adjust operation analysis)
+                adjustPerPuppetGasLimit: 3_412   // Keep existing (need adjust operation analysis)
+            })
+        );
         console.log("KeeperRouter deployed at:", address(keeperRouter));
 
         // Set up permissions for KeeperRouter to call other contracts

@@ -20,27 +20,44 @@ import {IAuthority} from "./utils/interfaces/IAuthority.sol";
  * @dev Separates keeper operations from user operations for better security and access control
  */
 contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallbackReceiver {
+    struct Config {
+        uint mirrorBaseGasLimit;
+        uint mirrorPerPuppetGasLimit;
+        uint adjustBaseGasLimit;
+        uint adjustPerPuppetGasLimit;
+    }
+
     MatchingRule public immutable matchingRule;
     MirrorPosition public immutable mirrorPosition;
     Allocate public immutable allocate;
     Settle public immutable settle;
+    
+    Config public gasConfig;
 
     constructor(
         IAuthority _authority,
         MirrorPosition _mirrorPosition,
         MatchingRule _matchingRule,
         Allocate _allocate,
-        Settle _settle
+        Settle _settle,
+        Config memory _config
     ) CoreContract(_authority) {
         require(address(_mirrorPosition) != address(0), "MirrorPosition not set correctly");
         require(address(_matchingRule) != address(0), "MatchingRule not set correctly");
         require(address(_allocate) != address(0), "Allocate not set correctly");
         require(address(_settle) != address(0), "Settle not set correctly");
+        require(_config.mirrorBaseGasLimit > 0, "Invalid mirror base gas limit");
+        require(_config.mirrorPerPuppetGasLimit > 0, "Invalid mirror per-puppet gas limit");
+        require(_config.adjustBaseGasLimit > 0, "Invalid adjust base gas limit");
+        require(_config.adjustPerPuppetGasLimit > 0, "Invalid adjust per-puppet gas limit");
 
         mirrorPosition = _mirrorPosition;
         matchingRule = _matchingRule;
         allocate = _allocate;
         settle = _settle;
+        
+        // Set gas configuration directly
+        gasConfig = _config;
     }
 
     /**
@@ -112,22 +129,36 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
     }
 
     /**
-     * @notice Get configuration (empty for KeeperRouter)
-     * @dev Required by Dictatorship.initContract but not used by KeeperRouter
+     * @notice Get gas configuration for keeper operations
+     * @return Current gas configuration
      */
-    function config() external pure returns (bytes memory) {
-        return "";
+    function getConfig() external view returns (Config memory) {
+        return gasConfig;
     }
 
     /**
-     * @notice Internal function to set configuration (not used but required by CoreContract)
-     * @dev RouterKeeper doesn't have its own configuration
+     * @notice Get configuration as bytes (required by CoreContract)
+     * @return ABI-encoded configuration data
+     */
+    function config() external view returns (bytes memory) {
+        return abi.encode(gasConfig);
+    }
+
+    /**
+     * @notice Internal function to set gas configuration
+     * @param _data Encoded configuration data containing the Config struct
      */
     function _setConfig(
-        bytes memory
+        bytes memory _data
     ) internal override {
-        // RouterKeeper doesn't have configuration to set
-        // This function is required by CoreContract but not used
+        Config memory _config = abi.decode(_data, (Config));
+        
+        require(_config.mirrorBaseGasLimit > 0, "Invalid mirror base gas limit");
+        require(_config.mirrorPerPuppetGasLimit > 0, "Invalid mirror per-puppet gas limit");
+        require(_config.adjustBaseGasLimit > 0, "Invalid adjust base gas limit");
+        require(_config.adjustPerPuppetGasLimit > 0, "Invalid adjust per-puppet gas limit");
+        
+        gasConfig = _config;
     }
 
     /**

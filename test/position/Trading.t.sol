@@ -102,7 +102,19 @@ contract TradingTest is BasicSetup {
             })
         );
 
-        keeperRouter = new KeeperRouter(dictator, mirrorPosition, matchingRule, allocate, settle);
+        keeperRouter = new KeeperRouter(
+            dictator, 
+            mirrorPosition, 
+            matchingRule, 
+            allocate, 
+            settle,
+            KeeperRouter.Config({
+                mirrorBaseGasLimit: 1_300_853,  // Based on empirical single-puppet test
+                mirrorPerPuppetGasLimit: 30_000, // Conservative estimate for additional puppets
+                adjustBaseGasLimit: 910_663,     // Keep existing (need adjust operation analysis)
+                adjustPerPuppetGasLimit: 3_412   // Keep existing (need adjust operation analysis)
+            })
+        );
 
         // Set up permissions for owner to act on behalf of users
         dictator.setAccess(allocationStore, address(matchingRule));
