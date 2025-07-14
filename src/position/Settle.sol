@@ -136,8 +136,7 @@ contract Settle is CoreContract {
         );
 
         require(
-            _callParams.keeperExecutionFee
-                < Precision.applyFactor(config.maxKeeperFeeToSettleRatio, _recordedAmountIn),
+            _callParams.keeperExecutionFee < Precision.applyFactor(config.maxKeeperFeeToSettleRatio, _recordedAmountIn),
             Error.Allocation__KeeperFeeExceedsSettledAmount(_callParams.keeperExecutionFee, _recordedAmountIn)
         );
 

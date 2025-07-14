@@ -101,10 +101,10 @@ library Error {
     error Allocation__KeeperFeeNotFullyCovered(uint totalPaid, uint requiredFee);
     error Allocation__InsufficientAllocationForKeeperFee(uint allocation, uint keeperFee);
 
-    error GmxExecutionCallback__FailedRefundExecutionFee();
-
     error AllocationAccount__UnauthorizedOperator();
     error AllocationAccount__InsufficientBalance();
+
+    error KeeperRouter__FailedRefundExecutionFee();
 
     error FeeMarketplace__NotAuctionableToken();
     error FeeMarketplace__InsufficientUnlockedBalance(uint accruedReward);

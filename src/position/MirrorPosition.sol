@@ -56,6 +56,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
         uint sizeDeltaInUsd;
         uint acceptablePrice;
         uint triggerPrice;
+        bytes32 requestKey;
     }
 
     Config public config;
@@ -271,7 +272,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
 
     /**
      * @notice Finalizes the state update after a GMX order execution.
-     * @dev This function is called by the `GmxExecutionCallback` contract via its `afterOrderExecution` function,
+     * @dev This function is called by the `KeeperRouter` contract via its `afterOrderExecution` function,
      * which is triggered by GMX's callback mechanism upon successful order execution (increase or decrease).
      * It uses the GMX request key (`_requestKey`) to retrieve the details of the intended adjustment stored
      * during the `mirror` or `adjust` call. It updates the internal position state (`positionMap`) to reflect
@@ -366,7 +367,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
         uint _sizeDeltaUsd,
         uint _initialCollateralDeltaAmount,
         address _callbackContract
-    ) internal returns (bytes32 gmxRequestKey) {
+    ) internal returns (bytes32 requestKey) {
         require(
             msg.value >= _order.executionFee,
             Error.MirrorPosition__InsufficientGmxExecutionFee(msg.value, _order.executionFee)
@@ -412,8 +413,8 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
             ErrorUtils.revertWithParsedMessage(returnData);
         }
 
-        gmxRequestKey = abi.decode(returnData, (bytes32));
-        require(gmxRequestKey != bytes32(0), Error.MirrorPosition__OrderCreationFailed());
+        requestKey = abi.decode(returnData, (bytes32));
+        require(requestKey != bytes32(0), Error.MirrorPosition__OrderCreationFailed());
     }
 
     /**
@@ -435,19 +436,6 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
         require(_config.fallbackRefundExecutionFeeReceiver != address(0), "Invalid Refund Execution Fee Receiver");
 
         config = _config;
-    }
-
-    function refundExecutionFee(
-        bytes32 key,
-        GmxPositionUtils.EventLogData memory /*eventData*/
-    ) external payable auth {
-        require(msg.value > 0, "No execution fee to refund");
-
-        // Refund the execution fee to the configured receiver
-        (bool success,) = config.fallbackRefundExecutionFeeReceiver.call{value: msg.value}("");
-        require(success, Error.GmxExecutionCallback__FailedRefundExecutionFee());
-
-        _logEvent("RefundExecutionFee", abi.encode(key, msg.value));
     }
 
     function _storeUnhandledCallback(bytes32 _key, bytes memory error) internal {

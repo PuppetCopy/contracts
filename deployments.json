@@ -4,12 +4,14 @@
     "PuppetToken": "0x10f7F9e33FaF343F9CfE1c69b177ed86Bc760B4e",
     "TokenRouter": "0xB2cD2387f93A8dc25498425b0F60C409d78331E0",
     "RouterProxy": "0x2793FF9b6B6CaDe1360427eb53db3E411da9555A",
-    "AllocationStore": "0xD737388C88b1d0bfA56c0753476B0d2Aa755C6A1",
+    "AllocationStore": "0x03a7942ec263b4ff08b3cf1b8d821e1ec1401377",
     "FeeMarketplaceStore": "0xAf97414983197b30485828ddb3De60134871dBe2",
     "FeeMarketplace": "0x1290fE1CC845D9D564183d3d8C65122DCf908ED5",
-    "MatchingRule": "0x5ED59b1212b49261Dbc5669178B5692Ae34a24e5",
-    "MirrorPosition": "0x74816B0a5082c88c0A7016e889857e7093852C76",
-    "GmxExecutionCallback": "0xE45C136247d0F0D1cfaa43781D05Eb756A75F8F0",
+    "MatchingRule": "0x27eb729ce87490251efb912b843f735d8cc48ea8",
+    "MirrorPosition": "0xcc223421f519cdfe8e570cba22edc4168c57de9d",
+    "Allocate": "0x7af02f2c8917617d034117bfe93c98740b6fd050",
+    "Settle": "0xb5c9e474ff4621f3bad1be816dde38999b21920e",
+    "KeeperRouter": "0x136bb60b7e1f81dbe11128a2567b059c008b8ad3",
     "Router": "0x94e58f4eDb5134C8e6885516857536580dacCc18"
   }
 }

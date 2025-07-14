@@ -7,18 +7,20 @@ import {console} from "forge-std/src/console.sol";
 
 import {Const} from "script/Const.sol";
 
-import {KeeperRouter} from "src/keeperRouter.sol";
 import {UserRouter} from "src/UserRouter.sol";
+import {KeeperRouter} from "src/keeperRouter.sol";
 import {Allocate} from "src/position/Allocate.sol";
-import {Settle} from "src/position/Settle.sol";
+
 import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
+import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {AllocationStore} from "src/shared/AllocationStore.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
-import {TokenRouter} from "src/shared/TokenRouter.sol";
+
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
+import {TokenRouter} from "src/shared/TokenRouter.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 
 /**
@@ -77,7 +79,7 @@ abstract contract ForkTestBase is Test {
 
         // Fork Arbitrum at current block
         vm.createSelectFork(rpcUrl);
-        
+
         console.log("=== Fork Test Setup ===");
         console.log("Chain ID:", block.chainid);
         console.log("Block Number:", block.number);
@@ -91,7 +93,7 @@ abstract contract ForkTestBase is Test {
         _setupPermissions();
         _initializeContracts();
         _configureSystem();
-        
+
         vm.stopPrank();
 
         isSetupComplete = true;
@@ -132,7 +134,7 @@ abstract contract ForkTestBase is Test {
         USDC.approve(address(tokenRouter), puppet1Deposit);
         vm.prank(puppet1);
         userRouter.deposit(USDC, puppet1Deposit);
-        
+
         vm.prank(puppet2);
         USDC.approve(address(tokenRouter), puppet2Deposit);
         vm.prank(puppet2);
@@ -146,12 +148,7 @@ abstract contract ForkTestBase is Test {
      * @param throttlePeriod Activity throttle period in seconds
      * @param expiryPeriod Rule expiry period in seconds
      */
-    function setupTradingRules(
-        uint puppet1Rate,
-        uint puppet2Rate,
-        uint throttlePeriod,
-        uint expiryPeriod
-    ) internal {
+    function setupTradingRules(uint puppet1Rate, uint puppet2Rate, uint throttlePeriod, uint expiryPeriod) internal {
         require(isSetupComplete, "Setup not complete");
 
         vm.prank(puppet1);
@@ -192,10 +189,10 @@ abstract contract ForkTestBase is Test {
         dictator = new Dictatorship(owner);
         tokenRouter = new TokenRouter(dictator, TokenRouter.Config(200_000));
         puppetToken = new PuppetToken(owner);
-        
+
         allocationStore = new AllocationStore(dictator, tokenRouter);
         feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
-        
+
         feeMarketplace = new FeeMarketplace(
             dictator,
             puppetToken,
@@ -262,18 +259,19 @@ abstract contract ForkTestBase is Test {
         console.log("mirrorPerPuppetGas: 29124");
         console.log("adjustBaseGas: 910663");
         console.log("adjustPerPuppetGas: 3412");
-        
+
         keeperRouter = new KeeperRouter(
-            dictator, 
-            mirrorPosition, 
-            matchingRule, 
-            allocate, 
+            dictator,
+            mirrorPosition,
+            matchingRule,
+            allocate,
             settle,
             KeeperRouter.Config({
-                mirrorBaseGasLimit: 1_300_853,  // Based on empirical single-puppet test
+                mirrorBaseGasLimit: 1_300_853, // Based on empirical single-puppet test
                 mirrorPerPuppetGasLimit: 30_000, // Conservative estimate for additional puppets
-                adjustBaseGasLimit: 910_663,     // Keep existing (need adjust operation analysis)
-                adjustPerPuppetGasLimit: 3_412   // Keep existing (need adjust operation analysis)
+                adjustBaseGasLimit: 910_663, // Keep existing (need adjust operation analysis)
+                adjustPerPuppetGasLimit: 3_412, // Keep existing (need adjust operation analysis)
+                fallbackRefundExecutionFeeReceiver: owner
             })
         );
         userRouter = new UserRouter(matchingRule, feeMarketplace, allocate);
@@ -305,13 +303,13 @@ abstract contract ForkTestBase is Test {
         dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, address(keeperRouter));
-        dictator.setPermission(mirrorPosition, mirrorPosition.refundExecutionFee.selector, address(keeperRouter));
 
         // External permissions
         dictator.setPermission(keeperRouter, keeperRouter.requestMirror.selector, keeper);
         dictator.setPermission(keeperRouter, keeperRouter.requestAdjust.selector, keeper);
         dictator.setPermission(keeperRouter, keeperRouter.settleAllocation.selector, keeper);
         dictator.setPermission(keeperRouter, keeperRouter.collectDust.selector, keeper);
+        dictator.setPermission(keeperRouter, keeperRouter.refundExecutionFee.selector, address(keeperRouter));
 
         // Admin permissions
         dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, owner);
@@ -327,7 +325,6 @@ abstract contract ForkTestBase is Test {
         dictator.initContract(mirrorPosition);
         dictator.initContract(keeperRouter);
     }
-
 
     function _configureSystem() private {
         // Configure allowed tokens

@@ -12,6 +12,7 @@ import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackR
 import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
 import {AllocationAccount} from "./shared/AllocationAccount.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
+import {Error} from "./utils/Error.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
 /**
@@ -25,14 +26,15 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         uint mirrorPerPuppetGasLimit;
         uint adjustBaseGasLimit;
         uint adjustPerPuppetGasLimit;
+        address fallbackRefundExecutionFeeReceiver;
     }
 
     MatchingRule public immutable matchingRule;
     MirrorPosition public immutable mirrorPosition;
     Allocate public immutable allocate;
     Settle public immutable settle;
-    
-    Config public gasConfig;
+
+    Config public config;
 
     constructor(
         IAuthority _authority,
@@ -55,9 +57,9 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         matchingRule = _matchingRule;
         allocate = _allocate;
         settle = _settle;
-        
+
         // Set gas configuration directly
-        gasConfig = _config;
+        config = _config;
     }
 
     /**
@@ -133,15 +135,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
      * @return Current gas configuration
      */
     function getConfig() external view returns (Config memory) {
-        return gasConfig;
-    }
-
-    /**
-     * @notice Get configuration as bytes (required by CoreContract)
-     * @return ABI-encoded configuration data
-     */
-    function config() external view returns (bytes memory) {
-        return abi.encode(gasConfig);
+        return config;
     }
 
     /**
@@ -152,13 +146,13 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         bytes memory _data
     ) internal override {
         Config memory _config = abi.decode(_data, (Config));
-        
+
         require(_config.mirrorBaseGasLimit > 0, "Invalid mirror base gas limit");
         require(_config.mirrorPerPuppetGasLimit > 0, "Invalid mirror per-puppet gas limit");
         require(_config.adjustBaseGasLimit > 0, "Invalid adjust base gas limit");
         require(_config.adjustPerPuppetGasLimit > 0, "Invalid adjust per-puppet gas limit");
-        
-        gasConfig = _config;
+
+        config = _config;
     }
 
     /**
@@ -218,11 +212,12 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
      * @param eventData Additional event data from GMX
      */
     function refundExecutionFee(bytes32 key, GmxPositionUtils.EventLogData memory eventData) external payable auth {
-        // Forward the refund to MirrorPosition's fallback handler
-        // This maintains compatibility while allowing future improvements
-        (bool success,) = address(mirrorPosition).call{value: msg.value}(
-            abi.encodeWithSelector(MirrorPosition.refundExecutionFee.selector, key, eventData)
-        );
-        require(success, "Failed to forward execution fee refund");
+        require(msg.value > 0, "No execution fee to refund");
+
+        // Refund the execution fee to the configured receiver
+        (bool success,) = config.fallbackRefundExecutionFeeReceiver.call{value: msg.value}("");
+        require(success, Error.KeeperRouter__FailedRefundExecutionFee());
+
+        _logEvent("RefundExecutionFee", abi.encode(key, msg.value));
     }
 }

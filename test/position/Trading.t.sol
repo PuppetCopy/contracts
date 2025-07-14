@@ -103,16 +103,17 @@ contract TradingTest is BasicSetup {
         );
 
         keeperRouter = new KeeperRouter(
-            dictator, 
-            mirrorPosition, 
-            matchingRule, 
-            allocate, 
+            dictator,
+            mirrorPosition,
+            matchingRule,
+            allocate,
             settle,
             KeeperRouter.Config({
-                mirrorBaseGasLimit: 1_300_853,  // Based on empirical single-puppet test
+                mirrorBaseGasLimit: 1_300_853, // Based on empirical single-puppet test
                 mirrorPerPuppetGasLimit: 30_000, // Conservative estimate for additional puppets
-                adjustBaseGasLimit: 910_663,     // Keep existing (need adjust operation analysis)
-                adjustPerPuppetGasLimit: 3_412   // Keep existing (need adjust operation analysis)
+                adjustBaseGasLimit: 910_663, // Keep existing (need adjust operation analysis)
+                adjustPerPuppetGasLimit: 3_412, // Keep existing (need adjust operation analysis)
+                fallbackRefundExecutionFeeReceiver: address(0x9999)
             })
         );
 
@@ -231,7 +232,8 @@ contract TradingTest is BasicSetup {
             collateralDelta: 1000e30,
             sizeDeltaInUsd: 5000e30,
             acceptablePrice: 3000e30,
-            triggerPrice: 0
+            triggerPrice: 0,
+            requestKey: bytes32(0)
         });
 
         vm.deal(users.owner, 1 ether);
@@ -275,7 +277,8 @@ contract TradingTest is BasicSetup {
             collateralDelta: 1000e30,
             sizeDeltaInUsd: 5000e30,
             acceptablePrice: 3000e30,
-            triggerPrice: 0
+            triggerPrice: 0,
+            requestKey: bytes32(0)
         });
 
         vm.deal(users.owner, 1 ether);
@@ -311,7 +314,8 @@ contract TradingTest is BasicSetup {
             collateralDelta: 1000e30,
             sizeDeltaInUsd: 5000e30,
             acceptablePrice: 3000e30,
-            triggerPrice: 0
+            triggerPrice: 0,
+            requestKey: bytes32(0)
         });
 
         vm.deal(users.owner, 1 ether);
@@ -333,7 +337,8 @@ contract TradingTest is BasicSetup {
             collateralDelta: 100e30, // Small collateral increase
             sizeDeltaInUsd: 3000e30, // Large size increase (changes leverage)
             acceptablePrice: 3100e30,
-            triggerPrice: 0
+            triggerPrice: 0,
+            requestKey: bytes32(0)
         });
 
         Allocate.CallAllocation memory adjustAllocParams = Allocate.CallAllocation({
@@ -449,7 +454,8 @@ contract TradingTest is BasicSetup {
             collateralDelta: 1000e30,
             sizeDeltaInUsd: 5000e30,
             acceptablePrice: 3000e30,
-            triggerPrice: 0
+            triggerPrice: 0,
+            requestKey: bytes32(0)
         });
 
         vm.deal(users.owner, 1 ether);
@@ -487,7 +493,8 @@ contract TradingTest is BasicSetup {
             collateralDelta: 1000e30,
             sizeDeltaInUsd: 5000e30,
             acceptablePrice: 3000e30,
-            triggerPrice: 0
+            triggerPrice: 0,
+            requestKey: bytes32(0)
         });
 
         vm.deal(users.owner, 1 ether);
@@ -527,7 +534,8 @@ contract TradingTest is BasicSetup {
             collateralDelta: 1000e30,
             sizeDeltaInUsd: 5000e30,
             acceptablePrice: 3000e30,
-            triggerPrice: 0
+            triggerPrice: 0,
+            requestKey: bytes32(0)
         });
 
         vm.deal(users.owner, 1 ether);
@@ -600,7 +608,8 @@ contract TradingTest is BasicSetup {
             collateralDelta: 1000e30,
             sizeDeltaInUsd: 5000e30,
             acceptablePrice: 3000e30,
-            triggerPrice: 0
+            triggerPrice: 0,
+            requestKey: bytes32(0)
         });
 
         vm.deal(users.owner, 2 ether);
@@ -620,7 +629,8 @@ contract TradingTest is BasicSetup {
             collateralDelta: 300e30, // Remove some collateral
             sizeDeltaInUsd: 2000e30, // Reduce size
             acceptablePrice: 2900e30,
-            triggerPrice: 0
+            triggerPrice: 0,
+            requestKey: bytes32(0)
         });
 
         Allocate.CallAllocation memory adjustAllocParams = Allocate.CallAllocation({
@@ -691,7 +701,8 @@ contract TradingTest is BasicSetup {
             collateralDelta: 500e30,
             sizeDeltaInUsd: 2000e30,
             acceptablePrice: 3000e30,
-            triggerPrice: 0
+            triggerPrice: 0,
+            requestKey: bytes32(0)
         });
 
         vm.deal(users.owner, 2 ether);

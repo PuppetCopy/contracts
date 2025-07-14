@@ -8,7 +8,7 @@
     "test:fork": "forge test --match-contract TradingForkTest -vvvvv --fork-url=arbitrum",
     "build": "forge build --sizes",
     "build:prod": "FOUNDRY_PROFILE=prod forge build --sizes",
-    "script:deploy": "FOUNDRY_PROFILE=prod SCRIPT='DeployPosition' bun deploy.ts",
+    "script:deploy": "FOUNDRY_PROFILE=prod SCRIPT='DeployPosition' bun ./script/deploy.ts",
     "script:updateRouter": "FOUNDRY_PROFILE=prod forge script script/UpdateRouter.s.sol:UpdateRouter --broadcast --verify --rpc-url arbitrum -- --vvvvv",
     "docgen": "forge doc --out '.docgen' --build",
     "gas-report": "forge test --match-contract TradingTest --gas-report",

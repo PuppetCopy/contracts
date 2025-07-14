@@ -226,16 +226,17 @@ contract DeployPosition is BaseScript {
 
         // Deploy contract with empirical gas configuration
         KeeperRouter keeperRouter = new KeeperRouter(
-            dictator, 
-            mirrorPosition, 
-            matchingRule, 
-            allocate, 
+            dictator,
+            mirrorPosition,
+            matchingRule,
+            allocate,
             settle,
             KeeperRouter.Config({
-                mirrorBaseGasLimit: 1_300_853,  // Based on empirical single-puppet test  
+                mirrorBaseGasLimit: 1_300_853, // Based on empirical single-puppet test
                 mirrorPerPuppetGasLimit: 30_000, // Conservative estimate for additional puppets
-                adjustBaseGasLimit: 910_663,     // Keep existing (need adjust operation analysis)
-                adjustPerPuppetGasLimit: 3_412   // Keep existing (need adjust operation analysis)
+                adjustBaseGasLimit: 910_663, // Keep existing (need adjust operation analysis)
+                adjustPerPuppetGasLimit: 3_412, // Keep existing (need adjust operation analysis)
+                fallbackRefundExecutionFeeReceiver: Const.dao // Fallback receiver for execution fee refunds
             })
         );
         console.log("KeeperRouter deployed at:", address(keeperRouter));
@@ -250,13 +251,13 @@ contract DeployPosition is BaseScript {
         // Settle permissions
         dictator.setPermission(settle, settle.settle.selector, address(keeperRouter));
         dictator.setPermission(settle, settle.collectDust.selector, address(keeperRouter));
+        dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, Const.dao);
 
         // MirrorPosition permissions
         dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, address(keeperRouter));
-        dictator.setPermission(mirrorPosition, mirrorPosition.refundExecutionFee.selector, address(keeperRouter));
 
         // GMX callback permissions for KeeperRouter
         console.log("Setting up GMX callback permissions...");
@@ -269,6 +270,8 @@ contract DeployPosition is BaseScript {
         dictator.setPermission(keeperRouter, keeperRouter.afterOrderExecution.selector, Const.gmxLiquidationHandler);
         dictator.setPermission(keeperRouter, keeperRouter.afterOrderExecution.selector, Const.gmxAdlHandler);
 
+        dictator.setPermission(keeperRouter, keeperRouter.refundExecutionFee.selector, address(keeperRouter));
+
         // External keeper permissions
         console.log("Setting up external keeper permissions...");
         dictator.setPermission(keeperRouter, keeperRouter.requestMirror.selector, Const.keeper);
@@ -279,10 +282,6 @@ contract DeployPosition is BaseScript {
         // Initialize contract
         dictator.initContract(keeperRouter);
         console.log("KeeperRouter initialized and permissions configured");
-
-        // Dao permissions
-        console.log("Setting up DAO permissions...");
-        dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, Const.dao);
 
         return keeperRouter;
     }
@@ -340,7 +339,6 @@ contract DeployPosition is BaseScript {
         dictator.setPermission(newMirrorPosition, newMirrorPosition.requestAdjust.selector, address(keeperRouter));
         dictator.setPermission(newMirrorPosition, newMirrorPosition.execute.selector, address(keeperRouter));
         dictator.setPermission(newMirrorPosition, newMirrorPosition.liquidate.selector, address(keeperRouter));
-        dictator.setPermission(newMirrorPosition, newMirrorPosition.refundExecutionFee.selector, address(keeperRouter));
 
         console.log("MirrorPosition upgrade complete with KeeperRouter permissions");
         return newMirrorPosition;
