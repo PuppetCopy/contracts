@@ -57,7 +57,7 @@ contract FeeMarketplace is CoreContract {
     uint public distributionBalance;
 
     /// @notice Current marketplace settings
-    Config public config;
+    Config config;
 
     constructor(
         IAuthority _authority,
@@ -67,6 +67,10 @@ contract FeeMarketplace is CoreContract {
     ) CoreContract(_authority, abi.encode(_config)) {
         protocolToken = _protocolToken;
         store = _store;
+    }
+
+    function getConfig() external view returns (Config memory) {
+        return config;
     }
 
     /**

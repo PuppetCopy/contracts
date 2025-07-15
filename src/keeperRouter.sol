@@ -34,7 +34,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
     Allocate public immutable allocate;
     Settle public immutable settle;
 
-    Config public config;
+    Config config;
 
     constructor(
         IAuthority _authority,
@@ -53,6 +53,14 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         matchingRule = _matchingRule;
         allocate = _allocate;
         settle = _settle;
+    }
+
+    /**
+     * @notice Get gas configuration for keeper operations
+     * @return Current gas configuration
+     */
+    function getConfig() external view returns (Config memory) {
+        return config;
     }
 
     /**
@@ -121,14 +129,6 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         address _receiver
     ) external auth nonReentrant returns (uint dustAmount) {
         return settle.collectDust(AllocationAccount(_allocationAccount), _dustToken, _receiver);
-    }
-
-    /**
-     * @notice Get gas configuration for keeper operations
-     * @return Current gas configuration
-     */
-    function getConfig() external view returns (Config memory) {
-        return config;
     }
 
     /**

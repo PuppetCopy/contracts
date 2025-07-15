@@ -17,10 +17,14 @@ contract TokenRouter is CoreContract {
         uint transferGasLimit;
     }
 
-    Config public config;
+    Config config;
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {
         authority = _authority;
+    }
+
+    function getConfig() external view returns (Config memory) {
+        return config;
     }
 
     /**

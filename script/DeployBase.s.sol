@@ -20,7 +20,7 @@ contract DeployBase is BaseScript {
     function deployContracts() internal {
         Dictatorship dictatorship = new Dictatorship(Const.dao);
 
-        new PuppetToken(Const.dao);
+        // new PuppetToken(Const.dao);
         // new PuppetVoteToken(dictatorship);
         TokenRouter tokenRouter = new TokenRouter(dictatorship, TokenRouter.Config(200_000));
         dictatorship.registerContract(tokenRouter);

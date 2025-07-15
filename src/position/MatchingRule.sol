@@ -28,11 +28,23 @@ contract MatchingRule is CoreContract {
 
     AllocationStore public immutable store;
 
-    Config public config;
+    Config config;
     IERC20[] public tokenAllowanceList;
 
     mapping(IERC20 token => uint) tokenAllowanceCapMap;
     mapping(bytes32 traderMatchingKey => mapping(address puppet => Rule)) public matchingRuleMap;
+
+    constructor(
+        IAuthority _authority,
+        AllocationStore _store,
+        Config memory _config
+    ) CoreContract(_authority, abi.encode(_config)) {
+        store = _store;
+    }
+
+    function getConfig() external view returns (Config memory) {
+        return config;
+    }
 
     function getRuleList(
         bytes32 _traderMatchingKey,
@@ -45,10 +57,6 @@ contract MatchingRule is CoreContract {
             address _puppet = _puppetList[i];
             _ruleList[i] = matchingRuleMap[_traderMatchingKey][_puppet];
         }
-    }
-
-    constructor(IAuthority _authority, AllocationStore _store, Config memory _config) CoreContract(_authority, abi.encode(_config)) {
-        store = _store;
     }
 
     function deposit(IERC20 _collateralToken, address _depositor, address _user, uint _amount) external auth {

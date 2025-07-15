@@ -39,7 +39,7 @@ contract Allocate is CoreContract {
     AllocationStore public immutable allocationStore;
     address public immutable allocationAccountImplementation;
 
-    Config public config;
+    Config config;
 
     // Allocation tracking
     mapping(address allocationAddress => uint totalAmount) public allocationMap;

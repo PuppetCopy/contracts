@@ -35,5 +35,8 @@ interface IGmxOrderCallbackReceiver {
     /// @param key the key of the order
     /// @param eventData the event data that was passed to the order execution
     /// @notice this function is called when the order execution fails, and the execution fee needs
-    function refundExecutionFee(bytes32 key, GmxPositionUtils.EventLogData calldata eventData) external payable;
+    function refundExecutionFee(
+        bytes32 key, //
+        GmxPositionUtils.EventLogData calldata eventData
+    ) external payable;
 }

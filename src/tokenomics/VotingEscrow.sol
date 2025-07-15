@@ -28,7 +28,7 @@ contract VotingEscrow is CoreContract {
     PuppetToken public immutable token;
     PuppetVoteToken public immutable vToken;
 
-    Config public config;
+    Config config;
 
     mapping(address => uint) public lockDurationMap;
     mapping(address => Vested) public vestMap;
@@ -42,6 +42,10 @@ contract VotingEscrow is CoreContract {
         store = _store;
         token = _token;
         vToken = _vToken;
+    }
+
+    function getConfig() external view returns (Config memory) {
+        return config;
     }
 
     function getVestingCursor(

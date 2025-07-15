@@ -56,7 +56,6 @@ await $`forge script \
   script/${scriptFile}:${scriptName} \
   --broadcast \
   --verify \
-  --resume \
   -vvvv \
   --rpc-url ${rpcUrl}`
 
@@ -70,10 +69,8 @@ const deployments = (await deploymentsFile.exists())
       }
     })
 
-const latestRun = (await import(
-  `./broadcast/${scriptFile}/${chainId}/run-latest.json`,
-  { with: { type: 'json' } } // Added 'with' assertion for JSON import
-)) as IDeploymentArtifact
+const broadcastFile = file(`./broadcast/${scriptFile}/${chainId}/run-latest.json`)
+const latestRun = (await broadcastFile.json()) as IDeploymentArtifact
 
 latestRun.transactions.reduce((acc, tx) => {
   if (!tx.contractName) {

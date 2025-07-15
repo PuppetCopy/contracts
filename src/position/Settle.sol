@@ -39,7 +39,7 @@ contract Settle is CoreContract {
 
     AllocationStore public immutable allocationStore;
 
-    Config public config;
+    Config config;
     IERC20[] public tokenDustThresholdList;
 
     // Platform fee tracking

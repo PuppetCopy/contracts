@@ -30,7 +30,7 @@ contract RewardDistributor is CoreContract {
     RewardStore public immutable store;
 
     // Reward distribution state
-    Config public config;
+    Config config;
     uint public cumulativeRewardPerToken;
     uint public totalUndistributed; // Total rewards deposited but not yet distributed
     uint public lastDistributionTime;

@@ -59,12 +59,14 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
         bytes32 requestKey;
     }
 
-    Config public config;
+    Config config;
     uint public unhandledCallbackListId = 0;
 
     mapping(address allocationAddress => Position) public positionMap;
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
     mapping(uint unhandledCallbackListSequenceId => UnhandledCallback) public unhandledCallbackMap;
+
+    constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
     function getConfig() external view returns (Config memory) {
         return config;
@@ -80,9 +82,6 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
         bytes32 _requestKey
     ) external view returns (RequestAdjustment memory) {
         return requestAdjustmentMap[_requestKey];
-    }
-
-    constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {
     }
 
     /**
@@ -283,7 +282,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
      */
     function execute(
         bytes32 _requestKey
-    ) external auth {
+    ) external auth nonReentrant {
         RequestAdjustment memory _request = requestAdjustmentMap[_requestKey];
         require(_request.allocationAddress != address(0), Error.MirrorPosition__ExecutionRequestMissing(_requestKey));
 
@@ -349,7 +348,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
 
     function liquidate(
         address _allocationAddress
-    ) external auth {
+    ) external auth nonReentrant {
         Position memory _position = positionMap[_allocationAddress];
         require(_position.size > 0, Error.MirrorPosition__PositionNotFound(_allocationAddress));
 

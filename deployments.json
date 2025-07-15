@@ -1,17 +1,17 @@
 {
   "42161": {
-    "Dictatorship": "0x6dB9010e25c1c97c6b78C4eA1d517C93851dFb82",
+    "Dictatorship": "0x583C63CEcb474789331C43da153b1fe5eC0d6CEC",
     "PuppetToken": "0x10f7F9e33FaF343F9CfE1c69b177ed86Bc760B4e",
-    "TokenRouter": "0xB2cD2387f93A8dc25498425b0F60C409d78331E0",
-    "RouterProxy": "0x2793FF9b6B6CaDe1360427eb53db3E411da9555A",
-    "AllocationStore": "0x03a7942ec263b4ff08b3cf1b8d821e1ec1401377",
+    "TokenRouter": "0x796347E2881bE603C4D88ac0103c4A3569BA8b28",
+    "RouterProxy": "0x34Df3B8042902492451d4Ae87306904bDF8e702a",
+    "AllocationStore": "0xd29389780e53bb915f64d93c8981d2ca168c2ddc",
     "FeeMarketplaceStore": "0xAf97414983197b30485828ddb3De60134871dBe2",
     "FeeMarketplace": "0x1290fE1CC845D9D564183d3d8C65122DCf908ED5",
-    "MatchingRule": "0x27eb729ce87490251efb912b843f735d8cc48ea8",
-    "MirrorPosition": "0xcc223421f519cdfe8e570cba22edc4168c57de9d",
-    "Allocate": "0x7af02f2c8917617d034117bfe93c98740b6fd050",
-    "Settle": "0xb5c9e474ff4621f3bad1be816dde38999b21920e",
-    "KeeperRouter": "0x136bb60b7e1f81dbe11128a2567b059c008b8ad3",
+    "MatchingRule": "0xaac31987673082034e06e7066726a6bc85dbcf80",
+    "MirrorPosition": "0xfab9370c2a8f8f69ed7880f5f204e0125c351632",
+    "Allocate": "0x31b1932248c12029820fd28bde2b49991ed6f178",
+    "Settle": "0x0c93cb536516bceb4d23ec9464d674c50b417b2d",
+    "KeeperRouter": "0x3d04f440b4c3c5b56770d7341c1682065bee6593",
     "Router": "0x94e58f4eDb5134C8e6885516857536580dacCc18"
   }
 }

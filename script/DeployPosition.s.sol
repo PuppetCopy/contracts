@@ -25,30 +25,25 @@ import {Const} from "./Const.sol";
  */
 contract DeployPosition is BaseScript {
     // State variables to hold deployed contracts
-    Dictatorship dictator;
-    TokenRouter tokenRouter;
+    Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
+    TokenRouter tokenRouter = TokenRouter(getDeployedAddress("TokenRouter"));
 
     function run() public {
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
 
         verifySelectorsMatch();
 
-        // Get base infrastructure
-        // dictator = Dictatorship(getDeployedAddress("Dictatorship"));
-        // tokenRouter = TokenRouter(getDeployedAddress("TokenRouter"));
+        console.log("=== Deploying Position Contracts ===");
 
-        // console.log("=== Deploying Position Contracts ===");
+        // Deploy each contract with its permissions
+        AllocationStore allocationStore = deployAllocationStore();
+        MatchingRule matchingRule = deployMatchingRule(allocationStore);
+        Allocate allocate = deployAllocate(allocationStore, matchingRule);
+        Settle settle = deploySettle(allocationStore);
+        MirrorPosition mirrorPosition = deployMirrorPosition();
+        KeeperRouter keeperRouter = deployKeeperRouter(mirrorPosition, matchingRule, allocate, settle);
 
-        // // Deploy each contract with its permissions
-        // AllocationStore allocationStore = deployAllocationStore();
-        // MatchingRule matchingRule = deployMatchingRule(allocationStore);
-
-        // Allocate allocate = deployAllocate(allocationStore, matchingRule);
-        // Settle settle = deploySettle(allocationStore);
-        // MirrorPosition mirrorPosition = deployMirrorPosition();
-        // KeeperRouter keeperRouter = deployKeeperRouter(mirrorPosition, matchingRule, allocate, settle);
-
-        // console.log("=== Position Contracts Deployment Complete ===");
+        console.log("=== Position Contracts Deployment Complete ===");
 
         vm.stopBroadcast();
     }
@@ -353,27 +348,21 @@ contract DeployPosition is BaseScript {
 
         KeeperRouter tempCallback = KeeperRouter(address(0)); // Use a zero address for selector matching
 
-        console.log(
-            "Matching afterOrderExecution? ",
-            IOrderCallbackReceiver.afterOrderExecution.selector == tempCallback.afterOrderExecution.selector
-                ? "YES"
-                : "NO"
+        require(
+            IOrderCallbackReceiver.afterOrderExecution.selector == tempCallback.afterOrderExecution.selector,
+            "afterOrderExecution selector mismatch"
         );
-        console.log(
-            "Matching afterOrderCancellation? ",
-            IOrderCallbackReceiver.afterOrderCancellation.selector == tempCallback.afterOrderCancellation.selector
-                ? "YES"
-                : "NO"
+        require(
+            IOrderCallbackReceiver.afterOrderCancellation.selector == tempCallback.afterOrderCancellation.selector,
+            "afterOrderCancellation selector mismatch"
         );
-        console.log(
-            "Matching afterOrderFrozen? ",
-            IOrderCallbackReceiver.afterOrderFrozen.selector == tempCallback.afterOrderFrozen.selector ? "YES" : "NO"
+        require(
+            IOrderCallbackReceiver.afterOrderFrozen.selector == tempCallback.afterOrderFrozen.selector,
+            "afterOrderFrozen selector mismatch"
         );
-        console.log(
-            "Matching refundExecutionFee? ",
-            IGasFeeCallbackReceiver.refundExecutionFee.selector == tempCallback.refundExecutionFee.selector
-                ? "YES"
-                : "NO"
+        require(
+            IGasFeeCallbackReceiver.refundExecutionFee.selector == tempCallback.refundExecutionFee.selector,
+            "refundExecutionFee selector mismatch"
         );
     }
 }
