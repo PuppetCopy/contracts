@@ -140,11 +140,11 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, address(keeperRouter));
 
         // Initialize contracts
-        dictator.initContract(allocate);
-        dictator.initContract(settle);
-        dictator.initContract(matchingRule);
-        dictator.initContract(mirrorPosition);
-        dictator.initContract(keeperRouter);
+        dictator.registerContract(allocate);
+        dictator.registerContract(settle);
+        dictator.registerContract(matchingRule);
+        dictator.registerContract(mirrorPosition);
+        dictator.registerContract(keeperRouter);
 
         // Stop current prank and restart for user operations
         IERC20[] memory allowedTokens = new IERC20[](1);

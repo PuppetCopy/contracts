@@ -19,10 +19,8 @@ contract TokenRouter is CoreContract {
 
     Config public config;
 
-    constructor(IAuthority _authority, Config memory _config) CoreContract(_authority) {
+    constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {
         authority = _authority;
-
-        _setConfig(abi.encode(_config));
     }
 
     /**

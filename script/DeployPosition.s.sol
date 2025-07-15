@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.29;
 
+import {IGasFeeCallbackReceiver} from "@gmx/contracts/callback/IGasFeeCallbackReceiver.sol";
+import {IOrderCallbackReceiver} from "@gmx/contracts/callback/IOrderCallbackReceiver.sol";
 import {console} from "forge-std/src/console.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
@@ -29,22 +31,24 @@ contract DeployPosition is BaseScript {
     function run() public {
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
 
+        verifySelectorsMatch();
+
         // Get base infrastructure
-        dictator = Dictatorship(getDeployedAddress("Dictatorship"));
-        tokenRouter = TokenRouter(getDeployedAddress("TokenRouter"));
+        // dictator = Dictatorship(getDeployedAddress("Dictatorship"));
+        // tokenRouter = TokenRouter(getDeployedAddress("TokenRouter"));
 
-        console.log("=== Deploying Position Contracts ===");
+        // console.log("=== Deploying Position Contracts ===");
 
-        // Deploy each contract with its permissions
-        AllocationStore allocationStore = deployAllocationStore();
-        MatchingRule matchingRule = deployMatchingRule(allocationStore);
+        // // Deploy each contract with its permissions
+        // AllocationStore allocationStore = deployAllocationStore();
+        // MatchingRule matchingRule = deployMatchingRule(allocationStore);
 
-        Allocate allocate = deployAllocate(allocationStore, matchingRule);
-        Settle settle = deploySettle(allocationStore);
-        MirrorPosition mirrorPosition = deployMirrorPosition();
-        KeeperRouter keeperRouter = deployKeeperRouter(mirrorPosition, matchingRule, allocate, settle);
+        // Allocate allocate = deployAllocate(allocationStore, matchingRule);
+        // Settle settle = deploySettle(allocationStore);
+        // MirrorPosition mirrorPosition = deployMirrorPosition();
+        // KeeperRouter keeperRouter = deployKeeperRouter(mirrorPosition, matchingRule, allocate, settle);
 
-        console.log("=== Position Contracts Deployment Complete ===");
+        // console.log("=== Position Contracts Deployment Complete ===");
 
         vm.stopBroadcast();
     }
@@ -100,7 +104,7 @@ contract DeployPosition is BaseScript {
         dictator.setPermission(allocate, allocate.initializeTraderActivityThrottle.selector, address(matchingRule));
 
         // Initialize contract
-        dictator.initContract(allocate);
+        dictator.registerContract(allocate);
         console.log("Allocate initialized and permissions configured");
 
         return allocate;
@@ -135,7 +139,7 @@ contract DeployPosition is BaseScript {
         dictator.setAccess(allocationStore, address(settle));
 
         // Initialize contract
-        dictator.initContract(settle);
+        dictator.registerContract(settle);
         console.log("Settle initialized and permissions configured");
 
         return settle;
@@ -171,7 +175,7 @@ contract DeployPosition is BaseScript {
         dictator.setAccess(allocationStore, address(matchingRule));
 
         // Initialize contract
-        dictator.initContract(matchingRule);
+        dictator.registerContract(matchingRule);
         console.log("MatchingRule initialized and permissions configured");
 
         return matchingRule;
@@ -201,7 +205,7 @@ contract DeployPosition is BaseScript {
         // MirrorPosition has no standalone permissions, they're set up via KeeperRouter
 
         // Initialize contract
-        dictator.initContract(mirrorPosition);
+        dictator.registerContract(mirrorPosition);
         console.log("MirrorPosition initialized");
 
         return mirrorPosition;
@@ -280,7 +284,7 @@ contract DeployPosition is BaseScript {
         dictator.setPermission(keeperRouter, keeperRouter.collectDust.selector, Const.keeper);
 
         // Initialize contract
-        dictator.initContract(keeperRouter);
+        dictator.registerContract(keeperRouter);
         console.log("KeeperRouter initialized and permissions configured");
 
         return keeperRouter;
@@ -342,5 +346,34 @@ contract DeployPosition is BaseScript {
 
         console.log("MirrorPosition upgrade complete with KeeperRouter permissions");
         return newMirrorPosition;
+    }
+
+    function verifySelectorsMatch() public pure {
+        console.log("\n=== Verifying Selector Compatibility ===");
+
+        KeeperRouter tempCallback = KeeperRouter(address(0)); // Use a zero address for selector matching
+
+        console.log(
+            "Matching afterOrderExecution? ",
+            IOrderCallbackReceiver.afterOrderExecution.selector == tempCallback.afterOrderExecution.selector
+                ? "YES"
+                : "NO"
+        );
+        console.log(
+            "Matching afterOrderCancellation? ",
+            IOrderCallbackReceiver.afterOrderCancellation.selector == tempCallback.afterOrderCancellation.selector
+                ? "YES"
+                : "NO"
+        );
+        console.log(
+            "Matching afterOrderFrozen? ",
+            IOrderCallbackReceiver.afterOrderFrozen.selector == tempCallback.afterOrderFrozen.selector ? "YES" : "NO"
+        );
+        console.log(
+            "Matching refundExecutionFee? ",
+            IGasFeeCallbackReceiver.refundExecutionFee.selector == tempCallback.refundExecutionFee.selector
+                ? "YES"
+                : "NO"
+        );
     }
 }

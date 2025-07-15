@@ -82,8 +82,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
         return requestAdjustmentMap[_requestKey];
     }
 
-    constructor(IAuthority _authority, Config memory _config) CoreContract(_authority) {
-        _setConfig(abi.encode(_config));
+    constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {
     }
 
     /**

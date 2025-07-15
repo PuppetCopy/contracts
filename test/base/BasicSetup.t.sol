@@ -40,7 +40,7 @@ contract BasicSetup is Test {
 
         dictator = new Dictatorship(users.owner);
         tokenRouter = new TokenRouter(dictator, TokenRouter.Config(200_000));
-        dictator.initContract(tokenRouter);
+        dictator.registerContract(tokenRouter);
         puppetToken = new PuppetToken(users.owner);
         vPuppetToken = new PuppetVoteToken(dictator);
 

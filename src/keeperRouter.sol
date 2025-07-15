@@ -43,23 +43,16 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         Allocate _allocate,
         Settle _settle,
         Config memory _config
-    ) CoreContract(_authority) {
+    ) CoreContract(_authority, abi.encode(_config)) {
         require(address(_mirrorPosition) != address(0), "MirrorPosition not set correctly");
         require(address(_matchingRule) != address(0), "MatchingRule not set correctly");
         require(address(_allocate) != address(0), "Allocate not set correctly");
         require(address(_settle) != address(0), "Settle not set correctly");
-        require(_config.mirrorBaseGasLimit > 0, "Invalid mirror base gas limit");
-        require(_config.mirrorPerPuppetGasLimit > 0, "Invalid mirror per-puppet gas limit");
-        require(_config.adjustBaseGasLimit > 0, "Invalid adjust base gas limit");
-        require(_config.adjustPerPuppetGasLimit > 0, "Invalid adjust per-puppet gas limit");
 
         mirrorPosition = _mirrorPosition;
         matchingRule = _matchingRule;
         allocate = _allocate;
         settle = _settle;
-
-        // Set gas configuration directly
-        config = _config;
     }
 
     /**
@@ -163,8 +156,8 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
      */
     function afterOrderExecution(
         bytes32 key,
-        GmxPositionUtils.Props memory order,
-        GmxPositionUtils.EventLogData memory /*eventData*/
+        GmxPositionUtils.Props calldata order,
+        GmxPositionUtils.EventLogData calldata /* eventData */
     ) external auth nonReentrant {
         if (
             GmxPositionUtils.isIncreaseOrder(GmxPositionUtils.OrderType(order.numbers.orderType))
@@ -184,9 +177,9 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
      * @dev Called by GMX when an order is cancelled
      */
     function afterOrderCancellation(
-        bytes32, /*key*/
-        GmxPositionUtils.Props calldata, /*order*/
-        GmxPositionUtils.EventLogData calldata /*eventData*/
+        bytes32, /* key */
+        GmxPositionUtils.Props calldata, /* order */
+        GmxPositionUtils.EventLogData calldata /* eventData */
     ) external auth nonReentrant {
         // For now, cancellations are handled silently
         // Future implementation could add retry logic or cleanup
@@ -197,9 +190,9 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
      * @dev Called by GMX when an order is frozen
      */
     function afterOrderFrozen(
-        bytes32, /*key*/
-        GmxPositionUtils.Props calldata, /*order*/
-        GmxPositionUtils.EventLogData calldata /*eventData*/
+        bytes32, /* key */
+        GmxPositionUtils.Props calldata, /* order */
+        GmxPositionUtils.EventLogData calldata /* eventData */
     ) external auth nonReentrant {
         // For now, frozen orders are handled silently
         // Future implementation could add retry logic or cleanup
@@ -209,11 +202,10 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
      * @notice GMX callback handler for execution fee refunds
      * @dev Called by GMX when execution fees need to be refunded
      * @param key The request key for the refunded order
-     * @param eventData Additional event data from GMX
      */
     function refundExecutionFee(
         bytes32 key,
-        GmxPositionUtils.EventLogData memory eventData
+        GmxPositionUtils.EventLogData calldata /* eventData */
     ) external payable auth nonReentrant {
         require(msg.value > 0, "No execution fee to refund");
 

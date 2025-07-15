@@ -34,7 +34,7 @@ contract FeeMarketplaceTest is BasicSetup {
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
         dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
 
-        dictator.initContract(feeMarketplace);
+        dictator.registerContract(feeMarketplace);
 
         vm.startPrank(users.owner);
     }

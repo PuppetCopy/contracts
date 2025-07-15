@@ -14,9 +14,10 @@ abstract contract CoreContract is Permission, ERC165 {
     /// @notice The central authority (Dictatorship) managing this contract.
     // Inherited 'authority' variable assumed from Permission contract
     /// @param _authority The address of the Dictatorship contract.
-    constructor(
-        IAuthority _authority
-    ) Permission(_authority) {}
+    /// @param _config The initial configuration data to set during deployment.
+    constructor(IAuthority _authority, bytes memory _config) Permission(_authority) {
+        _setConfig(_config);
+    }
 
     /// @notice  Sets the configuration parameters via governance
     /// @param _data The encoded configuration data
@@ -29,8 +30,6 @@ abstract contract CoreContract is Permission, ERC165 {
         bytes calldata _data
     ) external virtual onlyAuthority {
         _setConfig(_data);
-
-        _logEvent("SetConfig", _data);
     }
 
     /// @notice Helper function to log events through the central Authority.

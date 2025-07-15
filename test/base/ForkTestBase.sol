@@ -317,13 +317,13 @@ abstract contract ForkTestBase is Test {
     }
 
     function _initializeContracts() private {
-        dictator.initContract(tokenRouter);
-        dictator.initContract(feeMarketplace);
-        dictator.initContract(allocate);
-        dictator.initContract(settle);
-        dictator.initContract(matchingRule);
-        dictator.initContract(mirrorPosition);
-        dictator.initContract(keeperRouter);
+        dictator.registerContract(tokenRouter);
+        dictator.registerContract(feeMarketplace);
+        dictator.registerContract(allocate);
+        dictator.registerContract(settle);
+        dictator.registerContract(matchingRule);
+        dictator.registerContract(mirrorPosition);
+        dictator.registerContract(keeperRouter);
     }
 
     function _configureSystem() private {

@@ -9,8 +9,8 @@ interface IGmxOrderCallbackReceiver {
     /// @param order the order that was executed
     function afterOrderExecution(
         bytes32 key,
-        GmxPositionUtils.Props memory order,
-        GmxPositionUtils.EventLogData memory eventData
+        GmxPositionUtils.Props calldata order,
+        GmxPositionUtils.EventLogData calldata eventData
     ) external;
 
     /// @dev called after an order cancellation
@@ -35,5 +35,5 @@ interface IGmxOrderCallbackReceiver {
     /// @param key the key of the order
     /// @param eventData the event data that was passed to the order execution
     /// @notice this function is called when the order execution fails, and the execution fee needs
-    function refundExecutionFee(bytes32 key, GmxPositionUtils.EventLogData memory eventData) external payable;
+    function refundExecutionFee(bytes32 key, GmxPositionUtils.EventLogData calldata eventData) external payable;
 }

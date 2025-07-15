@@ -50,10 +50,9 @@ contract Allocate is CoreContract {
         IAuthority _authority,
         AllocationStore _allocationStore,
         Config memory _config
-    ) CoreContract(_authority) {
+    ) CoreContract(_authority, abi.encode(_config)) {
         allocationStore = _allocationStore;
         allocationAccountImplementation = address(new AllocationAccount(_allocationStore));
-        _setConfig(abi.encode(_config));
     }
 
     function getConfig() external view returns (Config memory) {

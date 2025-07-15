@@ -64,11 +64,9 @@ contract FeeMarketplace is CoreContract {
         PuppetToken _protocolToken,
         FeeMarketplaceStore _store,
         Config memory _config
-    ) CoreContract(_authority) {
+    ) CoreContract(_authority, abi.encode(_config)) {
         protocolToken = _protocolToken;
         store = _store;
-
-        _setConfig(abi.encode(_config));
     }
 
     /**
