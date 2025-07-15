@@ -15,14 +15,14 @@ import {RouterProxy} from "src/utils/RouterProxy.sol";
 import {BaseScript} from "./BaseScript.s.sol";
 import {Const} from "./Const.sol";
 
-contract UpdateRouter is BaseScript {
+contract DeployUserRouter is BaseScript {
     function run() public {
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
-        updateRouter();
+        deployUserRouter();
         vm.stopBroadcast();
     }
 
-    function updateRouter() internal {
+    function deployUserRouter() internal {
         RouterProxy routerProxy = RouterProxy(payable(getDeployedAddress("RouterProxy")));
         MatchingRule matchingRule = MatchingRule(getDeployedAddress("MatchingRule"));
         FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
@@ -30,14 +30,5 @@ contract UpdateRouter is BaseScript {
 
         UserRouter newRouter = new UserRouter(matchingRule, feeMarketplace, allocate);
         routerProxy.update(address(newRouter));
-        console.log("UserRouter implementation deployed at:", address(newRouter));
-        console.log("Seeding MatchingRule with initial rules...");
-        matchingRule.setRule(
-            allocate,
-            IERC20(Const.usdc),
-            DEPLOYER_ADDRESS,
-            DEPLOYER_ADDRESS,
-            MatchingRule.Rule({allowanceRate: 1000, throttleActivity: 100, expiry: block.timestamp + 30 days})
-        );
     }
 }

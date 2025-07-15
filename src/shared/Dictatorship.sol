@@ -27,7 +27,7 @@ contract Dictatorship is Ownable, IAuthority {
     event SetConfig(address indexed target, bytes config);
 
     /// @notice Central log for events emitted by registered CoreContracts via this authority.
-    event LogEvent(address indexed operator, string indexed method, bytes data);
+    event PuppetEventLog(address indexed operator, string indexed method, bytes data);
 
     /// @notice Emitted when a CoreContract is initialized and added to the registry.
     event AddContractAccess(address indexed target);
@@ -102,7 +102,7 @@ contract Dictatorship is Ownable, IAuthority {
     /// @inheritdoc IAuthority
     function logEvent(string memory _method, bytes memory _data) public {
         require(contractAccessRegistry[msg.sender], Error.Dictatorship__ContractNotRegistered());
-        emit LogEvent(msg.sender, _method, _data);
+        emit PuppetEventLog(msg.sender, _method, _data);
     }
 
     /// @notice Initializes a CoreContract, registers it, and optionally sets initial configuration.

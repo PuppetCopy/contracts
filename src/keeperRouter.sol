@@ -165,7 +165,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         bytes32 key,
         GmxPositionUtils.Props memory order,
         GmxPositionUtils.EventLogData memory /*eventData*/
-    ) external auth {
+    ) external auth nonReentrant {
         if (
             GmxPositionUtils.isIncreaseOrder(GmxPositionUtils.OrderType(order.numbers.orderType))
                 || GmxPositionUtils.isDecreaseOrder(GmxPositionUtils.OrderType(order.numbers.orderType))
@@ -187,7 +187,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         bytes32, /*key*/
         GmxPositionUtils.Props calldata, /*order*/
         GmxPositionUtils.EventLogData calldata /*eventData*/
-    ) external auth {
+    ) external auth nonReentrant {
         // For now, cancellations are handled silently
         // Future implementation could add retry logic or cleanup
     }
@@ -200,7 +200,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         bytes32, /*key*/
         GmxPositionUtils.Props calldata, /*order*/
         GmxPositionUtils.EventLogData calldata /*eventData*/
-    ) external auth {
+    ) external auth nonReentrant {
         // For now, frozen orders are handled silently
         // Future implementation could add retry logic or cleanup
     }
@@ -211,7 +211,10 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
      * @param key The request key for the refunded order
      * @param eventData Additional event data from GMX
      */
-    function refundExecutionFee(bytes32 key, GmxPositionUtils.EventLogData memory eventData) external payable auth {
+    function refundExecutionFee(
+        bytes32 key,
+        GmxPositionUtils.EventLogData memory eventData
+    ) external payable auth nonReentrant {
         require(msg.value > 0, "No execution fee to refund");
 
         // Refund the execution fee to the configured receiver
