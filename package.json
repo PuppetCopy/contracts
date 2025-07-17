@@ -21,7 +21,6 @@
     "./deployments.json"
   ],
   "devDependencies": {
-    "@balancer-labs/v2-interfaces": "0.4.0",
     "@openzeppelin/contracts": "5.3.0",
     "@uniswap/v3-core": "1.0.1",
     "@gmx": "github:gmx-io/gmx-synthetics#v2.1",

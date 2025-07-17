@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.29;
 
-import {IGasFeeCallbackReceiver} from "@gmx/contracts/callback/IGasFeeCallbackReceiver.sol";
-import {IOrderCallbackReceiver} from "@gmx/contracts/callback/IOrderCallbackReceiver.sol";
-
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/src/console.sol";
 
@@ -306,28 +303,5 @@ contract DeployPosition is BaseScript {
         dustTokenThresholds[0] = 0.1e6; // 0.1 USDC
 
         settle.setTokenDustThresholdList(allowedTokens, dustTokenThresholds);
-    }
-
-    function verifySelectorsMatch() public pure {
-        console.log("\n=== Verifying Selector Compatibility ===");
-
-        KeeperRouter tempCallback = KeeperRouter(address(0)); // Use a zero address for selector matching
-
-        require(
-            IOrderCallbackReceiver.afterOrderExecution.selector == tempCallback.afterOrderExecution.selector,
-            "afterOrderExecution selector mismatch"
-        );
-        require(
-            IOrderCallbackReceiver.afterOrderCancellation.selector == tempCallback.afterOrderCancellation.selector,
-            "afterOrderCancellation selector mismatch"
-        );
-        require(
-            IOrderCallbackReceiver.afterOrderFrozen.selector == tempCallback.afterOrderFrozen.selector,
-            "afterOrderFrozen selector mismatch"
-        );
-        require(
-            IGasFeeCallbackReceiver.refundExecutionFee.selector == tempCallback.refundExecutionFee.selector,
-            "refundExecutionFee selector mismatch"
-        );
     }
 }
