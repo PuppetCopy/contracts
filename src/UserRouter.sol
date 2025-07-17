@@ -19,10 +19,6 @@ contract UserRouter is ReentrancyGuardTransient {
     Allocate public immutable allocate;
 
     constructor(MatchingRule _matchingRule, FeeMarketplace _feeMarketplace, Allocate _allocate) {
-        require(address(_matchingRule) != address(0), "MatchingRule not set correctly");
-        require(address(_feeMarketplace) != address(0), "FeeMarketplace not set correctly");
-        require(address(_allocate) != address(0), "Allocate not set correctly");
-
         matchingRule = _matchingRule;
         feeMarketplace = _feeMarketplace;
         allocate = _allocate;

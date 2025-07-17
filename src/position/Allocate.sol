@@ -105,12 +105,12 @@ contract Allocate is CoreContract {
 
         // Get rules and balances
         MatchingRule.Rule[] memory _rules = _matchingRule.getRuleList(_traderMatchingKey, _params.puppetList);
-        uint[] memory _balances = allocationStore.getBalanceList(_params.collateralToken, _params.puppetList);
+        uint[] memory _balanceList = allocationStore.getBalanceList(_params.collateralToken, _params.puppetList);
 
         uint _feePerPuppet = _params.keeperFee / _puppetCount;
         uint _totalAllocated = 0;
 
-        uint[] memory _puppetAllocations = new uint[](_puppetCount);
+        uint[] memory _allocationList = new uint[](_puppetCount);
         allocationPuppetList[_allocationAddress] = new uint[](_puppetCount);
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
@@ -121,21 +121,21 @@ contract Allocate is CoreContract {
                 _rule.expiry > block.timestamp
                     && block.timestamp >= lastActivityThrottleMap[_traderMatchingKey][_puppet]
             ) {
-                uint _puppetAllocation = Precision.applyBasisPoints(_rule.allowanceRate, _balances[_i]);
+                uint _puppetAllocation = Precision.applyBasisPoints(_rule.allowanceRate, _balanceList[_i]);
 
                 if (_feePerPuppet > Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _puppetAllocation)) {
                     continue;
                 }
 
-                _puppetAllocations[_i] = _puppetAllocation;
+                _allocationList[_i] = _puppetAllocation;
                 allocationPuppetList[_allocationAddress][_i] = _puppetAllocation;
-                _balances[_i] -= _puppetAllocation;
+                _balanceList[_i] -= _puppetAllocation;
                 _totalAllocated += _puppetAllocation;
                 lastActivityThrottleMap[_traderMatchingKey][_puppet] = block.timestamp + _rule.throttleActivity;
             }
         }
 
-        allocationStore.setBalanceList(_params.collateralToken, _params.puppetList, _balances);
+        allocationStore.setBalanceList(_params.collateralToken, _params.puppetList, _balanceList);
 
         require(
             _params.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _totalAllocated),
@@ -153,7 +153,7 @@ contract Allocate is CoreContract {
         );
 
         _logEvent(
-            "CreateAllocation", abi.encode(_params, _allocationAddress, _totalAllocated, _allocated, _puppetAllocations)
+            "CreateAllocation", abi.encode(_params, _allocationAddress, _totalAllocated, _allocated, _allocationList)
         );
     }
 
@@ -241,6 +241,7 @@ contract Allocate is CoreContract {
         _logEvent(
             "UpdateAllocationForKeeperFee",
             abi.encode(
+                // _params, TODO: emit _params intead of individual fields like collateralToken and keeperFee
                 _allocationAddress,
                 _params.collateralToken,
                 _params.keeperFee,

@@ -111,24 +111,24 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
      * Emits a `Mirror` event with key details.
      * @param _params Position parameters for the trader's action
      * @param _allocationAddress The allocation account address created
-     * @param _netAllocation The net allocation amount after deducting the keeper fee
+     * @param _allocation The net allocation amount after deducting the keeper fee
      * @return _requestKey The unique key returned by GMX identifying the created order request
      */
     function requestMirror(
         CallPosition calldata _params,
         address _allocationAddress,
-        uint _netAllocation,
+        uint _allocation,
         address _callbackContract
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
         require(_params.isIncrease, Error.MirrorPosition__InitialMustBeIncrease());
         require(_params.collateralDelta > 0, Error.MirrorPosition__InvalidCollateralDelta());
         require(_params.sizeDeltaInUsd > 0, Error.MirrorPosition__InvalidSizeDelta());
         require(_allocationAddress != address(0), Error.MirrorPosition__InvalidAllocation(_allocationAddress));
-        require(_netAllocation > 0, "Invalid net allocation");
+        require(_allocation > 0, "Invalid net allocation");
 
         // Calculate position size proportional to trader's leverage
         uint _traderTargetLeverage = Precision.toBasisPoints(_params.sizeDeltaInUsd, _params.collateralDelta);
-        uint _sizeDelta = Math.mulDiv(_params.sizeDeltaInUsd, _netAllocation, _params.collateralDelta);
+        uint _sizeDelta = Math.mulDiv(_params.sizeDeltaInUsd, _allocation, _params.collateralDelta);
 
         // Submit GMX order
         _requestKey = _submitOrder(
@@ -137,7 +137,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
             GmxPositionUtils.OrderType.MarketIncrease,
             config.increaseCallbackGasLimit,
             _sizeDelta,
-            _netAllocation,
+            _allocation,
             _callbackContract
         );
 
@@ -153,7 +153,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
 
         _logEvent(
             "RequestMirror",
-            abi.encode(_params, _requestKey, _allocationAddress, _netAllocation, _sizeDelta, _traderTargetLeverage)
+            abi.encode(_params, _requestKey, _allocationAddress, _allocation, _sizeDelta, _traderTargetLeverage)
         );
     }
 
@@ -180,25 +180,25 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
      * @param _params Structure containing details of the trader's adjustment action (deltas must be > 0),
      * market, collateral, GMX execution fee, keeper fee, and keeper fee receiver.
      * @param _allocationAddress The allocation account address associated with the position being adjusted.
-     * @param _currentAllocation The current total allocation amount for the position.
+     * @param _allocation The current total allocation amount for the position.
      * @return _requestKey The unique key returned by GMX identifying the created adjustment order request.
      */
     function requestAdjust(
         CallPosition calldata _params,
         address _allocationAddress,
-        uint _currentAllocation,
+        uint _allocation,
         address _callbackContract
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
         require(_params.collateralDelta > 0 || _params.sizeDeltaInUsd > 0, Error.MirrorPosition__NoAdjustmentRequired());
         require(_allocationAddress != address(0), Error.MirrorPosition__InvalidAllocation(_allocationAddress));
-        require(_currentAllocation > 0, "Invalid current allocation");
+        require(_allocation > 0, "Invalid current allocation");
 
         Position memory _position = positionMap[_allocationAddress];
         require(_position.size > 0, Error.MirrorPosition__PositionNotFound(_allocationAddress));
         require(_position.traderCollateral > 0, Error.MirrorPosition__TraderCollateralZero(_allocationAddress));
 
         // Calculate trader's new target leverage
-        uint _currentPuppetLeverage = Precision.toBasisPoints(_position.size, _currentAllocation);
+        uint _currentPuppetLeverage = Precision.toBasisPoints(_position.size, _allocation);
 
         uint newTraderSize;
         uint newTraderCollateral;
@@ -264,7 +264,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
 
         _logEvent(
             "RequestAdjust",
-            abi.encode(_params, _requestKey, _allocationAddress, _currentAllocation, _sizeDelta, _traderTargetLeverage)
+            abi.encode(_params, _requestKey, _allocationAddress, _allocation, _sizeDelta, _traderTargetLeverage)
         );
     }
 

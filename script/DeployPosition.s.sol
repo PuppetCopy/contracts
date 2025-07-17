@@ -3,6 +3,8 @@ pragma solidity ^0.8.29;
 
 import {IGasFeeCallbackReceiver} from "@gmx/contracts/callback/IGasFeeCallbackReceiver.sol";
 import {IOrderCallbackReceiver} from "@gmx/contracts/callback/IOrderCallbackReceiver.sol";
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/src/console.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
@@ -31,19 +33,20 @@ contract DeployPosition is BaseScript {
     function run() public {
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
 
-        verifySelectorsMatch();
+        // console.log("=== Deploying Position Contracts ===");
 
-        console.log("=== Deploying Position Contracts ===");
+        // // Deploy each contract with its permissions
+        // verifySelectorsMatch();
+        // AllocationStore allocationStore = deployAllocationStore();
+        // MatchingRule matchingRule = deployMatchingRule(allocationStore);
+        // Allocate allocate = deployAllocate(allocationStore, matchingRule);
+        // Settle settle = deploySettle(allocationStore);
+        // MirrorPosition mirrorPosition = deployMirrorPosition();
+        // KeeperRouter keeperRouter = deployKeeperRouter(mirrorPosition, matchingRule, allocate, settle);
 
-        // Deploy each contract with its permissions
-        AllocationStore allocationStore = deployAllocationStore();
-        MatchingRule matchingRule = deployMatchingRule(allocationStore);
-        Allocate allocate = deployAllocate(allocationStore, matchingRule);
-        Settle settle = deploySettle(allocationStore);
-        MirrorPosition mirrorPosition = deployMirrorPosition();
-        KeeperRouter keeperRouter = deployKeeperRouter(mirrorPosition, matchingRule, allocate, settle);
+        // setupUpkeepingConfig(MatchingRule(getDeployedAddress("MatchingRule")), Settle(getDeployedAddress("Settle")));
 
-        console.log("=== Position Contracts Deployment Complete ===");
+        // console.log("=== Position Contracts Deployment Complete ===");
 
         vm.stopBroadcast();
     }
@@ -180,7 +183,9 @@ contract DeployPosition is BaseScript {
      * @notice Deploys MirrorPosition contract and sets up its permissions
      * @return mirrorPosition The deployed MirrorPosition contract
      */
-    function deployMirrorPosition() internal returns (MirrorPosition) {
+    function deployMirrorPosition(
+        AllocationStore allocationStore
+    ) internal returns (MirrorPosition) {
         console.log("\n--- Deploying MirrorPosition ---");
 
         // Deploy contract
@@ -196,6 +201,8 @@ contract DeployPosition is BaseScript {
             })
         );
         console.log("MirrorPosition deployed at:", address(mirrorPosition));
+
+        dictator.setAccess(allocationStore, address(mirrorPosition));
 
         // MirrorPosition has no standalone permissions, they're set up via KeeperRouter
 
@@ -250,7 +257,6 @@ contract DeployPosition is BaseScript {
         // Settle permissions
         dictator.setPermission(settle, settle.settle.selector, address(keeperRouter));
         dictator.setPermission(settle, settle.collectDust.selector, address(keeperRouter));
-        dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, Const.dao);
 
         // MirrorPosition permissions
         dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, address(keeperRouter));
@@ -285,62 +291,21 @@ contract DeployPosition is BaseScript {
         return keeperRouter;
     }
 
-    /**
-     * @notice Upgrade a specific contract while maintaining permissions
-     * @dev Can be called to upgrade individual contracts
-     */
-    function upgradeAllocate(
-        AllocationStore allocationStore,
-        MatchingRule matchingRule,
-        KeeperRouter keeperRouter
-    ) public returns (Allocate) {
-        console.log("\n--- Upgrading Allocate ---");
-        Allocate newAllocate = deployAllocate(allocationStore, matchingRule);
+    function setupUpkeepingConfig(MatchingRule matchingRule, Settle settle) public {
+        dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, Const.dao);
 
-        // Grant KeeperRouter permissions to new Allocate contract
-        dictator.setPermission(newAllocate, newAllocate.createAllocation.selector, address(keeperRouter));
-        dictator.setPermission(newAllocate, newAllocate.collectKeeperFee.selector, address(keeperRouter));
+        IERC20[] memory allowedTokens = new IERC20[](1);
+        allowedTokens[0] = IERC20(Const.usdc);
+        uint[] memory allowanceCaps = new uint[](1);
+        allowanceCaps[0] = 100e6;
+        matchingRule.setTokenAllowanceList(allowedTokens, allowanceCaps);
 
-        console.log("Allocate upgrade complete with KeeperRouter permissions");
-        return newAllocate;
-    }
+        dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, Const.dao);
 
-    function upgradeSettle(AllocationStore allocationStore, KeeperRouter keeperRouter) public returns (Settle) {
-        console.log("\n--- Upgrading Settle ---");
-        Settle newSettle = deploySettle(allocationStore);
+        uint[] memory dustTokenThresholds = new uint[](1);
+        dustTokenThresholds[0] = 0.1e6; // 0.1 USDC
 
-        // Grant KeeperRouter permissions to new Settle contract
-        dictator.setPermission(newSettle, newSettle.settle.selector, address(keeperRouter));
-        dictator.setPermission(newSettle, newSettle.collectDust.selector, address(keeperRouter));
-
-        console.log("Settle upgrade complete with KeeperRouter permissions");
-        return newSettle;
-    }
-
-    function upgradeMatchingRule(
-        AllocationStore allocationStore
-    ) public returns (MatchingRule) {
-        console.log("\n--- Upgrading MatchingRule ---");
-        MatchingRule newMatchingRule = deployMatchingRule(allocationStore);
-        // MatchingRule doesn't need KeeperRouter permissions directly
-        console.log("MatchingRule upgrade complete");
-        return newMatchingRule;
-    }
-
-    function upgradeMirrorPosition(
-        KeeperRouter keeperRouter
-    ) public returns (MirrorPosition) {
-        console.log("\n--- Upgrading MirrorPosition ---");
-        MirrorPosition newMirrorPosition = deployMirrorPosition();
-
-        // Grant KeeperRouter permissions to new MirrorPosition contract
-        dictator.setPermission(newMirrorPosition, newMirrorPosition.requestMirror.selector, address(keeperRouter));
-        dictator.setPermission(newMirrorPosition, newMirrorPosition.requestAdjust.selector, address(keeperRouter));
-        dictator.setPermission(newMirrorPosition, newMirrorPosition.execute.selector, address(keeperRouter));
-        dictator.setPermission(newMirrorPosition, newMirrorPosition.liquidate.selector, address(keeperRouter));
-
-        console.log("MirrorPosition upgrade complete with KeeperRouter permissions");
-        return newMirrorPosition;
+        settle.setTokenDustThresholdList(allowedTokens, dustTokenThresholds);
     }
 
     function verifySelectorsMatch() public pure {

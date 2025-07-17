@@ -1,5 +1,5 @@
 import { $, file, write } from 'bun'
-import { createPublicClient, http } from 'viem'
+import { createPublicClient, getAddress, http } from 'viem'
 
 console.log('Running deployment script...')
 
@@ -78,7 +78,7 @@ latestRun.transactions.reduce((acc, tx) => {
   }
 
   acc[String(latestRun.chain)] ??= {}
-  acc[String(latestRun.chain)][tx.contractName] = tx.contractAddress
+  acc[String(latestRun.chain)][tx.contractName] = getAddress(tx.contractAddress)
 
   return acc
 }, deployments)

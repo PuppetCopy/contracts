@@ -22,13 +22,26 @@ contract DeployUserRouter is BaseScript {
         vm.stopBroadcast();
     }
 
+    Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
+
     function deployUserRouter() internal {
         RouterProxy routerProxy = RouterProxy(payable(getDeployedAddress("RouterProxy")));
         MatchingRule matchingRule = MatchingRule(getDeployedAddress("MatchingRule"));
         FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
         Allocate allocate = Allocate(getDeployedAddress("Allocate"));
 
+        dictator.setPermission(matchingRule, matchingRule.setRule.selector, address(routerProxy));
+        dictator.setPermission(matchingRule, matchingRule.deposit.selector, address(routerProxy));
+        dictator.setPermission(matchingRule, matchingRule.withdraw.selector, address(routerProxy));
+        // dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, address(routerProxy));
+
         UserRouter newRouter = new UserRouter(matchingRule, feeMarketplace, allocate);
         routerProxy.update(address(newRouter));
+
+        UserRouter(address(routerProxy)).setMatchingRule(
+            IERC20(Const.usdc),
+            DEPLOYER_ADDRESS,
+            MatchingRule.Rule({allowanceRate: 1000, throttleActivity: 1 hours, expiry: block.timestamp + 830 days})
+        );
     }
 }
