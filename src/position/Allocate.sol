@@ -108,7 +108,6 @@ contract Allocate is CoreContract {
         uint[] memory _balanceList = allocationStore.getBalanceList(_params.collateralToken, _params.puppetList);
 
         uint _feePerPuppet = _params.keeperFee / _puppetCount;
-        uint _totalAllocated = 0;
 
         uint[] memory _allocationList = new uint[](_puppetCount);
         allocationPuppetList[_allocationAddress] = new uint[](_puppetCount);
@@ -130,7 +129,7 @@ contract Allocate is CoreContract {
                 _allocationList[_i] = _puppetAllocation;
                 allocationPuppetList[_allocationAddress][_i] = _puppetAllocation;
                 _balanceList[_i] -= _puppetAllocation;
-                _totalAllocated += _puppetAllocation;
+                _allocated += _puppetAllocation;
                 lastActivityThrottleMap[_traderMatchingKey][_puppet] = block.timestamp + _rule.throttleActivity;
             }
         }
@@ -138,11 +137,11 @@ contract Allocate is CoreContract {
         allocationStore.setBalanceList(_params.collateralToken, _params.puppetList, _balanceList);
 
         require(
-            _params.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _totalAllocated),
-            Error.Allocation__KeeperFeeExceedsCostFactor(_params.keeperFee, _totalAllocated)
+            _params.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _allocated),
+            Error.Allocation__KeeperFeeExceedsCostFactor(_params.keeperFee, _allocated)
         );
 
-        _allocated = _totalAllocated - _params.keeperFee;
+        _allocated -= _params.keeperFee;
         allocationMap[_allocationAddress] = _allocated;
 
         allocationStore.transferOut(
@@ -153,7 +152,7 @@ contract Allocate is CoreContract {
         );
 
         _logEvent(
-            "CreateAllocation", abi.encode(_params, _allocationAddress, _totalAllocated, _allocated, _allocationList)
+            "CreateAllocation", abi.encode(_params, _traderMatchingKey, _allocationAddress, _allocated, _allocationList)
         );
     }
 
@@ -161,24 +160,24 @@ contract Allocate is CoreContract {
      * @notice Updates allocations when handling keeper fees for adjustments
      * @dev Reduces puppet allocations if they can't afford their share of keeper fee
      * @return _allocationAddress The allocation account address
-     * @return _nextAllocated The updated total allocation after deducting insolvencies
+     * @return _allocated The updated total allocation after deducting insolvencies
      */
     function collectKeeperFee(
         CallAllocation calldata _params
-    ) external auth returns (address _allocationAddress, uint _nextAllocated) {
+    ) external auth returns (address _allocationAddress, uint _allocated) {
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_params.collateralToken, _params.trader);
         bytes32 _allocationKey =
             PositionUtils.getAllocationKey(_params.puppetList, _traderMatchingKey, _params.allocationId);
         _allocationAddress =
             Clones.predictDeterministicAddress(allocationAccountImplementation, _allocationKey, address(this));
 
-        _nextAllocated = allocationMap[_allocationAddress];
+        _allocated = allocationMap[_allocationAddress];
 
-        require(_nextAllocated > 0, Error.Allocation__InvalidAllocation(_allocationAddress));
+        require(_allocated > 0, Error.Allocation__InvalidAllocation(_allocationAddress));
         require(_params.keeperFee > 0, Error.Allocation__InvalidKeeperExecutionFeeAmount());
         require(
-            _params.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAdjustmentRatio, _nextAllocated),
-            Error.Allocation__KeeperFeeExceedsAdjustmentRatio(_params.keeperFee, _nextAllocated)
+            _params.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAdjustmentRatio, _allocated),
+            Error.Allocation__KeeperFeeExceedsAdjustmentRatio(_params.keeperFee, _allocated)
         );
 
         uint[] memory _allocationList = allocationPuppetList[_allocationAddress];
@@ -189,8 +188,8 @@ contract Allocate is CoreContract {
             Error.Allocation__PuppetListMismatch(_allocationList.length, _puppetCount)
         );
         require(
-            _nextAllocated > _params.keeperFee,
-            Error.Allocation__InsufficientAllocationForKeeperFee(_nextAllocated, _params.keeperFee)
+            _allocated > _params.keeperFee,
+            Error.Allocation__InsufficientAllocationForKeeperFee(_allocated, _params.keeperFee)
         );
 
         uint _remainingKeeperFeeToCollect = _params.keeperFee;
@@ -213,8 +212,12 @@ contract Allocate is CoreContract {
                 _balanceList[_i] -= _executionFee;
                 _remainingKeeperFeeToCollect -= _executionFee;
             } else {
-                _allocationList[_i] = _puppetAllocation >= _executionFee ? _puppetAllocation - _executionFee : 0;
-                _keeperExecutionFeeInsolvency += _executionFee;
+                if (_puppetAllocation > _executionFee) {
+                    _allocationList[_i] = _puppetAllocation - _executionFee;
+                } else {
+                    _keeperExecutionFeeInsolvency += _puppetAllocation;
+                    _allocationList[_i] = 0;
+                }
             }
         }
 
@@ -223,16 +226,16 @@ contract Allocate is CoreContract {
             Error.Allocation__KeeperFeeNotFullyCovered(0, _remainingKeeperFeeToCollect)
         );
 
-        _nextAllocated -= _keeperExecutionFeeInsolvency;
+        _allocated -= _keeperExecutionFeeInsolvency;
 
         require(
-            _params.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAdjustmentRatio, _nextAllocated),
-            Error.Allocation__KeeperFeeExceedsAdjustmentRatio(_params.keeperFee, _nextAllocated)
+            _params.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAdjustmentRatio, _allocated),
+            Error.Allocation__KeeperFeeExceedsAdjustmentRatio(_params.keeperFee, _allocated)
         );
 
         allocationStore.setBalanceList(_params.collateralToken, _params.puppetList, _balanceList);
         allocationPuppetList[_allocationAddress] = _allocationList;
-        allocationMap[_allocationAddress] = _nextAllocated;
+        allocationMap[_allocationAddress] = _allocated;
 
         allocationStore.transferOut(
             config.transferOutGasLimit, _params.collateralToken, _params.keeperFeeReceiver, _params.keeperFee
@@ -242,16 +245,17 @@ contract Allocate is CoreContract {
             "UpdateAllocationForKeeperFee",
             abi.encode(
                 // _params, TODO: emit _params intead of individual fields like collateralToken and keeperFee
+                _traderMatchingKey,
                 _allocationAddress,
                 _params.collateralToken,
                 _params.keeperFee,
-                _nextAllocated,
+                _allocated,
                 _keeperExecutionFeeInsolvency,
                 _allocationList
             )
         );
 
-        return (_allocationAddress, _nextAllocated);
+        return (_allocationAddress, _allocated);
     }
 
     /**

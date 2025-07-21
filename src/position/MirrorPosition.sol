@@ -17,6 +17,7 @@ import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
     struct Config {
         IGmxExchangeRouter gmxExchangeRouter;
+        // IGmx gmxExchangeRouter;
         address gmxOrderVault;
         bytes32 referralCode;
         uint increaseCallbackGasLimit;
@@ -126,11 +127,9 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
         require(_allocationAddress != address(0), Error.MirrorPosition__InvalidAllocation(_allocationAddress));
         require(_allocation > 0, "Invalid net allocation");
 
-        // Calculate position size proportional to trader's leverage
         uint _traderTargetLeverage = Precision.toBasisPoints(_params.sizeDeltaInUsd, _params.collateralDelta);
         uint _sizeDelta = Math.mulDiv(_params.sizeDeltaInUsd, _allocation, _params.collateralDelta);
 
-        // Submit GMX order
         _requestKey = _submitOrder(
             _params,
             _allocationAddress,
@@ -141,7 +140,6 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
             _callbackContract
         );
 
-        // Store request details for execute callback
         requestAdjustmentMap[_requestKey] = RequestAdjustment({
             allocationAddress: _allocationAddress,
             traderIsIncrease: true,
@@ -152,8 +150,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
         });
 
         _logEvent(
-            "RequestMirror",
-            abi.encode(_params, _requestKey, _allocationAddress, _allocation, _sizeDelta, _traderTargetLeverage)
+            "RequestMirror", abi.encode(_params, _allocationAddress, _sizeDelta, _traderTargetLeverage, _requestKey)
         );
     }
 
