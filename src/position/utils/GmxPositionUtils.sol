@@ -2,6 +2,7 @@
 pragma solidity ^0.8.29;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IGmxReadDataStore} from "../interface/IGmxReadDataStore.sol";
 
 library GmxPositionUtils {
     bytes32 public constant SIZE_IN_USD_KEY = keccak256(abi.encode("SIZE_IN_USD"));
@@ -253,5 +254,51 @@ library GmxPositionUtils {
         bool isLong
     ) internal pure returns (bytes32) {
         return keccak256(abi.encode(account, market, collateralToken, isLong));
+    }
+
+    /**
+     * @notice Gets the storage key for position size in USD
+     * @param positionKey The position key (hash of account, market, collateralToken, isLong)
+     * @return The storage key for size in USD
+     */
+    function getPositionSizeKey(bytes32 positionKey) internal pure returns (bytes32) {
+        return keccak256(abi.encode(positionKey, SIZE_IN_USD_KEY));
+    }
+
+    /**
+     * @notice Gets the storage key for position collateral amount
+     * @param positionKey The position key (hash of account, market, collateralToken, isLong)
+     * @return The storage key for collateral amount
+     */
+    function getPositionCollateralKey(bytes32 positionKey) internal pure returns (bytes32) {
+        return keccak256(abi.encode(positionKey, COLLATERAL_AMOUNT_KEY));
+    }
+
+    /**
+     * @notice Reads the position size in USD from GMX DataStore
+     * @param dataStore The GMX DataStore contract
+     * @param positionKey The position key
+     * @return The position size in USD (0 if position doesn't exist)
+     */
+    function getPositionSizeInUsd(
+        IGmxReadDataStore dataStore,
+        bytes32 positionKey
+    ) internal view returns (uint) {
+        bytes32 sizeKey = getPositionSizeKey(positionKey);
+        return dataStore.getUint(sizeKey);
+    }
+
+    /**
+     * @notice Reads the position collateral amount from GMX DataStore
+     * @param dataStore The GMX DataStore contract
+     * @param positionKey The position key
+     * @return The position collateral amount (0 if position doesn't exist)
+     */
+    function getPositionCollateralAmount(
+        IGmxReadDataStore dataStore,
+        bytes32 positionKey
+    ) internal view returns (uint) {
+        bytes32 collateralKey = getPositionCollateralKey(positionKey);
+        return dataStore.getUint(collateralKey);
     }
 }

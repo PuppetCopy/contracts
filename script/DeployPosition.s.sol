@@ -4,6 +4,7 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/src/console.sol";
 
+import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
 import {KeeperRouter} from "src/keeperRouter.sol";
 import {Allocate} from "src/position/Allocate.sol";
 import {MatchingRule} from "src/position/MatchingRule.sol";
@@ -194,6 +195,7 @@ contract DeployPosition is BaseScript {
                 referralCode: Const.referralCode,
                 increaseCallbackGasLimit: 2e6,
                 decreaseCallbackGasLimit: 2e6,
+                gmxDataStore: IGmxReadDataStore(Const.gmxDataStore),
                 fallbackRefundExecutionFeeReceiver: Const.dao
             })
         );
@@ -239,6 +241,8 @@ contract DeployPosition is BaseScript {
                 mirrorPerPuppetGasLimit: 30_000, // Conservative estimate for additional puppets
                 adjustBaseGasLimit: 910_663, // Keep existing (need adjust operation analysis)
                 adjustPerPuppetGasLimit: 3_412, // Keep existing (need adjust operation analysis)
+                settleBaseGasLimit: 1_300_853, // Based on empirical single-puppet test
+                settlePerPuppetGasLimit: 30_000, // Conservative estimate for additional pupp
                 fallbackRefundExecutionFeeReceiver: Const.dao // Fallback receiver for execution fee refunds
             })
         );

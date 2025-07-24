@@ -86,7 +86,7 @@ contract TradingForkTest is ForkTestBase {
             sizeDeltaInUsd: positionSize,
             acceptablePrice: acceptablePrice,
             triggerPrice: 0,
-            requestKey: bytes32(0)
+            traderRequestKey: bytes32(0)
         });
 
         console.log("\n--- Position Parameters ---");
@@ -285,7 +285,7 @@ contract TradingForkTest is ForkTestBase {
             sizeDeltaInUsd: 5000e30,
             acceptablePrice: 4000e30,
             triggerPrice: 0,
-            requestKey: bytes32(0)
+            traderRequestKey: bytes32(0)
         });
 
         // Measure gas
@@ -345,7 +345,7 @@ contract TradingForkTest is ForkTestBase {
             sizeDeltaInUsd: positionSize,
             acceptablePrice: acceptablePrice,
             triggerPrice: 0,
-            requestKey: bytes32(0)
+            traderRequestKey: bytes32(0)
         });
 
         // Step 1: Mirror Request - Keeper submits position to GMX

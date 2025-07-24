@@ -4,7 +4,6 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-import {Allocate} from "./position/Allocate.sol";
 import {MatchingRule} from "./position/MatchingRule.sol";
 import {MirrorPosition} from "./position/MirrorPosition.sol";
 import {Settle} from "./position/Settle.sol";
@@ -26,12 +25,13 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         uint mirrorPerPuppetGasLimit;
         uint adjustBaseGasLimit;
         uint adjustPerPuppetGasLimit;
+        uint settleBaseGasLimit;
+        uint settlePerPuppetGasLimit;
         address fallbackRefundExecutionFeeReceiver;
     }
 
     MatchingRule public immutable matchingRule;
     MirrorPosition public immutable mirrorPosition;
-    Allocate public immutable allocate;
     Settle public immutable settle;
 
     Config config;
@@ -40,7 +40,6 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         IAuthority _authority,
         MirrorPosition _mirrorPosition,
         MatchingRule _matchingRule,
-        Allocate _allocate,
         Settle _settle,
         Config memory _config
     ) CoreContract(_authority, abi.encode(_config)) {
@@ -51,7 +50,6 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
 
         mirrorPosition = _mirrorPosition;
         matchingRule = _matchingRule;
-        allocate = _allocate;
         settle = _settle;
     }
 
@@ -65,22 +63,16 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
 
     /**
      * @notice Orchestrates mirror position creation by coordinating Allocation and MirrorPosition
-     * @param _allocParams Allocation parameters for puppet fund management
-     * @param _callParams Position parameters for the trader's action
-     * @return _allocationAddress The allocation account address created
-     * @return _requestKey The GMX request key for the submitted order
+     * @param _callParams Position parameters for the trader's position
+     * @param _puppetList List of puppet addresses to mirror the position
+     * @return _allocationAddress The allocation address created for the position
+     * @return _requestKey The GMX request key for the submitted position
      */
     function requestMirror(
-        Allocate.CallAllocation calldata _allocParams,
-        MirrorPosition.CallPosition calldata _callParams
+        MirrorPosition.CallPosition calldata _callParams,
+        address[] calldata _puppetList
     ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
-        (address allocationAddress, uint totalAllocated) = allocate.createAllocation(matchingRule, _allocParams);
-
-        _requestKey = mirrorPosition.requestMirror{value: msg.value}(
-            _callParams, allocationAddress, totalAllocated, address(this)
-        );
-
-        return (allocationAddress, _requestKey);
+        return mirrorPosition.requestOpen{value: msg.value}(matchingRule, _callParams, _puppetList);
     }
 
     /**
@@ -97,6 +89,22 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
 
         _requestKey =
             mirrorPosition.requestAdjust{value: msg.value}(_callParams, allocationAddress, nextAllocated, address(this));
+
+        return _requestKey;
+    }
+
+    /**
+     * @notice Closes a stalled position where the trader has exited but puppet position remains
+     * @param _callParams Position parameters for the stalled position
+     * @param _allocationAddress The allocation address of the stalled position
+     * @return _requestKey The GMX request key for the close order
+     */
+    function requestCloseStalledPosition(
+        MirrorPosition.CallPosition calldata _callParams,
+        address _allocationAddress
+    ) external payable auth nonReentrant returns (bytes32 _requestKey) {
+        _requestKey =
+            mirrorPosition.requestCloseStalledPosition{value: msg.value}(_callParams, _allocationAddress, address(this));
 
         return _requestKey;
     }

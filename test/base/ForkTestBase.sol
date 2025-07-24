@@ -5,23 +5,22 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test} from "forge-std/src/Test.sol";
 import {console} from "forge-std/src/console.sol";
 
-import {Const} from "script/Const.sol";
-
 import {UserRouter} from "src/UserRouter.sol";
 import {KeeperRouter} from "src/keeperRouter.sol";
 import {Allocate} from "src/position/Allocate.sol";
-
 import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
+import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
 import {AllocationStore} from "src/shared/AllocationStore.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
-
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
+
+import {Const} from "script/Const.sol";
 
 /**
  * @title ForkTestBase
@@ -246,6 +245,7 @@ abstract contract ForkTestBase is Test {
             MirrorPosition.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(Const.gmxExchangeRouter),
                 gmxOrderVault: Const.gmxOrderVault,
+                gmxDataStore: IGmxReadDataStore(Const.gmxDataStore),
                 referralCode: bytes32("PUPPET"),
                 increaseCallbackGasLimit: 2e6,
                 decreaseCallbackGasLimit: 2e6,
@@ -271,6 +271,8 @@ abstract contract ForkTestBase is Test {
                 mirrorPerPuppetGasLimit: 30_000, // Conservative estimate for additional puppets
                 adjustBaseGasLimit: 910_663, // Keep existing (need adjust operation analysis)
                 adjustPerPuppetGasLimit: 3_412, // Keep existing (need adjust operation analysis)
+                settleBaseGasLimit: 1_300_853, // Based on empirical single-puppet test
+                settlePerPuppetGasLimit: 30_000, // Conservative estimate for additional puppets
                 fallbackRefundExecutionFeeReceiver: owner
             })
         );

@@ -71,6 +71,7 @@ library Error {
     error MirrorPosition__InitialMustBeIncrease();
     error MirrorPosition__NoAdjustmentRequired();
     error MirrorPosition__PositionNotFound(address allocationAddress);
+    error MirrorPosition__PositionNotStalled(address allocationAddress, bytes32 positionKey);
     error MirrorPosition__TraderCollateralZero(address allocationAddress);
     error MirrorPosition__DustTransferFailed(address token, address account);
     error MirrorPosition__InsufficientGmxExecutionFee(uint provided, uint required);
