@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-import {MatchingRule} from "./position/MatchingRule.sol";
+import {Rule} from "./position/Rule.sol";
 import {MirrorPosition} from "./position/MirrorPosition.sol";
 import {Settle} from "./position/Settle.sol";
 import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
@@ -30,7 +30,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         address fallbackRefundExecutionFeeReceiver;
     }
 
-    MatchingRule public immutable matchingRule;
+    Rule public immutable ruleContract;
     MirrorPosition public immutable mirrorPosition;
     Settle public immutable settle;
 
@@ -39,16 +39,16 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
     constructor(
         IAuthority _authority,
         MirrorPosition _mirrorPosition,
-        MatchingRule _matchingRule,
+        Rule _ruleContract,
         Settle _settle,
         Config memory _config
     ) CoreContract(_authority, abi.encode(_config)) {
         require(address(_mirrorPosition) != address(0), "MirrorPosition not set correctly");
-        require(address(_matchingRule) != address(0), "MatchingRule not set correctly");
+        require(address(_ruleContract) != address(0), "Rule contract not set correctly");
         require(address(_settle) != address(0), "Settle not set correctly");
 
         mirrorPosition = _mirrorPosition;
-        matchingRule = _matchingRule;
+        ruleContract = _ruleContract;
         settle = _settle;
     }
 
@@ -71,7 +71,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         MirrorPosition.CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
-        return mirrorPosition.requestOpen{value: msg.value}(matchingRule, _callParams, _puppetList);
+        return mirrorPosition.requestOpen{value: msg.value}(ruleContract, _callParams, _puppetList);
     }
 
     /**

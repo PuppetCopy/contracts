@@ -5,7 +5,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/src/console.sol";
 
 import {UserRouter} from "src/UserRouter.sol";
-import {MatchingRule} from "src/position/MatchingRule.sol";
+import {Rule} from "src/position/Rule.sol";
+import {Deposit} from "src/position/Deposit.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
@@ -25,22 +26,23 @@ contract DeployUserRouter is BaseScript {
 
     function deployUserRouter() internal {
         RouterProxy routerProxy = RouterProxy(payable(getDeployedAddress("RouterProxy")));
-        MatchingRule matchingRule = MatchingRule(getDeployedAddress("MatchingRule"));
+        Rule ruleContract = Rule(getDeployedAddress("Rule"));
+        Deposit depositContract = Deposit(getDeployedAddress("Deposit"));
         FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
         MirrorPosition mirrorPosition = MirrorPosition(getDeployedAddress("MirrorPosition"));
 
-        dictator.setPermission(matchingRule, matchingRule.setRule.selector, address(routerProxy));
-        dictator.setPermission(matchingRule, matchingRule.deposit.selector, address(routerProxy));
-        dictator.setPermission(matchingRule, matchingRule.withdraw.selector, address(routerProxy));
+        dictator.setPermission(ruleContract, ruleContract.setRule.selector, address(routerProxy));
+        dictator.setPermission(depositContract, depositContract.deposit.selector, address(routerProxy));
+        dictator.setPermission(depositContract, depositContract.withdraw.selector, address(routerProxy));
         // dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, address(routerProxy));
 
-        UserRouter newRouter = new UserRouter(matchingRule, feeMarketplace, mirrorPosition);
+        UserRouter newRouter = new UserRouter(depositContract, ruleContract, feeMarketplace, mirrorPosition);
         routerProxy.update(address(newRouter));
 
         UserRouter(address(routerProxy)).setMatchingRule(
             IERC20(Const.usdc),
             DEPLOYER_ADDRESS,
-            MatchingRule.Rule({allowanceRate: 1000, throttleActivity: 1 hours, expiry: block.timestamp + 830 days})
+            Rule.RuleParams({allowanceRate: 1000, throttleActivity: 1 hours, expiry: block.timestamp + 830 days})
         );
     }
 }

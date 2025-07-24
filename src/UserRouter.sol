@@ -5,7 +5,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {MirrorPosition} from "./position/MirrorPosition.sol";
-import {MatchingRule} from "./position/MatchingRule.sol";
+import {Deposit} from "./position/Deposit.sol";
+import {Rule} from "./position/Rule.sol";
 import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
 
 /**
@@ -14,12 +15,14 @@ import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
  * @dev Contains deposit, withdraw, rule setting, and offer acceptance functionality
  */
 contract UserRouter is ReentrancyGuardTransient {
-    MatchingRule public immutable matchingRule;
+    Deposit public immutable depositContract;
+    Rule public immutable ruleContract;
     FeeMarketplace public immutable feeMarketplace;
     MirrorPosition public immutable mirrorPosition;
 
-    constructor(MatchingRule _matchingRule, FeeMarketplace _feeMarketplace, MirrorPosition _mirrorPosition) {
-        matchingRule = _matchingRule;
+    constructor(Deposit _depositContract, Rule _ruleContract, FeeMarketplace _feeMarketplace, MirrorPosition _mirrorPosition) {
+        depositContract = _depositContract;
+        ruleContract = _ruleContract;
         feeMarketplace = _feeMarketplace;
         mirrorPosition = _mirrorPosition;
     }
@@ -30,7 +33,7 @@ contract UserRouter is ReentrancyGuardTransient {
      * @param amount The amount being deposited.
      */
     function deposit(IERC20 token, uint amount) external nonReentrant {
-        matchingRule.deposit(token, msg.sender, msg.sender, amount);
+        depositContract.deposit(token, msg.sender, msg.sender, amount);
     }
 
     /**
@@ -40,7 +43,7 @@ contract UserRouter is ReentrancyGuardTransient {
      * @param amount The amount being withdrawn.
      */
     function withdraw(IERC20 token, address receiver, uint amount) external nonReentrant {
-        matchingRule.withdraw(token, msg.sender, receiver, amount);
+        depositContract.withdraw(token, msg.sender, receiver, amount);
     }
 
     /**
@@ -52,9 +55,9 @@ contract UserRouter is ReentrancyGuardTransient {
     function setMatchingRule(
         IERC20 collateralToken,
         address trader,
-        MatchingRule.Rule calldata ruleParams
+        Rule.RuleParams calldata ruleParams
     ) external nonReentrant {
-        matchingRule.setRule(mirrorPosition, collateralToken, msg.sender, trader, ruleParams);
+        ruleContract.setRule(mirrorPosition, collateralToken, msg.sender, trader, ruleParams);
     }
 
     /**

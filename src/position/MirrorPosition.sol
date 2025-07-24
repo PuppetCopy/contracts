@@ -13,7 +13,7 @@ import {AllocationAccount} from "./../shared/AllocationAccount.sol";
 import {Error} from "./../utils/Error.sol";
 import {ErrorUtils} from "./../utils/ErrorUtils.sol";
 import {Precision} from "./../utils/Precision.sol";
-import {MatchingRule} from "./MatchingRule.sol";
+import {Rule} from "./Rule.sol";
 import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
 import {IGmxReadDataStore} from "./interface/IGmxReadDataStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
@@ -139,12 +139,12 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
      * (`allocationMap`) and the GMX request details (`requestAdjustmentMap`),
      * which are necessary for future adjustments or settlement via the `execute` function upon GMX callback.
      * Emits a `Mirror` event with key details.
-     * @param _matchingRule The matching rule contract used to determine allocation amounts for each puppet.
+     * @param _ruleContract The rule contract used to determine allocation amounts for each puppet.
      * @param _callParams The parameters for the position to be mirrored, including market, collateral token,
      * @param _puppetList The list of puppet addresses to allocate funds to
      */
     function requestOpen(
-        MatchingRule _matchingRule,
+        Rule _ruleContract,
         CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
@@ -164,7 +164,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
         _allocationAddress = Clones.cloneDeterministic(allocationAccountImplementation, _allocationKey);
 
         // Get rules and balances
-        MatchingRule.Rule[] memory _rules = _matchingRule.getRuleList(_traderMatchingKey, _puppetList);
+        Rule.RuleParams[] memory _rules = _ruleContract.getRuleList(_traderMatchingKey, _puppetList);
         uint[] memory _balanceList = allocationStore.getBalanceList(_callParams.collateralToken, _puppetList);
 
         uint _feePerPuppet = _callParams.keeperFee / _puppetCount;
@@ -174,7 +174,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
             address _puppet = _puppetList[_i];
-            MatchingRule.Rule memory _rule = _rules[_i];
+            Rule.RuleParams memory _rule = _rules[_i];
 
             if (
                 _rule.expiry > block.timestamp

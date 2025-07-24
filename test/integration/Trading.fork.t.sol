@@ -6,7 +6,7 @@ import {console} from "forge-std/src/console.sol";
 import {Const} from "script/Const.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
-import {MatchingRule} from "src/position/MatchingRule.sol";
+import {Rule} from "src/position/Rule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {Settle} from "src/position/Settle.sol";
 
@@ -198,7 +198,7 @@ contract TradingForkTest is ForkTestBase {
         userRouter.setMatchingRule(
             USDC,
             trader,
-            MatchingRule.Rule({
+            Rule.RuleParams({
                 allowanceRate: 1000, // 10%
                 throttleActivity: 1 hours,
                 expiry: block.timestamp + 30 days
@@ -243,6 +243,167 @@ contract TradingForkTest is ForkTestBase {
         }
 
         console.log("\n=== Gas Analysis Complete ===");
+    }
+
+    /**
+     * @notice Comprehensive gas analysis for settle operations across different puppet counts
+     * @dev Tests gas consumption patterns for settlement operations to determine empirical limits
+     */
+    function testSettleGasAnalysisReport() public {
+        skipIfNoRPC();
+        if (!isRPCAvailable) return;
+
+        console.log("\n=== Settle Gas Analysis Report ===");
+        console.log("Purpose: Determine accurate gas limits for settle operations");
+        console.log("Note: Simulates realistic settle conditions with funded allocation accounts");
+
+        // Test with 1 puppet
+        uint gas1Puppet = _testSettleGasUsage(1, "1 Puppet Settle");
+
+        // Test with 2 puppets
+        uint gas2Puppets = _testSettleGasUsage(2, "2 Puppets Settle");
+
+        // Test with 3 puppets (add puppet3)
+        address puppet3 = makeAddr("puppet3");
+
+        // Fund puppet3
+        vm.startPrank(USDC_WHALE);
+        USDC.transfer(puppet3, 15000e6);
+        vm.stopPrank();
+
+        vm.deal(puppet3, 10 ether);
+
+        // Setup trading rule for puppet3
+        vm.prank(puppet3);
+        USDC.approve(address(tokenRouter), 7500e6);
+        vm.prank(puppet3);
+        userRouter.deposit(USDC, 7500e6);
+
+        vm.prank(puppet3);
+        userRouter.setMatchingRule(
+            USDC,
+            trader,
+            Rule.RuleParams({
+                allowanceRate: 1000, // 10%
+                throttleActivity: 1 hours,
+                expiry: block.timestamp + 30 days
+            })
+        );
+
+        uint gas3Puppets = _testSettleGasUsage(3, "3 Puppets Settle");
+
+        // Calculate settle gas analysis
+        console.log("\n--- Settle Gas Analysis Results ---");
+        console.log("1 Puppet Settle:", gas1Puppet);
+        console.log("2 Puppets Settle:", gas2Puppets);
+        console.log("3 Puppets Settle:", gas3Puppets);
+
+        // Calculate incremental costs
+        int perPuppetCost12 = int(gas2Puppets) - int(gas1Puppet);
+        int perPuppetCost23 = int(gas3Puppets) - int(gas2Puppets);
+
+        console.log("\n--- Settle Incremental Analysis ---");
+        console.log("Per-puppet cost (1->2):", perPuppetCost12 >= 0 ? uint(perPuppetCost12) : 0);
+        console.log("  (Negative indicates gas savings)");
+        console.log("Per-puppet cost (2->3):", perPuppetCost23 >= 0 ? uint(perPuppetCost23) : 0);
+        console.log("  (Negative indicates gas savings)");
+
+        // Use highest gas usage as conservative estimate
+        uint maxSettleGas = gas1Puppet;
+        if (gas2Puppets > maxSettleGas) maxSettleGas = gas2Puppets;
+        if (gas3Puppets > maxSettleGas) maxSettleGas = gas3Puppets;
+
+        // Calculate actual per-puppet cost from data
+        uint actualPerPuppet = 0;
+        if (gas3Puppets > gas1Puppet && gas3Puppets > gas2Puppets) {
+            // If 3-puppet is highest, use difference between 3 and 1 divided by 2
+            actualPerPuppet = (gas3Puppets - gas1Puppet) / 2;
+        } else if (gas2Puppets > gas1Puppet) {
+            // If 2-puppet is higher than 1, use that difference
+            actualPerPuppet = gas2Puppets - gas1Puppet;
+        } else {
+            // Use conservative estimate if gas doesn't increase predictably
+            actualPerPuppet = 15000; // Conservative estimate based on typical ERC20 transfers
+        }
+
+        console.log("\n--- Recommended Settle Gas Limits ---");
+        console.log("Settle Base Gas Limit:", maxSettleGas);
+        console.log("Settle Per-Puppet Gas Limit:", actualPerPuppet);
+
+        // Project costs for larger puppet counts
+        console.log("\n--- Projected Settle Gas Usage ---");
+        for (uint i = 5; i <= 20; i += 5) {
+            uint projected = maxSettleGas + (actualPerPuppet * (i - 1));
+            console.log(string.concat("Projected ", vm.toString(i), " puppets:"), projected);
+        }
+
+        console.log("\n=== Settle Gas Analysis Complete ===");
+    }
+
+    function _testSettleGasUsage(uint puppetCount, string memory testName) internal returns (uint gasUsed) {
+        console.log(string.concat("\n--- Testing ", testName, " ---"));
+
+        // Setup puppet list based on count
+        address[] memory puppetList = new address[](puppetCount);
+        puppetList[0] = puppet1;
+        if (puppetCount > 1) puppetList[1] = puppet2;
+        if (puppetCount > 2) puppetList[2] = makeAddr("puppet3");
+
+        uint allocationId = 200 + puppetCount; // Unique allocation ID for settle test
+
+        // Step 1: Create a mirror position first
+        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
+            collateralToken: USDC,
+            traderRequestKey: bytes32(0),
+            trader: trader,
+            market: Const.gmxEthUsdcMarket,
+            isIncrease: true,
+            isLong: true,
+            executionFee: EXECUTION_FEE,
+            collateralDelta: 500e30, // $500
+            sizeDeltaInUsd: 2000e30, // $2000 (4x leverage)
+            acceptablePrice: 4000e30,
+            triggerPrice: 0,
+            allocationId: allocationId,
+            keeperFee: KEEPER_FEE,
+            keeperFeeReceiver: keeper
+        });
+
+        vm.prank(keeper);
+        (address allocationAddress,) = keeperRouter.requestOpen{value: EXECUTION_FEE}(callParams, puppetList);
+
+        console.log("Created allocation:", allocationAddress);
+
+        // Step 2: Simulate position being closed by funding the allocation account
+        // This simulates GMX position closure profits being sent to the allocation account
+        uint settlementAmount = 600e6; // $600 profit simulation
+        vm.prank(USDC_WHALE);
+        USDC.transfer(allocationAddress, settlementAmount);
+
+        console.log("Funded allocation account with:", settlementAmount);
+
+        // Step 3: Now test the actual settle operation
+        Settle.CallSettle memory settleParams = Settle.CallSettle({
+            collateralToken: USDC,
+            distributionToken: USDC,
+            keeperFeeReceiver: keeper,
+            trader: trader,
+            allocationId: allocationId,
+            keeperExecutionFee: KEEPER_FEE
+        });
+
+        // Measure settle gas
+        uint gasStart = gasleft();
+
+        vm.prank(keeper);
+        keeperRouter.settleAllocation(settleParams, puppetList);
+
+        gasUsed = gasStart - gasleft();
+
+        console.log("Settle Gas Used:", gasUsed);
+        console.log("Settlement completed for allocation:", allocationAddress);
+
+        return gasUsed;
     }
 
     function _testMirrorGasUsage(uint puppetCount, string memory testName) internal returns (uint gasUsed) {

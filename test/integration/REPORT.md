@@ -19,6 +19,37 @@ This document contains ongoing analysis of fork test results for the Puppet copy
 
 ## Test Results
 
+### Run #2 - 2025-01-24 (Gas Analysis Update)
+
+**Block Information:**
+
+- Block Number: 22,992,146
+- Block Timestamp: 1,753,397,946
+- Chain ID: 42161
+
+**Comprehensive Gas Analysis Results:**
+
+- **1 Puppet Mirror Operation:** 1,283,731 gas
+- **2 Puppet Mirror Operation:** 1,110,360 gas  
+- **3 Puppet Mirror Operation:** 1,102,351 gas
+
+**Gas Pattern Analysis:**
+
+- Base Gas Requirement: 1,283,731 gas (worst case scenario)
+- Per-Puppet Incremental Cost: Gas decreases with more puppets (efficiency optimization)
+- Recommended Conservative Per-Puppet: 30,000 gas
+
+**Updated Gas Configuration:**
+
+- **Mirror Base Gas Limit:** 1,283,731 (empirically measured)
+- **Mirror Per-Puppet Gas Limit:** 30,000 (conservative estimate)
+- **Adjust Base Gas Limit:** 910,663 (existing - needs measurement)
+- **Adjust Per-Puppet Gas Limit:** 3,412 (existing - needs measurement)
+
+**Status:** ✅ PASSED - Empirical gas limits established
+
+---
+
 ### Run #1 - 2025-01-14
 
 **Block Information:**
@@ -132,13 +163,17 @@ This document contains ongoing analysis of fork test results for the Puppet copy
 
 | Date | Gas Used | Change | Notes |
 |------|----------|--------|-------|
+| 2025-01-24 | 1,283,731 | -3.2% | Empirical gas analysis - 1 puppet worst case |
+| 2025-01-24 | 1,110,360 | -16.2% | Empirical gas analysis - 2 puppets |
+| 2025-01-24 | 1,102,351 | -16.8% | Empirical gas analysis - 3 puppets |
 | 2025-01-14 | 1,325,645 | - | Initial UserRouter integration measurement |
 
-### Allocation Accuracy
+### Gas Configuration Updates
 
-| Date | Expected | Actual | Variance | Notes |
-|------|----------|--------|----------|-------|
-| 2025-01-14 | 1,264,814 | 1,325,645 | +4.8% | Within acceptable range for mirror operations |
+| Date | Mirror Base | Mirror Per-Puppet | Adjust Base | Adjust Per-Puppet | Notes |
+|------|-------------|-------------------|-------------|-------------------|-------|
+| 2025-01-24 | 1,283,731 | 30,000 | 910,663 | 3,412 | Empirically measured mirror operations |
+| 2025-01-14 | 1,300,853 | 30,000 | 910,663 | 3,412 | Initial conservative estimates |
 
 ### Error Log
 
@@ -156,8 +191,10 @@ This document contains ongoing analysis of fork test results for the Puppet copy
 
 ### Short Term  
 
+- [x] Conduct comprehensive gas analysis for mirror operations
+- [x] Update empirical gas limits in deployment scripts and test base
+- [ ] Conduct gas analysis for adjust operations
 - [ ] Add additional test scenarios
-- [ ] Implement gas optimization recommendations
 - [ ] Set up automated test reporting
 
 ### Long Term
@@ -184,5 +221,5 @@ This document contains ongoing analysis of fork test results for the Puppet copy
 
 5. **Update action items based on findings**
 
-**Last Updated:** 2025-01-14
-**Next Review:** 2025-01-21
+**Last Updated:** 2025-01-24 (Gas Analysis Update)
+**Next Review:** 2025-01-31

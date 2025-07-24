@@ -7,7 +7,8 @@ import {console} from "forge-std/src/console.sol";
 
 import {UserRouter} from "src/UserRouter.sol";
 import {KeeperRouter} from "src/keeperRouter.sol";
-import {MatchingRule} from "src/position/MatchingRule.sol";
+import {Rule} from "src/position/Rule.sol";
+import {Deposit} from "src/position/Deposit.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
@@ -40,7 +41,8 @@ abstract contract ForkTestBase is Test {
     FeeMarketplaceStore public feeMarketplaceStore;
     // Note: Allocate functionality has been merged into MirrorPosition
     Settle public settle;
-    MatchingRule public matchingRule;
+    Rule public ruleContract;
+    Deposit public depositContract;
     MirrorPosition public mirrorPosition;
     KeeperRouter public keeperRouter;
     UserRouter public userRouter;
@@ -153,7 +155,7 @@ abstract contract ForkTestBase is Test {
         userRouter.setMatchingRule(
             USDC,
             trader,
-            MatchingRule.Rule({
+            Rule.RuleParams({
                 allowanceRate: puppet1Rate,
                 throttleActivity: throttlePeriod,
                 expiry: block.timestamp + expiryPeriod
@@ -164,7 +166,7 @@ abstract contract ForkTestBase is Test {
         userRouter.setMatchingRule(
             USDC,
             trader,
-            MatchingRule.Rule({
+            Rule.RuleParams({
                 allowanceRate: puppet2Rate,
                 throttleActivity: throttlePeriod,
                 expiry: block.timestamp + expiryPeriod
@@ -216,16 +218,22 @@ abstract contract ForkTestBase is Test {
             })
         );
 
-        matchingRule = new MatchingRule(
+        ruleContract = new Rule(
             dictator,
-            allocationStore,
-            MatchingRule.Config({
-                transferOutGasLimit: 200_000,
+            Rule.Config({
                 minExpiryDuration: 1 hours,
                 minAllowanceRate: 100,
                 maxAllowanceRate: 10000,
                 minActivityThrottle: 1 hours,
                 maxActivityThrottle: 30 days
+            })
+        );
+
+        depositContract = new Deposit(
+            dictator,
+            allocationStore,
+            Deposit.Config({
+                transferOutGasLimit: 200_000
             })
         );
 
@@ -248,45 +256,49 @@ abstract contract ForkTestBase is Test {
         );
 
         // Debug: Log the config we're passing to constructor
-        console.log("\\n--- Debug: Config being passed to KeeperRouter ---");
-        console.log("mirrorBaseGas: 1206566");
-        console.log("mirrorPerPuppetGas: 29124");
-        console.log("adjustBaseGas: 910663");
-        console.log("adjustPerPuppetGas: 3412");
+        console.log("\\n--- Debug: Updated empirical gas config ---");
+        console.log("mirrorBaseGas: 1283731 (empirically measured)");
+        console.log("mirrorPerPuppetGas: 30000 (conservative estimate)");
+        console.log("adjustBaseGas: 910663 (needs empirical measurement)");
+        console.log("adjustPerPuppetGas: 3412 (needs empirical measurement)");
+        console.log("settleBaseGas: 90847 (empirically measured)");
+        console.log("settlePerPuppetGas: 15000 (empirically measured)");
 
         keeperRouter = new KeeperRouter(
             dictator,
             mirrorPosition,
-            matchingRule,
+            ruleContract,
             settle,
             KeeperRouter.Config({
-                mirrorBaseGasLimit: 1_300_853, // Based on empirical single-puppet test
-                mirrorPerPuppetGasLimit: 30_000, // Conservative estimate for additional puppets
-                adjustBaseGasLimit: 910_663, // Keep existing (need adjust operation analysis)
-                adjustPerPuppetGasLimit: 3_412, // Keep existing (need adjust operation analysis)
-                settleBaseGasLimit: 1_300_853, // Based on empirical single-puppet test
-                settlePerPuppetGasLimit: 30_000, // Conservative estimate for additional puppets
+                mirrorBaseGasLimit: 1_283_731,
+                mirrorPerPuppetGasLimit: 30_000,
+                adjustBaseGasLimit: 910_663,
+                adjustPerPuppetGasLimit: 3_412,
+                settleBaseGasLimit: 90_847,
+                settlePerPuppetGasLimit: 15_000,
                 fallbackRefundExecutionFeeReceiver: owner
             })
         );
-        userRouter = new UserRouter(matchingRule, feeMarketplace, mirrorPosition);
+        userRouter = new UserRouter(depositContract, ruleContract, feeMarketplace, mirrorPosition);
     }
 
     function _setupPermissions() private {
         // Store access
         // Note: allocate access moved to mirrorPosition
         dictator.setAccess(allocationStore, address(settle));
-        dictator.setAccess(allocationStore, address(matchingRule));
+        dictator.setAccess(allocationStore, address(depositContract));
         dictator.setAccess(allocationStore, address(mirrorPosition));
 
         // Core permissions
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
-        dictator.setPermission(mirrorPosition, mirrorPosition.initializeTraderActivityThrottle.selector, address(matchingRule));
+        dictator.setPermission(
+            mirrorPosition, mirrorPosition.initializeTraderActivityThrottle.selector, address(ruleContract)
+        );
 
         // UserRouter permissions
-        dictator.setPermission(matchingRule, matchingRule.deposit.selector, address(userRouter));
-        dictator.setPermission(matchingRule, matchingRule.withdraw.selector, address(userRouter));
-        dictator.setPermission(matchingRule, matchingRule.setRule.selector, address(userRouter));
+        dictator.setPermission(depositContract, depositContract.deposit.selector, address(userRouter));
+        dictator.setPermission(depositContract, depositContract.withdraw.selector, address(userRouter));
+        dictator.setPermission(ruleContract, ruleContract.setRule.selector, address(userRouter));
         dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, address(userRouter));
 
         // KeeperRouter permissions
@@ -306,7 +318,7 @@ abstract contract ForkTestBase is Test {
         dictator.setPermission(keeperRouter, keeperRouter.refundExecutionFee.selector, address(keeperRouter));
 
         // Admin permissions
-        dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, owner);
+        dictator.setPermission(depositContract, depositContract.setTokenAllowanceList.selector, owner);
         dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, owner);
     }
 
@@ -315,7 +327,8 @@ abstract contract ForkTestBase is Test {
         dictator.registerContract(feeMarketplace);
         // Note: allocate functionality merged into mirrorPosition
         dictator.registerContract(settle);
-        dictator.registerContract(matchingRule);
+        dictator.registerContract(ruleContract);
+        dictator.registerContract(depositContract);
         dictator.registerContract(mirrorPosition);
         dictator.registerContract(keeperRouter);
     }
@@ -326,7 +339,7 @@ abstract contract ForkTestBase is Test {
         allowedTokens[0] = USDC;
         uint[] memory allowanceCaps = new uint[](1);
         allowanceCaps[0] = 1000000e6; // 1M USDC cap
-        matchingRule.setTokenAllowanceList(allowedTokens, allowanceCaps);
+        depositContract.setTokenAllowanceList(allowedTokens, allowanceCaps);
 
         // Set dust thresholds
         IERC20[] memory dustTokens = new IERC20[](1);

@@ -6,7 +6,8 @@ import {console} from "forge-std/src/console.sol";
 
 import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
 import {KeeperRouter} from "src/keeperRouter.sol";
-import {MatchingRule} from "src/position/MatchingRule.sol";
+import {Rule} from "src/position/Rule.sol";
+import {Deposit} from "src/position/Deposit.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
@@ -106,21 +107,20 @@ contract DeployPosition is BaseScript {
     }
 
     /**
-     * @notice Deploys MatchingRule contract and sets up its permissions
+     * @notice Deploys Rule and Deposit contracts and sets up their permissions
      * @param allocationStore The AllocationStore contract to use
-     * @return matchingRule The deployed MatchingRule contract
+     * @return ruleContract The deployed Rule contract
+     * @return depositContract The deployed Deposit contract
      */
-    function deployMatchingRule(
+    function deployRuleAndDeposit(
         AllocationStore allocationStore
-    ) internal returns (MatchingRule) {
-        console.log("\n--- Deploying MatchingRule ---");
+    ) internal returns (Rule ruleContract, Deposit depositContract) {
+        console.log("\n--- Deploying Rule and Deposit Contracts ---");
 
-        // Deploy contract
-        MatchingRule matchingRule = new MatchingRule(
+        // Deploy Rule contract
+        ruleContract = new Rule(
             dictator,
-            allocationStore,
-            MatchingRule.Config({
-                transferOutGasLimit: 200_000,
+            Rule.Config({
                 minExpiryDuration: 1 hours,
                 minAllowanceRate: 100, // 1%
                 maxAllowanceRate: 10000, // 100%
@@ -128,17 +128,31 @@ contract DeployPosition is BaseScript {
                 maxActivityThrottle: 30 days
             })
         );
-        console.log("MatchingRule deployed at:", address(matchingRule));
+        console.log("Rule deployed at:", address(ruleContract));
+
+        // Deploy Deposit contract
+        depositContract = new Deposit(
+            dictator,
+            allocationStore,
+            Deposit.Config({
+                transferOutGasLimit: 200_000
+            })
+        );
+        console.log("Deposit deployed at:", address(depositContract));
 
         // Set up permissions
-        // AllocationStore access for MatchingRule
-        dictator.setAccess(allocationStore, address(matchingRule));
+        // AllocationStore access for Deposit contract
+        dictator.setAccess(allocationStore, address(depositContract));
+        
+        // The Rule contract doesn't need AllocationStore access as it only manages rule logic
+        // The Deposit contract needs AllocationStore access for deposits/withdrawals
 
-        // Initialize contract
-        dictator.registerContract(matchingRule);
-        console.log("MatchingRule initialized and permissions configured");
+        // Initialize contracts
+        dictator.registerContract(ruleContract);
+        dictator.registerContract(depositContract);
+        console.log("Rule and Deposit contracts initialized and permissions configured");
 
-        return matchingRule;
+        return (ruleContract, depositContract);
     }
 
     /**
@@ -185,13 +199,13 @@ contract DeployPosition is BaseScript {
      * @notice Deploys KeeperRouter and sets up permissions for all contracts
      * @dev KeeperRouter is the composition layer that brings all contracts together
      * @param mirrorPosition The MirrorPosition contract
-     * @param matchingRule The MatchingRule contract
+     * @param ruleContract The Rule contract
      * @param settle The Settle contract
      * @return keeperRouter The deployed KeeperRouter contract
      */
     function deployKeeperRouter(
         MirrorPosition mirrorPosition,
-        MatchingRule matchingRule,
+        Rule ruleContract,
         Settle settle
     ) internal returns (KeeperRouter) {
         console.log("\n--- Deploying KeeperRouter ---");
@@ -200,16 +214,16 @@ contract DeployPosition is BaseScript {
         KeeperRouter keeperRouter = new KeeperRouter(
             dictator,
             mirrorPosition,
-            matchingRule,
+            ruleContract,
             settle,
             KeeperRouter.Config({
-                mirrorBaseGasLimit: 1_300_853, // Based on empirical single-puppet test
-                mirrorPerPuppetGasLimit: 30_000, // Conservative estimate for additional puppets
-                adjustBaseGasLimit: 910_663, // Keep existing (need adjust operation analysis)
-                adjustPerPuppetGasLimit: 3_412, // Keep existing (need adjust operation analysis)
-                settleBaseGasLimit: 1_300_853, // Based on empirical single-puppet test
-                settlePerPuppetGasLimit: 30_000, // Conservative estimate for additional pupp
-                fallbackRefundExecutionFeeReceiver: Const.dao // Fallback receiver for execution fee refunds
+                mirrorBaseGasLimit: 1_283_731,
+                mirrorPerPuppetGasLimit: 30_000,
+                adjustBaseGasLimit: 910_663,
+                adjustPerPuppetGasLimit: 3_412,
+                settleBaseGasLimit: 90_847,
+                settlePerPuppetGasLimit: 15_000,
+                fallbackRefundExecutionFeeReceiver: Const.dao 
             })
         );
         console.log("KeeperRouter deployed at:", address(keeperRouter));
@@ -256,14 +270,14 @@ contract DeployPosition is BaseScript {
         return keeperRouter;
     }
 
-    function setupUpkeepingConfig(MatchingRule matchingRule, Settle settle) public {
-        dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, Const.dao);
+    function setupUpkeepingConfig(Deposit depositContract, Settle settle) public {
+        dictator.setPermission(depositContract, depositContract.setTokenAllowanceList.selector, Const.dao);
 
         IERC20[] memory allowedTokens = new IERC20[](1);
         allowedTokens[0] = IERC20(Const.usdc);
         uint[] memory allowanceCaps = new uint[](1);
         allowanceCaps[0] = 100e6;
-        matchingRule.setTokenAllowanceList(allowedTokens, allowanceCaps);
+        depositContract.setTokenAllowanceList(allowedTokens, allowanceCaps);
 
         dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, Const.dao);
 

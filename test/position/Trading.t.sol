@@ -5,7 +5,8 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
-import {MatchingRule} from "src/position/MatchingRule.sol";
+import {Rule} from "src/position/Rule.sol";
+import {Deposit} from "src/position/Deposit.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
@@ -23,15 +24,15 @@ import {Error} from "src/utils/Error.sol";
 
 /**
  * @title TradingTest
- * @notice Test suite for position mirroring and trading operations
- * @dev Tests integration between MirrorPosition, Settle, and KeeperRouter
- * NOTE: This test file needs to be updated to work with the merged MirrorPosition architecture
- * where Allocate functionality has been merged into MirrorPosition.
+ * @notice Test suite for position mirroring and trading operations  
+ * @dev Tests integration between MirrorPosition, Settle, KeeperRouter, Rule, and Deposit
+ * Updated to work with the decoupled Rule/Deposit architecture.
  */
 contract TradingTest is BasicSetup {
     AllocationStore allocationStore;
     Settle settle;
-    MatchingRule matchingRule;
+    Rule ruleContract;
+    Deposit depositContract;
     MirrorPosition mirrorPosition;
     KeeperRouter keeperRouter;
     MockGmxExchangeRouter mockGmxExchangeRouter;
@@ -65,16 +66,22 @@ contract TradingTest is BasicSetup {
             })
         );
 
-        matchingRule = new MatchingRule(
+        ruleContract = new Rule(
             dictator,
-            allocationStore,
-            MatchingRule.Config({
-                transferOutGasLimit: 200_000,
+            Rule.Config({
                 minExpiryDuration: 1 hours,
                 minAllowanceRate: 100, // 1%
                 maxAllowanceRate: 10000, // 100%
                 minActivityThrottle: 1 hours,
                 maxActivityThrottle: 30 days
+            })
+        );
+
+        depositContract = new Deposit(
+            dictator,
+            allocationStore,
+            Deposit.Config({
+                transferOutGasLimit: 200_000
             })
         );
 
@@ -101,7 +108,7 @@ contract TradingTest is BasicSetup {
         keeperRouter = new KeeperRouter(
             dictator,
             mirrorPosition,
-            matchingRule,
+            ruleContract,
             settle,
             KeeperRouter.Config({
                 mirrorBaseGasLimit: 1_300_853,
@@ -115,12 +122,12 @@ contract TradingTest is BasicSetup {
         );
 
         // Set up permissions
-        dictator.setAccess(allocationStore, address(matchingRule));
+        dictator.setAccess(allocationStore, address(depositContract));
         dictator.setAccess(allocationStore, address(mirrorPosition));
         dictator.setAccess(allocationStore, address(settle));
 
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
-        dictator.setPermission(mirrorPosition, mirrorPosition.initializeTraderActivityThrottle.selector, address(matchingRule));
+        dictator.setPermission(mirrorPosition, mirrorPosition.initializeTraderActivityThrottle.selector, address(ruleContract));
         dictator.setPermission(settle, settle.settle.selector, address(keeperRouter));
         dictator.setPermission(settle, settle.collectDust.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.requestOpen.selector, address(keeperRouter));
@@ -130,7 +137,8 @@ contract TradingTest is BasicSetup {
 
         // Initialize contracts
         dictator.registerContract(settle);
-        dictator.registerContract(matchingRule);
+        dictator.registerContract(ruleContract);
+        dictator.registerContract(depositContract);
         dictator.registerContract(mirrorPosition);
         dictator.registerContract(keeperRouter);
 
@@ -140,10 +148,10 @@ contract TradingTest is BasicSetup {
         uint[] memory allowanceCaps = new uint[](1);
         allowanceCaps[0] = 10000e6; // 10000 USDC cap
 
-        dictator.setPermission(matchingRule, matchingRule.setTokenAllowanceList.selector, users.owner);
-        matchingRule.setTokenAllowanceList(allowedTokens, allowanceCaps);
+        dictator.setPermission(depositContract, depositContract.setTokenAllowanceList.selector, users.owner);
+        depositContract.setTokenAllowanceList(allowedTokens, allowanceCaps);
 
-        // Test setup: mint USDC to owner and approve for matchingRule
+        // Test setup: mint USDC to owner and approve for allocateContract
         // Owner permissions for dust collection
         dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, users.owner);
 
@@ -154,34 +162,34 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(keeperRouter, keeperRouter.collectDust.selector, users.owner);
 
         // Owner permissions to act on behalf of users
-        dictator.setPermission(matchingRule, matchingRule.deposit.selector, users.owner);
-        dictator.setPermission(matchingRule, matchingRule.setRule.selector, users.owner);
+        dictator.setPermission(depositContract, depositContract.deposit.selector, users.owner);
+        dictator.setPermission(ruleContract, ruleContract.setRule.selector, users.owner);
 
         dictator.setPermission(keeperRouter, keeperRouter.afterOrderExecution.selector, users.owner);
 
         // Setup puppet balances using owner permissions - owner deposits on behalf of puppets
-        matchingRule.deposit(usdc, users.owner, puppet1, 1000e6);
-        matchingRule.deposit(usdc, users.owner, puppet2, 800e6);
+        depositContract.deposit(usdc, users.owner, puppet1, 1000e6);
+        depositContract.deposit(usdc, users.owner, puppet2, 800e6);
 
         // Set up trading rules using owner permissions
-        matchingRule.setRule(
+        ruleContract.setRule(
             mirrorPosition,
             usdc,
             puppet1,
             trader,
-            MatchingRule.Rule({
+            Rule.RuleParams({
                 allowanceRate: 2000, // 20%
                 throttleActivity: 1 hours,
                 expiry: block.timestamp + 30 days
             })
         );
 
-        matchingRule.setRule(
+        ruleContract.setRule(
             mirrorPosition,
             usdc,
             puppet2,
             trader,
-            MatchingRule.Rule({
+            Rule.RuleParams({
                 allowanceRate: 1500, // 15%
                 throttleActivity: 2 hours,
                 expiry: block.timestamp + 30 days
@@ -591,12 +599,12 @@ contract TradingTest is BasicSetup {
         puppetList2[0] = puppet2;
 
         // Set rule for puppet2 to follow trader2
-        matchingRule.setRule(
+        ruleContract.setRule(
             mirrorPosition,
             usdc,
             puppet2,
             trader2,
-            MatchingRule.Rule({
+            Rule.RuleParams({
                 allowanceRate: 1000, // 10%
                 throttleActivity: 1 hours,
                 expiry: block.timestamp + 30 days
