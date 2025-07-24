@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-import {Allocate} from "./position/Allocate.sol";
+import {MirrorPosition} from "./position/MirrorPosition.sol";
 import {MatchingRule} from "./position/MatchingRule.sol";
 import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
 
@@ -16,12 +16,12 @@ import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
 contract UserRouter is ReentrancyGuardTransient {
     MatchingRule public immutable matchingRule;
     FeeMarketplace public immutable feeMarketplace;
-    Allocate public immutable allocate;
+    MirrorPosition public immutable mirrorPosition;
 
-    constructor(MatchingRule _matchingRule, FeeMarketplace _feeMarketplace, Allocate _allocate) {
+    constructor(MatchingRule _matchingRule, FeeMarketplace _feeMarketplace, MirrorPosition _mirrorPosition) {
         matchingRule = _matchingRule;
         feeMarketplace = _feeMarketplace;
-        allocate = _allocate;
+        mirrorPosition = _mirrorPosition;
     }
 
     /**
@@ -54,7 +54,7 @@ contract UserRouter is ReentrancyGuardTransient {
         address trader,
         MatchingRule.Rule calldata ruleParams
     ) external nonReentrant {
-        matchingRule.setRule(allocate, collateralToken, msg.sender, trader, ruleParams);
+        matchingRule.setRule(mirrorPosition, collateralToken, msg.sender, trader, ruleParams);
     }
 
     /**

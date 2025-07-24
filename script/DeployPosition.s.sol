@@ -6,7 +6,6 @@ import {console} from "forge-std/src/console.sol";
 
 import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
 import {KeeperRouter} from "src/keeperRouter.sol";
-import {Allocate} from "src/position/Allocate.sol";
 import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {Settle} from "src/position/Settle.sol";
@@ -37,10 +36,10 @@ contract DeployPosition is BaseScript {
         // verifySelectorsMatch();
         // AllocationStore allocationStore = deployAllocationStore();
         // MatchingRule matchingRule = deployMatchingRule(allocationStore);
-        // Allocate allocate = deployAllocate(allocationStore, matchingRule);
+        // Allocate functionality moved to MirrorPosition
         // Settle settle = deploySettle(allocationStore);
         // MirrorPosition mirrorPosition = deployMirrorPosition();
-        // KeeperRouter keeperRouter = deployKeeperRouter(mirrorPosition, matchingRule, allocate, settle);
+        // KeeperRouter keeperRouter = deployKeeperRouter(mirrorPosition, matchingRule, settle);
 
         // setupUpkeepingConfig(MatchingRule(getDeployedAddress("MatchingRule")), Settle(getDeployedAddress("Settle")));
 
@@ -70,41 +69,6 @@ contract DeployPosition is BaseScript {
         return allocationStore;
     }
 
-    /**
-     * @notice Deploys Allocate contract and sets up its permissions
-     * @param allocationStore The AllocationStore contract to use
-     * @return allocate The deployed Allocate contract
-     */
-    function deployAllocate(AllocationStore allocationStore, MatchingRule matchingRule) internal returns (Allocate) {
-        console.log("\n--- Deploying Allocate ---");
-
-        // Deploy contract
-        Allocate allocate = new Allocate(
-            dictator,
-            allocationStore,
-            Allocate.Config({
-                transferOutGasLimit: 200_000,
-                maxPuppetList: 50,
-                maxKeeperFeeToAllocationRatio: 0.1e30, // 10%
-                maxKeeperFeeToAdjustmentRatio: 0.1e30, // 10%
-                gmxOrderVault: Const.gmxOrderVault
-            })
-        );
-        console.log("Allocate deployed at:", address(allocate));
-
-        // Set up permissions
-        // AllocationStore access for Allocate
-        dictator.setAccess(allocationStore, address(allocate));
-
-        // MatchingRule needs to initialize trader activity throttle
-        dictator.setPermission(allocate, allocate.initializeTraderActivityThrottle.selector, address(matchingRule));
-
-        // Initialize contract
-        dictator.registerContract(allocate);
-        console.log("Allocate initialized and permissions configured");
-
-        return allocate;
-    }
 
     /**
      * @notice Deploys Settle contract and sets up its permissions
@@ -189,14 +153,19 @@ contract DeployPosition is BaseScript {
         // Deploy contract
         MirrorPosition mirrorPosition = new MirrorPosition(
             dictator,
+            allocationStore,
             MirrorPosition.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(Const.gmxExchangeRouter),
+                gmxDataStore: IGmxReadDataStore(Const.gmxDataStore),
                 gmxOrderVault: Const.gmxOrderVault,
                 referralCode: Const.referralCode,
                 increaseCallbackGasLimit: 2e6,
                 decreaseCallbackGasLimit: 2e6,
-                gmxDataStore: IGmxReadDataStore(Const.gmxDataStore),
-                fallbackRefundExecutionFeeReceiver: Const.dao
+                fallbackRefundExecutionFeeReceiver: Const.dao,
+                transferOutGasLimit: 200_000,
+                maxPuppetList: 50,
+                maxKeeperFeeToAllocationRatio: 0.1e30,
+                maxKeeperFeeToAdjustmentRatio: 0.1e30
             })
         );
         console.log("MirrorPosition deployed at:", address(mirrorPosition));
@@ -217,14 +186,12 @@ contract DeployPosition is BaseScript {
      * @dev KeeperRouter is the composition layer that brings all contracts together
      * @param mirrorPosition The MirrorPosition contract
      * @param matchingRule The MatchingRule contract
-     * @param allocate The Allocate contract
      * @param settle The Settle contract
      * @return keeperRouter The deployed KeeperRouter contract
      */
     function deployKeeperRouter(
         MirrorPosition mirrorPosition,
         MatchingRule matchingRule,
-        Allocate allocate,
         Settle settle
     ) internal returns (KeeperRouter) {
         console.log("\n--- Deploying KeeperRouter ---");
@@ -234,7 +201,6 @@ contract DeployPosition is BaseScript {
             dictator,
             mirrorPosition,
             matchingRule,
-            allocate,
             settle,
             KeeperRouter.Config({
                 mirrorBaseGasLimit: 1_300_853, // Based on empirical single-puppet test
@@ -251,16 +217,14 @@ contract DeployPosition is BaseScript {
         // Set up permissions for KeeperRouter to call other contracts
         console.log("Setting up KeeperRouter permissions...");
 
-        // Allocate permissions
-        dictator.setPermission(allocate, allocate.createAllocation.selector, address(keeperRouter));
-        dictator.setPermission(allocate, allocate.collectKeeperFee.selector, address(keeperRouter));
+        // Note: Allocate functionality has been merged into MirrorPosition
 
         // Settle permissions
         dictator.setPermission(settle, settle.settle.selector, address(keeperRouter));
         dictator.setPermission(settle, settle.collectDust.selector, address(keeperRouter));
 
         // MirrorPosition permissions
-        dictator.setPermission(mirrorPosition, mirrorPosition.requestMirror.selector, address(keeperRouter));
+        dictator.setPermission(mirrorPosition, mirrorPosition.requestOpen.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(keeperRouter));
         dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, address(keeperRouter));
@@ -280,7 +244,7 @@ contract DeployPosition is BaseScript {
 
         // External keeper permissions
         console.log("Setting up external keeper permissions...");
-        dictator.setPermission(keeperRouter, keeperRouter.requestMirror.selector, Const.keeper);
+        dictator.setPermission(keeperRouter, keeperRouter.requestOpen.selector, Const.keeper);
         dictator.setPermission(keeperRouter, keeperRouter.requestAdjust.selector, Const.keeper);
         dictator.setPermission(keeperRouter, keeperRouter.settleAllocation.selector, Const.keeper);
         dictator.setPermission(keeperRouter, keeperRouter.collectDust.selector, Const.keeper);

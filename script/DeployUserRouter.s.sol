@@ -5,7 +5,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/src/console.sol";
 
 import {UserRouter} from "src/UserRouter.sol";
-import {Allocate} from "src/position/Allocate.sol";
 import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
@@ -28,14 +27,14 @@ contract DeployUserRouter is BaseScript {
         RouterProxy routerProxy = RouterProxy(payable(getDeployedAddress("RouterProxy")));
         MatchingRule matchingRule = MatchingRule(getDeployedAddress("MatchingRule"));
         FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
-        Allocate allocate = Allocate(getDeployedAddress("Allocate"));
+        MirrorPosition mirrorPosition = MirrorPosition(getDeployedAddress("MirrorPosition"));
 
         dictator.setPermission(matchingRule, matchingRule.setRule.selector, address(routerProxy));
         dictator.setPermission(matchingRule, matchingRule.deposit.selector, address(routerProxy));
         dictator.setPermission(matchingRule, matchingRule.withdraw.selector, address(routerProxy));
         // dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, address(routerProxy));
 
-        UserRouter newRouter = new UserRouter(matchingRule, feeMarketplace, allocate);
+        UserRouter newRouter = new UserRouter(matchingRule, feeMarketplace, mirrorPosition);
         routerProxy.update(address(newRouter));
 
         UserRouter(address(routerProxy)).setMatchingRule(

@@ -6,7 +6,6 @@ import {console} from "forge-std/src/console.sol";
 import {Const} from "script/Const.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
-import {Allocate} from "src/position/Allocate.sol";
 import {MatchingRule} from "src/position/MatchingRule.sol";
 import {MirrorPosition} from "src/position/MirrorPosition.sol";
 import {Settle} from "src/position/Settle.sol";
@@ -64,19 +63,10 @@ contract TradingForkTest is ForkTestBase {
         console.log("GMX ExchangeRouter:", address(Const.gmxExchangeRouter));
         console.log("GMX OrderVault:", Const.gmxOrderVault);
 
-        // Prepare allocation parameters
-        Allocate.CallAllocation memory allocParams = Allocate.CallAllocation({
-            collateralToken: USDC,
-            trader: trader,
-            puppetList: puppetList,
-            allocationId: allocationId,
-            keeperFee: KEEPER_FEE,
-            keeperFeeReceiver: keeper
-        });
-
-        // Prepare position parameters
+        // Prepare position parameters (merged allocation and position params)
         MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
             collateralToken: USDC,
+            traderRequestKey: bytes32(0),
             trader: trader,
             market: Const.gmxEthUsdcMarket,
             isIncrease: true,
@@ -86,7 +76,9 @@ contract TradingForkTest is ForkTestBase {
             sizeDeltaInUsd: positionSize,
             acceptablePrice: acceptablePrice,
             triggerPrice: 0,
-            traderRequestKey: bytes32(0)
+            allocationId: allocationId,
+            keeperFee: KEEPER_FEE,
+            keeperFeeReceiver: keeper
         });
 
         console.log("\n--- Position Parameters ---");
@@ -104,7 +96,7 @@ contract TradingForkTest is ForkTestBase {
         // Execute mirror request
         vm.prank(keeper);
         (address allocationAddress, bytes32 requestKey) =
-            keeperRouter.requestMirror{value: EXECUTION_FEE}(allocParams, callParams);
+            keeperRouter.requestOpen{value: EXECUTION_FEE}(callParams, puppetList);
 
         uint gasUsed = gasStart - gasleft();
         uint timestampEnd = block.timestamp;
@@ -118,8 +110,8 @@ contract TradingForkTest is ForkTestBase {
         console.log("Allocation Address:", allocationAddress);
 
         // Verify allocation was created
-        uint totalAllocation = allocate.getAllocation(allocationAddress);
-        uint[] memory puppetAllocations = allocate.getPuppetAllocationList(allocationAddress);
+        uint totalAllocation = mirrorPosition.getAllocation(allocationAddress);
+        uint[] memory puppetAllocations = mirrorPosition.getPuppetAllocationList(allocationAddress);
 
         console.log("\n--- Allocation Details ---");
         console.log("Total Allocation:", totalAllocation);
@@ -264,18 +256,10 @@ contract TradingForkTest is ForkTestBase {
 
         uint allocationId = 100 + puppetCount; // Unique allocation ID
 
-        // Prepare parameters
-        Allocate.CallAllocation memory allocParams = Allocate.CallAllocation({
-            collateralToken: USDC,
-            trader: trader,
-            puppetList: puppetList,
-            allocationId: allocationId,
-            keeperFee: KEEPER_FEE,
-            keeperFeeReceiver: keeper
-        });
-
+        // Prepare parameters (merged allocation and position params)
         MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
             collateralToken: USDC,
+            traderRequestKey: bytes32(0),
             trader: trader,
             market: Const.gmxEthUsdcMarket,
             isIncrease: true,
@@ -285,7 +269,9 @@ contract TradingForkTest is ForkTestBase {
             sizeDeltaInUsd: 5000e30,
             acceptablePrice: 4000e30,
             triggerPrice: 0,
-            traderRequestKey: bytes32(0)
+            allocationId: allocationId,
+            keeperFee: KEEPER_FEE,
+            keeperFeeReceiver: keeper
         });
 
         // Measure gas
@@ -293,7 +279,7 @@ contract TradingForkTest is ForkTestBase {
 
         vm.prank(keeper);
         (address allocationAddress, bytes32 requestKey) =
-            keeperRouter.requestMirror{value: EXECUTION_FEE}(allocParams, callParams);
+            keeperRouter.requestOpen{value: EXECUTION_FEE}(callParams, puppetList);
 
         gasUsed = gasStart - gasleft();
 
@@ -324,18 +310,10 @@ contract TradingForkTest is ForkTestBase {
         uint positionSize = 5000e30; // $5000 (5x leverage)
         uint acceptablePrice = 4000e30; // $4000 per ETH
 
-        // Prepare allocation and position parameters
-        Allocate.CallAllocation memory allocParams = Allocate.CallAllocation({
-            collateralToken: USDC,
-            trader: trader,
-            puppetList: puppetList,
-            allocationId: allocationId,
-            keeperFee: KEEPER_FEE,
-            keeperFeeReceiver: keeper
-        });
-
+        // Prepare position parameters (merged allocation and position params)
         MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
             collateralToken: USDC,
+            traderRequestKey: bytes32(0),
             trader: trader,
             market: Const.gmxEthUsdcMarket,
             isIncrease: true,
@@ -345,7 +323,9 @@ contract TradingForkTest is ForkTestBase {
             sizeDeltaInUsd: positionSize,
             acceptablePrice: acceptablePrice,
             triggerPrice: 0,
-            traderRequestKey: bytes32(0)
+            allocationId: allocationId,
+            keeperFee: KEEPER_FEE,
+            keeperFeeReceiver: keeper
         });
 
         // Step 1: Mirror Request - Keeper submits position to GMX
@@ -354,7 +334,7 @@ contract TradingForkTest is ForkTestBase {
 
         vm.prank(keeper);
         (address allocationAddress, bytes32 requestKey) =
-            keeperRouter.requestMirror{value: EXECUTION_FEE}(allocParams, callParams);
+            keeperRouter.requestOpen{value: EXECUTION_FEE}(callParams, puppetList);
 
         uint mirrorGasUsed = gasStart - gasleft();
         console.log("Mirror Gas Used:", mirrorGasUsed);
@@ -362,8 +342,8 @@ contract TradingForkTest is ForkTestBase {
         console.log("Allocation Address:", allocationAddress);
 
         // Validate allocation was created
-        uint totalAllocation = allocate.getAllocation(allocationAddress);
-        uint[] memory puppetAllocations = allocate.getPuppetAllocationList(allocationAddress);
+        uint totalAllocation = mirrorPosition.getAllocation(allocationAddress);
+        uint[] memory puppetAllocations = mirrorPosition.getPuppetAllocationList(allocationAddress);
 
         console.log("Total Allocation:", totalAllocation);
         console.log("Puppet1 Allocation:", puppetAllocations[0]);

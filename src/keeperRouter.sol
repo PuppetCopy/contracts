@@ -45,7 +45,6 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
     ) CoreContract(_authority, abi.encode(_config)) {
         require(address(_mirrorPosition) != address(0), "MirrorPosition not set correctly");
         require(address(_matchingRule) != address(0), "MatchingRule not set correctly");
-        require(address(_allocate) != address(0), "Allocate not set correctly");
         require(address(_settle) != address(0), "Settle not set correctly");
 
         mirrorPosition = _mirrorPosition;
@@ -68,7 +67,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
      * @return _allocationAddress The allocation address created for the position
      * @return _requestKey The GMX request key for the submitted position
      */
-    function requestMirror(
+    function requestOpen(
         MirrorPosition.CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
@@ -77,20 +76,15 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
 
     /**
      * @notice Orchestrates position adjustment by coordinating Allocation and MirrorPosition
-     * @param _callParams Position parameters for the trader's adjustment
-     * @param _allocParams Allocation parameters for keeper fee handling
+     * @param _callParams Position parameters for the trader's adjustment and allocation
+     * @param _puppetList List of puppet addresses involved in the position
      * @return _requestKey The GMX request key for the submitted adjustment
      */
     function requestAdjust(
-        Allocate.CallAllocation calldata _allocParams,
-        MirrorPosition.CallPosition calldata _callParams
+        MirrorPosition.CallPosition calldata _callParams,
+        address[] calldata _puppetList
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
-        (address allocationAddress, uint nextAllocated) = allocate.collectKeeperFee(_allocParams);
-
-        _requestKey =
-            mirrorPosition.requestAdjust{value: msg.value}(_callParams, allocationAddress, nextAllocated, address(this));
-
-        return _requestKey;
+        return mirrorPosition.requestAdjust{value: msg.value}(_callParams, _puppetList);
     }
 
     /**
@@ -121,7 +115,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         Settle.CallSettle calldata _settleParams,
         address[] calldata _puppetList
     ) external auth nonReentrant returns (uint settledBalance, uint distributionAmount, uint platformFeeAmount) {
-        return settle.settle(allocate, _settleParams, _puppetList);
+        return settle.settle(mirrorPosition, _settleParams, _puppetList);
     }
 
     /**
