@@ -5,9 +5,10 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
-import {Rule} from "src/position/Rule.sol";
+
 import {Deposit} from "src/position/Deposit.sol";
 import {Mirror} from "src/position/Mirror.sol";
+import {Rule} from "src/position/Rule.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
@@ -15,16 +16,17 @@ import {AllocationStore} from "src/shared/AllocationStore.sol";
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
 
+import {Const} from "script/Const.sol";
+
+import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
+import {PositionUtils} from "src/position/utils/PositionUtils.sol";
+import {Error} from "src/utils/Error.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockGmxExchangeRouter} from "test/mock/MockGmxExchangeRouter.sol";
-import {Const} from "script/Const.sol";
-import {PositionUtils} from "src/position/utils/PositionUtils.sol";
-import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
-import {Error} from "src/utils/Error.sol";
 
 /**
  * @title TradingTest
- * @notice Test suite for position mirroring and trading operations  
+ * @notice Test suite for position mirroring and trading operations
  * @dev Tests integration between Mirror, Settle, KeeperRouter, Rule, and Deposit
  * Updated to work with the decoupled Rule/Deposit architecture.
  */
@@ -77,13 +79,7 @@ contract TradingTest is BasicSetup {
             })
         );
 
-        depositContract = new Deposit(
-            dictator,
-            allocationStore,
-            Deposit.Config({
-                transferOutGasLimit: 200_000
-            })
-        );
+        depositContract = new Deposit(dictator, allocationStore, Deposit.Config({transferOutGasLimit: 200_000}));
 
         mockGmxExchangeRouter = new MockGmxExchangeRouter();
 

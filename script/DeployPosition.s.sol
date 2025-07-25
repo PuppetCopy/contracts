@@ -4,13 +4,14 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/src/console.sol";
 
-import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
 import {KeeperRouter} from "src/keeperRouter.sol";
-import {Rule} from "src/position/Rule.sol";
+
 import {Deposit} from "src/position/Deposit.sol";
 import {Mirror} from "src/position/Mirror.sol";
+import {Rule} from "src/position/Rule.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
+import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
 import {AllocationStore} from "src/shared/AllocationStore.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
@@ -69,7 +70,6 @@ contract DeployPosition is BaseScript {
 
         return allocationStore;
     }
-
 
     /**
      * @notice Deploys Settle contract and sets up its permissions
@@ -131,19 +131,13 @@ contract DeployPosition is BaseScript {
         console.log("Rule deployed at:", address(ruleContract));
 
         // Deploy Deposit contract
-        depositContract = new Deposit(
-            dictator,
-            allocationStore,
-            Deposit.Config({
-                transferOutGasLimit: 200_000
-            })
-        );
+        depositContract = new Deposit(dictator, allocationStore, Deposit.Config({transferOutGasLimit: 200_000}));
         console.log("Deposit deployed at:", address(depositContract));
 
         // Set up permissions
         // AllocationStore access for Deposit contract
         dictator.setAccess(allocationStore, address(depositContract));
-        
+
         // The Rule contract doesn't need AllocationStore access as it only manages rule logic
         // The Deposit contract needs AllocationStore access for deposits/withdrawals
 
@@ -203,11 +197,7 @@ contract DeployPosition is BaseScript {
      * @param settle The Settle contract
      * @return keeperRouter The deployed KeeperRouter contract
      */
-    function deployKeeperRouter(
-        Mirror mirror,
-        Rule ruleContract,
-        Settle settle
-    ) internal returns (KeeperRouter) {
+    function deployKeeperRouter(Mirror mirror, Rule ruleContract, Settle settle) internal returns (KeeperRouter) {
         console.log("\n--- Deploying KeeperRouter ---");
 
         // Deploy contract with empirical gas configuration
@@ -223,7 +213,7 @@ contract DeployPosition is BaseScript {
                 adjustPerPuppetGasLimit: 3_412,
                 settleBaseGasLimit: 90_847,
                 settlePerPuppetGasLimit: 15_000,
-                fallbackRefundExecutionFeeReceiver: Const.dao 
+                fallbackRefundExecutionFeeReceiver: Const.dao
             })
         );
         console.log("KeeperRouter deployed at:", address(keeperRouter));

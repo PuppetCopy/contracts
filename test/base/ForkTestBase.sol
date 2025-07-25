@@ -7,9 +7,10 @@ import {console} from "forge-std/src/console.sol";
 
 import {UserRouter} from "src/UserRouter.sol";
 import {KeeperRouter} from "src/keeperRouter.sol";
-import {Rule} from "src/position/Rule.sol";
+
 import {Deposit} from "src/position/Deposit.sol";
 import {Mirror} from "src/position/Mirror.sol";
+import {Rule} from "src/position/Rule.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
@@ -229,13 +230,7 @@ abstract contract ForkTestBase is Test {
             })
         );
 
-        depositContract = new Deposit(
-            dictator,
-            allocationStore,
-            Deposit.Config({
-                transferOutGasLimit: 200_000
-            })
-        );
+        depositContract = new Deposit(dictator, allocationStore, Deposit.Config({transferOutGasLimit: 200_000}));
 
         mirror = new Mirror(
             dictator,
@@ -291,9 +286,7 @@ abstract contract ForkTestBase is Test {
 
         // Core permissions
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
-        dictator.setPermission(
-            mirror, mirror.initializeTraderActivityThrottle.selector, address(ruleContract)
-        );
+        dictator.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(ruleContract));
 
         // UserRouter permissions
         dictator.setPermission(depositContract, depositContract.deposit.selector, address(userRouter));

@@ -4,8 +4,8 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-import {Mirror} from "./position/Mirror.sol";
 import {Deposit} from "./position/Deposit.sol";
+import {Mirror} from "./position/Mirror.sol";
 import {Rule} from "./position/Rule.sol";
 import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
 

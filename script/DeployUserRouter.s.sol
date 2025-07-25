@@ -5,9 +5,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/src/console.sol";
 
 import {UserRouter} from "src/UserRouter.sol";
-import {Rule} from "src/position/Rule.sol";
+
 import {Deposit} from "src/position/Deposit.sol";
 import {Mirror} from "src/position/Mirror.sol";
+import {Rule} from "src/position/Rule.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 import {RouterProxy} from "src/utils/RouterProxy.sol";

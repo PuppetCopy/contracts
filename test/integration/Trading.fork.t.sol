@@ -6,8 +6,9 @@ import {console} from "forge-std/src/console.sol";
 import {Const} from "script/Const.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
-import {Rule} from "src/position/Rule.sol";
+
 import {Mirror} from "src/position/Mirror.sol";
+import {Rule} from "src/position/Rule.sol";
 import {Settle} from "src/position/Settle.sol";
 
 /**

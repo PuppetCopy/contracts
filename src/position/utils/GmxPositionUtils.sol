@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.29;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IGmxReadDataStore} from "../interface/IGmxReadDataStore.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 library GmxPositionUtils {
     bytes32 public constant SIZE_IN_USD_KEY = keccak256(abi.encode("SIZE_IN_USD"));
@@ -261,7 +261,9 @@ library GmxPositionUtils {
      * @param positionKey The position key (hash of account, market, collateralToken, isLong)
      * @return The storage key for size in USD
      */
-    function getPositionSizeKey(bytes32 positionKey) internal pure returns (bytes32) {
+    function getPositionSizeKey(
+        bytes32 positionKey
+    ) internal pure returns (bytes32) {
         return keccak256(abi.encode(positionKey, SIZE_IN_USD_KEY));
     }
 
@@ -270,7 +272,9 @@ library GmxPositionUtils {
      * @param positionKey The position key (hash of account, market, collateralToken, isLong)
      * @return The storage key for collateral amount
      */
-    function getPositionCollateralKey(bytes32 positionKey) internal pure returns (bytes32) {
+    function getPositionCollateralKey(
+        bytes32 positionKey
+    ) internal pure returns (bytes32) {
         return keccak256(abi.encode(positionKey, COLLATERAL_AMOUNT_KEY));
     }
 
@@ -280,10 +284,7 @@ library GmxPositionUtils {
      * @param positionKey The position key
      * @return The position size in USD (0 if position doesn't exist)
      */
-    function getPositionSizeInUsd(
-        IGmxReadDataStore dataStore,
-        bytes32 positionKey
-    ) internal view returns (uint) {
+    function getPositionSizeInUsd(IGmxReadDataStore dataStore, bytes32 positionKey) internal view returns (uint) {
         bytes32 sizeKey = getPositionSizeKey(positionKey);
         return dataStore.getUint(sizeKey);
     }

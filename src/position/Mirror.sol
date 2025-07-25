@@ -282,10 +282,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
-        require(
-            _callParams.collateralDelta > 0 || _callParams.sizeDeltaInUsd > 0,
-            Error.Mirror__NoAdjustmentRequired()
-        );
+        require(_callParams.collateralDelta > 0 || _callParams.sizeDeltaInUsd > 0, Error.Mirror__NoAdjustmentRequired());
 
         // Collect keeper fee and update allocations inline
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
@@ -582,8 +579,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         address _callbackContract
     ) internal returns (bytes32 requestKey) {
         require(
-            msg.value >= _order.executionFee,
-            Error.Mirror__InsufficientGmxExecutionFee(msg.value, _order.executionFee)
+            msg.value >= _order.executionFee, Error.Mirror__InsufficientGmxExecutionFee(msg.value, _order.executionFee)
         );
 
         bytes memory gmxCallData = abi.encodeWithSelector(

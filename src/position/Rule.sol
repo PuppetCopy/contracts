@@ -28,10 +28,7 @@ contract Rule is CoreContract {
 
     mapping(bytes32 traderMatchingKey => mapping(address puppet => RuleParams)) public matchingRuleMap;
 
-    constructor(
-        IAuthority _authority,
-        Config memory _config
-    ) CoreContract(_authority, abi.encode(_config)) {}
+    constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
     function getConfig() external view returns (Config memory) {
         return config;
@@ -64,8 +61,7 @@ contract Rule is CoreContract {
         );
 
         require(
-            _ruleParams.expiry >= config.minExpiryDuration,
-            Error.Rule__InvalidExpiryDuration(config.minExpiryDuration)
+            _ruleParams.expiry >= config.minExpiryDuration, Error.Rule__InvalidExpiryDuration(config.minExpiryDuration)
         );
 
         require(
