@@ -75,7 +75,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         Mirror.CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
-        return mirror.requestOpen{value: msg.value}(account, ruleContract, _callParams, _puppetList);
+        return mirror.requestOpen{value: msg.value}(account, ruleContract, address(this), _callParams, _puppetList);
     }
 
     /**
@@ -88,7 +88,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         Mirror.CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
-        return mirror.requestAdjust{value: msg.value}(account, _callParams, _puppetList);
+        return mirror.requestAdjust{value: msg.value}(account, address(this), _callParams, _puppetList);
     }
 
     /**

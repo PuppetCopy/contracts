@@ -114,6 +114,12 @@ contract DeployPosition is BaseScript {
         // Account permissions for Settle
         dictator.setPermission(account, account.execute.selector, address(settle));
         dictator.setPermission(account, account.setBalanceList.selector, address(settle));
+        dictator.setPermission(account, account.transferInAllocation.selector, address(settle));
+        dictator.setPermission(account, account.transferOut.selector, address(settle));
+        dictator.setPermission(account, account.getAllocationAddress.selector, address(settle));
+        dictator.setPermission(account, account.transferInAllocation.selector, address(settle));
+        dictator.setPermission(account, account.transferOut.selector, address(settle));
+        dictator.setPermission(account, account.getAllocationAddress.selector, address(settle));
 
         // Initialize contract
         dictator.registerContract(settle);
@@ -174,6 +180,12 @@ contract DeployPosition is BaseScript {
         dictator.setPermission(account, account.setUserBalance.selector, address(mirror));
         dictator.setPermission(account, account.setBalanceList.selector, address(mirror));
         dictator.setPermission(account, account.createAllocationAccount.selector, address(mirror));
+        dictator.setPermission(account, account.getBalanceList.selector, address(mirror));
+        dictator.setPermission(account, account.transferOut.selector, address(mirror));
+        dictator.setPermission(account, account.getAllocationAddress.selector, address(mirror));
+        dictator.setPermission(account, account.getBalanceList.selector, address(mirror));
+        dictator.setPermission(account, account.transferOut.selector, address(mirror));
+        dictator.setPermission(account, account.getAllocationAddress.selector, address(mirror));
 
         // Initialize contract
         dictator.registerContract(mirror);

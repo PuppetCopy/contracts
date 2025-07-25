@@ -50,11 +50,11 @@ contract Account is CoreContract, ReentrancyGuardTransient {
     /**
      * @notice Get balance list for multiple users and a token
      */
-    function getBalanceList(IERC20 _token, address[] calldata _userList) external view returns (uint[] memory) {
-        uint _accountListLength = _userList.length;
+    function getBalanceList(IERC20 _token, address[] calldata _puppetList) external view returns (uint[] memory) {
+        uint _accountListLength = _puppetList.length;
         uint[] memory _balanceList = new uint[](_accountListLength);
         for (uint i = 0; i < _accountListLength; i++) {
-            _balanceList[i] = userBalanceMap[_token][_userList[i]];
+            _balanceList[i] = userBalanceMap[_token][_puppetList[i]];
         }
         return _balanceList;
     }

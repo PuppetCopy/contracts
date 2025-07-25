@@ -5,7 +5,6 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
-import {Allocate} from "src/position/Allocate.sol";
 import {Mirror} from "src/position/Mirror.sol";
 import {Rule} from "src/position/Rule.sol";
 import {Settle} from "src/position/Settle.sol";
@@ -14,7 +13,8 @@ import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
 import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
 import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
-import {AllocationStore} from "src/shared/AllocationStore.sol";
+import {Account as AccountContract} from "src/shared/Account.sol";
+import {AccountStore} from "src/shared/AccountStore.sol";
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
 import {Error} from "src/utils/Error.sol";
@@ -30,8 +30,8 @@ import {Const} from "script/Const.sol";
  * Updated to work with the decoupled Rule/Deposit architecture.
  */
 contract TradingTest is BasicSetup {
-    AllocationStore allocationStore;
-    Allocate allocate;
+    AccountStore allocationStore;
+    AccountContract account;
     Settle settle;
     Rule ruleContract;
     Mirror mirror;
@@ -53,30 +53,16 @@ contract TradingTest is BasicSetup {
         super.setUp();
 
         // Deploy core contracts
-        allocationStore = new AllocationStore(dictator, tokenRouter);
-
-        allocate = new Allocate(
+        allocationStore = new AccountStore(dictator, tokenRouter);
+        
+        account = new AccountContract(
             dictator,
             allocationStore,
-            Allocate.Config({
-                transferOutGasLimit: 200_000,
-                maxPuppetList: 50,
-                maxKeeperFeeToAllocationRatio: 0.1e30,
-                maxKeeperFeeToAdjustmentRatio: 0.1e30
+            AccountContract.Config({
+                transferOutGasLimit: 200_000
             })
         );
 
-        settle = new Settle(
-            dictator,
-            allocate,
-            Settle.Config({
-                transferOutGasLimit: 200_000,
-                platformSettleFeeFactor: 0.05e30, // 5%
-                maxKeeperFeeToSettleRatio: 0.1e30, // 10%
-                maxPuppetList: 50,
-                allocationAccountTransferGasLimit: 100_000
-            })
-        );
 
         ruleContract = new Rule(
             dictator,
@@ -93,7 +79,6 @@ contract TradingTest is BasicSetup {
 
         mirror = new Mirror(
             dictator,
-            allocate,
             Mirror.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(address(mockGmxExchangeRouter)),
                 gmxDataStore: IGmxReadDataStore(Const.gmxDataStore),
@@ -101,14 +86,29 @@ contract TradingTest is BasicSetup {
                 referralCode: bytes32("PUPPET"),
                 increaseCallbackGasLimit: 2e6,
                 decreaseCallbackGasLimit: 2e6,
-                fallbackRefundExecutionFeeReceiver: address(0x9999)
+                fallbackRefundExecutionFeeReceiver: address(0x9999),
+                maxPuppetList: 50,
+                maxKeeperFeeToAllocationRatio: 0.1e30,
+                maxKeeperFeeToAdjustmentRatio: 0.1e30
+            })
+        );
+
+        settle = new Settle(
+            dictator,
+            Settle.Config({
+                transferOutGasLimit: 200_000,
+                platformSettleFeeFactor: 0.05e30, // 5%
+                maxKeeperFeeToSettleRatio: 0.1e30, // 10%
+                maxPuppetList: 50,
+                allocationAccountTransferGasLimit: 100_000
             })
         );
 
         keeperRouter = new KeeperRouter(
             dictator,
-            mirror,
+            account,
             ruleContract,
+            mirror,
             settle,
             KeeperRouter.Config({
                 mirrorBaseGasLimit: 1_300_853,
@@ -121,26 +121,37 @@ contract TradingTest is BasicSetup {
             })
         );
 
-        // Set up permissions
-        dictator.setAccess(allocationStore, address(allocate));
+        // Core Contract Access
+        dictator.setAccess(allocationStore, address(account));
         dictator.setAccess(allocationStore, address(settle));
 
+        // TokenRouter Permissions
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
-        dictator.setPermission(allocate, allocate.initializeTraderActivityThrottle.selector, address(ruleContract));
-        dictator.setPermission(allocate, allocate.createAllocation.selector, address(mirror));
-        dictator.setPermission(allocate, allocate.updateAllocation.selector, address(mirror));
-        dictator.setPermission(allocate, allocate.execute.selector, address(mirror));
-        dictator.setPermission(allocate, allocate.execute.selector, address(settle));
-        dictator.setPermission(allocate, allocate.setBalanceList.selector, address(settle));
-        dictator.setPermission(settle, settle.settle.selector, address(keeperRouter));
-        dictator.setPermission(settle, settle.collectDust.selector, address(keeperRouter));
+
+        // Account Contract Permissions
+        dictator.setPermission(account, account.setBalanceList.selector, address(mirror));
+        dictator.setPermission(account, account.createAllocationAccount.selector, address(mirror));
+        dictator.setPermission(account, account.getBalanceList.selector, address(mirror));
+        dictator.setPermission(account, account.transferOut.selector, address(mirror));
+        dictator.setPermission(account, account.execute.selector, address(mirror));
+        dictator.setPermission(account, account.execute.selector, address(settle));
+        dictator.setPermission(account, account.setBalanceList.selector, address(settle));
+        dictator.setPermission(account, account.transferInAllocation.selector, address(settle));
+        dictator.setPermission(account, account.transferOut.selector, address(settle));
+
+        // Mirror Contract Permissions
+        dictator.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(ruleContract));
         dictator.setPermission(mirror, mirror.requestOpen.selector, address(keeperRouter));
         dictator.setPermission(mirror, mirror.requestAdjust.selector, address(keeperRouter));
         dictator.setPermission(mirror, mirror.execute.selector, address(keeperRouter));
         dictator.setPermission(mirror, mirror.liquidate.selector, address(keeperRouter));
 
+        // Settle Contract Permissions
+        dictator.setPermission(settle, settle.settle.selector, address(keeperRouter));
+        dictator.setPermission(settle, settle.collectDust.selector, address(keeperRouter));
+
         // Initialize contracts
-        dictator.registerContract(allocate);
+        dictator.registerContract(account);
         dictator.registerContract(settle);
         dictator.registerContract(ruleContract);
         dictator.registerContract(mirror);
@@ -155,32 +166,26 @@ contract TradingTest is BasicSetup {
         uint[] memory allowanceCaps = new uint[](1);
         allowanceCaps[0] = 10000e6; // 10000 USDC cap
 
-        dictator.setPermission(allocate, allocate.setTokenAllowanceList.selector, users.owner);
-        allocate.setTokenAllowanceList(allowedTokens, allowanceCaps);
-
-        // Test setup: mint USDC to owner and approve for allocateContract
-        // Owner permissions for dust collection
+        // Owner Test Permissions
+        dictator.setPermission(account, account.setDepositCapList.selector, users.owner);
+        dictator.setPermission(account, account.deposit.selector, users.owner);
+        dictator.setPermission(ruleContract, ruleContract.setRule.selector, users.owner);
         dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, users.owner);
-
         dictator.setPermission(keeperRouter, keeperRouter.requestOpen.selector, users.owner);
         dictator.setPermission(keeperRouter, keeperRouter.requestAdjust.selector, users.owner);
         dictator.setPermission(keeperRouter, keeperRouter.settleAllocation.selector, users.owner);
         dictator.setPermission(keeperRouter, keeperRouter.collectDust.selector, users.owner);
-        dictator.setPermission(keeperRouter, keeperRouter.collectDust.selector, users.owner);
-
-        // Owner permissions to act on behalf of users
-        dictator.setPermission(allocate, allocate.deposit.selector, users.owner);
-        dictator.setPermission(ruleContract, ruleContract.setRule.selector, users.owner);
-
         dictator.setPermission(keeperRouter, keeperRouter.afterOrderExecution.selector, users.owner);
 
+        account.setDepositCapList(allowedTokens, allowanceCaps);
+
         // Setup puppet balances using owner permissions - owner deposits on behalf of puppets
-        allocate.deposit(usdc, users.owner, puppet1, 1000e6);
-        allocate.deposit(usdc, users.owner, puppet2, 800e6);
+        account.deposit(usdc, users.owner, puppet1, 1000e6);
+        account.deposit(usdc, users.owner, puppet2, 800e6);
 
         // Set up trading rules using owner permissions
         ruleContract.setRule(
-            allocate,
+            mirror,
             usdc,
             puppet1,
             trader,
@@ -192,7 +197,7 @@ contract TradingTest is BasicSetup {
         );
 
         ruleContract.setRule(
-            allocate,
+            mirror,
             usdc,
             puppet2,
             trader,
@@ -238,7 +243,7 @@ contract TradingTest is BasicSetup {
             keeperRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
 
         // Verify allocation was created
-        assertGt(allocate.allocationMap(allocationAddress), 0, "Allocation should be created");
+        assertGt(mirror.allocationMap(allocationAddress), 0, "Allocation should be created");
 
         // Verify request was submitted to GMX
         assertNotEq(requestKey, bytes32(0), "Request key should be generated");
@@ -359,8 +364,8 @@ contract TradingTest is BasicSetup {
             keeperExecutionFee: 0.1e6
         });
 
-        uint puppet1BalanceBefore = allocate.userBalanceMap(usdc, puppet1);
-        uint puppet2BalanceBefore = allocate.userBalanceMap(usdc, puppet2);
+        uint puppet1BalanceBefore = account.userBalanceMap(usdc, puppet1);
+        uint puppet2BalanceBefore = account.userBalanceMap(usdc, puppet2);
 
         (uint settledAmount, uint distributionAmount, uint platformFeeAmount) =
             keeperRouter.settleAllocation(settleParams, puppetList);
@@ -370,8 +375,8 @@ contract TradingTest is BasicSetup {
         assertGt(distributionAmount, 0, "Should have distributed some amount");
 
         // Verify puppet balances increased
-        assertGt(allocate.userBalanceMap(usdc, puppet1), puppet1BalanceBefore, "Puppet1 balance should increase");
-        assertGt(allocate.userBalanceMap(usdc, puppet2), puppet2BalanceBefore, "Puppet2 balance should increase");
+        assertGt(account.userBalanceMap(usdc, puppet1), puppet1BalanceBefore, "Puppet1 balance should increase");
+        assertGt(account.userBalanceMap(usdc, puppet2), puppet2BalanceBefore, "Puppet2 balance should increase");
 
         // Verify platform fee was collected
         assertGt(platformFeeAmount, 0, "Platform fee should be collected");
@@ -506,7 +511,7 @@ contract TradingTest is BasicSetup {
         (address allocationAddress,) = keeperRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
 
         // Should get allocation only from puppet1 since puppet2 is still throttled
-        uint allocatedAmount = allocate.allocationMap(allocationAddress);
+        uint allocatedAmount = mirror.allocationMap(allocationAddress);
         uint puppet1Expected = 1000e6 * 2000 / 10000; // 20% of 1000 USDC = 200 USDC
         // But puppet1's balance has been reduced from previous test (200e6 initial balance from BasicSetup + allocation
         // used)
@@ -607,7 +612,7 @@ contract TradingTest is BasicSetup {
 
         // Set rule for puppet2 to follow trader2
         ruleContract.setRule(
-            allocate,
+            mirror,
             usdc,
             puppet2,
             trader2,
@@ -665,8 +670,8 @@ contract TradingTest is BasicSetup {
         (address allocation2,) = keeperRouter.requestOpen{value: 0.001 ether}(callParams2, puppetList2);
 
         // Verify both allocations were created
-        assertGt(allocate.allocationMap(allocation1), 0, "Trader1 allocation should exist");
-        assertGt(allocate.allocationMap(allocation2), 0, "Trader2 allocation should exist");
+        assertGt(mirror.allocationMap(allocation1), 0, "Trader1 allocation should exist");
+        assertGt(mirror.allocationMap(allocation2), 0, "Trader2 allocation should exist");
         assertNotEq(allocation1, allocation2, "Allocations should be different");
 
         // Simulate profits by sending tokens to both allocation accounts
@@ -674,8 +679,8 @@ contract TradingTest is BasicSetup {
         usdc.mint(allocation2, 80e6); // 80 USDC profit for trader2's position
 
         // Record initial balances
-        uint puppet1BalanceBefore = allocate.userBalanceMap(usdc, puppet1);
-        uint puppet2BalanceBefore = allocate.userBalanceMap(usdc, puppet2);
+        uint puppet1BalanceBefore = account.userBalanceMap(usdc, puppet1);
+        uint puppet2BalanceBefore = account.userBalanceMap(usdc, puppet2);
 
         // Settle trader1's position (puppet1 gets the profit)
         Settle.CallSettle memory settleParams1 = Settle.CallSettle({
@@ -712,8 +717,8 @@ contract TradingTest is BasicSetup {
         assertGt(platformFee2, 0, "Should collect platform fee from trader2");
 
         // Verify puppet balances increased appropriately
-        uint puppet1BalanceAfter = allocate.userBalanceMap(usdc, puppet1);
-        uint puppet2BalanceAfter = allocate.userBalanceMap(usdc, puppet2);
+        uint puppet1BalanceAfter = account.userBalanceMap(usdc, puppet1);
+        uint puppet2BalanceAfter = account.userBalanceMap(usdc, puppet2);
 
         assertGt(puppet1BalanceAfter, puppet1BalanceBefore, "Puppet1 should receive trader1 profits");
         assertGt(puppet2BalanceAfter, puppet2BalanceBefore, "Puppet2 should receive trader2 profits");
@@ -816,7 +821,7 @@ contract TradingTest is BasicSetup {
         bytes32 _allocationKey = keccak256(abi.encodePacked(_puppetList, _traderMatchingKey, _allocationId));
 
         return Clones.predictDeterministicAddress(
-            allocate.allocationAccountImplementation(), _allocationKey, address(allocate)
+            account.allocationAccountImplementation(), _allocationKey, address(account)
         );
     }
 
