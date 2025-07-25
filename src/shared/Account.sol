@@ -48,13 +48,6 @@ contract Account is CoreContract, ReentrancyGuardTransient {
     }
 
     /**
-     * @notice Get the AccountStore address
-     */
-    function getAccountStoreAddress() external view returns (address) {
-        return address(accountStore);
-    }
-
-    /**
      * @notice Get balance list for multiple users and a token
      */
     function getBalanceList(IERC20 _token, address[] calldata _userList) external view returns (uint[] memory) {
@@ -216,22 +209,19 @@ contract Account is CoreContract, ReentrancyGuardTransient {
      * @notice Get allocation address for given parameters
      */
     function getAllocationAddress(
-        address[] calldata _puppetList,
-        bytes32 _traderMatchingKey,
-        uint _allocationId
+        bytes32 _allocationKey
     ) external view returns (address) {
-        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _allocationId);
         return Clones.predictDeterministicAddress(allocationAccountImplementation, _allocationKey, address(this));
     }
 
     /**
-     * @notice Create allocation account using deterministic cloning
-     * @param _allocationKey The allocation key for deterministic address
-     * @return _allocationAddress The address of the created allocation account
+     * @notice Create a new allocation account with a deterministic address
+     * @param _allocationKey The key to derive the allocation account address
+     * @return The address of the newly created allocation account
      */
     function createAllocationAccount(
         bytes32 _allocationKey
-    ) external auth nonReentrant returns (address _allocationAddress) {
+    ) external auth nonReentrant returns (address) {
         return Clones.cloneDeterministic(allocationAccountImplementation, _allocationKey);
     }
 

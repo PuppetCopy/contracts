@@ -173,7 +173,6 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         //     Error.Mirror__TraderPositionNotFound(_callParams.trader, _traderPositionKey)
         // );
 
-        // Create allocation
         uint _puppetCount = _puppetList.length;
         require(_puppetCount > 0, Error.Allocation__PuppetListEmpty());
         require(_puppetCount <= config.maxPuppetList, "Puppet list too large");
@@ -186,14 +185,12 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         uint _allocated;
         uint[] memory _allocatedList;
         {
-            // Get rules and process allocations (scoped to reduce stack depth)
             Rule.RuleParams[] memory _rules = _ruleContract.getRuleList(_traderMatchingKey, _puppetList);
             uint _feePerPuppet = _callParams.keeperFee / _puppetCount;
             _allocatedList = new uint[](_puppetCount);
             allocationPuppetList[_allocationAddress] = new uint[](_puppetCount);
             _allocated = 0;
 
-            // Get current balances for all puppets
             uint[] memory _balanceList = _account.getBalanceList(_callParams.collateralToken, _puppetList);
             uint[] memory _nextBalanceList = new uint[](_puppetCount);
 
@@ -220,7 +217,6 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
                 }
             }
 
-            // Set all balances at once
             _account.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
         }
 
@@ -232,11 +228,9 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         _allocated -= _callParams.keeperFee;
         allocationMap[_allocationAddress] = _allocated;
 
-        // Transfer keeper fee and allocated funds
         _account.transferOut(_callParams.collateralToken, _callParams.keeperFeeReceiver, _callParams.keeperFee);
         _account.transferOut(_callParams.collateralToken, config.gmxOrderVault, _allocated);
 
-        // Mirror position
         uint _traderTargetLeverage = Precision.toBasisPoints(_callParams.sizeDeltaInUsd, _callParams.collateralDelta);
         uint _sizeDelta = Math.mulDiv(_callParams.sizeDeltaInUsd, _allocated, _callParams.collateralDelta);
 
@@ -309,12 +303,11 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
         require(_callParams.collateralDelta > 0 || _callParams.sizeDeltaInUsd > 0, Error.Mirror__NoAdjustmentRequired());
 
-        // Get allocation address
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
-        address _allocationAddress =
-            _account.getAllocationAddress(_puppetList, _traderMatchingKey, _callParams.allocationId);
+        address _allocationAddress = _account.getAllocationAddress(
+            PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId)
+        );
 
-        // Update allocation
         uint _allocated = allocationMap[_allocationAddress];
         require(_allocated > 0, Error.Allocation__InvalidAllocation(_allocationAddress));
         require(_callParams.keeperFee > 0, Error.Allocation__InvalidKeeperExecutionFeeAmount());
@@ -337,7 +330,6 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         uint _remainingKeeperFeeToCollect = _callParams.keeperFee;
         uint _keeperExecutionFeeInsolvency = 0;
 
-        // Get current balances for all puppets
         uint[] memory _balanceList = _account.getBalanceList(_callParams.collateralToken, _puppetList);
         uint[] memory _nextBalanceList = new uint[](_puppetCount);
 
@@ -368,7 +360,6 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
             }
         }
 
-        // Set all balances at once
         _account.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
 
         require(
@@ -390,9 +381,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         require(_position.size > 0, Error.Mirror__PositionNotFound(_allocationAddress));
         require(_position.traderCollateral > 0, Error.Mirror__TraderCollateralZero(_allocationAddress));
 
-        // Calculate adjustments
         uint _currentPuppetLeverage = Precision.toBasisPoints(_position.size, _allocated);
-
         uint _newTraderSize;
         uint _newTraderCollateral;
 
@@ -425,7 +414,6 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         require(_traderTargetLeverage != _currentPuppetLeverage, Error.Mirror__NoAdjustmentRequired());
         require(_currentPuppetLeverage > 0, Error.Mirror__InvalidCurrentLeverage());
 
-        // Calculate size delta
         bool isIncrease = _traderTargetLeverage > _currentPuppetLeverage;
         uint _sizeDelta;
 
@@ -447,7 +435,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
             isIncrease ? config.increaseCallbackGasLimit : config.decreaseCallbackGasLimit,
             _sizeDelta,
             0,
-            msg.sender // callbackContract
+            msg.sender
         );
 
         requestAdjustmentMap[_requestKey] = RequestAdjustment({
@@ -544,7 +532,6 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
             return;
         }
 
-        // Update trader position state
         if (_request.traderIsIncrease) {
             _position.traderSize += _request.traderSizeDelta;
             _position.traderCollateral += _request.traderCollateralDelta;
@@ -556,7 +543,6 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
                 : 0;
         }
 
-        // Update puppet position size
         if (_request.traderTargetLeverage > 0) {
             if (_request.traderIsIncrease) {
                 _position.size += _request.sizeDelta;

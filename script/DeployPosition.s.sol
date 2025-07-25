@@ -6,12 +6,12 @@ import {console} from "forge-std/src/console.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
 
-import {Account as AccountContract} from "src/shared/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
 import {Rule} from "src/position/Rule.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
+import {Account as AccountContract} from "src/shared/Account.sol";
 import {AccountStore} from "src/shared/AccountStore.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
@@ -39,8 +39,8 @@ contract DeployPosition is BaseScript {
         AccountContract account = deployAccount(accountStore);
         Rule ruleContract = deployRule();
         Mirror mirror = deployMirror(account);
-        Settle settle = deploySettle(mirror, account);
-        deployKeeperRouter(mirror, ruleContract, settle);
+        Settle settle = deploySettle( account);
+        deployKeeperRouter(mirror, ruleContract, settle, account);
 
         // Set up cross-contract permissions
         setupCrossContractPermissions(mirror, ruleContract);
@@ -53,10 +53,6 @@ contract DeployPosition is BaseScript {
         vm.stopBroadcast();
     }
 
-    /**
-     * @notice Deploys AccountStore and sets up its permissions
-     * @return accountStore The deployed AccountStore contract
-     */
     function deployAccountStore() internal returns (AccountStore) {
         console.log("\n--- Deploying AccountStore ---");
 
@@ -73,22 +69,14 @@ contract DeployPosition is BaseScript {
         return accountStore;
     }
 
-    /**
-     * @notice Deploys Account contract and sets up its permissions
-     * @param accountStore The AccountStore contract to use
-     * @return account The deployed Account contract
-     */
-    function deployAccount(AccountStore accountStore) internal returns (AccountContract) {
+    function deployAccount(
+        AccountStore accountStore
+    ) internal returns (AccountContract) {
         console.log("\n--- Deploying Account ---");
 
         // Deploy contract
-        AccountContract account = new AccountContract(
-            dictator,
-            accountStore,
-            AccountContract.Config({
-                transferOutGasLimit: 200_000
-            })
-        );
+        AccountContract account =
+            new AccountContract(dictator, accountStore, AccountContract.Config({transferOutGasLimit: 200_000}));
         console.log("Account deployed at:", address(account));
 
         // Set up permissions
@@ -102,14 +90,7 @@ contract DeployPosition is BaseScript {
         return account;
     }
 
-    /**
-     * @notice Deploys Settle contract and sets up its permissions
-     * @param mirror The Mirror contract to use
-     * @param account The Account contract to use
-     * @return settle The deployed Settle contract
-     */
     function deploySettle(
-        Mirror mirror,
         AccountContract account
     ) internal returns (Settle) {
         console.log("\n--- Deploying Settle ---");
@@ -141,10 +122,6 @@ contract DeployPosition is BaseScript {
         return settle;
     }
 
-    /**
-     * @notice Deploys Rule contract and sets up its permissions
-     * @return ruleContract The deployed Rule contract
-     */
     function deployRule() internal returns (Rule ruleContract) {
         console.log("\n--- Deploying Rule Contract ---");
 
@@ -168,11 +145,6 @@ contract DeployPosition is BaseScript {
         return ruleContract;
     }
 
-    /**
-     * @notice Deploys Mirror contract and sets up its permissions
-     * @param account The Account contract to use
-     * @return mirror The deployed Mirror contract
-     */
     function deployMirror(
         AccountContract account
     ) internal returns (Mirror) {
@@ -181,7 +153,6 @@ contract DeployPosition is BaseScript {
         // Deploy contract
         Mirror mirror = new Mirror(
             dictator,
-            account,
             Mirror.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(Const.gmxExchangeRouter),
                 gmxDataStore: IGmxReadDataStore(Const.gmxDataStore),
@@ -202,6 +173,7 @@ contract DeployPosition is BaseScript {
         dictator.setPermission(account, account.execute.selector, address(mirror));
         dictator.setPermission(account, account.setUserBalance.selector, address(mirror));
         dictator.setPermission(account, account.setBalanceList.selector, address(mirror));
+        dictator.setPermission(account, account.createAllocationAccount.selector, address(mirror));
 
         // Initialize contract
         dictator.registerContract(mirror);
@@ -210,22 +182,20 @@ contract DeployPosition is BaseScript {
         return mirror;
     }
 
-    /**
-     * @notice Deploys KeeperRouter and sets up permissions for all contracts
-     * @dev KeeperRouter is the composition layer that brings all contracts together
-     * @param mirror The Mirror contract
-     * @param ruleContract The Rule contract
-     * @param settle The Settle contract
-     * @return keeperRouter The deployed KeeperRouter contract
-     */
-    function deployKeeperRouter(Mirror mirror, Rule ruleContract, Settle settle) internal returns (KeeperRouter) {
+    function deployKeeperRouter(
+        Mirror mirror,
+        Rule ruleContract,
+        Settle settle,
+        AccountContract account
+    ) internal returns (KeeperRouter) {
         console.log("\n--- Deploying KeeperRouter ---");
 
         // Deploy contract with empirical gas configuration
         KeeperRouter keeperRouter = new KeeperRouter(
             dictator,
-            mirror,
+            account,
             ruleContract,
+            mirror,
             settle,
             KeeperRouter.Config({
                 mirrorBaseGasLimit: 1_283_731,
@@ -281,10 +251,6 @@ contract DeployPosition is BaseScript {
         return keeperRouter;
     }
 
-    /**
-     * @notice Sets up cross-contract permissions between Mirror and Rule
-     * @dev Rule needs to call Mirror for activity throttle initialization
-     */
     function setupCrossContractPermissions(Mirror mirror, Rule ruleContract) internal {
         console.log("\n--- Setting up cross-contract permissions ---");
 
@@ -294,11 +260,6 @@ contract DeployPosition is BaseScript {
         console.log("Cross-contract permissions configured");
     }
 
-    /**
-     * @notice Sets up upkeeping configuration for token allowances and dust thresholds
-     * @param account The Account contract
-     * @param settle The Settle contract
-     */
     function setupUpkeepingConfig(AccountContract account, Settle settle) internal {
         console.log("\n--- Setting up upkeeping configuration ---");
 

@@ -42,10 +42,7 @@ contract Settle is CoreContract {
     mapping(IERC20 token => uint accumulatedFees) public platformFeeMap;
     mapping(IERC20 token => uint) public tokenDustThresholdAmountMap;
 
-    constructor(
-        IAuthority _authority,
-        Config memory _config
-    ) CoreContract(_authority, abi.encode(_config)) {}
+    constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
     function getConfig() external view returns (Config memory) {
         return config;
@@ -77,8 +74,8 @@ contract Settle is CoreContract {
      * @return _platformFeeAmount Platform fee taken
      */
     function settle(
-        Mirror _mirror,
         Account _account,
+        Mirror _mirror,
         CallSettle calldata _callParams,
         address[] calldata _puppetList
     ) external auth returns (uint _settledAmount, uint _distributionAmount, uint _platformFeeAmount) {
@@ -95,7 +92,9 @@ contract Settle is CoreContract {
         require(_keeperFeeReceiver != address(0), Error.Allocation__InvalidKeeperExecutionFeeReceiver());
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
-        address _allocationAddress = _account.getAllocationAddress(_puppetList, _traderMatchingKey, _callParams.allocationId);
+        address _allocationAddress = _account.getAllocationAddress(
+            PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId)
+        );
 
         uint _allocation = _mirror.allocationMap(_allocationAddress);
         require(_allocation > 0, Error.Allocation__InvalidAllocation(_allocationAddress));
@@ -172,11 +171,8 @@ contract Settle is CoreContract {
             _dustAmount <= _dustThreshold, Error.Allocation__AmountExceedsDustThreshold(_dustAmount, _dustThreshold)
         );
 
-        _dustAmount = _account.transferInAllocation(
-            _allocationAccount,
-            _dustToken,
-            config.allocationAccountTransferGasLimit
-        );
+        _dustAmount =
+            _account.transferInAllocation(_allocationAccount, _dustToken, config.allocationAccountTransferGasLimit);
 
         _account.transferOut(_dustToken, _receiver, _dustAmount);
 
