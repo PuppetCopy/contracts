@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-import {Allocate} from "./position/Allocate.sol";
+import {Account} from "./shared/Account.sol";
 import {Mirror} from "./position/Mirror.sol";
 import {Rule} from "./position/Rule.sol";
 import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
@@ -15,13 +15,13 @@ import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
  * @dev Contains deposit, withdraw, rule setting, and offer acceptance functionality
  */
 contract UserRouter is ReentrancyGuardTransient {
-    Allocate public immutable allocate;
+    Account public immutable account;
     Rule public immutable ruleContract;
     FeeMarketplace public immutable feeMarketplace;
     Mirror public immutable mirror;
 
-    constructor(Allocate _allocate, Rule _ruleContract, FeeMarketplace _feeMarketplace, Mirror _mirror) {
-        allocate = _allocate;
+    constructor(Account _account, Rule _ruleContract, FeeMarketplace _feeMarketplace, Mirror _mirror) {
+        account = _account;
         ruleContract = _ruleContract;
         feeMarketplace = _feeMarketplace;
         mirror = _mirror;
@@ -33,7 +33,7 @@ contract UserRouter is ReentrancyGuardTransient {
      * @param amount The amount being deposited.
      */
     function deposit(IERC20 token, uint amount) external nonReentrant {
-        allocate.deposit(token, msg.sender, msg.sender, amount);
+        account.deposit(token, msg.sender, msg.sender, amount);
     }
 
     /**
@@ -43,7 +43,7 @@ contract UserRouter is ReentrancyGuardTransient {
      * @param amount The amount being withdrawn.
      */
     function withdraw(IERC20 token, address receiver, uint amount) external nonReentrant {
-        allocate.withdraw(token, msg.sender, receiver, amount);
+        account.withdraw(token, msg.sender, receiver, amount);
     }
 
     /**
@@ -57,7 +57,7 @@ contract UserRouter is ReentrancyGuardTransient {
         address trader,
         Rule.RuleParams calldata ruleParams
     ) external nonReentrant {
-        ruleContract.setRule(mirror.allocate(), collateralToken, msg.sender, trader, ruleParams);
+        ruleContract.setRule(mirror, collateralToken, msg.sender, trader, ruleParams);
     }
 
     /**

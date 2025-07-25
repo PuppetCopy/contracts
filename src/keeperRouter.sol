@@ -4,6 +4,7 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
+import {Account} from "./shared/Account.sol";
 import {Mirror} from "./position/Mirror.sol";
 import {Rule} from "./position/Rule.sol";
 import {Settle} from "./position/Settle.sol";
@@ -32,6 +33,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
     Rule public immutable ruleContract;
     Mirror public immutable mirror;
     Settle public immutable settle;
+    Account public immutable account;
 
     Config config;
 
@@ -40,15 +42,18 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         Mirror _mirror,
         Rule _ruleContract,
         Settle _settle,
+        Account _account,
         Config memory _config
     ) CoreContract(_authority, abi.encode(_config)) {
         require(address(_mirror) != address(0), "Mirror not set correctly");
         require(address(_ruleContract) != address(0), "Rule contract not set correctly");
         require(address(_settle) != address(0), "Settle not set correctly");
+        require(address(_account) != address(0), "Account not set correctly");
 
         mirror = _mirror;
         ruleContract = _ruleContract;
         settle = _settle;
+        account = _account;
     }
 
     /**
@@ -70,7 +75,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         Mirror.CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
-        return mirror.requestOpen{value: msg.value}(ruleContract, _callParams, _puppetList);
+        return mirror.requestOpen{value: msg.value}(account, ruleContract, _callParams, _puppetList);
     }
 
     /**
@@ -83,7 +88,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         Mirror.CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
-        return mirror.requestAdjust{value: msg.value}(_callParams, _puppetList);
+        return mirror.requestAdjust{value: msg.value}(account, _callParams, _puppetList);
     }
 
     /**
@@ -97,7 +102,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         address _allocationAddress
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
         _requestKey =
-            mirror.requestCloseStalledPosition{value: msg.value}(_callParams, _allocationAddress, address(this));
+            mirror.requestCloseStalledPosition{value: msg.value}(account, _callParams, _allocationAddress, address(this));
 
         return _requestKey;
     }
@@ -114,7 +119,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         Settle.CallSettle calldata _settleParams,
         address[] calldata _puppetList
     ) external auth nonReentrant returns (uint settledBalance, uint distributionAmount, uint platformFeeAmount) {
-        return settle.settle(_settleParams, _puppetList);
+        return settle.settle(mirror, account, _settleParams, _puppetList);
     }
 
     /**
@@ -129,7 +134,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         IERC20 _dustToken,
         address _receiver
     ) external auth nonReentrant returns (uint dustAmount) {
-        return settle.collectDust(_allocationAccount, _dustToken, _receiver);
+        return settle.collectDust(account, _allocationAccount, _dustToken, _receiver);
     }
 
     /**

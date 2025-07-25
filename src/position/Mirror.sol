@@ -6,13 +6,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {AllocationStore} from "../shared/AllocationStore.sol";
+import {Account} from "../shared/Account.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Error} from "./../utils/Error.sol";
 import {ErrorUtils} from "./../utils/ErrorUtils.sol";
 import {Precision} from "./../utils/Precision.sol";
-import {Allocate} from "./Allocate.sol";
 import {Rule} from "./Rule.sol";
 import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
 import {IGmxReadDataStore} from "./interface/IGmxReadDataStore.sol";
@@ -28,6 +27,9 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         uint increaseCallbackGasLimit;
         uint decreaseCallbackGasLimit;
         address fallbackRefundExecutionFeeReceiver;
+        uint maxPuppetList;
+        uint maxKeeperFeeToAllocationRatio;
+        uint maxKeeperFeeToAdjustmentRatio;
     }
 
     struct Position {
@@ -63,19 +65,17 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
     }
 
     Config public config;
-    Allocate public immutable allocate;
 
     // Position tracking
     mapping(address allocationAddress => Position) public positionMap;
     mapping(bytes32 requestKey => RequestAdjustment) public requestAdjustmentMap;
 
-    constructor(
-        IAuthority _authority,
-        Allocate _allocate,
-        Config memory _config
-    ) CoreContract(_authority, abi.encode(_config)) {
-        allocate = _allocate;
-    }
+    // Allocation tracking
+    mapping(address allocationAddress => uint totalAmount) public allocationMap;
+    mapping(address allocationAddress => uint[] puppetAmounts) public allocationPuppetList;
+    mapping(bytes32 traderMatchingKey => mapping(address puppet => uint lastActivity)) public lastActivityThrottleMap;
+
+    constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
     function getConfig() external view returns (Config memory) {
         return config;
@@ -90,13 +90,27 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
     function getAllocation(
         address _allocationAddress
     ) external view returns (uint) {
-        return allocate.allocationMap(_allocationAddress);
+        return allocationMap[_allocationAddress];
     }
 
     function getAllocationPuppetList(
         address _allocationAddress
     ) external view returns (uint[] memory) {
-        return allocate.getAllocationPuppetList(_allocationAddress);
+        return allocationPuppetList[_allocationAddress];
+    }
+
+    /**
+     * @notice Get last activity timestamp for a puppet/trader combination
+     */
+    function getLastActivityThrottle(bytes32 _traderMatchingKey, address _puppet) external view returns (uint) {
+        return lastActivityThrottleMap[_traderMatchingKey][_puppet];
+    }
+
+    /**
+     * @notice Initialize trader activity throttle - called by Rule contract
+     */
+    function initializeTraderActivityThrottle(bytes32 _traderMatchingKey, address _puppet) external auth {
+        lastActivityThrottleMap[_traderMatchingKey][_puppet] = 1;
     }
 
     function getTraderPositionSizeInUsd(
@@ -141,6 +155,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
      * @param _puppetList The list of puppet addresses to allocate funds to
      */
     function requestOpen(
+        Account _account,
         Rule _ruleContract,
         CallPosition calldata _callParams,
         address[] calldata _puppetList
@@ -149,34 +164,84 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         require(_callParams.collateralDelta > 0, Error.Mirror__InvalidCollateralDelta());
         require(_callParams.sizeDeltaInUsd > 0, Error.Mirror__InvalidSizeDelta());
 
-        bytes32 _traderPositionKey = GmxPositionUtils.getPositionKey(
-            _callParams.trader, _callParams.market, _callParams.collateralToken, _callParams.isLong
-        );
+        // bytes32 _traderPositionKey = GmxPositionUtils.getPositionKey(
+        //     _callParams.trader, _callParams.market, _callParams.collateralToken, _callParams.isLong
+        // );
 
-        require(
-            GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, _traderPositionKey) > 0,
-            Error.Mirror__TraderPositionNotFound(_callParams.trader, _traderPositionKey)
-        );
+        // require(
+        //     GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, _traderPositionKey) > 0,
+        //     Error.Mirror__TraderPositionNotFound(_callParams.trader, _traderPositionKey)
+        // );
 
-        // Create allocation through Allocate contract
+        // Create allocation
+        uint _puppetCount = _puppetList.length;
+        require(_puppetCount > 0, Error.Allocation__PuppetListEmpty());
+        require(_puppetCount <= config.maxPuppetList, "Puppet list too large");
+
+        bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
+        bytes32 _allocationKey =
+            PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId);
+        _allocationAddress = _account.createAllocationAccount(_allocationKey);
+
         uint _allocated;
         uint[] memory _allocatedList;
-        (_allocationAddress, _allocated, _allocatedList) = allocate.createAllocation(
-            _ruleContract,
-            _callParams.collateralToken,
-            _callParams.trader,
-            _callParams.allocationId,
-            _callParams.keeperFee,
-            _callParams.keeperFeeReceiver,
-            _puppetList,
-            config.gmxOrderVault
+        {
+            // Get rules and process allocations (scoped to reduce stack depth)
+            Rule.RuleParams[] memory _rules = _ruleContract.getRuleList(_traderMatchingKey, _puppetList);
+            uint _feePerPuppet = _callParams.keeperFee / _puppetCount;
+            _allocatedList = new uint[](_puppetCount);
+            allocationPuppetList[_allocationAddress] = new uint[](_puppetCount);
+            _allocated = 0;
+
+            // Get current balances for all puppets
+            uint[] memory _balanceList = _account.getBalanceList(_callParams.collateralToken, _puppetList);
+            uint[] memory _nextBalanceList = new uint[](_puppetCount);
+
+            for (uint _i = 0; _i < _puppetCount; _i++) {
+                address _puppet = _puppetList[_i];
+                Rule.RuleParams memory _rule = _rules[_i];
+                uint _balance = _balanceList[_i];
+                _nextBalanceList[_i] = _balance;
+
+                if (
+                    _rule.expiry > block.timestamp
+                        && block.timestamp >= lastActivityThrottleMap[_traderMatchingKey][_puppet]
+                ) {
+                    uint _puppetAllocation = Precision.applyBasisPoints(_rule.allowanceRate, _balance);
+
+                    if (_feePerPuppet <= Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _puppetAllocation))
+                    {
+                        _allocatedList[_i] = _puppetAllocation;
+                        allocationPuppetList[_allocationAddress][_i] = _puppetAllocation;
+                        _nextBalanceList[_i] = _balance - _puppetAllocation;
+                        _allocated += _puppetAllocation;
+                        lastActivityThrottleMap[_traderMatchingKey][_puppet] = block.timestamp + _rule.throttleActivity;
+                    }
+                }
+            }
+
+            // Set all balances at once
+            _account.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
+        }
+
+        require(
+            _callParams.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _allocated),
+            Error.Allocation__KeeperFeeExceedsCostFactor(_callParams.keeperFee, _allocated)
         );
+
+        _allocated -= _callParams.keeperFee;
+        allocationMap[_allocationAddress] = _allocated;
+
+        // Transfer keeper fee and allocated funds
+        _account.transferOut(_callParams.collateralToken, _callParams.keeperFeeReceiver, _callParams.keeperFee);
+        _account.transferOut(_callParams.collateralToken, config.gmxOrderVault, _allocated);
 
         // Mirror position
         uint _traderTargetLeverage = Precision.toBasisPoints(_callParams.sizeDeltaInUsd, _callParams.collateralDelta);
         uint _sizeDelta = Math.mulDiv(_callParams.sizeDeltaInUsd, _allocated, _callParams.collateralDelta);
 
         _requestKey = _submitOrder(
+            _account,
             _callParams,
             _allocationAddress,
             GmxPositionUtils.OrderType.MarketIncrease,
@@ -195,15 +260,13 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
             sizeDelta: _sizeDelta
         });
 
-        bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
-
         _logEvent(
             "RequestOpen",
             abi.encode(
                 _callParams,
                 _puppetList,
                 _traderMatchingKey,
-                _traderPositionKey,
+                // _traderPositionKey,
                 _allocationAddress,
                 _sizeDelta,
                 _traderTargetLeverage,
@@ -240,6 +303,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
      * @return _requestKey The GMX request key for the submitted adjustment order
      */
     function requestAdjust(
+        Account _account,
         CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
@@ -247,23 +311,80 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
 
         // Get allocation address
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
-        bytes32 _allocationKey =
-            PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId);
-        address _allocationAddress = Clones.predictDeterministicAddress(
-            allocate.allocationAccountImplementation(), _allocationKey, address(allocate)
+        address _allocationAddress =
+            _account.getAllocationAddress(_puppetList, _traderMatchingKey, _callParams.allocationId);
+
+        // Update allocation
+        uint _allocated = allocationMap[_allocationAddress];
+        require(_allocated > 0, Error.Allocation__InvalidAllocation(_allocationAddress));
+        require(_callParams.keeperFee > 0, Error.Allocation__InvalidKeeperExecutionFeeAmount());
+        require(
+            _callParams.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAdjustmentRatio, _allocated),
+            Error.Allocation__KeeperFeeExceedsAdjustmentRatio(_callParams.keeperFee, _allocated)
         );
 
-        // Update allocation through Allocate contract
-        uint _allocated;
-        uint _keeperExecutionFeeInsolvency;
-        uint[] memory _allocationList;
-        (_allocated, _keeperExecutionFeeInsolvency, _allocationList) = allocate.updateAllocation(
-            _callParams.collateralToken,
-            _callParams.keeperFee,
-            _callParams.keeperFeeReceiver,
-            _puppetList,
-            _allocationAddress
+        uint[] memory _allocationList = allocationPuppetList[_allocationAddress];
+        uint _puppetCount = _puppetList.length;
+        require(
+            _allocationList.length == _puppetCount,
+            Error.Allocation__PuppetListMismatch(_allocationList.length, _puppetCount)
         );
+        require(
+            _allocated > _callParams.keeperFee,
+            Error.Allocation__InsufficientAllocationForKeeperFee(_allocated, _callParams.keeperFee)
+        );
+
+        uint _remainingKeeperFeeToCollect = _callParams.keeperFee;
+        uint _keeperExecutionFeeInsolvency = 0;
+
+        // Get current balances for all puppets
+        uint[] memory _balanceList = _account.getBalanceList(_callParams.collateralToken, _puppetList);
+        uint[] memory _nextBalanceList = new uint[](_puppetCount);
+
+        for (uint _i = 0; _i < _puppetCount; _i++) {
+            uint _puppetAllocation = _allocationList[_i];
+            uint _balance = _balanceList[_i];
+            _nextBalanceList[_i] = _balance;
+
+            if (_puppetAllocation == 0) continue;
+
+            uint _remainingPuppets = _puppetCount - _i;
+            uint _executionFee = (_remainingKeeperFeeToCollect + _remainingPuppets - 1) / _remainingPuppets;
+
+            if (_executionFee > _remainingKeeperFeeToCollect) {
+                _executionFee = _remainingKeeperFeeToCollect;
+            }
+
+            if (_balance >= _executionFee) {
+                _nextBalanceList[_i] = _balance - _executionFee;
+                _remainingKeeperFeeToCollect -= _executionFee;
+            } else {
+                if (_puppetAllocation > _executionFee) {
+                    _allocationList[_i] = _puppetAllocation - _executionFee;
+                } else {
+                    _keeperExecutionFeeInsolvency += _puppetAllocation;
+                    _allocationList[_i] = 0;
+                }
+            }
+        }
+
+        // Set all balances at once
+        _account.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
+
+        require(
+            _remainingKeeperFeeToCollect == 0,
+            Error.Allocation__KeeperFeeNotFullyCovered(0, _remainingKeeperFeeToCollect)
+        );
+
+        _allocated -= _keeperExecutionFeeInsolvency;
+        require(
+            _callParams.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAdjustmentRatio, _allocated),
+            Error.Allocation__KeeperFeeExceedsAdjustmentRatio(_callParams.keeperFee, _allocated)
+        );
+        allocationPuppetList[_allocationAddress] = _allocationList;
+        allocationMap[_allocationAddress] = _allocated;
+
+        _account.transferOut(_callParams.collateralToken, _callParams.keeperFeeReceiver, _callParams.keeperFee);
 
         Position memory _position = positionMap[_allocationAddress];
         require(_position.size > 0, Error.Mirror__PositionNotFound(_allocationAddress));
@@ -319,6 +440,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         }
 
         _requestKey = _submitOrder(
+            _account,
             _callParams,
             _allocationAddress,
             isIncrease ? GmxPositionUtils.OrderType.MarketIncrease : GmxPositionUtils.OrderType.MarketDecrease,
@@ -364,6 +486,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
      * @return _requestKey The GMX request key for the close order
      */
     function requestCloseStalledPosition(
+        Account _account,
         CallPosition calldata _params,
         address _allocationAddress,
         address _callbackContract
@@ -381,6 +504,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         );
 
         _requestKey = _submitOrder(
+            _account,
             _params,
             _allocationAddress,
             GmxPositionUtils.OrderType.MarketDecrease,
@@ -471,6 +595,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
     }
 
     function _submitOrder(
+        Account _account,
         CallPosition calldata _order,
         address _allocationAddress,
         GmxPositionUtils.OrderType _orderType,
@@ -517,7 +642,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         config.gmxExchangeRouter.sendWnt{value: _order.executionFee}(config.gmxOrderVault, _order.executionFee);
 
         (bool success, bytes memory returnData) =
-            allocate.execute(_allocationAddress, address(config.gmxExchangeRouter), gmxCallData, gasleft());
+            _account.execute(_allocationAddress, address(config.gmxExchangeRouter), gmxCallData, gasleft());
 
         if (!success) {
             ErrorUtils.revertWithParsedMessage(returnData);
@@ -538,6 +663,9 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         require(_config.increaseCallbackGasLimit > 0, "Invalid Increase Callback Gas Limit");
         require(_config.decreaseCallbackGasLimit > 0, "Invalid Decrease Callback Gas Limit");
         require(_config.fallbackRefundExecutionFeeReceiver != address(0), "Invalid Refund Execution Fee Receiver");
+        require(_config.maxPuppetList > 0, "Invalid max puppet list");
+        require(_config.maxKeeperFeeToAllocationRatio > 0, "Invalid max keeper fee to allocation ratio");
+        require(_config.maxKeeperFeeToAdjustmentRatio > 0, "Invalid max keeper fee to adjustment ratio");
 
         config = _config;
     }

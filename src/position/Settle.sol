@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.29;
 
-import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {Account} from "../shared/Account.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {Allocate} from "./Allocate.sol";
+import {Mirror} from "./Mirror.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
 /**
@@ -35,8 +35,6 @@ contract Settle is CoreContract {
         uint keeperExecutionFee;
     }
 
-    Allocate public immutable allocate;
-
     Config config;
     IERC20[] public tokenDustThresholdList;
 
@@ -46,11 +44,8 @@ contract Settle is CoreContract {
 
     constructor(
         IAuthority _authority,
-        Allocate _allocate,
         Config memory _config
-    ) CoreContract(_authority, abi.encode(_config)) {
-        allocate = _allocate;
-    }
+    ) CoreContract(_authority, abi.encode(_config)) {}
 
     function getConfig() external view returns (Config memory) {
         return config;
@@ -82,6 +77,8 @@ contract Settle is CoreContract {
      * @return _platformFeeAmount Platform fee taken
      */
     function settle(
+        Mirror _mirror,
+        Account _account,
         CallSettle calldata _callParams,
         address[] calldata _puppetList
     ) external auth returns (uint _settledAmount, uint _distributionAmount, uint _platformFeeAmount) {
@@ -98,57 +95,26 @@ contract Settle is CoreContract {
         require(_keeperFeeReceiver != address(0), Error.Allocation__InvalidKeeperExecutionFeeReceiver());
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
-        bytes32 _allocationKey =
-            PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId);
-        address _allocationAddress = Clones.predictDeterministicAddress(
-            allocate.allocationAccountImplementation(), _allocationKey, address(allocate)
-        );
+        address _allocationAddress = _account.getAllocationAddress(_puppetList, _traderMatchingKey, _callParams.allocationId);
 
-        uint _allocation = allocate.allocationMap(_allocationAddress);
+        uint _allocation = _mirror.allocationMap(_allocationAddress);
         require(_allocation > 0, Error.Allocation__InvalidAllocation(_allocationAddress));
 
-        _settledAmount = _callParams.distributionToken.balanceOf(_allocationAddress);
-
-        // Transfer funds from AllocationAccount to AllocationStore via Allocate
-        (bool _success, bytes memory returnData) = allocate.execute(
-            _allocationAddress,
-            address(_callParams.distributionToken),
-            abi.encodeWithSelector(IERC20.transfer.selector, address(allocate.allocationStore()), _settledAmount),
-            config.allocationAccountTransferGasLimit
-        );
-        require(
-            _success,
-            Error.Allocation__SettlementTransferFailed(address(_callParams.distributionToken), _allocationAddress)
-        );
-
-        if (returnData.length > 0) {
-            require(abi.decode(returnData, (bool)), "ERC20 transfer returned false");
-        }
-
-        // Update AllocationStore internal accounting and get actual transferred amount
-        uint _recordedAmountIn = allocate.allocationStore().recordTransferIn(_callParams.distributionToken);
-
-        require(
-            _recordedAmountIn >= _settledAmount,
-            Error.Allocation__InvalidSettledAmount(_callParams.distributionToken, _recordedAmountIn, _settledAmount)
+        _settledAmount = _account.transferInAllocation(
+            _allocationAddress, _callParams.distributionToken, config.allocationAccountTransferGasLimit
         );
 
         require(
-            _callParams.keeperExecutionFee < Precision.applyFactor(config.maxKeeperFeeToSettleRatio, _recordedAmountIn),
-            Error.Allocation__KeeperFeeExceedsSettledAmount(_callParams.keeperExecutionFee, _recordedAmountIn)
+            _callParams.keeperExecutionFee < Precision.applyFactor(config.maxKeeperFeeToSettleRatio, _settledAmount),
+            Error.Allocation__KeeperFeeExceedsSettledAmount(_callParams.keeperExecutionFee, _settledAmount)
         );
 
-        _distributionAmount = _recordedAmountIn - _callParams.keeperExecutionFee;
+        _distributionAmount = _settledAmount - _callParams.keeperExecutionFee;
 
-        // Transfer keeper fee directly through AllocationStore
-        allocate.allocationStore().transferOut(
-            config.transferOutGasLimit,
-            _callParams.distributionToken,
-            _callParams.keeperFeeReceiver,
-            _callParams.keeperExecutionFee
+        _account.transferOut(
+            _callParams.distributionToken, _callParams.keeperFeeReceiver, _callParams.keeperExecutionFee
         );
 
-        // Calculate platform fee from distribution amount
         if (config.platformSettleFeeFactor > 0) {
             _platformFeeAmount = Precision.applyFactor(config.platformSettleFeeFactor, _distributionAmount);
 
@@ -159,13 +125,13 @@ contract Settle is CoreContract {
             platformFeeMap[_callParams.distributionToken] += _platformFeeAmount;
         }
 
-        uint[] memory _nextBalanceList = allocate.getBalanceList(_callParams.distributionToken, _puppetList);
-        uint[] memory _puppetAllocations = allocate.getAllocationPuppetList(_allocationAddress);
+        uint[] memory _nextBalanceList = _account.getBalanceList(_callParams.distributionToken, _puppetList);
+        uint[] memory _puppetAllocations = _mirror.getAllocationPuppetList(_allocationAddress);
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
             _nextBalanceList[_i] += Math.mulDiv(_distributionAmount, _puppetAllocations[_i], _allocation);
         }
-        allocate.setBalanceList(_callParams.distributionToken, _puppetList, _nextBalanceList);
+        _account.setBalanceList(_callParams.distributionToken, _puppetList, _nextBalanceList);
 
         _logEvent(
             "Settle",
@@ -190,6 +156,7 @@ contract Settle is CoreContract {
      * @return _dustAmount The amount of dust collected
      */
     function collectDust(
+        Account _account,
         address _allocationAccount,
         IERC20 _dustToken,
         address _receiver
@@ -205,23 +172,14 @@ contract Settle is CoreContract {
             _dustAmount <= _dustThreshold, Error.Allocation__AmountExceedsDustThreshold(_dustAmount, _dustThreshold)
         );
 
-        (bool _success, bytes memory returnData) = allocate.execute(
+        _dustAmount = _account.transferInAllocation(
             _allocationAccount,
-            address(_dustToken),
-            abi.encodeWithSelector(IERC20.transfer.selector, address(allocate.allocationStore()), _dustAmount),
+            _dustToken,
             config.allocationAccountTransferGasLimit
         );
 
-        require(_success, Error.Allocation__DustTransferFailed(address(_dustToken), _allocationAccount));
+        _account.transferOut(_dustToken, _receiver, _dustAmount);
 
-        // Validate ERC20 transfer return value
-        if (returnData.length > 0) {
-            require(abi.decode(returnData, (bool)), "ERC20 transfer returned false");
-        }
-
-        allocate.allocationStore().transferOut(config.transferOutGasLimit, _dustToken, _receiver, _dustAmount);
-
-        // Log dust collection event
         _logEvent("CollectDust", abi.encode(_allocationAccount, _dustToken, _receiver, _dustAmount));
 
         return _dustAmount;
@@ -234,13 +192,13 @@ contract Settle is CoreContract {
      * @param _receiver The address to receive the collected fees
      * @param _amount The amount of fees to collect (must not exceed accumulated fees)
      */
-    function collectFees(IERC20 _token, address _receiver, uint _amount) external auth {
+    function collectFees(Account _account, IERC20 _token, address _receiver, uint _amount) external auth {
         require(_receiver != address(0), "Invalid receiver");
         require(_amount > 0, "Invalid amount");
         require(_amount <= platformFeeMap[_token], "Amount exceeds accumulated fees");
 
         platformFeeMap[_token] -= _amount;
-        allocate.allocationStore().transferOut(config.transferOutGasLimit, _token, _receiver, _amount);
+        _account.transferOut(_token, _receiver, _amount);
 
         _logEvent("CollectFees", abi.encode(_token, _receiver, _amount));
     }

@@ -6,13 +6,13 @@ import {console} from "forge-std/src/console.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
 
-import {Allocate} from "src/position/Allocate.sol";
+import {Account as AccountContract} from "src/shared/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
 import {Rule} from "src/position/Rule.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
-import {AllocationStore} from "src/shared/AllocationStore.sol";
+import {AccountStore} from "src/shared/AccountStore.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
 
@@ -34,18 +34,19 @@ contract DeployPosition is BaseScript {
 
         console.log("=== Deploying Position Contracts ===");
 
-        // Deploy each contract with its permissions
-        AllocationStore allocationStore = deployAllocationStore();
-        (Rule ruleContract, Allocate allocate) = deployRuleAndAllocate(allocationStore);
-        Settle settle = deploySettle(allocate);
-        Mirror mirror = deployMirror(allocationStore);
+        // Deploy each contract with their permissions
+        AccountStore accountStore = deployAccountStore();
+        AccountContract account = deployAccount(accountStore);
+        Rule ruleContract = deployRule();
+        Mirror mirror = deployMirror(account);
+        Settle settle = deploySettle(mirror, account);
         deployKeeperRouter(mirror, ruleContract, settle);
 
         // Set up cross-contract permissions
         setupCrossContractPermissions(mirror, ruleContract);
 
         // Setup upkeeping configuration
-        setupUpkeepingConfig(allocate, settle);
+        setupUpkeepingConfig(account, settle);
 
         console.log("=== Position Contracts Deployment Complete ===");
 
@@ -53,39 +54,69 @@ contract DeployPosition is BaseScript {
     }
 
     /**
-     * @notice Deploys AllocationStore and sets up its permissions
-     * @return allocationStore The deployed AllocationStore contract
+     * @notice Deploys AccountStore and sets up its permissions
+     * @return accountStore The deployed AccountStore contract
      */
-    function deployAllocationStore() internal returns (AllocationStore) {
-        console.log("\n--- Deploying AllocationStore ---");
+    function deployAccountStore() internal returns (AccountStore) {
+        console.log("\n--- Deploying AccountStore ---");
 
         // Deploy contract
-        AllocationStore allocationStore = new AllocationStore(dictator, tokenRouter);
-        console.log("AllocationStore deployed at:", address(allocationStore));
+        AccountStore accountStore = new AccountStore(dictator, tokenRouter);
+        console.log("AccountStore deployed at:", address(accountStore));
 
         // Set up permissions
-        // TokenRouter needs permission to transfer tokens for AllocationStore
-        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
+        // TokenRouter needs permission to transfer tokens for AccountStore
+        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(accountStore));
 
-        console.log("AllocationStore permissions configured");
+        console.log("AccountStore permissions configured");
 
-        return allocationStore;
+        return accountStore;
+    }
+
+    /**
+     * @notice Deploys Account contract and sets up its permissions
+     * @param accountStore The AccountStore contract to use
+     * @return account The deployed Account contract
+     */
+    function deployAccount(AccountStore accountStore) internal returns (AccountContract) {
+        console.log("\n--- Deploying Account ---");
+
+        // Deploy contract
+        AccountContract account = new AccountContract(
+            dictator,
+            accountStore,
+            AccountContract.Config({
+                transferOutGasLimit: 200_000
+            })
+        );
+        console.log("Account deployed at:", address(account));
+
+        // Set up permissions
+        // AccountStore access for Account
+        dictator.setAccess(accountStore, address(account));
+
+        // Initialize contract
+        dictator.registerContract(account);
+        console.log("Account initialized and permissions configured");
+
+        return account;
     }
 
     /**
      * @notice Deploys Settle contract and sets up its permissions
-     * @param allocate The Allocate contract to use
+     * @param mirror The Mirror contract to use
+     * @param account The Account contract to use
      * @return settle The deployed Settle contract
      */
     function deploySettle(
-        Allocate allocate
+        Mirror mirror,
+        AccountContract account
     ) internal returns (Settle) {
         console.log("\n--- Deploying Settle ---");
 
         // Deploy contract
         Settle settle = new Settle(
             dictator,
-            allocate,
             Settle.Config({
                 transferOutGasLimit: 200_000,
                 platformSettleFeeFactor: 0.01e30, // 1%
@@ -97,8 +128,11 @@ contract DeployPosition is BaseScript {
         console.log("Settle deployed at:", address(settle));
 
         // Set up permissions
-        // AllocationStore access for Settle (through Allocate)
-        dictator.setAccess(allocate.allocationStore(), address(settle));
+        // AccountStore access for Settle
+        dictator.setAccess(account.accountStore(), address(settle));
+        // Account permissions for Settle
+        dictator.setPermission(account, account.execute.selector, address(settle));
+        dictator.setPermission(account, account.setBalanceList.selector, address(settle));
 
         // Initialize contract
         dictator.registerContract(settle);
@@ -108,15 +142,11 @@ contract DeployPosition is BaseScript {
     }
 
     /**
-     * @notice Deploys Rule and Allocate contracts and sets up their permissions
-     * @param allocationStore The AllocationStore contract to use
+     * @notice Deploys Rule contract and sets up its permissions
      * @return ruleContract The deployed Rule contract
-     * @return allocate The deployed Allocate contract
      */
-    function deployRuleAndAllocate(
-        AllocationStore allocationStore
-    ) internal returns (Rule ruleContract, Allocate allocate) {
-        console.log("\n--- Deploying Rule and Allocate Contracts ---");
+    function deployRule() internal returns (Rule ruleContract) {
+        console.log("\n--- Deploying Rule Contract ---");
 
         // Deploy Rule contract
         ruleContract = new Rule(
@@ -131,47 +161,27 @@ contract DeployPosition is BaseScript {
         );
         console.log("Rule deployed at:", address(ruleContract));
 
-        // Deploy Allocate contract
-        allocate = new Allocate(
-            dictator,
-            allocationStore,
-            Allocate.Config({
-                transferOutGasLimit: 200_000,
-                maxPuppetList: 50,
-                maxKeeperFeeToAllocationRatio: 0.1e30,
-                maxKeeperFeeToAdjustmentRatio: 0.1e30
-            })
-        );
-        console.log("Allocate deployed at:", address(allocate));
-
-        // Set up permissions
-        // AllocationStore access for Allocate contract
-        dictator.setAccess(allocationStore, address(allocate));
-
-        // Initialize contracts
+        // Initialize contract
         dictator.registerContract(ruleContract);
-        dictator.registerContract(allocate);
-        console.log("Rule and Allocate contracts initialized and permissions configured");
+        console.log("Rule contract initialized and permissions configured");
 
-        return (ruleContract, allocate);
+        return ruleContract;
     }
 
     /**
      * @notice Deploys Mirror contract and sets up its permissions
+     * @param account The Account contract to use
      * @return mirror The deployed Mirror contract
      */
     function deployMirror(
-        AllocationStore allocationStore
+        AccountContract account
     ) internal returns (Mirror) {
         console.log("\n--- Deploying Mirror ---");
 
         // Deploy contract
-        // TODO: Update deployment to use Allocate contract
-        // For now, commenting out to fix compilation
-        /*
         Mirror mirror = new Mirror(
             dictator,
-            allocationStore,
+            account,
             Mirror.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(Const.gmxExchangeRouter),
                 gmxDataStore: IGmxReadDataStore(Const.gmxDataStore),
@@ -179,20 +189,22 @@ contract DeployPosition is BaseScript {
                 referralCode: Const.referralCode,
                 increaseCallbackGasLimit: 2e6,
                 decreaseCallbackGasLimit: 2e6,
-                fallbackRefundExecutionFeeReceiver: Const.dao
+                fallbackRefundExecutionFeeReceiver: Const.dao,
+                maxPuppetList: 50,
+                maxKeeperFeeToAllocationRatio: 0.1e30,
+                maxKeeperFeeToAdjustmentRatio: 0.1e30
             })
         );
-        */
-        console.log("TODO: Deploy Allocate and Mirror contracts");
-        // Temporary dummy mirror to fix compilation
-        Mirror mirror = Mirror(address(0));
         console.log("Mirror deployed at:", address(mirror));
 
         // Set up permissions
-        // dictator.setAccess(allocationStore, address(mirror));
+        // Account permissions for Mirror
+        dictator.setPermission(account, account.execute.selector, address(mirror));
+        dictator.setPermission(account, account.setUserBalance.selector, address(mirror));
+        dictator.setPermission(account, account.setBalanceList.selector, address(mirror));
 
         // Initialize contract
-        // dictator.registerContract(mirror);
+        dictator.registerContract(mirror);
         console.log("Mirror initialized and permissions configured");
 
         return mirror;
@@ -271,35 +283,35 @@ contract DeployPosition is BaseScript {
 
     /**
      * @notice Sets up cross-contract permissions between Mirror and Rule
-     * @dev Mirror needs to call Rule for activity throttle initialization
+     * @dev Rule needs to call Mirror for activity throttle initialization
      */
     function setupCrossContractPermissions(Mirror mirror, Rule ruleContract) internal {
         console.log("\n--- Setting up cross-contract permissions ---");
 
-        // Mirror needs permission to initialize trader activity throttle via Rule
-        // dictator.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(ruleContract));
+        // Rule needs permission to initialize trader activity throttle via Mirror
+        dictator.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(ruleContract));
 
         console.log("Cross-contract permissions configured");
     }
 
     /**
      * @notice Sets up upkeeping configuration for token allowances and dust thresholds
-     * @param allocate The Allocate contract
+     * @param account The Account contract
      * @param settle The Settle contract
      */
-    function setupUpkeepingConfig(Allocate allocate, Settle settle) internal {
+    function setupUpkeepingConfig(AccountContract account, Settle settle) internal {
         console.log("\n--- Setting up upkeeping configuration ---");
 
         // Set up DAO permissions for configuration
-        dictator.setPermission(allocate, allocate.setTokenAllowanceList.selector, Const.dao);
+        dictator.setPermission(account, account.setDepositCapList.selector, Const.dao);
         dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, Const.dao);
 
         // Configure USDC as allowed token
         IERC20[] memory allowedTokens = new IERC20[](1);
         allowedTokens[0] = IERC20(Const.usdc);
-        uint[] memory allowanceCaps = new uint[](1);
-        allowanceCaps[0] = 100e6; // 100 USDC cap
-        allocate.setTokenAllowanceList(allowedTokens, allowanceCaps);
+        uint[] memory depositCaps = new uint[](1);
+        depositCaps[0] = 100e6; // 100 USDC cap
+        account.setDepositCapList(allowedTokens, depositCaps);
 
         // Configure dust threshold for USDC
         uint[] memory dustTokenThresholds = new uint[](1);

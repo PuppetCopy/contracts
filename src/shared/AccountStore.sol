@@ -6,10 +6,10 @@ import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 import {TokenRouter} from "./TokenRouter.sol";
 
 /**
- * @title AllocationStore
+ * @title AccountStore
  * @notice Minimal token storage contract focused only on token transfers
- * @dev User balance logic moved to Allocate.sol for better separation of concerns
+ * @dev User balance logic moved to Account.sol for better separation of concerns
  */
-contract AllocationStore is BankStore {
+contract AccountStore is BankStore {
     constructor(IAuthority _authority, TokenRouter _router) BankStore(_authority, _router) {}
 }

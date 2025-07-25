@@ -6,7 +6,7 @@ import {console} from "forge-std/src/console.sol";
 
 import {UserRouter} from "src/UserRouter.sol";
 
-import {Allocate} from "src/position/Allocate.sol";
+import {Account as AccountContract} from "src/shared/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
 import {Rule} from "src/position/Rule.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
@@ -27,17 +27,17 @@ contract DeployUserRouter is BaseScript {
 
     function deployUserRouter() internal {
         RouterProxy routerProxy = RouterProxy(payable(getDeployedAddress("RouterProxy")));
+        AccountContract account = AccountContract(getDeployedAddress("Account"));
         Rule ruleContract = Rule(getDeployedAddress("Rule"));
-        Allocate allocate = Allocate(getDeployedAddress("Allocate"));
         FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
         Mirror mirror = Mirror(getDeployedAddress("Mirror"));
 
         dictator.setPermission(ruleContract, ruleContract.setRule.selector, address(routerProxy));
-        dictator.setPermission(allocate, allocate.deposit.selector, address(routerProxy));
-        dictator.setPermission(allocate, allocate.withdraw.selector, address(routerProxy));
+        dictator.setPermission(account, account.deposit.selector, address(routerProxy));
+        dictator.setPermission(account, account.withdraw.selector, address(routerProxy));
         // dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, address(routerProxy));
 
-        UserRouter newRouter = new UserRouter(allocate, ruleContract, feeMarketplace, mirror);
+        UserRouter newRouter = new UserRouter(account, ruleContract, feeMarketplace, mirror);
         routerProxy.update(address(newRouter));
 
         UserRouter(address(routerProxy)).setMatchingRule(
