@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-import {Deposit} from "./position/Deposit.sol";
+import {Allocate} from "./position/Allocate.sol";
 import {Mirror} from "./position/Mirror.sol";
 import {Rule} from "./position/Rule.sol";
 import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
@@ -15,13 +15,13 @@ import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
  * @dev Contains deposit, withdraw, rule setting, and offer acceptance functionality
  */
 contract UserRouter is ReentrancyGuardTransient {
-    Deposit public immutable depositContract;
+    Allocate public immutable allocate;
     Rule public immutable ruleContract;
     FeeMarketplace public immutable feeMarketplace;
     Mirror public immutable mirror;
 
-    constructor(Deposit _depositContract, Rule _ruleContract, FeeMarketplace _feeMarketplace, Mirror _mirror) {
-        depositContract = _depositContract;
+    constructor(Allocate _allocate, Rule _ruleContract, FeeMarketplace _feeMarketplace, Mirror _mirror) {
+        allocate = _allocate;
         ruleContract = _ruleContract;
         feeMarketplace = _feeMarketplace;
         mirror = _mirror;
@@ -33,7 +33,7 @@ contract UserRouter is ReentrancyGuardTransient {
      * @param amount The amount being deposited.
      */
     function deposit(IERC20 token, uint amount) external nonReentrant {
-        depositContract.deposit(token, msg.sender, msg.sender, amount);
+        allocate.deposit(token, msg.sender, msg.sender, amount);
     }
 
     /**
@@ -43,7 +43,7 @@ contract UserRouter is ReentrancyGuardTransient {
      * @param amount The amount being withdrawn.
      */
     function withdraw(IERC20 token, address receiver, uint amount) external nonReentrant {
-        depositContract.withdraw(token, msg.sender, receiver, amount);
+        allocate.withdraw(token, msg.sender, receiver, amount);
     }
 
     /**
@@ -57,7 +57,7 @@ contract UserRouter is ReentrancyGuardTransient {
         address trader,
         Rule.RuleParams calldata ruleParams
     ) external nonReentrant {
-        ruleContract.setRule(mirror, collateralToken, msg.sender, trader, ruleParams);
+        ruleContract.setRule(mirror.allocate(), collateralToken, msg.sender, trader, ruleParams);
     }
 
     /**

@@ -8,7 +8,7 @@ import {console} from "forge-std/src/console.sol";
 import {UserRouter} from "src/UserRouter.sol";
 import {KeeperRouter} from "src/keeperRouter.sol";
 
-import {Deposit} from "src/position/Deposit.sol";
+import {Allocate} from "src/position/Allocate.sol";
 import {Mirror} from "src/position/Mirror.sol";
 import {Rule} from "src/position/Rule.sol";
 import {Settle} from "src/position/Settle.sol";
@@ -43,7 +43,7 @@ abstract contract ForkTestBase is Test {
     // Note: Allocate functionality has been merged into Mirror
     Settle public settle;
     Rule public ruleContract;
-    Deposit public depositContract;
+    Allocate public allocate;
     Mirror public mirror;
     KeeperRouter public keeperRouter;
     UserRouter public userRouter;
@@ -195,11 +195,20 @@ abstract contract ForkTestBase is Test {
             })
         );
 
-        // Note: Allocate functionality has been merged into Mirror
+        allocate = new Allocate(
+            dictator,
+            allocationStore,
+            Allocate.Config({
+                transferOutGasLimit: 200_000,
+                maxPuppetList: 50,
+                maxKeeperFeeToAllocationRatio: 0.1e30,
+                maxKeeperFeeToAdjustmentRatio: 0.1e30
+            })
+        );
 
         settle = new Settle(
             dictator,
-            allocationStore,
+            allocate,
             Settle.Config({
                 transferOutGasLimit: 200_000,
                 platformSettleFeeFactor: 0.01e30,
@@ -220,11 +229,9 @@ abstract contract ForkTestBase is Test {
             })
         );
 
-        depositContract = new Deposit(dictator, allocationStore, Deposit.Config({transferOutGasLimit: 200_000}));
-
         mirror = new Mirror(
             dictator,
-            allocationStore,
+            allocate,
             Mirror.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(Const.gmxExchangeRouter),
                 gmxDataStore: IGmxReadDataStore(Const.gmxDataStore),
@@ -232,11 +239,7 @@ abstract contract ForkTestBase is Test {
                 referralCode: bytes32("PUPPET"),
                 increaseCallbackGasLimit: 2e6,
                 decreaseCallbackGasLimit: 2e6,
-                fallbackRefundExecutionFeeReceiver: owner,
-                transferOutGasLimit: 200_000,
-                maxPuppetList: 50,
-                maxKeeperFeeToAllocationRatio: 0.1e30,
-                maxKeeperFeeToAdjustmentRatio: 0.1e30
+                fallbackRefundExecutionFeeReceiver: owner
             })
         );
 
@@ -264,23 +267,26 @@ abstract contract ForkTestBase is Test {
                 fallbackRefundExecutionFeeReceiver: owner
             })
         );
-        userRouter = new UserRouter(depositContract, ruleContract, feeMarketplace, mirror);
+        userRouter = new UserRouter(allocate, ruleContract, feeMarketplace, mirror);
     }
 
     function _setupPermissions() private {
         // Store access
-        // Note: allocate access moved to mirrorPosition
         dictator.setAccess(allocationStore, address(settle));
-        dictator.setAccess(allocationStore, address(depositContract));
-        dictator.setAccess(allocationStore, address(mirror));
+        dictator.setAccess(allocationStore, address(allocate));
 
         // Core permissions
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
-        dictator.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(ruleContract));
+        dictator.setPermission(allocate, allocate.initializeTraderActivityThrottle.selector, address(ruleContract));
+        dictator.setPermission(allocate, allocate.createAllocation.selector, address(mirror));
+        dictator.setPermission(allocate, allocate.updateAllocation.selector, address(mirror));
+        dictator.setPermission(allocate, allocate.execute.selector, address(mirror));
+        dictator.setPermission(allocate, allocate.execute.selector, address(settle));
+        dictator.setPermission(allocate, allocate.setBalanceList.selector, address(settle));
 
         // UserRouter permissions
-        dictator.setPermission(depositContract, depositContract.deposit.selector, address(userRouter));
-        dictator.setPermission(depositContract, depositContract.withdraw.selector, address(userRouter));
+        dictator.setPermission(allocate, allocate.deposit.selector, address(userRouter));
+        dictator.setPermission(allocate, allocate.withdraw.selector, address(userRouter));
         dictator.setPermission(ruleContract, ruleContract.setRule.selector, address(userRouter));
         dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, address(userRouter));
 
@@ -301,7 +307,7 @@ abstract contract ForkTestBase is Test {
         dictator.setPermission(keeperRouter, keeperRouter.refundExecutionFee.selector, address(keeperRouter));
 
         // Admin permissions
-        dictator.setPermission(depositContract, depositContract.setTokenAllowanceList.selector, owner);
+        dictator.setPermission(allocate, allocate.setTokenAllowanceList.selector, owner);
         dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, owner);
     }
 
@@ -311,7 +317,7 @@ abstract contract ForkTestBase is Test {
         // Note: allocate functionality merged into mirrorPosition
         dictator.registerContract(settle);
         dictator.registerContract(ruleContract);
-        dictator.registerContract(depositContract);
+        dictator.registerContract(allocate);
         dictator.registerContract(mirror);
         dictator.registerContract(keeperRouter);
     }
@@ -322,7 +328,7 @@ abstract contract ForkTestBase is Test {
         allowedTokens[0] = USDC;
         uint[] memory allowanceCaps = new uint[](1);
         allowanceCaps[0] = 1000000e6; // 1M USDC cap
-        depositContract.setTokenAllowanceList(allowedTokens, allowanceCaps);
+        allocate.setTokenAllowanceList(allowedTokens, allowanceCaps);
 
         // Set dust thresholds
         IERC20[] memory dustTokens = new IERC20[](1);

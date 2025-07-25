@@ -9,7 +9,6 @@ import {Rule} from "./position/Rule.sol";
 import {Settle} from "./position/Settle.sol";
 import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
 import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
-import {AllocationAccount} from "./shared/AllocationAccount.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
 import {Error} from "./utils/Error.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
@@ -115,7 +114,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         Settle.CallSettle calldata _settleParams,
         address[] calldata _puppetList
     ) external auth nonReentrant returns (uint settledBalance, uint distributionAmount, uint platformFeeAmount) {
-        return settle.settle(mirror, _settleParams, _puppetList);
+        return settle.settle(_settleParams, _puppetList);
     }
 
     /**
@@ -130,7 +129,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         IERC20 _dustToken,
         address _receiver
     ) external auth nonReentrant returns (uint dustAmount) {
-        return settle.collectDust(AllocationAccount(_allocationAccount), _dustToken, _receiver);
+        return settle.collectDust(_allocationAccount, _dustToken, _receiver);
     }
 
     /**

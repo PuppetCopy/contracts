@@ -105,8 +105,8 @@ contract TradingForkTest is ForkTestBase {
 
         // Log initial state
         console.log("\n--- Initial State ---");
-        console.log("Puppet1 Balance:", allocationStore.userBalanceMap(USDC, puppet1));
-        console.log("Puppet2 Balance:", allocationStore.userBalanceMap(USDC, puppet2));
+        console.log("Puppet1 Balance:", allocate.userBalanceMap(USDC, puppet1));
+        console.log("Puppet2 Balance:", allocate.userBalanceMap(USDC, puppet2));
         console.log("Keeper Balance:", USDC.balanceOf(keeper));
         console.log("GMX ExchangeRouter:", address(Const.gmxExchangeRouter));
         console.log("GMX OrderVault:", Const.gmxOrderVault);
@@ -161,8 +161,8 @@ contract TradingForkTest is ForkTestBase {
         console.log("Allocation Address:", allocationAddress);
 
         // Verify allocation was created
-        uint totalAllocation = mirror.getAllocation(allocationAddress);
-        uint[] memory puppetAllocations = mirror.getPuppetAllocationList(allocationAddress);
+        uint totalAllocation = allocate.allocationMap(allocationAddress);
+        uint[] memory puppetAllocations = mirror.getAllocationPuppetList(allocationAddress);
 
         console.log("\n--- Allocation Details ---");
         console.log("Total Allocation:", totalAllocation);
@@ -199,8 +199,8 @@ contract TradingForkTest is ForkTestBase {
 
         // Log final balances
         console.log("\n--- Final State ---");
-        console.log("Puppet1 Remaining Balance:", allocationStore.userBalanceMap(USDC, puppet1));
-        console.log("Puppet2 Remaining Balance:", allocationStore.userBalanceMap(USDC, puppet2));
+        console.log("Puppet1 Remaining Balance:", allocate.userBalanceMap(USDC, puppet1));
+        console.log("Puppet2 Remaining Balance:", allocate.userBalanceMap(USDC, puppet2));
         console.log("Keeper Final Balance:", USDC.balanceOf(keeper));
 
         // Assertions for test validity
@@ -554,8 +554,8 @@ contract TradingForkTest is ForkTestBase {
         console.log("Allocation Address:", allocationAddress);
 
         // Validate allocation was created
-        uint totalAllocation = mirror.getAllocation(allocationAddress);
-        uint[] memory puppetAllocations = mirror.getPuppetAllocationList(allocationAddress);
+        uint totalAllocation = allocate.allocationMap(allocationAddress);
+        uint[] memory puppetAllocations = mirror.getAllocationPuppetList(allocationAddress);
 
         console.log("Total Allocation:", totalAllocation);
         console.log("Puppet1 Allocation:", puppetAllocations[0]);
@@ -581,8 +581,8 @@ contract TradingForkTest is ForkTestBase {
         // This would normally happen when trader closes their position
 
         // Record pre-settlement balances
-        uint puppet1BalanceBefore = allocationStore.userBalanceMap(USDC, puppet1);
-        uint puppet2BalanceBefore = allocationStore.userBalanceMap(USDC, puppet2);
+        uint puppet1BalanceBefore = allocate.userBalanceMap(USDC, puppet1);
+        uint puppet2BalanceBefore = allocate.userBalanceMap(USDC, puppet2);
         uint keeperBalanceBefore = USDC.balanceOf(keeper);
 
         console.log("Pre-Settlement Balances:");
@@ -617,8 +617,8 @@ contract TradingForkTest is ForkTestBase {
             // Step 4: Validate final distributions
             console.log("\n--- Step 4: Final Validation ---");
 
-            uint puppet1BalanceAfter = allocationStore.userBalanceMap(USDC, puppet1);
-            uint puppet2BalanceAfter = allocationStore.userBalanceMap(USDC, puppet2);
+            uint puppet1BalanceAfter = allocate.userBalanceMap(USDC, puppet1);
+            uint puppet2BalanceAfter = allocate.userBalanceMap(USDC, puppet2);
             uint keeperBalanceAfter = USDC.balanceOf(keeper);
 
             console.log("Post-Settlement Balances:");
