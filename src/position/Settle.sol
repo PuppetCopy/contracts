@@ -11,7 +11,7 @@ import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {MirrorPosition} from "./MirrorPosition.sol";
+import {Mirror} from "./Mirror.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
 /**
@@ -84,7 +84,7 @@ contract Settle is CoreContract {
      * @return _platformFeeAmount Platform fee taken
      */
     function settle(
-        MirrorPosition _mirrorPosition,
+        Mirror _mirror,
         CallSettle calldata _callParams,
         address[] calldata _puppetList
     ) external auth returns (uint _settledAmount, uint _distributionAmount, uint _platformFeeAmount) {
@@ -104,10 +104,10 @@ contract Settle is CoreContract {
         bytes32 _allocationKey =
             PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId);
         address _allocationAddress = Clones.predictDeterministicAddress(
-            _mirrorPosition.allocationAccountImplementation(), _allocationKey, address(_mirrorPosition)
+            _mirror.allocationAccountImplementation(), _allocationKey, address(_mirror)
         );
 
-        uint _allocation = _mirrorPosition.getAllocation(_allocationAddress);
+        uint _allocation = _mirror.getAllocation(_allocationAddress);
         require(_allocation > 0, Error.Allocation__InvalidAllocation(_allocationAddress));
 
         _settledAmount = _callParams.distributionToken.balanceOf(_allocationAddress);
@@ -160,7 +160,7 @@ contract Settle is CoreContract {
         }
 
         uint[] memory _nextBalanceList = allocationStore.getBalanceList(_callParams.distributionToken, _puppetList);
-        uint[] memory _puppetAllocations = _mirrorPosition.getPuppetAllocationList(_allocationAddress);
+        uint[] memory _puppetAllocations = _mirror.getPuppetAllocationList(_allocationAddress);
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
             _nextBalanceList[_i] += Math.mulDiv(_distributionAmount, _puppetAllocations[_i], _allocation);

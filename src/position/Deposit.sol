@@ -33,13 +33,13 @@ contract Deposit is CoreContract {
     }
 
     function deposit(IERC20 _collateralToken, address _depositor, address _user, uint _amount) external auth {
-        require(_amount > 0, Error.MatchingRule__InvalidAmount());
+        require(_amount > 0, Error.Deposit__InvalidAmount());
 
         uint allowanceCap = tokenAllowanceCapMap[_collateralToken];
-        require(allowanceCap > 0, Error.MatchingRule__TokenNotAllowed());
+        require(allowanceCap > 0, Error.Deposit__TokenNotAllowed());
 
         uint nextBalance = store.userBalanceMap(_collateralToken, _user) + _amount;
-        require(nextBalance <= allowanceCap, Error.MatchingRule__AllowanceAboveLimit(allowanceCap));
+        require(nextBalance <= allowanceCap, Error.Deposit__AllowanceAboveLimit(allowanceCap));
 
         store.transferIn(_collateralToken, _depositor, _amount);
         store.setUserBalance(_collateralToken, _user, nextBalance);
@@ -48,11 +48,11 @@ contract Deposit is CoreContract {
     }
 
     function withdraw(IERC20 _collateralToken, address _user, address _receiver, uint _amount) external auth {
-        require(_amount > 0, Error.MatchingRule__InvalidAmount());
+        require(_amount > 0, Error.Deposit__InvalidAmount());
 
         uint balance = store.userBalanceMap(_collateralToken, _user);
 
-        require(_amount <= balance, Error.MatchingRule__InsufficientBalance());
+        require(_amount <= balance, Error.Deposit__InsufficientBalance());
 
         uint nextBalance = balance - _amount;
 

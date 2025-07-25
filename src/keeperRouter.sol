@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {Rule} from "./position/Rule.sol";
-import {MirrorPosition} from "./position/MirrorPosition.sol";
+import {Mirror} from "./position/Mirror.sol";
 import {Settle} from "./position/Settle.sol";
 import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
 import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
@@ -31,23 +31,23 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
     }
 
     Rule public immutable ruleContract;
-    MirrorPosition public immutable mirrorPosition;
+    Mirror public immutable mirror;
     Settle public immutable settle;
 
     Config config;
 
     constructor(
         IAuthority _authority,
-        MirrorPosition _mirrorPosition,
+        Mirror _mirror,
         Rule _ruleContract,
         Settle _settle,
         Config memory _config
     ) CoreContract(_authority, abi.encode(_config)) {
-        require(address(_mirrorPosition) != address(0), "MirrorPosition not set correctly");
+        require(address(_mirror) != address(0), "Mirror not set correctly");
         require(address(_ruleContract) != address(0), "Rule contract not set correctly");
         require(address(_settle) != address(0), "Settle not set correctly");
 
-        mirrorPosition = _mirrorPosition;
+        mirror = _mirror;
         ruleContract = _ruleContract;
         settle = _settle;
     }
@@ -61,30 +61,30 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
     }
 
     /**
-     * @notice Orchestrates mirror position creation by coordinating Allocation and MirrorPosition
+     * @notice Orchestrates mirror position creation by coordinating Allocation and Mirror
      * @param _callParams Position parameters for the trader's position
      * @param _puppetList List of puppet addresses to mirror the position
      * @return _allocationAddress The allocation address created for the position
      * @return _requestKey The GMX request key for the submitted position
      */
     function requestOpen(
-        MirrorPosition.CallPosition calldata _callParams,
+        Mirror.CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
-        return mirrorPosition.requestOpen{value: msg.value}(ruleContract, _callParams, _puppetList);
+        return mirror.requestOpen{value: msg.value}(ruleContract, _callParams, _puppetList);
     }
 
     /**
-     * @notice Orchestrates position adjustment by coordinating Allocation and MirrorPosition
+     * @notice Orchestrates position adjustment by coordinating Allocation and Mirror
      * @param _callParams Position parameters for the trader's adjustment and allocation
      * @param _puppetList List of puppet addresses involved in the position
      * @return _requestKey The GMX request key for the submitted adjustment
      */
     function requestAdjust(
-        MirrorPosition.CallPosition calldata _callParams,
+        Mirror.CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
-        return mirrorPosition.requestAdjust{value: msg.value}(_callParams, _puppetList);
+        return mirror.requestAdjust{value: msg.value}(_callParams, _puppetList);
     }
 
     /**
@@ -94,11 +94,11 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
      * @return _requestKey The GMX request key for the close order
      */
     function requestCloseStalledPosition(
-        MirrorPosition.CallPosition calldata _callParams,
+        Mirror.CallPosition calldata _callParams,
         address _allocationAddress
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
         _requestKey =
-            mirrorPosition.requestCloseStalledPosition{value: msg.value}(_callParams, _allocationAddress, address(this));
+            mirror.requestCloseStalledPosition{value: msg.value}(_callParams, _allocationAddress, address(this));
 
         return _requestKey;
     }
@@ -115,7 +115,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         Settle.CallSettle calldata _settleParams,
         address[] calldata _puppetList
     ) external auth nonReentrant returns (uint settledBalance, uint distributionAmount, uint platformFeeAmount) {
-        return settle.settle(mirrorPosition, _settleParams, _puppetList);
+        return settle.settle(mirror, _settleParams, _puppetList);
     }
 
     /**
@@ -165,11 +165,11 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
             GmxPositionUtils.isIncreaseOrder(GmxPositionUtils.OrderType(order.numbers.orderType))
                 || GmxPositionUtils.isDecreaseOrder(GmxPositionUtils.OrderType(order.numbers.orderType))
         ) {
-            // Call MirrorPosition.execute for successful order execution
-            mirrorPosition.execute(key);
+            // Call Mirror.execute for successful order execution
+            mirror.execute(key);
         } else if (GmxPositionUtils.isLiquidateOrder(GmxPositionUtils.OrderType(order.numbers.orderType))) {
-            // Handle liquidation by calling MirrorPosition.liquidate
-            mirrorPosition.liquidate(order.addresses.account);
+            // Handle liquidation by calling Mirror.liquidate
+            mirror.liquidate(order.addresses.account);
         }
         // Note: Invalid order types are silently ignored to avoid reverting GMX callbacks
     }

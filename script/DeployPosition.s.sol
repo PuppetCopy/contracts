@@ -8,7 +8,7 @@ import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
 import {KeeperRouter} from "src/keeperRouter.sol";
 import {Rule} from "src/position/Rule.sol";
 import {Deposit} from "src/position/Deposit.sol";
-import {MirrorPosition} from "src/position/MirrorPosition.sol";
+import {Mirror} from "src/position/Mirror.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {AllocationStore} from "src/shared/AllocationStore.sol";
@@ -37,10 +37,10 @@ contract DeployPosition is BaseScript {
         // verifySelectorsMatch();
         // AllocationStore allocationStore = deployAllocationStore();
         // MatchingRule matchingRule = deployMatchingRule(allocationStore);
-        // Allocate functionality moved to MirrorPosition
+        // Allocate functionality moved to Mirror
         // Settle settle = deploySettle(allocationStore);
-        // MirrorPosition mirrorPosition = deployMirrorPosition();
-        // KeeperRouter keeperRouter = deployKeeperRouter(mirrorPosition, matchingRule, settle);
+        // Mirror mirror = deployMirror();
+        // KeeperRouter keeperRouter = deployKeeperRouter(mirror, matchingRule, settle);
 
         // setupUpkeepingConfig(MatchingRule(getDeployedAddress("MatchingRule")), Settle(getDeployedAddress("Settle")));
 
@@ -156,19 +156,19 @@ contract DeployPosition is BaseScript {
     }
 
     /**
-     * @notice Deploys MirrorPosition contract and sets up its permissions
-     * @return mirrorPosition The deployed MirrorPosition contract
+     * @notice Deploys Mirror contract and sets up its permissions
+     * @return mirror The deployed Mirror contract
      */
-    function deployMirrorPosition(
+    function deployMirror(
         AllocationStore allocationStore
-    ) internal returns (MirrorPosition) {
-        console.log("\n--- Deploying MirrorPosition ---");
+    ) internal returns (Mirror) {
+        console.log("\n--- Deploying Mirror ---");
 
         // Deploy contract
-        MirrorPosition mirrorPosition = new MirrorPosition(
+        Mirror mirror = new Mirror(
             dictator,
             allocationStore,
-            MirrorPosition.Config({
+            Mirror.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(Const.gmxExchangeRouter),
                 gmxDataStore: IGmxReadDataStore(Const.gmxDataStore),
                 gmxOrderVault: Const.gmxOrderVault,
@@ -182,29 +182,29 @@ contract DeployPosition is BaseScript {
                 maxKeeperFeeToAdjustmentRatio: 0.1e30
             })
         );
-        console.log("MirrorPosition deployed at:", address(mirrorPosition));
+        console.log("Mirror deployed at:", address(mirror));
 
-        dictator.setAccess(allocationStore, address(mirrorPosition));
+        dictator.setAccess(allocationStore, address(mirror));
 
-        // MirrorPosition has no standalone permissions, they're set up via KeeperRouter
+        // Mirror has no standalone permissions, they're set up via KeeperRouter
 
         // Initialize contract
-        dictator.registerContract(mirrorPosition);
-        console.log("MirrorPosition initialized");
+        dictator.registerContract(mirror);
+        console.log("Mirror initialized");
 
-        return mirrorPosition;
+        return mirror;
     }
 
     /**
      * @notice Deploys KeeperRouter and sets up permissions for all contracts
      * @dev KeeperRouter is the composition layer that brings all contracts together
-     * @param mirrorPosition The MirrorPosition contract
+     * @param mirror The Mirror contract
      * @param ruleContract The Rule contract
      * @param settle The Settle contract
      * @return keeperRouter The deployed KeeperRouter contract
      */
     function deployKeeperRouter(
-        MirrorPosition mirrorPosition,
+        Mirror mirror,
         Rule ruleContract,
         Settle settle
     ) internal returns (KeeperRouter) {
@@ -213,7 +213,7 @@ contract DeployPosition is BaseScript {
         // Deploy contract with empirical gas configuration
         KeeperRouter keeperRouter = new KeeperRouter(
             dictator,
-            mirrorPosition,
+            mirror,
             ruleContract,
             settle,
             KeeperRouter.Config({
@@ -231,17 +231,17 @@ contract DeployPosition is BaseScript {
         // Set up permissions for KeeperRouter to call other contracts
         console.log("Setting up KeeperRouter permissions...");
 
-        // Note: Allocate functionality has been merged into MirrorPosition
+        // Note: Allocate functionality has been merged into Mirror
 
         // Settle permissions
         dictator.setPermission(settle, settle.settle.selector, address(keeperRouter));
         dictator.setPermission(settle, settle.collectDust.selector, address(keeperRouter));
 
-        // MirrorPosition permissions
-        dictator.setPermission(mirrorPosition, mirrorPosition.requestOpen.selector, address(keeperRouter));
-        dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, address(keeperRouter));
-        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(keeperRouter));
-        dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, address(keeperRouter));
+        // Mirror permissions
+        dictator.setPermission(mirror, mirror.requestOpen.selector, address(keeperRouter));
+        dictator.setPermission(mirror, mirror.requestAdjust.selector, address(keeperRouter));
+        dictator.setPermission(mirror, mirror.execute.selector, address(keeperRouter));
+        dictator.setPermission(mirror, mirror.liquidate.selector, address(keeperRouter));
 
         // GMX callback permissions for KeeperRouter
         console.log("Setting up GMX callback permissions...");

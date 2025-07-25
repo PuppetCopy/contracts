@@ -9,7 +9,7 @@ import {UserRouter} from "src/UserRouter.sol";
 import {KeeperRouter} from "src/keeperRouter.sol";
 import {Rule} from "src/position/Rule.sol";
 import {Deposit} from "src/position/Deposit.sol";
-import {MirrorPosition} from "src/position/MirrorPosition.sol";
+import {Mirror} from "src/position/Mirror.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
@@ -39,11 +39,11 @@ abstract contract ForkTestBase is Test {
     AllocationStore public allocationStore;
     FeeMarketplace public feeMarketplace;
     FeeMarketplaceStore public feeMarketplaceStore;
-    // Note: Allocate functionality has been merged into MirrorPosition
+    // Note: Allocate functionality has been merged into Mirror
     Settle public settle;
     Rule public ruleContract;
     Deposit public depositContract;
-    MirrorPosition public mirrorPosition;
+    Mirror public mirror;
     KeeperRouter public keeperRouter;
     UserRouter public userRouter;
 
@@ -204,7 +204,7 @@ abstract contract ForkTestBase is Test {
             })
         );
 
-        // Note: Allocate functionality has been merged into MirrorPosition
+        // Note: Allocate functionality has been merged into Mirror
 
         settle = new Settle(
             dictator,
@@ -237,10 +237,10 @@ abstract contract ForkTestBase is Test {
             })
         );
 
-        mirrorPosition = new MirrorPosition(
+        mirror = new Mirror(
             dictator,
             allocationStore,
-            MirrorPosition.Config({
+            Mirror.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(Const.gmxExchangeRouter),
                 gmxDataStore: IGmxReadDataStore(Const.gmxDataStore),
                 gmxOrderVault: Const.gmxOrderVault,
@@ -266,7 +266,7 @@ abstract contract ForkTestBase is Test {
 
         keeperRouter = new KeeperRouter(
             dictator,
-            mirrorPosition,
+            mirror,
             ruleContract,
             settle,
             KeeperRouter.Config({
@@ -279,7 +279,7 @@ abstract contract ForkTestBase is Test {
                 fallbackRefundExecutionFeeReceiver: owner
             })
         );
-        userRouter = new UserRouter(depositContract, ruleContract, feeMarketplace, mirrorPosition);
+        userRouter = new UserRouter(depositContract, ruleContract, feeMarketplace, mirror);
     }
 
     function _setupPermissions() private {
@@ -287,12 +287,12 @@ abstract contract ForkTestBase is Test {
         // Note: allocate access moved to mirrorPosition
         dictator.setAccess(allocationStore, address(settle));
         dictator.setAccess(allocationStore, address(depositContract));
-        dictator.setAccess(allocationStore, address(mirrorPosition));
+        dictator.setAccess(allocationStore, address(mirror));
 
         // Core permissions
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
         dictator.setPermission(
-            mirrorPosition, mirrorPosition.initializeTraderActivityThrottle.selector, address(ruleContract)
+            mirror, mirror.initializeTraderActivityThrottle.selector, address(ruleContract)
         );
 
         // UserRouter permissions
@@ -302,13 +302,13 @@ abstract contract ForkTestBase is Test {
         dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, address(userRouter));
 
         // KeeperRouter permissions
-        // Note: createAllocation and collectKeeperFee functionality merged into MirrorPosition
+        // Note: createAllocation and collectKeeperFee functionality merged into Mirror
         dictator.setPermission(settle, settle.settle.selector, address(keeperRouter));
         dictator.setPermission(settle, settle.collectDust.selector, address(keeperRouter));
-        dictator.setPermission(mirrorPosition, mirrorPosition.requestOpen.selector, address(keeperRouter));
-        dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, address(keeperRouter));
-        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(keeperRouter));
-        dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, address(keeperRouter));
+        dictator.setPermission(mirror, mirror.requestOpen.selector, address(keeperRouter));
+        dictator.setPermission(mirror, mirror.requestAdjust.selector, address(keeperRouter));
+        dictator.setPermission(mirror, mirror.execute.selector, address(keeperRouter));
+        dictator.setPermission(mirror, mirror.liquidate.selector, address(keeperRouter));
 
         // External permissions
         dictator.setPermission(keeperRouter, keeperRouter.requestOpen.selector, keeper);
@@ -329,7 +329,7 @@ abstract contract ForkTestBase is Test {
         dictator.registerContract(settle);
         dictator.registerContract(ruleContract);
         dictator.registerContract(depositContract);
-        dictator.registerContract(mirrorPosition);
+        dictator.registerContract(mirror);
         dictator.registerContract(keeperRouter);
     }
 

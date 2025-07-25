@@ -7,7 +7,7 @@ import {Const} from "script/Const.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
 import {Rule} from "src/position/Rule.sol";
-import {MirrorPosition} from "src/position/MirrorPosition.sol";
+import {Mirror} from "src/position/Mirror.sol";
 import {Settle} from "src/position/Settle.sol";
 
 /**
@@ -64,7 +64,7 @@ contract TradingForkTest is ForkTestBase {
         console.log("GMX OrderVault:", Const.gmxOrderVault);
 
         // Prepare position parameters (merged allocation and position params)
-        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
+        Mirror.CallPosition memory callParams = Mirror.CallPosition({
             collateralToken: USDC,
             traderRequestKey: bytes32(0),
             trader: trader,
@@ -110,8 +110,8 @@ contract TradingForkTest is ForkTestBase {
         console.log("Allocation Address:", allocationAddress);
 
         // Verify allocation was created
-        uint totalAllocation = mirrorPosition.getAllocation(allocationAddress);
-        uint[] memory puppetAllocations = mirrorPosition.getPuppetAllocationList(allocationAddress);
+        uint totalAllocation = mirror.getAllocation(allocationAddress);
+        uint[] memory puppetAllocations = mirror.getPuppetAllocationList(allocationAddress);
 
         console.log("\n--- Allocation Details ---");
         console.log("Total Allocation:", totalAllocation);
@@ -352,7 +352,7 @@ contract TradingForkTest is ForkTestBase {
         uint allocationId = 200 + puppetCount; // Unique allocation ID for settle test
 
         // Step 1: Create a mirror position first
-        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
+        Mirror.CallPosition memory callParams = Mirror.CallPosition({
             collateralToken: USDC,
             traderRequestKey: bytes32(0),
             trader: trader,
@@ -418,7 +418,7 @@ contract TradingForkTest is ForkTestBase {
         uint allocationId = 100 + puppetCount; // Unique allocation ID
 
         // Prepare parameters (merged allocation and position params)
-        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
+        Mirror.CallPosition memory callParams = Mirror.CallPosition({
             collateralToken: USDC,
             traderRequestKey: bytes32(0),
             trader: trader,
@@ -472,7 +472,7 @@ contract TradingForkTest is ForkTestBase {
         uint acceptablePrice = 4000e30; // $4000 per ETH
 
         // Prepare position parameters (merged allocation and position params)
-        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
+        Mirror.CallPosition memory callParams = Mirror.CallPosition({
             collateralToken: USDC,
             traderRequestKey: bytes32(0),
             trader: trader,
@@ -503,8 +503,8 @@ contract TradingForkTest is ForkTestBase {
         console.log("Allocation Address:", allocationAddress);
 
         // Validate allocation was created
-        uint totalAllocation = mirrorPosition.getAllocation(allocationAddress);
-        uint[] memory puppetAllocations = mirrorPosition.getPuppetAllocationList(allocationAddress);
+        uint totalAllocation = mirror.getAllocation(allocationAddress);
+        uint[] memory puppetAllocations = mirror.getPuppetAllocationList(allocationAddress);
 
         console.log("Total Allocation:", totalAllocation);
         console.log("Puppet1 Allocation:", puppetAllocations[0]);
@@ -516,11 +516,11 @@ contract TradingForkTest is ForkTestBase {
         // Simulate successful GMX execution by calling execute directly
         // In real flow, this would be called by GMX callback
         vm.prank(address(keeperRouter));
-        mirrorPosition.execute(requestKey);
+        mirror.execute(requestKey);
 
         console.log("Position executed successfully");
 
-        // Verify position is now active in MirrorPosition
+        // Verify position is now active in Mirror
         // Note: We can't easily check the internal position state without additional getters
 
         // Step 3: Settlement - Simulate position closure and fund distribution

@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {KeeperRouter} from "src/keeperRouter.sol";
 import {Rule} from "src/position/Rule.sol";
 import {Deposit} from "src/position/Deposit.sol";
-import {MirrorPosition} from "src/position/MirrorPosition.sol";
+import {Mirror} from "src/position/Mirror.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
@@ -25,7 +25,7 @@ import {Error} from "src/utils/Error.sol";
 /**
  * @title TradingTest
  * @notice Test suite for position mirroring and trading operations  
- * @dev Tests integration between MirrorPosition, Settle, KeeperRouter, Rule, and Deposit
+ * @dev Tests integration between Mirror, Settle, KeeperRouter, Rule, and Deposit
  * Updated to work with the decoupled Rule/Deposit architecture.
  */
 contract TradingTest is BasicSetup {
@@ -33,7 +33,7 @@ contract TradingTest is BasicSetup {
     Settle settle;
     Rule ruleContract;
     Deposit depositContract;
-    MirrorPosition mirrorPosition;
+    Mirror mirror;
     KeeperRouter keeperRouter;
     MockGmxExchangeRouter mockGmxExchangeRouter;
 
@@ -87,10 +87,10 @@ contract TradingTest is BasicSetup {
 
         mockGmxExchangeRouter = new MockGmxExchangeRouter();
 
-        mirrorPosition = new MirrorPosition(
+        mirror = new Mirror(
             dictator,
             allocationStore,
-            MirrorPosition.Config({
+            Mirror.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(address(mockGmxExchangeRouter)),
                 gmxDataStore: IGmxReadDataStore(Const.gmxDataStore),
                 gmxOrderVault: address(0x1234),
@@ -107,7 +107,7 @@ contract TradingTest is BasicSetup {
 
         keeperRouter = new KeeperRouter(
             dictator,
-            mirrorPosition,
+            mirror,
             ruleContract,
             settle,
             KeeperRouter.Config({
@@ -123,23 +123,23 @@ contract TradingTest is BasicSetup {
 
         // Set up permissions
         dictator.setAccess(allocationStore, address(depositContract));
-        dictator.setAccess(allocationStore, address(mirrorPosition));
+        dictator.setAccess(allocationStore, address(mirror));
         dictator.setAccess(allocationStore, address(settle));
 
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
-        dictator.setPermission(mirrorPosition, mirrorPosition.initializeTraderActivityThrottle.selector, address(ruleContract));
+        dictator.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(ruleContract));
         dictator.setPermission(settle, settle.settle.selector, address(keeperRouter));
         dictator.setPermission(settle, settle.collectDust.selector, address(keeperRouter));
-        dictator.setPermission(mirrorPosition, mirrorPosition.requestOpen.selector, address(keeperRouter));
-        dictator.setPermission(mirrorPosition, mirrorPosition.requestAdjust.selector, address(keeperRouter));
-        dictator.setPermission(mirrorPosition, mirrorPosition.execute.selector, address(keeperRouter));
-        dictator.setPermission(mirrorPosition, mirrorPosition.liquidate.selector, address(keeperRouter));
+        dictator.setPermission(mirror, mirror.requestOpen.selector, address(keeperRouter));
+        dictator.setPermission(mirror, mirror.requestAdjust.selector, address(keeperRouter));
+        dictator.setPermission(mirror, mirror.execute.selector, address(keeperRouter));
+        dictator.setPermission(mirror, mirror.liquidate.selector, address(keeperRouter));
 
         // Initialize contracts
         dictator.registerContract(settle);
         dictator.registerContract(ruleContract);
         dictator.registerContract(depositContract);
-        dictator.registerContract(mirrorPosition);
+        dictator.registerContract(mirror);
         dictator.registerContract(keeperRouter);
 
         // Stop current prank and restart for user operations
@@ -173,7 +173,7 @@ contract TradingTest is BasicSetup {
 
         // Set up trading rules using owner permissions
         ruleContract.setRule(
-            mirrorPosition,
+            mirror,
             usdc,
             puppet1,
             trader,
@@ -185,7 +185,7 @@ contract TradingTest is BasicSetup {
         );
 
         ruleContract.setRule(
-            mirrorPosition,
+            mirror,
             usdc,
             puppet2,
             trader,
@@ -209,7 +209,7 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint keeperFee = 1e6; // 1 USDC
 
-        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
+        Mirror.CallPosition memory callParams = Mirror.CallPosition({
             collateralToken: usdc,
             traderRequestKey: bytes32(0),
             trader: trader,
@@ -231,7 +231,7 @@ contract TradingTest is BasicSetup {
             keeperRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
 
         // Verify allocation was created
-        assertGt(mirrorPosition.getAllocation(allocationAddress), 0, "Allocation should be created");
+        assertGt(mirror.getAllocation(allocationAddress), 0, "Allocation should be created");
 
         // Verify request was submitted to GMX
         assertNotEq(requestKey, bytes32(0), "Request key should be generated");
@@ -248,7 +248,7 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint keeperFee = 10000e6; // Excessive keeper fee
 
-        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
+        Mirror.CallPosition memory callParams = Mirror.CallPosition({
             collateralToken: usdc,
             traderRequestKey: bytes32(0),
             trader: trader,
@@ -279,7 +279,7 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint keeperFee = 1e6; // 1 USDC
 
-        MirrorPosition.CallPosition memory initialCallParams = MirrorPosition.CallPosition({
+        Mirror.CallPosition memory initialCallParams = Mirror.CallPosition({
             collateralToken: usdc,
             traderRequestKey: bytes32(0),
             trader: trader,
@@ -305,7 +305,7 @@ contract TradingTest is BasicSetup {
         uint adjustKeeperFee = 0.5e6; // 0.5 USDC
 
         // Adjust position - trader increases leverage by adding more size without proportional collateral
-        MirrorPosition.CallPosition memory adjustCallParams = MirrorPosition.CallPosition({
+        Mirror.CallPosition memory adjustCallParams = Mirror.CallPosition({
             collateralToken: usdc,
             traderRequestKey: bytes32(0),
             trader: trader,
@@ -407,7 +407,7 @@ contract TradingTest is BasicSetup {
         address[] memory emptyPuppetList = new address[](0);
         uint allocationId = getNextAllocationId();
 
-        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
+        Mirror.CallPosition memory callParams = Mirror.CallPosition({
             collateralToken: usdc,
             traderRequestKey: bytes32(0),
             trader: trader,
@@ -440,7 +440,7 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint keeperFee = 1e6; // Non-zero keeper fee
 
-        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
+        Mirror.CallPosition memory callParams = Mirror.CallPosition({
             collateralToken: usdc,
             traderRequestKey: bytes32(0),
             trader: trader,
@@ -475,7 +475,7 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint keeperFee = 0.1e6; // Small keeper fee
 
-        MirrorPosition.CallPosition memory callParams = MirrorPosition.CallPosition({
+        Mirror.CallPosition memory callParams = Mirror.CallPosition({
             collateralToken: usdc,
             traderRequestKey: bytes32(0),
             trader: trader,
@@ -499,7 +499,7 @@ contract TradingTest is BasicSetup {
         (address allocationAddress,) = keeperRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
 
         // Should get allocation only from puppet1 since puppet2 is still throttled
-        uint allocatedAmount = mirrorPosition.getAllocation(allocationAddress);
+        uint allocatedAmount = mirror.getAllocation(allocationAddress);
         uint puppet1Expected = 1000e6 * 2000 / 10000; // 20% of 1000 USDC = 200 USDC
         // But puppet1's balance has been reduced from previous test (200e6 initial balance from BasicSetup + allocation
         // used)
@@ -543,7 +543,7 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint keeperFee = 1e6;
 
-        MirrorPosition.CallPosition memory openParams = MirrorPosition.CallPosition({
+        Mirror.CallPosition memory openParams = Mirror.CallPosition({
             collateralToken: usdc,
             traderRequestKey: bytes32(0),
             trader: trader,
@@ -567,7 +567,7 @@ contract TradingTest is BasicSetup {
         executeOrder(requestKey);
 
         // Now decrease the position
-        MirrorPosition.CallPosition memory decreaseParams = MirrorPosition.CallPosition({
+        Mirror.CallPosition memory decreaseParams = Mirror.CallPosition({
             collateralToken: usdc,
             traderRequestKey: bytes32(0),
             trader: trader,
@@ -600,7 +600,7 @@ contract TradingTest is BasicSetup {
 
         // Set rule for puppet2 to follow trader2
         ruleContract.setRule(
-            mirrorPosition,
+            mirror,
             usdc,
             puppet2,
             trader2,
@@ -615,7 +615,7 @@ contract TradingTest is BasicSetup {
         uint allocationId1 = getNextAllocationId();
         uint allocationId2 = getNextAllocationId();
 
-        MirrorPosition.CallPosition memory callParams1 = MirrorPosition.CallPosition({
+        Mirror.CallPosition memory callParams1 = Mirror.CallPosition({
             collateralToken: usdc,
             traderRequestKey: bytes32(0),
             trader: trader,
@@ -632,7 +632,7 @@ contract TradingTest is BasicSetup {
             keeperFeeReceiver: users.owner
         });
 
-        MirrorPosition.CallPosition memory callParams2 = MirrorPosition.CallPosition({
+        Mirror.CallPosition memory callParams2 = Mirror.CallPosition({
             collateralToken: usdc,
             traderRequestKey: bytes32(0),
             trader: trader2,
@@ -658,8 +658,8 @@ contract TradingTest is BasicSetup {
         (address allocation2,) = keeperRouter.requestOpen{value: 0.001 ether}(callParams2, puppetList2);
 
         // Verify both allocations were created
-        assertGt(mirrorPosition.getAllocation(allocation1), 0, "Trader1 allocation should exist");
-        assertGt(mirrorPosition.getAllocation(allocation2), 0, "Trader2 allocation should exist");
+        assertGt(mirror.getAllocation(allocation1), 0, "Trader1 allocation should exist");
+        assertGt(mirror.getAllocation(allocation2), 0, "Trader2 allocation should exist");
         assertNotEq(allocation1, allocation2, "Allocations should be different");
 
         // Simulate profits by sending tokens to both allocation accounts
@@ -809,7 +809,7 @@ contract TradingTest is BasicSetup {
         bytes32 _allocationKey = keccak256(abi.encodePacked(_puppetList, _traderMatchingKey, _allocationId));
 
         return Clones.predictDeterministicAddress(
-            mirrorPosition.allocationAccountImplementation(), _allocationKey, address(mirrorPosition)
+            mirror.allocationAccountImplementation(), _allocationKey, address(mirror)
         );
     }
 }

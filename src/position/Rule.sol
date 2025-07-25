@@ -7,7 +7,7 @@ import {PositionUtils} from "../position/utils/PositionUtils.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {MirrorPosition} from "./MirrorPosition.sol";
+import {Mirror} from "./Mirror.sol";
 
 contract Rule is CoreContract {
     struct RuleParams {
@@ -51,7 +51,7 @@ contract Rule is CoreContract {
     }
 
     function setRule(
-        MirrorPosition mirrorPosition,
+        Mirror mirror,
         IERC20 _collateralToken,
         address _user,
         address _trader,
@@ -60,22 +60,22 @@ contract Rule is CoreContract {
         require(
             _ruleParams.throttleActivity >= config.minActivityThrottle
                 && _ruleParams.throttleActivity <= config.maxActivityThrottle,
-            Error.MatchingRule__InvalidActivityThrottle(config.minActivityThrottle, config.maxActivityThrottle)
+            Error.Rule__InvalidActivityThrottle(config.minActivityThrottle, config.maxActivityThrottle)
         );
 
         require(
             _ruleParams.expiry >= config.minExpiryDuration,
-            Error.MatchingRule__InvalidExpiryDuration(config.minExpiryDuration)
+            Error.Rule__InvalidExpiryDuration(config.minExpiryDuration)
         );
 
         require(
             _ruleParams.allowanceRate >= config.minAllowanceRate && _ruleParams.allowanceRate <= config.maxAllowanceRate,
-            Error.MatchingRule__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate)
+            Error.Rule__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate)
         );
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_collateralToken, _trader);
         matchingRuleMap[_traderMatchingKey][_user] = _ruleParams;
-        mirrorPosition.initializeTraderActivityThrottle(_traderMatchingKey, _user);
+        mirror.initializeTraderActivityThrottle(_traderMatchingKey, _user);
 
         _logEvent("SetMatchingRule", abi.encode(_collateralToken, _traderMatchingKey, _user, _trader, _ruleParams));
     }

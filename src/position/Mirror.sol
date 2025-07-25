@@ -19,7 +19,7 @@ import {IGmxReadDataStore} from "./interface/IGmxReadDataStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
-contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
+contract Mirror is CoreContract, ReentrancyGuardTransient {
     struct Config {
         IGmxExchangeRouter gmxExchangeRouter;
         IGmxReadDataStore gmxDataStore;
@@ -148,9 +148,9 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
         CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
-        require(_callParams.isIncrease, Error.MirrorPosition__InitialMustBeIncrease());
-        require(_callParams.collateralDelta > 0, Error.MirrorPosition__InvalidCollateralDelta());
-        require(_callParams.sizeDeltaInUsd > 0, Error.MirrorPosition__InvalidSizeDelta());
+        require(_callParams.isIncrease, Error.Mirror__InitialMustBeIncrease());
+        require(_callParams.collateralDelta > 0, Error.Mirror__InvalidCollateralDelta());
+        require(_callParams.sizeDeltaInUsd > 0, Error.Mirror__InvalidSizeDelta());
 
         // Create allocation inline
         uint _puppetCount = _puppetList.length;
@@ -284,7 +284,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
         require(
             _callParams.collateralDelta > 0 || _callParams.sizeDeltaInUsd > 0,
-            Error.MirrorPosition__NoAdjustmentRequired()
+            Error.Mirror__NoAdjustmentRequired()
         );
 
         // Collect keeper fee and update allocations inline
@@ -367,8 +367,8 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
         );
 
         Position memory _position = positionMap[_allocationAddress];
-        require(_position.size > 0, Error.MirrorPosition__PositionNotFound(_allocationAddress));
-        require(_position.traderCollateral > 0, Error.MirrorPosition__TraderCollateralZero(_allocationAddress));
+        require(_position.size > 0, Error.Mirror__PositionNotFound(_allocationAddress));
+        require(_position.traderCollateral > 0, Error.Mirror__TraderCollateralZero(_allocationAddress));
 
         // Calculate adjustments
         uint _currentPuppetLeverage = Precision.toBasisPoints(_position.size, _allocated);
@@ -402,8 +402,8 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
             }
         }
 
-        require(_traderTargetLeverage != _currentPuppetLeverage, Error.MirrorPosition__NoAdjustmentRequired());
-        require(_currentPuppetLeverage > 0, Error.MirrorPosition__InvalidCurrentLeverage());
+        require(_traderTargetLeverage != _currentPuppetLeverage, Error.Mirror__NoAdjustmentRequired());
+        require(_currentPuppetLeverage > 0, Error.Mirror__InvalidCurrentLeverage());
 
         // Calculate size delta
         bool isIncrease = _traderTargetLeverage > _currentPuppetLeverage;
@@ -470,16 +470,16 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
         address _allocationAddress,
         address _callbackContract
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
-        require(_allocationAddress != address(0), Error.MirrorPosition__InvalidAllocation(_allocationAddress));
+        require(_allocationAddress != address(0), Error.Mirror__InvalidAllocation(_allocationAddress));
 
         Position memory _position = positionMap[_allocationAddress];
-        require(_position.size > 0, Error.MirrorPosition__PositionNotFound(_allocationAddress));
+        require(_position.size > 0, Error.Mirror__PositionNotFound(_allocationAddress));
         bytes32 positionKey =
             GmxPositionUtils.getPositionKey(_params.trader, _params.market, _params.collateralToken, _params.isLong);
 
         require(
             GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, positionKey) > 0,
-            Error.MirrorPosition__PositionNotStalled(_allocationAddress, positionKey)
+            Error.Mirror__PositionNotStalled(_allocationAddress, positionKey)
         );
 
         _requestKey = _submitOrder(
@@ -511,7 +511,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
         bytes32 _requestKey
     ) external auth nonReentrant {
         RequestAdjustment memory _request = requestAdjustmentMap[_requestKey];
-        require(_request.allocationAddress != address(0), Error.MirrorPosition__ExecutionRequestMissing(_requestKey));
+        require(_request.allocationAddress != address(0), Error.Mirror__ExecutionRequestMissing(_requestKey));
 
         Position memory _position = positionMap[_request.allocationAddress];
         delete requestAdjustmentMap[_requestKey];
@@ -566,7 +566,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
         address _allocationAddress
     ) external auth nonReentrant {
         Position memory _position = positionMap[_allocationAddress];
-        require(_position.size > 0, Error.MirrorPosition__PositionNotFound(_allocationAddress));
+        require(_position.size > 0, Error.Mirror__PositionNotFound(_allocationAddress));
 
         delete positionMap[_allocationAddress];
         _logEvent("Liquidate", abi.encode(_allocationAddress));
@@ -583,7 +583,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
     ) internal returns (bytes32 requestKey) {
         require(
             msg.value >= _order.executionFee,
-            Error.MirrorPosition__InsufficientGmxExecutionFee(msg.value, _order.executionFee)
+            Error.Mirror__InsufficientGmxExecutionFee(msg.value, _order.executionFee)
         );
 
         bytes memory gmxCallData = abi.encodeWithSelector(
@@ -627,7 +627,7 @@ contract MirrorPosition is CoreContract, ReentrancyGuardTransient {
         }
 
         requestKey = abi.decode(returnData, (bytes32));
-        require(requestKey != bytes32(0), Error.MirrorPosition__OrderCreationFailed());
+        require(requestKey != bytes32(0), Error.Mirror__OrderCreationFailed());
     }
 
     function _setConfig(
