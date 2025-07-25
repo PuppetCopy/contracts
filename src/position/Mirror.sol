@@ -250,7 +250,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         bytes32 _allocationKey =
             PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId);
         address _allocationAddress = Clones.predictDeterministicAddress(
-            allocate.allocationStore().allocationAccountImplementation(), _allocationKey, address(allocate)
+            allocate.allocationAccountImplementation(), _allocationKey, address(allocate)
         );
 
         // Update allocation through Allocate contract

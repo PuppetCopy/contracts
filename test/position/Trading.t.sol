@@ -816,7 +816,7 @@ contract TradingTest is BasicSetup {
         bytes32 _allocationKey = keccak256(abi.encodePacked(_puppetList, _traderMatchingKey, _allocationId));
 
         return Clones.predictDeterministicAddress(
-            allocate.allocationStore().allocationAccountImplementation(), _allocationKey, address(allocate)
+            allocate.allocationAccountImplementation(), _allocationKey, address(allocate)
         );
     }
 

@@ -28,6 +28,7 @@ contract Allocate is CoreContract, ReentrancyGuardTransient {
     }
 
     AllocationStore public immutable allocationStore;
+    address public immutable allocationAccountImplementation;
 
     Config config;
 
@@ -49,6 +50,7 @@ contract Allocate is CoreContract, ReentrancyGuardTransient {
         Config memory _config
     ) CoreContract(_authority, abi.encode(_config)) {
         allocationStore = _allocationStore;
+        allocationAccountImplementation = address(new AllocationAccount(_allocationStore));
     }
 
     function getConfig() external view returns (Config memory) {
@@ -215,8 +217,7 @@ contract Allocate is CoreContract, ReentrancyGuardTransient {
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_collateralToken, _trader);
         bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _allocationId);
 
-        _allocationAddress =
-            Clones.cloneDeterministic(allocationStore.allocationAccountImplementation(), _allocationKey);
+        _allocationAddress = Clones.cloneDeterministic(allocationAccountImplementation, _allocationKey);
 
         // Get rules and process allocations in single loop
         Rule.RuleParams[] memory _rules = _ruleContract.getRuleList(_traderMatchingKey, _puppetList);

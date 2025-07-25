@@ -10,7 +10,6 @@ import {Error} from "../utils/Error.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Allocate} from "./Allocate.sol";
-import {AllocationStore} from "../shared/AllocationStore.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
 /**
@@ -102,7 +101,7 @@ contract Settle is CoreContract {
         bytes32 _allocationKey =
             PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId);
         address _allocationAddress = Clones.predictDeterministicAddress(
-            allocate.allocationStore().allocationAccountImplementation(), _allocationKey, address(allocate)
+            allocate.allocationAccountImplementation(), _allocationKey, address(allocate)
         );
 
         uint _allocation = allocate.allocationMap(_allocationAddress);
