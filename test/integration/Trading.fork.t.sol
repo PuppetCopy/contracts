@@ -11,6 +11,10 @@ import {Mirror} from "src/position/Mirror.sol";
 import {Rule} from "src/position/Rule.sol";
 import {Settle} from "src/position/Settle.sol";
 
+import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
+import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
+import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
+
 /**
  * @title Trading Fork Test - Live GMX Integration
  * @notice Fork test for analyzing live GMX integration performance and behavior
@@ -23,13 +27,59 @@ contract TradingForkTest is ForkTestBase {
     uint constant PUPPET1_DEPOSIT = 25000e6; // 25k USDC
     uint constant PUPPET2_DEPOSIT = 15000e6; // 15k USDC
     uint constant KEEPER_FEE = 50e6; // 50 USDC
-    uint constant EXECUTION_FEE = 0.003 ether;
+    uint constant EXECUTION_FEE = 0.05 ether;
+
+    /**
+     * @notice Creates a trader position on GMX using fork blockchain tooling
+     * @param callParams The position parameters to create
+     * @dev This simulates a real trader opening a position before puppets can mirror it
+     */
+    function createTraderPosition(
+        Mirror.CallPosition memory callParams
+    ) internal {
+        console.log("\n--- Creating Trader Position on GMX ---");
+
+        // Fund trader with collateral token
+        uint traderCollateralAmount = callParams.collateralDelta * 2; // Give trader extra funds
+        deal(address(callParams.collateralToken), callParams.trader, traderCollateralAmount);
+
+        // Approve GMX router to spend trader's tokens
+        vm.prank(callParams.trader);
+        callParams.collateralToken.approve(Const.gmxExchangeRouter, traderCollateralAmount);
+
+        console.log("Trader:", callParams.trader);
+        console.log("Collateral Amount:", callParams.collateralDelta);
+        console.log("Position Size:", callParams.sizeDeltaInUsd);
+        console.log("Market:", callParams.market);
+
+        // For fork tests, we'll mock the GMX DataStore getUint function directly
+        // This is the most reliable way to simulate trader positions
+        bytes32 positionKey = GmxPositionUtils.getPositionKey(
+            callParams.trader, callParams.market, callParams.collateralToken, callParams.isLong
+        );
+
+        bytes32 SIZE_IN_USD_KEY = keccak256(abi.encode("SIZE_IN_USD"));
+        bytes32 sizeInUsdKey = keccak256(abi.encode(positionKey, SIZE_IN_USD_KEY));
+
+        // Mock the getUint call to return our desired position size
+        vm.mockCall(
+            Const.gmxDataStore,
+            abi.encodeWithSelector(IGmxReadDataStore.getUint.selector, sizeInUsdKey),
+            abi.encode(callParams.sizeDeltaInUsd)
+        );
+
+        console.log("Mocked GMX DataStore to return position size:", callParams.sizeDeltaInUsd);
+
+        // Verify the mock works
+        uint positionSize = GmxPositionUtils.getPositionSizeInUsd(IGmxReadDataStore(Const.gmxDataStore), positionKey);
+
+        console.log("Verified Position Size:", positionSize);
+        require(positionSize > 0, "Failed to create trader position");
+    }
 
     function setUp() public {
         // Initialize fork test environment
         initializeForkTest();
-
-        if (!isRPCAvailable) return;
 
         // Fund test accounts and setup trading rules
         fundTestAccounts(PUPPET1_BALANCE, PUPPET2_BALANCE, PUPPET1_DEPOSIT, PUPPET2_DEPOSIT);
@@ -41,9 +91,6 @@ contract TradingForkTest is ForkTestBase {
      * @dev This test creates a mirror position and logs all relevant data for analysis
      */
     function testLiveGmxPositionMirror() public {
-        skipIfNoRPC();
-        if (!isRPCAvailable) return;
-
         console.log("\n=== Testing Live GMX Position Mirror ===");
 
         // Test parameters
@@ -89,6 +136,9 @@ contract TradingForkTest is ForkTestBase {
         console.log("Acceptable Price:", acceptablePrice);
         console.log("Execution Fee:", EXECUTION_FEE);
         console.log("Keeper Fee:", KEEPER_FEE);
+
+        // Create trader position on GMX first
+        createTraderPosition(callParams);
 
         // Record gas usage and timing
         uint gasStart = gasleft();
@@ -167,9 +217,6 @@ contract TradingForkTest is ForkTestBase {
      * @dev Tests gas consumption patterns for empirical limit setting
      */
     function testGasAnalysisReport() public {
-        skipIfNoRPC();
-        if (!isRPCAvailable) return;
-
         console.log("\n=== Gas Analysis Report ===");
         console.log("Purpose: Determine accurate gas limits for keeper operations");
         console.log("Note: Results exclude keeper-side buffers");
@@ -251,9 +298,6 @@ contract TradingForkTest is ForkTestBase {
      * @dev Tests gas consumption patterns for settlement operations to determine empirical limits
      */
     function testSettleGasAnalysisReport() public {
-        skipIfNoRPC();
-        if (!isRPCAvailable) return;
-
         console.log("\n=== Settle Gas Analysis Report ===");
         console.log("Purpose: Determine accurate gas limits for settle operations");
         console.log("Note: Simulates realistic settle conditions with funded allocation accounts");
@@ -370,6 +414,9 @@ contract TradingForkTest is ForkTestBase {
             keeperFeeReceiver: keeper
         });
 
+        // Create trader position on GMX first
+        createTraderPosition(callParams);
+
         vm.prank(keeper);
         (address allocationAddress,) = keeperRouter.requestOpen{value: EXECUTION_FEE}(callParams, puppetList);
 
@@ -436,6 +483,9 @@ contract TradingForkTest is ForkTestBase {
             keeperFeeReceiver: keeper
         });
 
+        // Create trader position on GMX first
+        createTraderPosition(callParams);
+
         // Measure gas
         uint gasStart = gasleft();
 
@@ -457,9 +507,6 @@ contract TradingForkTest is ForkTestBase {
      * @dev Tests the full lifecycle: mirror → execute → settle → validate distributions
      */
     function testCompleteMirrorToSettlement() public {
-        skipIfNoRPC();
-        if (!isRPCAvailable) return;
-
         console.log("\n=== Testing Complete Mirror-to-Settlement Flow ===");
 
         // Setup test parameters
@@ -489,6 +536,9 @@ contract TradingForkTest is ForkTestBase {
             keeperFee: KEEPER_FEE,
             keeperFeeReceiver: keeper
         });
+
+        // Create trader position on GMX first
+        createTraderPosition(callParams);
 
         // Step 1: Mirror Request - Keeper submits position to GMX
         console.log("\n--- Step 1: Mirror Request ---");

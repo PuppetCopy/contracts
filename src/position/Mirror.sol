@@ -110,6 +110,18 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         return allocationPuppetList[_allocationAddress];
     }
 
+    function getTraderPositionSizeInUsd(
+        bytes32 _traderPositionKey
+    ) external view returns (uint) {
+        return GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, _traderPositionKey);
+    }
+
+    function getTraderPositionCollateralAmount(
+        bytes32 _traderPositionKey
+    ) external view returns (uint) {
+        return GmxPositionUtils.getPositionCollateralAmount(config.gmxDataStore, _traderPositionKey);
+    }
+
     function initializeTraderActivityThrottle(bytes32 _traderMatchingKey, address _puppet) external auth {
         lastActivityThrottleMap[_traderMatchingKey][_puppet] = 1;
     }
@@ -156,6 +168,15 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         uint _puppetCount = _puppetList.length;
         require(_puppetCount > 0, Error.Allocation__PuppetListEmpty());
         require(_puppetCount <= config.maxPuppetList, "Puppet list too large");
+
+        bytes32 _traderPositionKey = GmxPositionUtils.getPositionKey(
+            _callParams.trader, _callParams.market, _callParams.collateralToken, _callParams.isLong
+        );
+
+        require(
+            GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, _traderPositionKey) > 0,
+            Error.Mirror__TraderPositionNotFound(_callParams.trader, _traderPositionKey)
+        );
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
         bytes32 _allocationKey =
@@ -243,6 +264,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
                 _callParams,
                 _puppetList,
                 _traderMatchingKey,
+                _traderPositionKey,
                 _allocationAddress,
                 _sizeDelta,
                 _traderTargetLeverage,
@@ -475,7 +497,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
             GmxPositionUtils.getPositionKey(_params.trader, _params.market, _params.collateralToken, _params.isLong);
 
         require(
-            GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, positionKey) > 0,
+            GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, positionKey) == 0,
             Error.Mirror__PositionNotStalled(_allocationAddress, positionKey)
         );
 

@@ -5,24 +5,23 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
-
 import {Deposit} from "src/position/Deposit.sol";
 import {Mirror} from "src/position/Mirror.sol";
 import {Rule} from "src/position/Rule.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
+import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
+import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
+import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {AllocationStore} from "src/shared/AllocationStore.sol";
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
-
-import {Const} from "script/Const.sol";
-
-import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
-import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {Error} from "src/utils/Error.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockGmxExchangeRouter} from "test/mock/MockGmxExchangeRouter.sol";
+
+import {Const} from "script/Const.sol";
 
 /**
  * @title TradingTest
@@ -137,6 +136,9 @@ contract TradingTest is BasicSetup {
         dictator.registerContract(depositContract);
         dictator.registerContract(mirror);
         dictator.registerContract(keeperRouter);
+
+        // Mock GMX DataStore calls to simulate trader positions
+        _setupGmxDataStoreMocks();
 
         // Stop current prank and restart for user operations
         IERC20[] memory allowedTokens = new IERC20[](1);
@@ -806,6 +808,51 @@ contract TradingTest is BasicSetup {
 
         return Clones.predictDeterministicAddress(
             mirror.allocationAccountImplementation(), _allocationKey, address(mirror)
+        );
+    }
+
+    /**
+     * @notice Sets up GMX DataStore mocks to simulate trader positions
+     * @dev Mocks the getUint calls that check for existing trader positions
+     */
+    function _setupGmxDataStoreMocks() internal {
+        // Mock positions for trader1
+        _mockTraderPosition(trader);
+
+        // Mock positions for trader2 (used in testMultipleTraders)
+        address trader2 = makeAddr("trader2");
+        _mockTraderPosition(trader2);
+    }
+
+    /**
+     * @notice Helper function to mock a trader's position
+     * @param _trader The trader address to mock
+     */
+    function _mockTraderPosition(
+        address _trader
+    ) internal {
+        // Create a trader position key for the specified trader
+        bytes32 traderPositionKey = GmxPositionUtils.getPositionKey(
+            _trader,
+            address(0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f), // market
+            IERC20(address(usdc)),
+            true // isLong
+        );
+
+        // Mock position size in USD (simulate existing position)
+        bytes32 sizeInUsdKey = keccak256(abi.encode(traderPositionKey, GmxPositionUtils.SIZE_IN_USD_KEY));
+        vm.mockCall(
+            Const.gmxDataStore,
+            abi.encodeWithSelector(IGmxReadDataStore.getUint.selector, sizeInUsdKey),
+            abi.encode(5000000000000000000000000000000000) // 5000 USD position
+        );
+
+        // Mock position collateral amount
+        bytes32 collateralKey = keccak256(abi.encode(traderPositionKey, GmxPositionUtils.COLLATERAL_AMOUNT_KEY));
+        vm.mockCall(
+            Const.gmxDataStore,
+            abi.encodeWithSelector(IGmxReadDataStore.getUint.selector, collateralKey),
+            abi.encode(1000000000000000000000000000000000) // 1000 USD collateral
         );
     }
 }

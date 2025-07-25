@@ -175,16 +175,6 @@ abstract contract ForkTestBase is Test {
         );
     }
 
-    /**
-     * @notice Checks if RPC is available for fork testing
-     */
-    function skipIfNoRPC() internal view {
-        if (!isRPCAvailable) {
-            console.log("Test: Skipping - RPC not available");
-            return;
-        }
-    }
-
     // Internal deployment functions
     function _deployContracts() private {
         dictator = new Dictatorship(owner);

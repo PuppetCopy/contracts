@@ -57,6 +57,7 @@ library Error {
     error Mirror__InvalidAllocation(address allocationAddress);
     error Mirror__InvalidAllocationId();
     error Mirror__InvalidSettledAmount(IERC20 token, uint recordedAmount, uint settledAmount);
+    error Mirror__TraderPositionNotFound(address trader, bytes32 positionKey);
     error Mirror__InvalidCollateralDelta();
     error Mirror__InvalidCurrentLeverage();
     error Mirror__InvalidKeeperExecutionFeeAmount();

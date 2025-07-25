@@ -21,8 +21,8 @@ import {Const} from "./Const.sol";
 
 /**
  * @title DeployPosition
- * @notice Deployment script for the Mirror Position trading system
- * @dev Each contract can be deployed independently with its own permissions
+ * @notice Deployment script for the core position trading system
+ * @dev Deploys all core position contracts with proper permissions
  */
 contract DeployPosition is BaseScript {
     // State variables to hold deployed contracts
@@ -32,20 +32,22 @@ contract DeployPosition is BaseScript {
     function run() public {
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
 
-        // console.log("=== Deploying Position Contracts ===");
+        console.log("=== Deploying Position Contracts ===");
 
-        // // Deploy each contract with its permissions
-        // verifySelectorsMatch();
-        // AllocationStore allocationStore = deployAllocationStore();
-        // MatchingRule matchingRule = deployMatchingRule(allocationStore);
-        // Allocate functionality moved to Mirror
-        // Settle settle = deploySettle(allocationStore);
-        // Mirror mirror = deployMirror();
-        // KeeperRouter keeperRouter = deployKeeperRouter(mirror, matchingRule, settle);
+        // Deploy each contract with its permissions
+        AllocationStore allocationStore = deployAllocationStore();
+        (Rule ruleContract, Deposit depositContract) = deployRuleAndDeposit(allocationStore);
+        Settle settle = deploySettle(allocationStore);
+        Mirror mirror = deployMirror(allocationStore);
+        deployKeeperRouter(mirror, ruleContract, settle);
 
-        // setupUpkeepingConfig(MatchingRule(getDeployedAddress("MatchingRule")), Settle(getDeployedAddress("Settle")));
+        // Set up cross-contract permissions
+        setupCrossContractPermissions(mirror, ruleContract);
 
-        // console.log("=== Position Contracts Deployment Complete ===");
+        // Setup upkeeping configuration
+        setupUpkeepingConfig(depositContract, settle);
+
+        console.log("=== Position Contracts Deployment Complete ===");
 
         vm.stopBroadcast();
     }
@@ -65,7 +67,6 @@ contract DeployPosition is BaseScript {
         // TokenRouter needs permission to transfer tokens for AllocationStore
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocationStore));
 
-        // No initialization needed for AllocationStore
         console.log("AllocationStore permissions configured");
 
         return allocationStore;
@@ -138,9 +139,6 @@ contract DeployPosition is BaseScript {
         // AllocationStore access for Deposit contract
         dictator.setAccess(allocationStore, address(depositContract));
 
-        // The Rule contract doesn't need AllocationStore access as it only manages rule logic
-        // The Deposit contract needs AllocationStore access for deposits/withdrawals
-
         // Initialize contracts
         dictator.registerContract(ruleContract);
         dictator.registerContract(depositContract);
@@ -178,13 +176,12 @@ contract DeployPosition is BaseScript {
         );
         console.log("Mirror deployed at:", address(mirror));
 
+        // Set up permissions
         dictator.setAccess(allocationStore, address(mirror));
-
-        // Mirror has no standalone permissions, they're set up via KeeperRouter
 
         // Initialize contract
         dictator.registerContract(mirror);
-        console.log("Mirror initialized");
+        console.log("Mirror initialized and permissions configured");
 
         return mirror;
     }
@@ -221,8 +218,6 @@ contract DeployPosition is BaseScript {
         // Set up permissions for KeeperRouter to call other contracts
         console.log("Setting up KeeperRouter permissions...");
 
-        // Note: Allocate functionality has been merged into Mirror
-
         // Settle permissions
         dictator.setPermission(settle, settle.settle.selector, address(keeperRouter));
         dictator.setPermission(settle, settle.collectDust.selector, address(keeperRouter));
@@ -230,6 +225,7 @@ contract DeployPosition is BaseScript {
         // Mirror permissions
         dictator.setPermission(mirror, mirror.requestOpen.selector, address(keeperRouter));
         dictator.setPermission(mirror, mirror.requestAdjust.selector, address(keeperRouter));
+        dictator.setPermission(mirror, mirror.requestCloseStalledPosition.selector, address(keeperRouter));
         dictator.setPermission(mirror, mirror.execute.selector, address(keeperRouter));
         dictator.setPermission(mirror, mirror.liquidate.selector, address(keeperRouter));
 
@@ -244,6 +240,7 @@ contract DeployPosition is BaseScript {
         dictator.setPermission(keeperRouter, keeperRouter.afterOrderExecution.selector, Const.gmxLiquidationHandler);
         dictator.setPermission(keeperRouter, keeperRouter.afterOrderExecution.selector, Const.gmxAdlHandler);
 
+        // Self-permission for refund
         dictator.setPermission(keeperRouter, keeperRouter.refundExecutionFee.selector, address(keeperRouter));
 
         // External keeper permissions
@@ -260,20 +257,43 @@ contract DeployPosition is BaseScript {
         return keeperRouter;
     }
 
-    function setupUpkeepingConfig(Deposit depositContract, Settle settle) public {
-        dictator.setPermission(depositContract, depositContract.setTokenAllowanceList.selector, Const.dao);
+    /**
+     * @notice Sets up cross-contract permissions between Mirror and Rule
+     * @dev Mirror needs to call Rule for activity throttle initialization
+     */
+    function setupCrossContractPermissions(Mirror mirror, Rule ruleContract) internal {
+        console.log("\n--- Setting up cross-contract permissions ---");
 
+        // Mirror needs permission to initialize trader activity throttle via Rule
+        dictator.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(ruleContract));
+
+        console.log("Cross-contract permissions configured");
+    }
+
+    /**
+     * @notice Sets up upkeeping configuration for token allowances and dust thresholds
+     * @param depositContract The Deposit contract
+     * @param settle The Settle contract
+     */
+    function setupUpkeepingConfig(Deposit depositContract, Settle settle) internal {
+        console.log("\n--- Setting up upkeeping configuration ---");
+
+        // Set up DAO permissions for configuration
+        dictator.setPermission(depositContract, depositContract.setTokenAllowanceList.selector, Const.dao);
+        dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, Const.dao);
+
+        // Configure USDC as allowed token
         IERC20[] memory allowedTokens = new IERC20[](1);
         allowedTokens[0] = IERC20(Const.usdc);
         uint[] memory allowanceCaps = new uint[](1);
-        allowanceCaps[0] = 100e6;
+        allowanceCaps[0] = 100e6; // 100 USDC cap
         depositContract.setTokenAllowanceList(allowedTokens, allowanceCaps);
 
-        dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, Const.dao);
-
+        // Configure dust threshold for USDC
         uint[] memory dustTokenThresholds = new uint[](1);
-        dustTokenThresholds[0] = 0.1e6; // 0.1 USDC
-
+        dustTokenThresholds[0] = 0.1e6; // 0.1 USDC threshold
         settle.setTokenDustThresholdList(allowedTokens, dustTokenThresholds);
+
+        console.log("Upkeeping configuration complete");
     }
 }
