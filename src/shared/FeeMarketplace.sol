@@ -29,7 +29,8 @@ contract FeeMarketplace is CoreContract {
     mapping(IERC20 => uint) public unclockedFees;
     mapping(IERC20 => uint) public lastDistributionTimestamp;
 
-    uint distributionBalance;
+    uint public distributionBalance;
+
     Config config;
 
     constructor(
