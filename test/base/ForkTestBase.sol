@@ -205,7 +205,6 @@ abstract contract ForkTestBase is Test {
                 referralCode: bytes32("PUPPET"),
                 increaseCallbackGasLimit: 2e6,
                 decreaseCallbackGasLimit: 2e6,
-                fallbackRefundExecutionFeeReceiver: owner,
                 maxPuppetList: 50,
                 maxKeeperFeeToAllocationRatio: 0.1e30,
                 maxKeeperFeeToAdjustmentRatio: 0.1e30
@@ -275,14 +274,12 @@ abstract contract ForkTestBase is Test {
         dictator.setPermission(account, account.execute.selector, address(mirror));
         dictator.setPermission(account, account.createAllocationAccount.selector, address(mirror));
         dictator.setPermission(account, account.transferOut.selector, address(mirror));
-        dictator.setPermission(account, account.getAllocationAddress.selector, address(mirror));
 
         // Account permissions for Settle
         dictator.setPermission(account, account.execute.selector, address(settle));
         dictator.setPermission(account, account.setBalanceList.selector, address(settle));
         dictator.setPermission(account, account.transferInAllocation.selector, address(settle));
         dictator.setPermission(account, account.transferOut.selector, address(settle));
-        dictator.setPermission(account, account.getAllocationAddress.selector, address(settle));
 
         // Mirror permissions
         dictator.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(ruleContract));

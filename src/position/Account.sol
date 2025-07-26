@@ -62,6 +62,15 @@ contract Account is CoreContract {
     }
 
     /**
+     * @notice Get deterministic allocation account address
+     */
+    function getAllocationAddress(
+        bytes32 _allocationKey
+    ) external view returns (address) {
+        return Clones.predictDeterministicAddress(allocationAccountImplementation, _allocationKey, address(this));
+    }
+
+    /**
      * @notice Set user balance for a specific token
      */
     function setUserBalance(IERC20 _token, address _account, uint _value) external auth {
@@ -191,19 +200,10 @@ contract Account is CoreContract {
             Error.Account__InvalidSettledAmount(_token, _recordedAmountIn, _settledAmount)
         );
     }
-
-    /**
-     * @notice Get deterministic allocation account address
-     */
-    function getAllocationAddress(
-        bytes32 _allocationKey
-    ) external view returns (address) {
-        return Clones.predictDeterministicAddress(allocationAccountImplementation, _allocationKey, address(this));
-    }
-
     /**
      * @notice Create a new allocation account with deterministic address
      */
+
     function createAllocationAccount(
         bytes32 _allocationKey
     ) external auth returns (address) {

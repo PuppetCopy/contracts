@@ -79,7 +79,6 @@ contract TradingTest is BasicSetup {
                 referralCode: bytes32("PUPPET"),
                 increaseCallbackGasLimit: 2e6,
                 decreaseCallbackGasLimit: 2e6,
-                fallbackRefundExecutionFeeReceiver: address(0x9999),
                 maxPuppetList: 50,
                 maxKeeperFeeToAllocationRatio: 0.1e30,
                 maxKeeperFeeToAdjustmentRatio: 0.1e30

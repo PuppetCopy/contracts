@@ -25,7 +25,6 @@ contract Mirror is CoreContract {
         bytes32 referralCode;
         uint increaseCallbackGasLimit;
         uint decreaseCallbackGasLimit;
-        address fallbackRefundExecutionFeeReceiver;
         uint maxPuppetList;
         uint maxKeeperFeeToAllocationRatio;
         uint maxKeeperFeeToAdjustmentRatio;
@@ -639,7 +638,6 @@ contract Mirror is CoreContract {
         require(_config.referralCode != bytes32(0), "Invalid Referral Code");
         require(_config.increaseCallbackGasLimit > 0, "Invalid Increase Callback Gas Limit");
         require(_config.decreaseCallbackGasLimit > 0, "Invalid Decrease Callback Gas Limit");
-        require(_config.fallbackRefundExecutionFeeReceiver != address(0), "Invalid Refund Execution Fee Receiver");
         require(_config.maxPuppetList > 0, "Invalid max puppet list");
         require(_config.maxKeeperFeeToAllocationRatio > 0, "Invalid max keeper fee to allocation ratio");
         require(_config.maxKeeperFeeToAdjustmentRatio > 0, "Invalid max keeper fee to adjustment ratio");

@@ -109,16 +109,10 @@ contract DeployPosition is BaseScript {
         console.log("Settle deployed at:", address(settle));
 
         // Set up permissions
-        // AccountStore access for Settle
-        dictator.setAccess(account.accountStore(), address(settle));
         // Account permissions for Settle
-        dictator.setPermission(account, account.execute.selector, address(settle));
         dictator.setPermission(account, account.setBalanceList.selector, address(settle));
         dictator.setPermission(account, account.transferInAllocation.selector, address(settle));
         dictator.setPermission(account, account.transferOut.selector, address(settle));
-        dictator.setPermission(account, account.getAllocationAddress.selector, address(settle));
-        dictator.setPermission(account, account.transferOut.selector, address(settle));
-        dictator.setPermission(account, account.getAllocationAddress.selector, address(settle));
 
         // Initialize contract
         dictator.registerContract(settle);
@@ -165,7 +159,6 @@ contract DeployPosition is BaseScript {
                 referralCode: Const.referralCode,
                 increaseCallbackGasLimit: 2e6,
                 decreaseCallbackGasLimit: 2e6,
-                fallbackRefundExecutionFeeReceiver: Const.dao,
                 maxPuppetList: 50,
                 maxKeeperFeeToAllocationRatio: 0.1e30,
                 maxKeeperFeeToAdjustmentRatio: 0.1e30
@@ -173,16 +166,11 @@ contract DeployPosition is BaseScript {
         );
         console.log("Mirror deployed at:", address(mirror));
 
-        // Set up permissions
         // Account permissions for Mirror
         dictator.setPermission(account, account.execute.selector, address(mirror));
-        dictator.setPermission(account, account.setUserBalance.selector, address(mirror));
         dictator.setPermission(account, account.setBalanceList.selector, address(mirror));
         dictator.setPermission(account, account.createAllocationAccount.selector, address(mirror));
-        dictator.setPermission(account, account.getBalanceList.selector, address(mirror));
         dictator.setPermission(account, account.transferOut.selector, address(mirror));
-        dictator.setPermission(account, account.getAllocationAddress.selector, address(mirror));
-        dictator.setPermission(account, account.getBalanceList.selector, address(mirror));
 
         // Initialize contract
         dictator.registerContract(mirror);

@@ -15,7 +15,7 @@ const client = createPublicClient({
 })
 
 const chainId = await client.getChainId()
-const scriptName = 'DeployBase'
+const scriptName = 'DeployPosition'
 const scriptFile = `${scriptName}.s.sol`
 
 console.log(`Config: ${JSON.stringify({ chainId, scriptName })}`)
