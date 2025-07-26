@@ -43,12 +43,15 @@ contract Account is CoreContract, ReentrancyGuardTransient {
         allocationAccountImplementation = address(new AllocationAccount(_accountStore));
     }
 
+    /**
+     * @notice Get current configuration parameters
+     */
     function getConfig() external view returns (Config memory) {
         return config;
     }
 
     /**
-     * @notice Get balance list for multiple users and a token
+     * @notice Get balances for multiple users for a specific token
      */
     function getBalanceList(IERC20 _token, address[] calldata _puppetList) external view returns (uint[] memory) {
         uint _accountListLength = _puppetList.length;
@@ -60,7 +63,7 @@ contract Account is CoreContract, ReentrancyGuardTransient {
     }
 
     /**
-     * @notice Set user balance for a specific token
+     * @notice Set user balance for a specific token  
      */
     function setUserBalance(IERC20 _token, address _account, uint _value) external auth nonReentrant {
         userBalanceMap[_token][_account] = _value;
@@ -82,6 +85,7 @@ contract Account is CoreContract, ReentrancyGuardTransient {
 
     /**
      * @notice Deposit tokens for a user
+     * @dev Validates against deposit cap and updates user balance
      */
     function deposit(
         IERC20 _collateralToken,
@@ -105,6 +109,7 @@ contract Account is CoreContract, ReentrancyGuardTransient {
 
     /**
      * @notice Withdraw tokens for a user
+     * @dev Validates sufficient balance and transfers to receiver
      */
     function withdraw(
         IERC20 _collateralToken,
@@ -127,7 +132,7 @@ contract Account is CoreContract, ReentrancyGuardTransient {
     }
 
     /**
-     * @notice Set deposit cap list for tokens
+     * @notice Configure deposit caps for allowed tokens
      */
     function setDepositCapList(
         IERC20[] calldata _depositTokenList,
@@ -156,12 +161,7 @@ contract Account is CoreContract, ReentrancyGuardTransient {
 
     /**
      * @notice Execute a call through an AllocationAccount
-     * @param _allocationAddress The allocation account address
-     * @param _target The target contract to call
-     * @param _callData The call data to execute
-     * @param _gasLimit The gas limit for the call
-     * @return success Whether the call was successful
-     * @return returnData The data returned from the call
+     * @dev Forwards call to allocation account with specified gas limit
      */
     function execute(
         address _allocationAddress,
@@ -173,11 +173,8 @@ contract Account is CoreContract, ReentrancyGuardTransient {
     }
 
     /**
-     * @notice Transfer tokens from allocation account to AccountStore and record the transfer
-     * @param _allocationAddress The allocation account to transfer from
-     * @param _token The token to transfer
-     * @param _gasLimit The gas limit for the allocation account transfer
-     * @return _recordedAmountIn The actual amount recorded in AccountStore
+     * @notice Transfer tokens from allocation account to AccountStore
+     * @dev Transfers full balance and records the amount transferred
      */
     function transferInAllocation(
         address _allocationAddress,
@@ -206,7 +203,7 @@ contract Account is CoreContract, ReentrancyGuardTransient {
     }
 
     /**
-     * @notice Get allocation address for given parameters
+     * @notice Get deterministic allocation account address
      */
     function getAllocationAddress(
         bytes32 _allocationKey
@@ -215,9 +212,7 @@ contract Account is CoreContract, ReentrancyGuardTransient {
     }
 
     /**
-     * @notice Create a new allocation account with a deterministic address
-     * @param _allocationKey The key to derive the allocation account address
-     * @return The address of the newly created allocation account
+     * @notice Create a new allocation account with deterministic address
      */
     function createAllocationAccount(
         bytes32 _allocationKey

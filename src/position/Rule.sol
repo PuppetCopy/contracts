@@ -30,10 +30,16 @@ contract Rule is CoreContract {
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
+    /**
+     * @notice Get current configuration parameters
+     */
     function getConfig() external view returns (Config memory) {
         return config;
     }
 
+    /**
+     * @notice Get matching rules for multiple puppets for a specific trader
+     */
     function getRuleList(
         bytes32 _traderMatchingKey,
         address[] calldata _puppetList
@@ -47,6 +53,10 @@ contract Rule is CoreContract {
         }
     }
 
+    /**
+     * @notice Set matching rule for a puppet to follow a trader
+     * @dev Validates rule parameters against config limits and initializes activity throttle
+     */
     function setRule(
         Mirror mirror,
         IERC20 _collateralToken,

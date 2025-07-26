@@ -87,22 +87,34 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
+    /**
+     * @notice Get current configuration parameters
+     */
     function getConfig() external view returns (Config memory) {
         return config;
     }
 
+    /**
+     * @notice Get position details for an allocation
+     */
     function getPosition(
         address _allocationAddress
     ) external view returns (Position memory) {
         return positionMap[_allocationAddress];
     }
 
+    /**
+     * @notice Get total allocated amount for an allocation
+     */
     function getAllocation(
         address _allocationAddress
     ) external view returns (uint) {
         return allocationMap[_allocationAddress];
     }
 
+    /**
+     * @notice Get puppet allocation amounts for an allocation
+     */
     function getAllocationPuppetList(
         address _allocationAddress
     ) external view returns (uint[] memory) {
@@ -123,12 +135,18 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         lastActivityThrottleMap[_traderMatchingKey][_puppet] = 1;
     }
 
+    /**
+     * @notice Get trader's position size in USD from GMX
+     */
     function getTraderPositionSizeInUsd(
         bytes32 _traderPositionKey
     ) external view returns (uint) {
         return GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, _traderPositionKey);
     }
 
+    /**
+     * @notice Get trader's collateral amount from GMX
+     */
     function getTraderPositionCollateralAmount(
         bytes32 _traderPositionKey
     ) external view returns (uint) {
@@ -136,33 +154,8 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
     }
 
     /**
-     * @notice Starts copying a trader's new position opening (increase) for a selected group of followers (puppets).
-     * @dev Called by an authorized Keeper (`auth`) to initiate the copy-trading process when a followed trader opens a
-     * new position.
-     * This function determines how much capital each eligible puppet allocates based on their individual matching rules
-     * (`MatchingRule`),
-     * available funds (`AllocationStore`), and activity limits. It ensures the total allocated amount is sufficient to
-     * cover the provided keeper execution fee (`_callParams.keeperExecutionFee`).
-     *
-     * The function orchestrates the fund movements:
-     * 1. It reserves the calculated allocation amounts from each puppet's balance in the `AllocationStore`.
-     * 2. It transfers the total collected capital from the `AllocationStore`.
-     * 3. It pays the `keeperExecutionFee` to the designated `_keeperFeeReceiver`.
-     * 4. It sends the remaining net capital (`_netAllocation`) to the GMX order vault (`config.gmxOrderVault`) to
-     * collateralize the position.
-     *
-     * It then calculates the appropriate size (`_sizeDelta`) for the combined puppet position, proportional to the net
-     * capital provided,
-     * and submits a `MarketIncrease` order to the GMX Router. The Keeper must provide `msg.value` to cover the GMX
-     * network execution fee (`_callParams.executionFee`).
-     *
-     * Finally, it records details about this specific mirror action, including the total capital committed
-     * (`allocationMap`) and the GMX request details (`requestAdjustmentMap`),
-     * which are necessary for future adjustments or settlement via the `execute` function upon GMX callback.
-     * Emits a `Mirror` event with key details.
-     * @param _ruleContract The rule contract used to determine allocation amounts for each puppet.
-     * @param _callParams The parameters for the position to be mirrored, including market, collateral token,
-     * @param _puppetList The list of puppet addresses to allocate funds to
+     * @notice Opens a new mirrored position by allocating puppet funds to copy a trader's position
+     * @dev Validates trader position exists, calculates puppet allocations based on rules, submits GMX order
      */
     function requestOpen(
         Account _account,
@@ -277,29 +270,8 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
     }
 
     /**
-     * @notice Adjusts an existing mirrored position to follow a trader's action (increase/decrease).
-     * @dev Called by an authorized Keeper when the trader being copied modifies their GMX position. This function
-     * ensures the combined puppet position reflects the trader's change. It requires `msg.value` from the Keeper
-     * to cover the GMX network fee for submitting the adjustment order.
-     *
-     * This function handles the Keeper's execution fee (`_callParams.keeperExecutionFee`) in a way that doesn't block
-     * the adjustment for all puppets if one cannot pay. It attempts to deduct each puppet's share of the fee from
-     * their available balance in the `AllocationStore`. If a puppet lacks sufficient funds, their invested amount
-     * (`allocationPuppetMap`) in *this specific position* is reduced by the unpaid fee amount. The *full* keeper fee
-     * is paid immediately using funds from the `AllocationStore`.
-     *
-     * The core logic calculates the trader's new target leverage based on their latest action. It compares this to the
-     * current leverage of the mirrored position (considering any reductions due to fee insolvency). It then determines
-     * the required size change (`_sizeDelta`) for the mirrored position to match the trader's target leverage and
-     * submits the corresponding `MarketIncrease` or `MarketDecrease` order to GMX.
-     *
-     * Details about the adjustment request are stored (`requestAdjustmentMap`) for processing when GMX confirms the
-     * order execution via the `execute` function callback. If puppet allocations were reduced due to fee handling,
-     * the total allocation (`allocationMap`) is updated. Emits an `Adjust` event.
-     * @param _callParams Position parameters for the trader's adjustment, including market, collateral token,
-     * size delta, and execution fee.
-     * @param _puppetList The list of puppet addresses to allocate funds to
-     * @return _requestKey The GMX request key for the submitted adjustment order
+     * @notice Adjusts an existing mirrored position to match trader's leverage changes
+     * @dev Handles keeper fee collection from puppets, calculates new leverage target, submits GMX order
      */
     function requestAdjust(
         Account _account,
@@ -456,16 +428,8 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
     }
 
     /**
-     * @notice Closes a stalled mirrored position when trader has closed their position on GMX
-     * @dev This function checks if the trader's position still exists on GMX using the DataStore.
-     * If the trader's position is closed (size = 0) but the mirrored position still exists,
-     * it submits a market decrease order to close the entire mirrored position.
-     * This prevents puppets from being stuck in positions that the trader has already exited.
-     * @param _account The account contract for fund management
-     * @param _params Parameters for the stalled position to close
-     * @param _puppetList The list of puppet addresses in the allocation
-     * @param _callbackContract The callback contract for GMX order execution
-     * @return _requestKey The GMX request key for the close order
+     * @notice Closes a mirrored position when the trader's position no longer exists on GMX
+     * @dev Verifies trader position is closed, then submits full decrease order for puppet position
      */
     function requestCloseStalledPosition(
         Account _account,
@@ -537,6 +501,10 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         );
     }
 
+    /**
+     * @notice Execute position adjustment after GMX order confirmation
+     * @dev Updates position tracking based on trader's leverage changes
+     */
     function execute(
         bytes32 _requestKey
     ) external auth nonReentrant {
@@ -590,6 +558,10 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         );
     }
 
+    /**
+     * @notice Mark a position as liquidated
+     * @dev Removes position from tracking when liquidated on GMX
+     */
     function liquidate(
         address _allocationAddress
     ) external auth nonReentrant {

@@ -44,34 +44,16 @@ contract Settle is CoreContract {
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
+    /**
+     * @notice Get current configuration parameters
+     */
     function getConfig() external view returns (Config memory) {
         return config;
     }
 
     /**
-     * @notice Settles and distributes funds received for a specific allocation instance.
-     * @dev This function is called by a Keeper when funds related to a closed or partially closed
-     * GMX position (identified by the allocation instance) are available in the AllocationAccount.
-     * It retrieves the specified `distributeToken` balance from the account, transfers it to the
-     * central `AllocationStore`, deducts a Keeper fee (paid to msg.sender) and a platform fee and distributes the
-     * remaining amount to the participating Puppets' balances within the `AllocationStore` based on their original
-     * contribution ratios (`allocationPuppetMap`).
-     *
-     * IMPORTANT: Settlement on GMX might occur in stages or involve multiple token types (e.g.,
-     * collateral returned separately from PnL or fees). This function processes only the currently
-     * available balance of the specified `distributeToken`. Multiple calls to `settle` (potentially
-     * with different `distributeToken` parameters) may be required for the same `allocationKey`
-     * to fully distribute all proceeds.
-     *
-     * Consequently, this function SHOULD NOT perform cleanup of the allocation state (`allocationMap`,
-     * `allocationPuppetMap`). This state must persist to correctly attribute any future funds
-     * arriving for this allocation instance. A separate mechanism or function call, triggered
-     * once a Keeper confirms no further funds are expected, should be used for final cleanup.
-     * @param _callParams Structure containing settlement details (tokens, trader, allocationId, keeperFee).
-     * @param _puppetList The list of puppet addresses involved in this specific allocation instance.
-     * @return _settledAmount Total amount that was settled
-     * @return _distributionAmount Amount distributed to puppets after fees
-     * @return _platformFeeAmount Platform fee taken
+     * @notice Settles and distributes funds from closed positions to puppets
+     * @dev Transfers funds from allocation account, deducts fees, distributes to puppets based on allocation ratios
      */
     function settle(
         Account _account,
@@ -149,10 +131,6 @@ contract Settle is CoreContract {
     /**
      * @notice Collects dust tokens from an allocation account
      * @dev Transfers small amounts of tokens that are below the dust threshold
-     * @param _allocationAccount The allocation account to collect dust from
-     * @param _dustToken The token to collect
-     * @param _receiver The address to receive the dust
-     * @return _dustAmount The amount of dust collected
      */
     function collectAllocationAccountDust(
         Account _account,
@@ -185,11 +163,8 @@ contract Settle is CoreContract {
     }
 
     /**
-     * @notice Collects platform fees from AllocationStore
-     * @dev This function allows authorized contracts to collect accumulated platform fees
-     * @param _token The token to collect fees for
-     * @param _receiver The address to receive the collected fees
-     * @param _amount The amount of fees to collect (must not exceed accumulated fees)
+     * @notice Collects accumulated platform fees from AllocationStore
+     * @dev Validates amount doesn't exceed accumulated fees before transfer
      */
     function collectPlatformFees(Account _account, IERC20 _token, address _receiver, uint _amount) external auth {
         require(_receiver != address(0), "Invalid receiver");
@@ -203,7 +178,7 @@ contract Settle is CoreContract {
     }
 
     /**
-     * @notice Sets dust thresholds for tokens
+     * @notice Configure dust collection thresholds for tokens
      */
     function setTokenDustThresholdList(
         IERC20[] calldata _tokenDustThresholdList,
