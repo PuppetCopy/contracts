@@ -136,8 +136,8 @@ contract Settle is CoreContract {
             "Settle",
             abi.encode(
                 _callParams,
-                _traderMatchingKey,
                 _allocationAddress,
+                _traderMatchingKey,
                 _settledAmount,
                 _distributionAmount,
                 _platformFeeAmount,
@@ -176,7 +176,10 @@ contract Settle is CoreContract {
 
         _account.transferOut(_dustToken, _receiver, _dustAmount);
 
-        _logEvent("CollectAllocationAccountDust", abi.encode(_allocationAccount, _dustToken, _receiver, _dustAmount));
+        _logEvent(
+            "CollectAllocationAccountDust",
+            abi.encode(_dustToken, _allocationAccount, _receiver, _dustThreshold, _dustAmount)
+        );
 
         return _dustAmount;
     }

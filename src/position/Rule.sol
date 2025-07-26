@@ -73,7 +73,7 @@ contract Rule is CoreContract {
         matchingRuleMap[_traderMatchingKey][_user] = _ruleParams;
         mirror.initializeTraderActivityThrottle(_traderMatchingKey, _user);
 
-        _logEvent("SetMatchingRule", abi.encode(_collateralToken, _traderMatchingKey, _user, _trader, _ruleParams));
+        _logEvent("SetMatchingRule", abi.encode(_ruleParams, _collateralToken, _trader, _user, _traderMatchingKey));
     }
 
     function _setConfig(

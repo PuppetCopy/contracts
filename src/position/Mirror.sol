@@ -52,6 +52,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         bytes32 traderRequestKey;
         address trader;
         address market;
+        address keeperFeeReceiver;
         bool isIncrease;
         bool isLong;
         uint executionFee;
@@ -61,7 +62,6 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         uint triggerPrice;
         uint allocationId;
         uint keeperFee;
-        address keeperFeeReceiver;
     }
 
     struct StalledPositionParams {
@@ -263,15 +263,15 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
             "RequestOpen",
             abi.encode(
                 _callParams,
-                _puppetList,
+                _allocationAddress,
                 _traderMatchingKey,
                 _traderPositionKey,
-                _allocationAddress,
+                _requestKey,
                 _sizeDelta,
                 _traderTargetLeverage,
-                _requestKey,
                 _allocated,
-                _allocatedList
+                _allocatedList,
+                _puppetList
             )
         );
     }
@@ -383,53 +383,50 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         require(_position.size > 0, Error.Mirror__PositionNotFound(_allocationAddress));
         require(_position.traderCollateral > 0, Error.Mirror__TraderCollateralZero(_allocationAddress));
 
-        uint _currentPuppetLeverage = Precision.toBasisPoints(_position.size, _allocated);
+        uint _puppetLeverage = Precision.toBasisPoints(_position.size, _allocated);
         uint _traderTargetLeverage = _callParams.isIncrease
             ? Precision.toBasisPoints(
                 _position.traderSize + _callParams.sizeDeltaInUsd, _position.traderCollateral + _callParams.collateralDelta
             )
-            : Precision.toBasisPoints(
-                _position.traderSize > _callParams.sizeDeltaInUsd ? _position.traderSize - _callParams.sizeDeltaInUsd : 0,
-                _position.traderCollateral > _callParams.collateralDelta
-                    ? _position.traderCollateral - _callParams.collateralDelta
-                    : 0
+            : _position.traderSize > _callParams.sizeDeltaInUsd && _position.traderCollateral > _callParams.collateralDelta
+                ? Precision.toBasisPoints(
+                    _position.traderSize - _callParams.sizeDeltaInUsd, _position.traderCollateral - _callParams.collateralDelta
+                )
+                : 0;
+
+        require(_traderTargetLeverage != _puppetLeverage, Error.Mirror__NoAdjustmentRequired());
+        require(_puppetLeverage > 0, Error.Mirror__InvalidCurrentLeverage());
+
+        bool _isIncrease = _traderTargetLeverage > _puppetLeverage;
+        uint _sizeDelta = _traderTargetLeverage == 0
+            ? _position.size
+            : Math.mulDiv(
+                _position.size,
+                _isIncrease ? _traderTargetLeverage - _puppetLeverage : _puppetLeverage - _traderTargetLeverage,
+                _puppetLeverage
             );
 
-        require(_traderTargetLeverage != _currentPuppetLeverage, Error.Mirror__NoAdjustmentRequired());
-        require(_currentPuppetLeverage > 0, Error.Mirror__InvalidCurrentLeverage());
+        bytes32 _traderPositionKey = GmxPositionUtils.getPositionKey(
+            _callParams.trader, _callParams.market, _callParams.collateralToken, _callParams.isLong
+        );
 
-        uint _sizeDelta;
-
-        if (_traderTargetLeverage > _currentPuppetLeverage) {
-            _sizeDelta =
-                Math.mulDiv(_position.size, (_traderTargetLeverage - _currentPuppetLeverage), _currentPuppetLeverage);
-
-            _requestKey = _submitOrder(
-                _account,
-                _callParams,
-                _allocationAddress,
-                GmxPositionUtils.OrderType.MarketIncrease,
-                config.increaseCallbackGasLimit,
-                _sizeDelta,
-                0,
-                _callbackContract
-            );
-        } else {
-            _sizeDelta = _traderTargetLeverage == 0
-                ? _position.size
-                : Math.mulDiv(_position.size, (_currentPuppetLeverage - _traderTargetLeverage), _currentPuppetLeverage);
-
-            _requestKey = _submitOrder(
-                _account,
-                _callParams,
-                _allocationAddress,
-                GmxPositionUtils.OrderType.MarketDecrease,
-                config.decreaseCallbackGasLimit,
-                _sizeDelta,
-                0,
-                _callbackContract
+        if (_isIncrease) {
+            require(
+                GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, _traderPositionKey) > 0,
+                Error.Mirror__TraderPositionNotFound(_callParams.trader, _traderPositionKey)
             );
         }
+
+        _requestKey = _submitOrder(
+            _account,
+            _callParams,
+            _allocationAddress,
+            _isIncrease ? GmxPositionUtils.OrderType.MarketIncrease : GmxPositionUtils.OrderType.MarketDecrease,
+            _isIncrease ? config.increaseCallbackGasLimit : config.decreaseCallbackGasLimit,
+            _sizeDelta,
+            0,
+            _callbackContract
+        );
 
         requestAdjustmentMap[_requestKey] = RequestAdjustment({
             allocationAddress: _allocationAddress,
@@ -445,10 +442,13 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
             abi.encode(
                 _callParams,
                 _allocationAddress,
+                _traderMatchingKey,
+                _traderPositionKey,
+                _requestKey,
+                _isIncrease,
                 _allocated,
                 _sizeDelta,
                 _traderTargetLeverage,
-                _requestKey,
                 _keeperExecutionFeeInsolvency,
                 _allocationList
             )
@@ -529,13 +529,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         _logEvent(
             "RequestCloseStalledPosition",
             abi.encode(
-                _params.collateralToken,
-                _params.market,
-                _params.trader,
-                _params.isLong,
-                _params.executionFee,
-                _params.acceptablePrice,
-                _params.allocationId,
+                _params,
                 _allocationAddress,
                 _traderPositionKey,
                 _requestKey
@@ -588,10 +582,10 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
             abi.encode(
                 _request.allocationAddress,
                 _requestKey,
-                _position.traderSize,
-                _position.traderCollateral,
+                _request.traderTargetLeverage,
                 _position.size,
-                _request.traderTargetLeverage
+                _position.traderSize,
+                _position.traderCollateral
             )
         );
     }
