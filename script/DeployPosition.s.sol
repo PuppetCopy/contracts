@@ -117,7 +117,6 @@ contract DeployPosition is BaseScript {
         dictator.setPermission(account, account.transferInAllocation.selector, address(settle));
         dictator.setPermission(account, account.transferOut.selector, address(settle));
         dictator.setPermission(account, account.getAllocationAddress.selector, address(settle));
-        dictator.setPermission(account, account.transferInAllocation.selector, address(settle));
         dictator.setPermission(account, account.transferOut.selector, address(settle));
         dictator.setPermission(account, account.getAllocationAddress.selector, address(settle));
 
@@ -184,8 +183,6 @@ contract DeployPosition is BaseScript {
         dictator.setPermission(account, account.transferOut.selector, address(mirror));
         dictator.setPermission(account, account.getAllocationAddress.selector, address(mirror));
         dictator.setPermission(account, account.getBalanceList.selector, address(mirror));
-        dictator.setPermission(account, account.transferOut.selector, address(mirror));
-        dictator.setPermission(account, account.getAllocationAddress.selector, address(mirror));
 
         // Initialize contract
         dictator.registerContract(mirror);

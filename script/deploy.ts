@@ -15,15 +15,14 @@ const client = createPublicClient({
 })
 
 const chainId = await client.getChainId()
-const scriptName = process.env.SCRIPT
+const scriptName = 'DeployBase'
+const scriptFile = `${scriptName}.s.sol`
 
 console.log(`Config: ${JSON.stringify({ chainId, scriptName })}`)
 
 if (!chainId || !scriptName) {
   throw new Error(`Missing required environment variables: ${JSON.stringify({ chainId, scriptName })}`)
 }
-
-const scriptFile = `${scriptName}.s.sol`
 
 type IDeploymentArtifact = {
   transactions: {

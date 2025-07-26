@@ -177,7 +177,7 @@ contract Mirror is CoreContract {
         );
 
         uint _puppetCount = _puppetList.length;
-        require(_puppetCount > 0, Error.Allocation__PuppetListEmpty());
+        require(_puppetCount > 0, Error.Mirror__PuppetListEmpty());
         require(_puppetCount <= config.maxPuppetList, "Puppet list too large");
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
@@ -219,7 +219,7 @@ contract Mirror is CoreContract {
 
         require(
             _callParams.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _allocated),
-            Error.Allocation__KeeperFeeExceedsCostFactor(_callParams.keeperFee, _allocated)
+            Error.Mirror__KeeperFeeExceedsCostFactor(_callParams.keeperFee, _allocated)
         );
 
         _allocated -= _callParams.keeperFee;
@@ -286,22 +286,22 @@ contract Mirror is CoreContract {
         );
 
         uint _allocated = allocationMap[_allocationAddress];
-        require(_allocated > 0, Error.Allocation__InvalidAllocation(_allocationAddress));
-        require(_callParams.keeperFee > 0, Error.Allocation__InvalidKeeperExecutionFeeAmount());
+        require(_allocated > 0, Error.Mirror__InvalidAllocation(_allocationAddress));
+        require(_callParams.keeperFee > 0, Error.Mirror__InvalidKeeperExecutionFeeAmount());
         require(
             _callParams.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAdjustmentRatio, _allocated),
-            Error.Allocation__KeeperFeeExceedsAdjustmentRatio(_callParams.keeperFee, _allocated)
+            Error.Mirror__KeeperFeeExceedsAdjustmentRatio(_callParams.keeperFee, _allocated)
         );
 
         uint[] memory _allocationList = allocationPuppetList[_allocationAddress];
         uint _puppetCount = _puppetList.length;
         require(
             _allocationList.length == _puppetCount,
-            Error.Allocation__PuppetListMismatch(_allocationList.length, _puppetCount)
+            Error.Mirror__PuppetListMismatch(_allocationList.length, _puppetCount)
         );
         require(
             _allocated > _callParams.keeperFee,
-            Error.Allocation__InsufficientAllocationForKeeperFee(_allocated, _callParams.keeperFee)
+            Error.Mirror__InsufficientAllocationForKeeperFee(_allocated, _callParams.keeperFee)
         );
 
         uint _remainingKeeperFeeToCollect = _callParams.keeperFee;
@@ -337,13 +337,13 @@ contract Mirror is CoreContract {
 
         require(
             _remainingKeeperFeeToCollect == 0,
-            Error.Allocation__KeeperFeeNotFullyCovered(0, _remainingKeeperFeeToCollect)
+            Error.Mirror__KeeperFeeNotFullyCovered(0, _remainingKeeperFeeToCollect)
         );
 
         _allocated -= _keeperExecutionFeeInsolvency;
         require(
             _callParams.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAdjustmentRatio, _allocated),
-            Error.Allocation__KeeperFeeExceedsAdjustmentRatio(_callParams.keeperFee, _allocated)
+            Error.Mirror__KeeperFeeExceedsAdjustmentRatio(_callParams.keeperFee, _allocated)
         );
         allocationPuppetList[_allocationAddress] = _allocationList;
         allocationMap[_allocationAddress] = _allocated;

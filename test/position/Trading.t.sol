@@ -430,7 +430,7 @@ contract TradingTest is BasicSetup {
         });
 
         vm.deal(users.owner, 1 ether);
-        vm.expectRevert(Error.Allocation__PuppetListEmpty.selector);
+        vm.expectRevert(Error.Mirror__PuppetListEmpty.selector);
         keeperRouter.requestOpen{value: 0.001 ether}(callParams, emptyPuppetList);
     }
 

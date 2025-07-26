@@ -62,16 +62,16 @@ contract Settle is CoreContract {
         address[] calldata _puppetList
     ) external auth returns (uint _settledAmount, uint _distributionAmount, uint _platformFeeAmount) {
         uint _puppetCount = _puppetList.length;
-        require(_puppetCount > 0, Error.Allocation__PuppetListEmpty());
+        require(_puppetCount > 0, Error.Mirror__PuppetListEmpty());
         require(
             _puppetCount <= config.maxPuppetList,
-            Error.Allocation__PuppetListExceedsMaximum(_puppetCount, config.maxPuppetList)
+            Error.Settle__PuppetListExceedsMaximum(_puppetCount, config.maxPuppetList)
         );
 
         uint _keeperFee = _callParams.keeperExecutionFee;
-        require(_keeperFee > 0, Error.Allocation__InvalidKeeperExecutionFeeAmount());
+        require(_keeperFee > 0, Error.Settle__InvalidKeeperExecutionFeeAmount());
         address _keeperFeeReceiver = _callParams.keeperFeeReceiver;
-        require(_keeperFeeReceiver != address(0), Error.Allocation__InvalidKeeperExecutionFeeReceiver());
+        require(_keeperFeeReceiver != address(0), Error.Settle__InvalidKeeperExecutionFeeReceiver());
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
         address _allocationAddress = _account.getAllocationAddress(
@@ -79,7 +79,7 @@ contract Settle is CoreContract {
         );
 
         uint _allocation = _mirror.allocationMap(_allocationAddress);
-        require(_allocation > 0, Error.Allocation__InvalidAllocation(_allocationAddress));
+        require(_allocation > 0, Error.Settle__InvalidAllocation(_allocationAddress));
 
         _settledAmount = _account.transferInAllocation(
             _allocationAddress, _callParams.distributionToken, config.allocationAccountTransferGasLimit
@@ -87,7 +87,7 @@ contract Settle is CoreContract {
 
         require(
             _callParams.keeperExecutionFee < Precision.applyFactor(config.maxKeeperFeeToSettleRatio, _settledAmount),
-            Error.Allocation__KeeperFeeExceedsSettledAmount(_callParams.keeperExecutionFee, _settledAmount)
+            Error.Settle__KeeperFeeExceedsSettledAmount(_callParams.keeperExecutionFee, _settledAmount)
         );
 
         _distributionAmount = _settledAmount - _callParams.keeperExecutionFee;
@@ -138,15 +138,15 @@ contract Settle is CoreContract {
         IERC20 _dustToken,
         address _receiver
     ) external auth returns (uint _dustAmount) {
-        require(_receiver != address(0), Error.Allocation__InvalidReceiver());
+        require(_receiver != address(0), Error.Settle__InvalidReceiver());
 
         _dustAmount = _dustToken.balanceOf(_allocationAccount);
         uint _dustThreshold = tokenDustThresholdAmountMap[_dustToken];
 
-        require(_dustThreshold > 0, Error.Allocation__DustThresholdNotSet(address(_dustToken)));
-        require(_dustAmount > 0, Error.Allocation__NoDustToCollect(address(_dustToken), _allocationAccount));
+        require(_dustThreshold > 0, Error.Settle__DustThresholdNotSet(address(_dustToken)));
+        require(_dustAmount > 0, Error.Settle__NoDustToCollect(address(_dustToken), _allocationAccount));
         require(
-            _dustAmount <= _dustThreshold, Error.Allocation__AmountExceedsDustThreshold(_dustAmount, _dustThreshold)
+            _dustAmount <= _dustThreshold, Error.Settle__AmountExceedsDustThreshold(_dustAmount, _dustThreshold)
         );
 
         _dustAmount =
