@@ -2,7 +2,6 @@
 pragma solidity ^0.8.29;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {Account} from "./position/Account.sol";
 import {Mirror} from "./position/Mirror.sol";
@@ -19,7 +18,7 @@ import {IAuthority} from "./utils/interfaces/IAuthority.sol";
  * @notice Handles keeper-specific operations for the copy trading system
  * @dev Separates keeper operations from user operations for better security and access control
  */
-contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallbackReceiver {
+contract KeeperRouter is CoreContract, IGmxOrderCallbackReceiver {
     struct Config {
         uint mirrorBaseGasLimit;
         uint mirrorPerPuppetGasLimit;
@@ -74,7 +73,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
     function requestOpen(
         Mirror.CallPosition calldata _callParams,
         address[] calldata _puppetList
-    ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
+    ) external payable auth returns (address _allocationAddress, bytes32 _requestKey) {
         return mirror.requestOpen{value: msg.value}(account, ruleContract, address(this), _callParams, _puppetList);
     }
 
@@ -87,7 +86,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
     function requestAdjust(
         Mirror.CallPosition calldata _callParams,
         address[] calldata _puppetList
-    ) external payable auth nonReentrant returns (bytes32 _requestKey) {
+    ) external payable auth returns (bytes32 _requestKey) {
         return mirror.requestAdjust{value: msg.value}(account, address(this), _callParams, _puppetList);
     }
 
@@ -100,7 +99,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
     function requestCloseStalledPosition(
         Mirror.StalledPositionParams calldata _params,
         address[] calldata _puppetList
-    ) external payable auth nonReentrant returns (bytes32) {
+    ) external payable auth returns (bytes32) {
         return mirror.requestCloseStalledPosition{value: msg.value}(account, _params, _puppetList, address(this));
     }
 
@@ -115,7 +114,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
     function settleAllocation(
         Settle.CallSettle calldata _settleParams,
         address[] calldata _puppetList
-    ) external auth nonReentrant returns (uint settledBalance, uint distributionAmount, uint platformFeeAmount) {
+    ) external auth returns (uint settledBalance, uint distributionAmount, uint platformFeeAmount) {
         return settle.settle(account, mirror, _settleParams, _puppetList);
     }
 
@@ -130,7 +129,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         address _allocationAccount,
         IERC20 _dustToken,
         address _receiver
-    ) external auth nonReentrant returns (uint) {
+    ) external auth returns (uint) {
         return settle.collectAllocationAccountDust(account, _allocationAccount, _dustToken, _receiver);
     }
 
@@ -161,7 +160,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         bytes32 key,
         GmxPositionUtils.Props calldata order,
         GmxPositionUtils.EventLogData calldata /* eventData */
-    ) external auth nonReentrant {
+    ) external auth {
         if (
             GmxPositionUtils.isIncreaseOrder(GmxPositionUtils.OrderType(order.numbers.orderType))
                 || GmxPositionUtils.isDecreaseOrder(GmxPositionUtils.OrderType(order.numbers.orderType))
@@ -183,7 +182,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         bytes32, /* key */
         GmxPositionUtils.Props calldata, /* order */
         GmxPositionUtils.EventLogData calldata /* eventData */
-    ) external auth nonReentrant {
+    ) external auth {
         // For now, cancellations are handled silently
         // Future implementation could add retry logic or cleanup
     }
@@ -196,7 +195,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
         bytes32, /* key */
         GmxPositionUtils.Props calldata, /* order */
         GmxPositionUtils.EventLogData calldata /* eventData */
-    ) external auth nonReentrant {
+    ) external auth {
         // For now, frozen orders are handled silently
         // Future implementation could add retry logic or cleanup
     }
@@ -209,7 +208,7 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
     function refundExecutionFee(
         bytes32 key,
         GmxPositionUtils.EventLogData calldata /* eventData */
-    ) external payable auth nonReentrant {
+    ) external payable auth {
         require(msg.value > 0, "No execution fee to refund");
 
         // Refund the execution fee to the configured receiver

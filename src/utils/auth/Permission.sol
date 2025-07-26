@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.29;
 
+import {TransientSlot} from "@openzeppelin/contracts/utils/TransientSlot.sol";
 import {Error} from "./../../utils/Error.sol";
 import {IAuthority} from "./../interfaces/IAuthority.sol";
 
@@ -8,6 +9,11 @@ import {IAuthority} from "./../interfaces/IAuthority.sol";
 /// @notice Provides granular access control based on function signatures (`bytes4`).
 /// @dev Managed by a central Authority (Dictatorship). Inheriting contracts use the 'auth' modifier.
 abstract contract Permission {
+    // Reentrancy guard using transient storage - uses OpenZeppelin's standard slot
+    // keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.ReentrancyGuard")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant REENTRANCY_GUARD_SLOT = 0x9b779b17422d0df92223018b32b4d1fa46e071723d6817e2486d003becc55f00;
+    
+    error ReentrancyGuardReentrantCall();
     /// @notice The central Authority contract responsible for managing permissions.
     IAuthority public immutable authority;
 
@@ -31,10 +37,17 @@ abstract contract Permission {
     }
 
     /// @notice Modifier to restrict function execution to permitted users only.
-    /// @dev Checks permission based on `msg.sig` and `msg.sender`. Reverts if not permitted.
+    /// @dev Checks permission based on `msg.sig` and `msg.sender`. Includes reentrancy protection.
     modifier auth() {
+        if (TransientSlot.tload(TransientSlot.asBoolean(REENTRANCY_GUARD_SLOT))) {
+            revert ReentrancyGuardReentrantCall();
+        }
+        TransientSlot.tstore(TransientSlot.asBoolean(REENTRANCY_GUARD_SLOT), true);
+        
         require(canCall(msg.sig, msg.sender), Error.Permission__Unauthorized());
         _;
+        
+        TransientSlot.tstore(TransientSlot.asBoolean(REENTRANCY_GUARD_SLOT), false);
     }
 
     /// @notice Modifier to restrict access to the central Authority contract only.

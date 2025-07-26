@@ -3,8 +3,6 @@ pragma solidity ^0.8.29;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
-
 import {AccountStore} from "../shared/AccountStore.sol";
 import {AllocationAccount} from "../shared/AllocationAccount.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
@@ -17,7 +15,7 @@ import {PositionUtils} from "./utils/PositionUtils.sol";
  * @notice Handles user account management including deposits, withdrawals, and balance tracking
  * @dev Central contract for all account-related functionality and AllocationAccount management
  */
-contract Account is CoreContract, ReentrancyGuardTransient {
+contract Account is CoreContract {
     struct Config {
         uint transferOutGasLimit;
     }
@@ -65,7 +63,7 @@ contract Account is CoreContract, ReentrancyGuardTransient {
     /**
      * @notice Set user balance for a specific token  
      */
-    function setUserBalance(IERC20 _token, address _account, uint _value) external auth nonReentrant {
+    function setUserBalance(IERC20 _token, address _account, uint _value) external auth {
         userBalanceMap[_token][_account] = _value;
     }
 
@@ -76,7 +74,7 @@ contract Account is CoreContract, ReentrancyGuardTransient {
         IERC20 _token,
         address[] calldata _accountList,
         uint[] calldata _balanceList
-    ) external auth nonReentrant {
+    ) external auth {
         uint _accountListLength = _accountList.length;
         for (uint i = 0; i < _accountListLength; i++) {
             userBalanceMap[_token][_accountList[i]] = _balanceList[i];
@@ -92,7 +90,7 @@ contract Account is CoreContract, ReentrancyGuardTransient {
         address _depositor,
         address _user,
         uint _amount
-    ) external auth nonReentrant {
+    ) external auth {
         require(_amount > 0, Error.Deposit__InvalidAmount());
 
         uint depositCap = depositCapMap[_collateralToken];
@@ -116,7 +114,7 @@ contract Account is CoreContract, ReentrancyGuardTransient {
         address _user,
         address _receiver,
         uint _amount
-    ) external auth nonReentrant {
+    ) external auth {
         require(_amount > 0, Error.Deposit__InvalidAmount());
 
         uint balance = userBalanceMap[_collateralToken][_user];
@@ -137,7 +135,7 @@ contract Account is CoreContract, ReentrancyGuardTransient {
     function setDepositCapList(
         IERC20[] calldata _depositTokenList,
         uint[] calldata _depositCapList
-    ) external auth nonReentrant {
+    ) external auth {
         require(_depositTokenList.length == _depositCapList.length, "Invalid deposit token list");
 
         for (uint i = 0; i < depositTokenList.length; i++) {
@@ -168,7 +166,7 @@ contract Account is CoreContract, ReentrancyGuardTransient {
         address _target,
         bytes calldata _callData,
         uint _gasLimit
-    ) external auth nonReentrant returns (bool success, bytes memory returnData) {
+    ) external auth returns (bool success, bytes memory returnData) {
         return AllocationAccount(_allocationAddress).execute(_target, _callData, _gasLimit);
     }
 
@@ -180,7 +178,7 @@ contract Account is CoreContract, ReentrancyGuardTransient {
         address _allocationAddress,
         IERC20 _token,
         uint _gasLimit
-    ) external auth nonReentrant returns (uint _recordedAmountIn) {
+    ) external auth returns (uint _recordedAmountIn) {
         uint _settledAmount = _token.balanceOf(_allocationAddress);
 
         (bool _success, bytes memory returnData) = AllocationAccount(_allocationAddress).execute(
@@ -216,14 +214,14 @@ contract Account is CoreContract, ReentrancyGuardTransient {
      */
     function createAllocationAccount(
         bytes32 _allocationKey
-    ) external auth nonReentrant returns (address) {
+    ) external auth returns (address) {
         return Clones.cloneDeterministic(allocationAccountImplementation, _allocationKey);
     }
 
     /**
      * @notice Transfer tokens out through AccountStore
      */
-    function transferOut(IERC20 _token, address _receiver, uint _amount) external auth nonReentrant {
+    function transferOut(IERC20 _token, address _receiver, uint _amount) external auth {
         accountStore.transferOut(config.transferOutGasLimit, _token, _receiver, _amount);
     }
 

@@ -3,7 +3,6 @@ pragma solidity ^0.8.29;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {CoreContract} from "../utils/CoreContract.sol";
@@ -18,7 +17,7 @@ import {IGmxReadDataStore} from "./interface/IGmxReadDataStore.sol";
 import {GmxPositionUtils} from "./utils/GmxPositionUtils.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
-contract Mirror is CoreContract, ReentrancyGuardTransient {
+contract Mirror is CoreContract {
     struct Config {
         IGmxExchangeRouter gmxExchangeRouter;
         IGmxReadDataStore gmxDataStore;
@@ -163,7 +162,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         address _callbackContract,
         CallPosition calldata _callParams,
         address[] calldata _puppetList
-    ) external payable auth nonReentrant returns (address _allocationAddress, bytes32 _requestKey) {
+    ) external payable auth returns (address _allocationAddress, bytes32 _requestKey) {
         require(_callParams.isIncrease, Error.Mirror__InitialMustBeIncrease());
         require(_callParams.collateralDelta > 0, Error.Mirror__InvalidCollateralDelta());
         require(_callParams.sizeDeltaInUsd > 0, Error.Mirror__InvalidSizeDelta());
@@ -278,7 +277,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         address _callbackContract,
         CallPosition calldata _callParams,
         address[] calldata _puppetList
-    ) external payable auth nonReentrant returns (bytes32 _requestKey) {
+    ) external payable auth returns (bytes32 _requestKey) {
         require(_callParams.collateralDelta > 0 || _callParams.sizeDeltaInUsd > 0, Error.Mirror__NoAdjustmentRequired());
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
@@ -436,7 +435,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         StalledPositionParams calldata _params,
         address[] calldata _puppetList,
         address _callbackContract
-    ) external payable auth nonReentrant returns (bytes32 _requestKey) {
+    ) external payable auth returns (bytes32 _requestKey) {
         address _allocationAddress = _account.getAllocationAddress(
             PositionUtils.getAllocationKey(
                 _puppetList,
@@ -507,7 +506,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
      */
     function execute(
         bytes32 _requestKey
-    ) external auth nonReentrant {
+    ) external auth {
         RequestAdjustment memory _request = requestAdjustmentMap[_requestKey];
         require(_request.allocationAddress != address(0), Error.Mirror__ExecutionRequestMissing(_requestKey));
 
@@ -564,7 +563,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
      */
     function liquidate(
         address _allocationAddress
-    ) external auth nonReentrant {
+    ) external auth {
         Position memory _position = positionMap[_allocationAddress];
         require(_position.size > 0, Error.Mirror__PositionNotFound(_allocationAddress));
 
