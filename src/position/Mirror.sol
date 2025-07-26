@@ -384,61 +384,52 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         require(_position.traderCollateral > 0, Error.Mirror__TraderCollateralZero(_allocationAddress));
 
         uint _currentPuppetLeverage = Precision.toBasisPoints(_position.size, _allocated);
-        uint _newTraderSize;
-        uint _newTraderCollateral;
-
-        if (_callParams.isIncrease) {
-            _newTraderSize = _position.traderSize + _callParams.sizeDeltaInUsd;
-            _newTraderCollateral = _position.traderCollateral + _callParams.collateralDelta;
-        } else {
-            _newTraderSize = _position.traderSize > _callParams.sizeDeltaInUsd
-                ? _position.traderSize - _callParams.sizeDeltaInUsd
-                : 0;
-            _newTraderCollateral = _position.traderCollateral > _callParams.collateralDelta
-                ? _position.traderCollateral - _callParams.collateralDelta
-                : 0;
-        }
-
-        uint _traderTargetLeverage;
-        if (_callParams.isIncrease) {
-            _traderTargetLeverage = Precision.toBasisPoints(_newTraderSize, _newTraderCollateral);
-        } else {
-            if (
-                _position.traderSize > _callParams.sizeDeltaInUsd
-                    && _position.traderCollateral > _callParams.collateralDelta
-            ) {
-                _traderTargetLeverage = Precision.toBasisPoints(_newTraderSize, _newTraderCollateral);
-            } else {
-                _traderTargetLeverage = 0;
-            }
-        }
+        uint _traderTargetLeverage = _callParams.isIncrease
+            ? Precision.toBasisPoints(
+                _position.traderSize + _callParams.sizeDeltaInUsd, _position.traderCollateral + _callParams.collateralDelta
+            )
+            : Precision.toBasisPoints(
+                _position.traderSize > _callParams.sizeDeltaInUsd ? _position.traderSize - _callParams.sizeDeltaInUsd : 0,
+                _position.traderCollateral > _callParams.collateralDelta
+                    ? _position.traderCollateral - _callParams.collateralDelta
+                    : 0
+            );
 
         require(_traderTargetLeverage != _currentPuppetLeverage, Error.Mirror__NoAdjustmentRequired());
         require(_currentPuppetLeverage > 0, Error.Mirror__InvalidCurrentLeverage());
 
-        bool isIncrease = _traderTargetLeverage > _currentPuppetLeverage;
         uint _sizeDelta;
 
-        if (isIncrease) {
+        if (_traderTargetLeverage > _currentPuppetLeverage) {
             _sizeDelta =
                 Math.mulDiv(_position.size, (_traderTargetLeverage - _currentPuppetLeverage), _currentPuppetLeverage);
-        } else if (_traderTargetLeverage == 0) {
-            _sizeDelta = _position.size;
-        } else {
-            _sizeDelta =
-                Math.mulDiv(_position.size, (_currentPuppetLeverage - _traderTargetLeverage), _currentPuppetLeverage);
-        }
 
-        _requestKey = _submitOrder(
-            _account,
-            _callParams,
-            _allocationAddress,
-            isIncrease ? GmxPositionUtils.OrderType.MarketIncrease : GmxPositionUtils.OrderType.MarketDecrease,
-            isIncrease ? config.increaseCallbackGasLimit : config.decreaseCallbackGasLimit,
-            _sizeDelta,
-            0,
-            _callbackContract
-        );
+            _requestKey = _submitOrder(
+                _account,
+                _callParams,
+                _allocationAddress,
+                GmxPositionUtils.OrderType.MarketIncrease,
+                config.increaseCallbackGasLimit,
+                _sizeDelta,
+                0,
+                _callbackContract
+            );
+        } else {
+            _sizeDelta = _traderTargetLeverage == 0
+                ? _position.size
+                : Math.mulDiv(_position.size, (_currentPuppetLeverage - _traderTargetLeverage), _currentPuppetLeverage);
+
+            _requestKey = _submitOrder(
+                _account,
+                _callParams,
+                _allocationAddress,
+                GmxPositionUtils.OrderType.MarketDecrease,
+                config.decreaseCallbackGasLimit,
+                _sizeDelta,
+                0,
+                _callbackContract
+            );
+        }
 
         requestAdjustmentMap[_requestKey] = RequestAdjustment({
             allocationAddress: _allocationAddress,
