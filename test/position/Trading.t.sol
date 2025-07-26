@@ -5,6 +5,7 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
+import {Account as AccountContract} from "src/position/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
 import {Rule} from "src/position/Rule.sol";
 import {Settle} from "src/position/Settle.sol";
@@ -13,7 +14,6 @@ import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
 import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
 import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
-import {Account as AccountContract} from "src/shared/Account.sol";
 import {AccountStore} from "src/shared/AccountStore.sol";
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
@@ -54,15 +54,8 @@ contract TradingTest is BasicSetup {
 
         // Deploy core contracts
         allocationStore = new AccountStore(dictator, tokenRouter);
-        
-        account = new AccountContract(
-            dictator,
-            allocationStore,
-            AccountContract.Config({
-                transferOutGasLimit: 200_000
-            })
-        );
 
+        account = new AccountContract(dictator, allocationStore, AccountContract.Config({transferOutGasLimit: 200_000}));
 
         ruleContract = new Rule(
             dictator,
@@ -148,7 +141,7 @@ contract TradingTest is BasicSetup {
 
         // Settle Contract Permissions
         dictator.setPermission(settle, settle.settle.selector, address(keeperRouter));
-        dictator.setPermission(settle, settle.collectDust.selector, address(keeperRouter));
+        dictator.setPermission(settle, settle.collectAllocationAccountDust.selector, address(keeperRouter));
 
         // Initialize contracts
         dictator.registerContract(account);
@@ -174,7 +167,7 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(keeperRouter, keeperRouter.requestOpen.selector, users.owner);
         dictator.setPermission(keeperRouter, keeperRouter.requestAdjust.selector, users.owner);
         dictator.setPermission(keeperRouter, keeperRouter.settleAllocation.selector, users.owner);
-        dictator.setPermission(keeperRouter, keeperRouter.collectDust.selector, users.owner);
+        dictator.setPermission(keeperRouter, keeperRouter.collectAllocationAccountDust.selector, users.owner);
         dictator.setPermission(keeperRouter, keeperRouter.afterOrderExecution.selector, users.owner);
 
         account.setDepositCapList(allowedTokens, allowanceCaps);
@@ -405,7 +398,7 @@ contract TradingTest is BasicSetup {
 
         uint ownerBalanceBefore = usdc.balanceOf(users.owner);
 
-        uint dustCollected = keeperRouter.collectDust(allocationAddress, usdc, users.owner);
+        uint dustCollected = keeperRouter.collectAllocationAccountDust(allocationAddress, usdc, users.owner);
 
         assertEq(dustCollected, 5e6, "Should collect all dust");
         assertEq(usdc.balanceOf(users.owner), ownerBalanceBefore + 5e6, "Owner should receive dust");
@@ -543,7 +536,7 @@ contract TradingTest is BasicSetup {
 
         // Should revert when trying to collect
         vm.expectRevert();
-        keeperRouter.collectDust(allocationAddress, usdc, users.owner);
+        keeperRouter.collectAllocationAccountDust(allocationAddress, usdc, users.owner);
     }
 
     function testDecreasePosition() public {

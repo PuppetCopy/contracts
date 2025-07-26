@@ -5,12 +5,12 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-import {PositionUtils} from "../position/utils/PositionUtils.sol";
+import {AccountStore} from "../shared/AccountStore.sol";
+import {AllocationAccount} from "../shared/AllocationAccount.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {AccountStore} from "./AccountStore.sol";
-import {AllocationAccount} from "./AllocationAccount.sol";
+import {PositionUtils} from "./utils/PositionUtils.sol";
 
 /**
  * @title Account

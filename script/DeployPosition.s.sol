@@ -6,12 +6,12 @@ import {console} from "forge-std/src/console.sol";
 
 import {KeeperRouter} from "src/keeperRouter.sol";
 
+import {Account as AccountContract} from "src/position/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
 import {Rule} from "src/position/Rule.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
-import {Account as AccountContract} from "src/shared/Account.sol";
 import {AccountStore} from "src/shared/AccountStore.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
@@ -39,7 +39,7 @@ contract DeployPosition is BaseScript {
         AccountContract account = deployAccount(accountStore);
         Rule ruleContract = deployRule();
         Mirror mirror = deployMirror(account);
-        Settle settle = deploySettle( account);
+        Settle settle = deploySettle(account);
         deployKeeperRouter(mirror, ruleContract, settle, account);
 
         // Set up cross-contract permissions
@@ -226,7 +226,7 @@ contract DeployPosition is BaseScript {
 
         // Settle permissions
         dictator.setPermission(settle, settle.settle.selector, address(keeperRouter));
-        dictator.setPermission(settle, settle.collectDust.selector, address(keeperRouter));
+        dictator.setPermission(settle, settle.collectAllocationAccountDust.selector, address(keeperRouter));
 
         // Mirror permissions
         dictator.setPermission(mirror, mirror.requestOpen.selector, address(keeperRouter));
@@ -254,7 +254,7 @@ contract DeployPosition is BaseScript {
         dictator.setPermission(keeperRouter, keeperRouter.requestOpen.selector, Const.keeper);
         dictator.setPermission(keeperRouter, keeperRouter.requestAdjust.selector, Const.keeper);
         dictator.setPermission(keeperRouter, keeperRouter.settleAllocation.selector, Const.keeper);
-        dictator.setPermission(keeperRouter, keeperRouter.collectDust.selector, Const.keeper);
+        dictator.setPermission(keeperRouter, keeperRouter.collectAllocationAccountDust.selector, Const.keeper);
 
         // Initialize contract
         dictator.registerContract(keeperRouter);

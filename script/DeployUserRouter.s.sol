@@ -6,7 +6,7 @@ import {console} from "forge-std/src/console.sol";
 
 import {UserRouter} from "src/UserRouter.sol";
 
-import {Account as AccountContract} from "src/shared/Account.sol";
+import {Account as AccountContract} from "src/position/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
 import {Rule} from "src/position/Rule.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";

@@ -8,7 +8,7 @@ import {console} from "forge-std/src/console.sol";
 import {UserRouter} from "src/UserRouter.sol";
 import {KeeperRouter} from "src/keeperRouter.sol";
 
-import {Account as AccountContract} from "src/shared/Account.sol";
+import {Account as AccountContract} from "src/position/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
 import {Rule} from "src/position/Rule.sol";
 import {Settle} from "src/position/Settle.sol";
@@ -194,13 +194,7 @@ abstract contract ForkTestBase is Test {
             })
         );
 
-        account = new AccountContract(
-            dictator,
-            accountStore,
-            AccountContract.Config({
-                transferOutGasLimit: 200_000
-            })
-        );
+        account = new AccountContract(dictator, accountStore, AccountContract.Config({transferOutGasLimit: 200_000}));
 
         mirror = new Mirror(
             dictator,
@@ -240,7 +234,6 @@ abstract contract ForkTestBase is Test {
             })
         );
 
-
         // Debug: Log the config we're passing to constructor
         console.log("\\n--- Debug: Updated empirical gas config ---");
         console.log("mirrorBaseGas: 1283731 (empirically measured)");
@@ -276,21 +269,21 @@ abstract contract ForkTestBase is Test {
 
         // Core permissions
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(accountStore));
-        
+
         // Account permissions for Mirror
         dictator.setPermission(account, account.setBalanceList.selector, address(mirror));
         dictator.setPermission(account, account.execute.selector, address(mirror));
         dictator.setPermission(account, account.createAllocationAccount.selector, address(mirror));
         dictator.setPermission(account, account.transferOut.selector, address(mirror));
         dictator.setPermission(account, account.getAllocationAddress.selector, address(mirror));
-        
+
         // Account permissions for Settle
         dictator.setPermission(account, account.execute.selector, address(settle));
         dictator.setPermission(account, account.setBalanceList.selector, address(settle));
         dictator.setPermission(account, account.transferInAllocation.selector, address(settle));
         dictator.setPermission(account, account.transferOut.selector, address(settle));
         dictator.setPermission(account, account.getAllocationAddress.selector, address(settle));
-        
+
         // Mirror permissions
         dictator.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(ruleContract));
 
@@ -303,7 +296,7 @@ abstract contract ForkTestBase is Test {
         // KeeperRouter permissions
         // Note: createAllocation and collectKeeperFee functionality merged into Mirror
         dictator.setPermission(settle, settle.settle.selector, address(keeperRouter));
-        dictator.setPermission(settle, settle.collectDust.selector, address(keeperRouter));
+        dictator.setPermission(settle, settle.collectAllocationAccountDust.selector, address(keeperRouter));
         dictator.setPermission(mirror, mirror.requestOpen.selector, address(keeperRouter));
         dictator.setPermission(mirror, mirror.requestAdjust.selector, address(keeperRouter));
         dictator.setPermission(mirror, mirror.execute.selector, address(keeperRouter));
@@ -313,7 +306,7 @@ abstract contract ForkTestBase is Test {
         dictator.setPermission(keeperRouter, keeperRouter.requestOpen.selector, keeper);
         dictator.setPermission(keeperRouter, keeperRouter.requestAdjust.selector, keeper);
         dictator.setPermission(keeperRouter, keeperRouter.settleAllocation.selector, keeper);
-        dictator.setPermission(keeperRouter, keeperRouter.collectDust.selector, keeper);
+        dictator.setPermission(keeperRouter, keeperRouter.collectAllocationAccountDust.selector, keeper);
         dictator.setPermission(keeperRouter, keeperRouter.refundExecutionFee.selector, address(keeperRouter));
 
         // Admin permissions

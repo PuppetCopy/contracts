@@ -4,7 +4,7 @@
     "PuppetToken": "0x10f7F9e33FaF343F9CfE1c69b177ed86Bc760B4e",
     "TokenRouter": "0x796347E2881bE603C4D88ac0103c4A3569BA8b28",
     "RouterProxy": "0x8c194dba375973a75cD0bDe2b4Af795a2b25ff3e",
-    "AllocationStore": "0xd29389780e53bb915f64d93c8981d2ca168c2ddc",
+    "AccountStore": "0xd29389780e53bb915f64d93c8981d2ca168c2ddc",
     "FeeMarketplaceStore": "0xAf97414983197b30485828ddb3De60134871dBe2",
     "FeeMarketplace": "0x1290fE1CC845D9D564183d3d8C65122DCf908ED5",
     "Mirror": "0xfab9370c2a8f8f69ed7880f5f204e0125c351632",

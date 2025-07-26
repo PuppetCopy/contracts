@@ -4,12 +4,12 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
+import {Account} from "./position/Account.sol";
 import {Mirror} from "./position/Mirror.sol";
 import {Rule} from "./position/Rule.sol";
 import {Settle} from "./position/Settle.sol";
 import {IGmxOrderCallbackReceiver} from "./position/interface/IGmxOrderCallbackReceiver.sol";
 import {GmxPositionUtils} from "./position/utils/GmxPositionUtils.sol";
-import {Account} from "./shared/Account.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
 import {Error} from "./utils/Error.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
@@ -93,19 +93,15 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
 
     /**
      * @notice Closes a stalled position where the trader has exited but puppet position remains
-     * @param _callParams Position parameters for the stalled position
-     * @param _allocationAddress The allocation address of the stalled position
+     * @param _params Position parameters for the stalled position
+     * @param _puppetList The list of puppet addresses in the allocation
      * @return _requestKey The GMX request key for the close order
      */
     function requestCloseStalledPosition(
-        Mirror.CallPosition calldata _callParams,
-        address _allocationAddress
-    ) external payable auth nonReentrant returns (bytes32 _requestKey) {
-        _requestKey = mirror.requestCloseStalledPosition{value: msg.value}(
-            account, _callParams, _allocationAddress, address(this)
-        );
-
-        return _requestKey;
+        Mirror.StalledPositionParams calldata _params,
+        address[] calldata _puppetList
+    ) external payable auth nonReentrant returns (bytes32) {
+        return mirror.requestCloseStalledPosition{value: msg.value}(account, _params, _puppetList, address(this));
     }
 
     /**
@@ -128,14 +124,14 @@ contract KeeperRouter is CoreContract, ReentrancyGuardTransient, IGmxOrderCallba
      * @param _allocationAccount The allocation account to collect dust from
      * @param _dustToken The token to collect
      * @param _receiver The address to receive the dust
-     * @return dustAmount Amount of dust collected
+     * @return The amount of dust collected
      */
-    function collectDust(
+    function collectAllocationAccountDust(
         address _allocationAccount,
         IERC20 _dustToken,
         address _receiver
-    ) external auth nonReentrant returns (uint dustAmount) {
-        return settle.collectDust(account, _allocationAccount, _dustToken, _receiver);
+    ) external auth nonReentrant returns (uint) {
+        return settle.collectAllocationAccountDust(account, _allocationAccount, _dustToken, _receiver);
     }
 
     /**

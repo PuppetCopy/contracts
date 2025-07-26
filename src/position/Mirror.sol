@@ -6,12 +6,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Account} from "../shared/Account.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Error} from "./../utils/Error.sol";
 import {ErrorUtils} from "./../utils/ErrorUtils.sol";
 import {Precision} from "./../utils/Precision.sol";
+import {Account} from "./Account.sol";
 import {Rule} from "./Rule.sol";
 import {IGmxExchangeRouter} from "./interface/IGmxExchangeRouter.sol";
 import {IGmxReadDataStore} from "./interface/IGmxReadDataStore.sol";
@@ -62,6 +62,16 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
         uint allocationId;
         uint keeperFee;
         address keeperFeeReceiver;
+    }
+
+    struct StalledPositionParams {
+        IERC20 collateralToken;
+        address market;
+        address trader;
+        bool isLong;
+        uint executionFee;
+        uint acceptablePrice;
+        uint allocationId;
     }
 
     Config public config;
@@ -460,32 +470,54 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
      * If the trader's position is closed (size = 0) but the mirrored position still exists,
      * it submits a market decrease order to close the entire mirrored position.
      * This prevents puppets from being stuck in positions that the trader has already exited.
-     * @param _params The position parameters to verify and close
-     * @param _allocationAddress The allocation address of the mirrored position
+     * @param _account The account contract for fund management
+     * @param _params Parameters for the stalled position to close
+     * @param _puppetList The list of puppet addresses in the allocation
      * @param _callbackContract The callback contract for GMX order execution
      * @return _requestKey The GMX request key for the close order
      */
     function requestCloseStalledPosition(
         Account _account,
-        CallPosition calldata _params,
-        address _allocationAddress,
+        StalledPositionParams calldata _params,
+        address[] calldata _puppetList,
         address _callbackContract
     ) external payable auth nonReentrant returns (bytes32 _requestKey) {
-        require(_allocationAddress != address(0), Error.Mirror__InvalidAllocation(_allocationAddress));
+        address _allocationAddress = _account.getAllocationAddress(
+            PositionUtils.getAllocationKey(
+                _puppetList,
+                PositionUtils.getTraderMatchingKey(_params.collateralToken, _params.trader),
+                _params.allocationId
+            )
+        );
 
         Position memory _position = positionMap[_allocationAddress];
         require(_position.size > 0, Error.Mirror__PositionNotFound(_allocationAddress));
-        bytes32 positionKey =
-            GmxPositionUtils.getPositionKey(_params.trader, _params.market, _params.collateralToken, _params.isLong);
 
+        bytes32 _traderPositionKey =
+            GmxPositionUtils.getPositionKey(_params.trader, _params.market, _params.collateralToken, _params.isLong);
         require(
-            GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, positionKey) == 0,
-            Error.Mirror__PositionNotStalled(_allocationAddress, positionKey)
+            GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, _traderPositionKey) == 0,
+            Error.Mirror__PositionNotStalled(_allocationAddress, _traderPositionKey)
         );
 
         _requestKey = _submitOrder(
             _account,
-            _params,
+            CallPosition({
+                collateralToken: _params.collateralToken,
+                traderRequestKey: bytes32(0),
+                trader: _params.trader,
+                market: _params.market,
+                isIncrease: false,
+                isLong: _params.isLong,
+                executionFee: _params.executionFee,
+                collateralDelta: 0,
+                sizeDeltaInUsd: _position.size,
+                acceptablePrice: _params.acceptablePrice,
+                triggerPrice: 0,
+                allocationId: 0,
+                keeperFee: 0,
+                keeperFeeReceiver: address(0)
+            }),
             _allocationAddress,
             GmxPositionUtils.OrderType.MarketDecrease,
             config.decreaseCallbackGasLimit,
@@ -505,7 +537,18 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
 
         _logEvent(
             "RequestCloseStalledPosition",
-            abi.encode(_params, _allocationAddress, _position.size, positionKey, _requestKey)
+            abi.encode(
+                _params.collateralToken,
+                _params.market,
+                _params.trader,
+                _params.isLong,
+                _params.executionFee,
+                _params.acceptablePrice,
+                _params.allocationId,
+                _allocationAddress,
+                _traderPositionKey,
+                _requestKey
+            )
         );
     }
 
@@ -574,7 +617,7 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
 
     function _submitOrder(
         Account _account,
-        CallPosition calldata _order,
+        CallPosition memory _order,
         address _allocationAddress,
         GmxPositionUtils.OrderType _orderType,
         uint _callbackGasLimit,

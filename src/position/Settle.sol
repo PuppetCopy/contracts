@@ -4,11 +4,11 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Account} from "../shared/Account.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
 import {Precision} from "../utils/Precision.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
+import {Account} from "./Account.sol";
 import {Mirror} from "./Mirror.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
@@ -154,7 +154,7 @@ contract Settle is CoreContract {
      * @param _receiver The address to receive the dust
      * @return _dustAmount The amount of dust collected
      */
-    function collectDust(
+    function collectAllocationAccountDust(
         Account _account,
         address _allocationAccount,
         IERC20 _dustToken,
@@ -176,7 +176,7 @@ contract Settle is CoreContract {
 
         _account.transferOut(_dustToken, _receiver, _dustAmount);
 
-        _logEvent("CollectDust", abi.encode(_allocationAccount, _dustToken, _receiver, _dustAmount));
+        _logEvent("CollectAllocationAccountDust", abi.encode(_allocationAccount, _dustToken, _receiver, _dustAmount));
 
         return _dustAmount;
     }
@@ -188,7 +188,7 @@ contract Settle is CoreContract {
      * @param _receiver The address to receive the collected fees
      * @param _amount The amount of fees to collect (must not exceed accumulated fees)
      */
-    function collectFees(Account _account, IERC20 _token, address _receiver, uint _amount) external auth {
+    function collectPlatformFees(Account _account, IERC20 _token, address _receiver, uint _amount) external auth {
         require(_receiver != address(0), "Invalid receiver");
         require(_amount > 0, "Invalid amount");
         require(_amount <= platformFeeMap[_token], "Amount exceeds accumulated fees");
@@ -196,7 +196,7 @@ contract Settle is CoreContract {
         platformFeeMap[_token] -= _amount;
         _account.transferOut(_token, _receiver, _amount);
 
-        _logEvent("CollectFees", abi.encode(_token, _receiver, _amount));
+        _logEvent("CollectPlatformFees", abi.encode(_token, _receiver, _amount));
     }
 
     /**
