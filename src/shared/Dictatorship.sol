@@ -18,7 +18,7 @@ contract Dictatorship is Ownable, IAuthority {
     /**
      * @notice Central log for events emitted by registered CoreContracts
      */
-    event PuppetEventLog(address indexed operator, string indexed method, bytes data);
+    event PuppetEventLog(address indexed coreContract, string indexed method, bytes data);
 
     mapping(address => bool) public registeredContract;
 
@@ -27,7 +27,7 @@ contract Dictatorship is Ownable, IAuthority {
     /**
      * @notice Update gas limit for external calls
      */
-    function settargetCallGasLimit(
+    function setTargetCallGasLimit(
         uint _gasLimit
     ) external onlyOwner {
         require(_gasLimit > 0, Error.Dictatorship__InvalidTargetAddress()); // Reuse existing error
@@ -58,7 +58,7 @@ contract Dictatorship is Ownable, IAuthority {
     /**
      * @notice Log events from registered CoreContracts
      */
-    function logEvent(string memory _method, bytes memory _data) public {
+    function logEvent(string memory _method, bytes memory _data) external {
         require(registeredContract[msg.sender], Error.Dictatorship__ContractNotRegistered());
         emit PuppetEventLog(msg.sender, _method, _data);
     }
@@ -66,7 +66,7 @@ contract Dictatorship is Ownable, IAuthority {
     /**
      * @notice Grant general access to user on target Access contract
      */
-    function setAccess(Access _target, address _user) public onlyOwner {
+    function setAccess(Access _target, address _user) external onlyOwner {
         _target.setAccess{gas: targetCallGasLimit}(_user, true);
         emit PuppetEventLog(address(this), "UpdateAccess", abi.encode(_target, _user, true));
     }
@@ -74,7 +74,7 @@ contract Dictatorship is Ownable, IAuthority {
     /**
      * @notice Revoke general access from user on target Access contract
      */
-    function removeAccess(Access _target, address _user) public onlyOwner {
+    function removeAccess(Access _target, address _user) external onlyOwner {
         _target.setAccess{gas: targetCallGasLimit}(_user, false);
         emit PuppetEventLog(address(this), "UpdateAccess", abi.encode(_target, _user, false));
     }
@@ -82,7 +82,7 @@ contract Dictatorship is Ownable, IAuthority {
     /**
      * @notice Grant function-specific permission to user
      */
-    function setPermission(Permission _target, bytes4 _functionSig, address _user) public onlyOwner {
+    function setPermission(Permission _target, bytes4 _functionSig, address _user) external onlyOwner {
         _target.setPermission{gas: targetCallGasLimit}(_functionSig, _user, true);
         emit PuppetEventLog(address(this), "UpdatePermission", abi.encode(address(_target), _user, _functionSig, true));
     }
@@ -90,7 +90,7 @@ contract Dictatorship is Ownable, IAuthority {
     /**
      * @notice Revoke function-specific permission from user
      */
-    function removePermission(Permission _target, bytes4 _functionSig, address _user) public onlyOwner {
+    function removePermission(Permission _target, bytes4 _functionSig, address _user) external onlyOwner {
         _target.setPermission{gas: targetCallGasLimit}(_functionSig, _user, false);
         emit PuppetEventLog(address(this), "UpdatePermission", abi.encode(address(_target), _user, _functionSig, false));
     }
@@ -99,9 +99,10 @@ contract Dictatorship is Ownable, IAuthority {
      * @notice Register a CoreContract for event logging
      */
     function registerContract(
-        CoreContract _target
-    ) public onlyOwner {
-        address targetAddress = address(_target);
+        CoreContract _contract
+    ) external onlyOwner {
+        require(_contract.supportsInterface(type(CoreContract).interfaceId), Error.Dictatorship__InvalidCoreContract());
+        address targetAddress = address(_contract);
         require(!registeredContract[targetAddress], Error.Dictatorship__ContractAlreadyInitialized());
 
         registeredContract[targetAddress] = true;
@@ -111,23 +112,27 @@ contract Dictatorship is Ownable, IAuthority {
     /**
      * @notice Push configuration update to registered CoreContract
      */
-    function setConfig(CoreContract _target, bytes calldata _config) public onlyOwner {
-        require(registeredContract[address(_target)], Error.Dictatorship__ContractNotRegistered());
-        try _target.setConfig{gas: targetCallGasLimit}(_config) {}
+    function setConfig(CoreContract _contract, bytes calldata _config) external onlyOwner {
+        require(_contract.supportsInterface(type(CoreContract).interfaceId), Error.Dictatorship__InvalidCoreContract());
+        require(registeredContract[address(_contract)], Error.Dictatorship__ContractNotRegistered());
+        
+        try _contract.setConfig{gas: targetCallGasLimit}(_config) {}
         catch {
             revert Error.Dictatorship__ConfigurationUpdateFailed();
         }
 
-        emit PuppetEventLog(address(_target), "SetConfig", _config);
+        emit PuppetEventLog(address(_contract), "SetConfig", _config);
     }
 
     /**
      * @notice De-register a CoreContract from event logging
      */
     function removeContract(
-        CoreContract _target
-    ) public onlyOwner {
-        address targetAddress = address(_target);
+        CoreContract _contract
+    ) external onlyOwner {
+        require(_contract.supportsInterface(type(CoreContract).interfaceId), Error.Dictatorship__InvalidCoreContract());
+
+        address targetAddress = address(_contract);
         require(registeredContract[targetAddress], Error.Dictatorship__ContractNotRegistered());
 
         registeredContract[targetAddress] = false;

@@ -17,21 +17,20 @@ contract VotingEscrow is CoreContract {
         uint accrued;
     }
 
+    VotingEscrowStore public immutable store;
+    PuppetToken public immutable token;
+    PuppetVoteToken public immutable vToken;
     uint public constant MAXTIME = 106 weeks; // about 2 years
+
+    mapping(address => uint) public lockDurationMap;
+    mapping(address => Vested) public vestMap;
 
     struct Config {
         uint transferOutGasLimit;
         uint baseMultiplier;
     }
 
-    VotingEscrowStore public immutable store;
-    PuppetToken public immutable token;
-    PuppetVoteToken public immutable vToken;
-
     Config config;
-
-    mapping(address => uint) public lockDurationMap;
-    mapping(address => Vested) public vestMap;
 
     constructor(
         IAuthority _authority,

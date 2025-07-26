@@ -18,23 +18,22 @@ contract RewardDistributor is CoreContract {
         uint distributionWindow;
     }
 
-    /// @notice Reward tracking structure per user
     struct UserRewards {
         uint cumulativeRewardCheckpoint;
         uint accrued;
     }
 
-    // Immutable contract references
     IERC20 public immutable rewardToken;
     IERC20 public immutable vToken;
     RewardStore public immutable store;
 
-    // Reward distribution state
-    Config config;
+    mapping(address => UserRewards) public userRewardMap;
+
     uint public cumulativeRewardPerToken;
     uint public totalUndistributed; // Total rewards deposited but not yet distributed
     uint public lastDistributionTime;
-    mapping(address => UserRewards) public userRewardMap;
+
+    Config config;
 
     constructor(
         IAuthority _authority,

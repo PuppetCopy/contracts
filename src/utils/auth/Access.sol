@@ -53,7 +53,6 @@ abstract contract Access {
 
     /// @notice Modifier to restrict access to the central Authority contract only.
     modifier onlyAuthority() {
-        // "Access: Caller not authority"
         require(msg.sender == address(authority), Error.Access__CallerNotAuthority());
         _;
     }
