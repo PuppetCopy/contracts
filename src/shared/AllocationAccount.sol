@@ -5,17 +5,14 @@ import {Error} from "../utils/Error.sol";
 import {Access} from "./../utils/auth/Access.sol";
 
 /**
- * @title AllocationAccount
- * @author Puppet Protocol
  * @notice A minimal proxy contract that enables identity-preserving delegated execution
- * @dev This contract has been directed to work with EIP-1167 minimal proxies.
+ * @dev Designed for EIP-1167 minimal proxies. Only authorized contracts can execute calls.
  */
 contract AllocationAccount {
     Access internal immutable store;
 
     /**
-     * @notice Constructor for the implementation contract only
-     * @dev This is only used for the implementation contract and not for proxies
+     * @notice Initialize the implementation contract with store reference
      */
     constructor(
         Access _store
@@ -24,15 +21,8 @@ contract AllocationAccount {
     }
 
     /**
-     * @notice Executes a call to a target contract with an ETH amount if the sender is authorized
-     * @dev This function only verifies that the caller has permission via store.canCall().
-     * All additional security checks, input validation, and event logging must be
-     * implemented by the authorized contracts themselves.
-     * @param _contract Target contract to call
-     * @param _data The calldata to send to the target contract
-     * @param _ethAmount The amount of ETH to send with the call
-     * @return _success Whether the call was successful
-     * @return _returnData The data returned from the call
+     * @notice Execute a call to target contract with optional ETH value
+     * @dev Requires authorization via store.canCall(). Calling contracts handle validation and logging.
      */
     function execute(
         address _contract,
@@ -48,14 +38,7 @@ contract AllocationAccount {
     }
 
     /**
-     * @notice Executes a call to a target contract if the sender is authorized
-     * @dev This function only verifies that the caller has permission via store.canCall().
-     * All additional security checks, input validation, and event logging must be
-     * implemented by the authorized contracts themselves.
-     * @param _contract Target contract to call
-     * @param _data The calldata to send to the target contract
-     * @return _success Whether the call was successful
-     * @return _returnData The data returned from the call
+     * @notice Execute a call to target contract without ETH value
      */
     function execute(
         address _contract,

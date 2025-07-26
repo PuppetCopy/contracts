@@ -9,8 +9,7 @@ import {TransferUtils} from "../utils/TransferUtils.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 
 /**
- * @title TokenRouter
- * @dev Central token router and spending approval for transferring tokens
+ * @notice Central token router for authorized token transfers
  */
 contract TokenRouter is CoreContract {
     struct Config {
@@ -23,16 +22,16 @@ contract TokenRouter is CoreContract {
         authority = _authority;
     }
 
+    /**
+     * @notice Get current configuration parameters
+     */
     function getConfig() external view returns (Config memory) {
         return config;
     }
 
     /**
-     * @dev low level call to an ERC20 contract, return raw data to be handled by authorised contract
-     * @param token the token to transfer
-     * @param from the account to transfer from
-     * @param to the account to transfer to
-     * @param amount the amount to transfer
+     * @notice Transfer tokens from one address to another
+     * @dev Uses transferFrom with gas limit protection
      */
     function transfer(IERC20 token, address from, address to, uint amount) external auth {
         TransferUtils.transferStrictlyFrom(config.transferGasLimit, token, from, to, amount);

@@ -6,6 +6,9 @@ import {TokenRouter} from "./../shared/TokenRouter.sol";
 import {BankStore} from "./../utils/BankStore.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 
+/**
+ * @notice Token storage for FeeMarketplace with burn capability
+ */
 contract FeeMarketplaceStore is BankStore {
     PuppetToken public immutable protocolToken;
 
@@ -17,6 +20,9 @@ contract FeeMarketplaceStore is BankStore {
         protocolToken = _protocolToken;
     }
 
+    /**
+     * @notice Burn protocol tokens
+     */
     function burn(
         uint _amount
     ) external auth {

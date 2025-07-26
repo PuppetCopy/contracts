@@ -12,51 +12,24 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {FeeMarketplaceStore} from "./FeeMarketplaceStore.sol";
 
 /**
- * @title Fee Marketplace
- * @notice Publicly offers accumulated protocol fees to trade with protocol tokens at a fixed price
- *
- * @dev Core mechanics:
- * - Fee tokens unlock gradually over time after deposit
- * - Each fee token has a fixed redemption price (askAmount)
- * - Fixed price applies regardless of purchase amount (up to available balance)
- * - Public can purchase any amount of unlocked tokens at the posted price
- * - Protocol tokens received are burned/distributed per configuration
- *
- * @dev Example: If askAmount[USDC] = 1000:
- * - Taker paying 1000 protocol tokens can redeem any amount up to unlocked balance
- * - Price remains 1000 whether purchasing 100 USDC or 2000 USDC
- * - Protocol offers flexible quantity purchases at this fixed price
+ * @notice Marketplace for trading accumulated protocol fees with protocol tokens at fixed prices
+ * @dev Fee tokens unlock gradually over time. Each token has a fixed redemption price regardless of quantity.
  */
 contract FeeMarketplace is CoreContract {
-    /**
-     * @param distributionTimeframe Unlock duration for deposits (seconds)
-     * @param burnBasisPoints Protocol tokens to burn (basis points: 100 = 1%)
-     */
     struct Config {
         uint transferOutGasLimit;
         uint distributionTimeframe;
         uint burnBasisPoints;
     }
 
-    /// @notice Protocol token used for purchases
     PuppetToken public immutable protocolToken;
-
-    /// @notice Holds fee tokens
     FeeMarketplaceStore public immutable store;
 
-    /// @notice Fixed price to redeem any amount of each fee token
     mapping(IERC20 => uint) public askAmount;
-
-    /// @notice Currently unlocked balance per fee token
     mapping(IERC20 => uint) public unclockedFees;
-
-    /// @notice Last unlock calculation timestamp per fee token
     mapping(IERC20 => uint) public lastDistributionTimestamp;
 
-    /// @notice Available protocol tokens for distribution (after burns)
-    uint public distributionBalance;
-
-    /// @notice Current marketplace settings
+    uint distributionBalance;
     Config config;
 
     constructor(
@@ -69,14 +42,15 @@ contract FeeMarketplace is CoreContract {
         store = _store;
     }
 
+    /**
+     * @notice Get current configuration parameters
+     */
     function getConfig() external view returns (Config memory) {
         return config;
     }
 
     /**
-     * @notice Returns the pending unlocked amount for a fee token based on elapsed time.
-     * @param feeToken The fee token.
-     * @return pending The number of fee tokens that have newly unlocked.
+     * @notice Calculate pending unlocked amount for a fee token based on elapsed time
      */
     function getPendingUnlock(
         IERC20 feeToken
@@ -93,9 +67,7 @@ contract FeeMarketplace is CoreContract {
     }
 
     /**
-     * @notice Returns the total fee balance that is available for redemption.
-     * @param feeToken The fee token.
-     * @return Total unlocked fee balance.
+     * @notice Get total unlocked balance available for redemption
      */
     function getTotalUnlocked(
         IERC20 feeToken
@@ -104,10 +76,7 @@ contract FeeMarketplace is CoreContract {
     }
 
     /**
-     * @notice Deposits fee tokens into the marketplace.
-     * @param _feeToken The fee token to deposit.
-     * @param _depositor The address depositing the tokens.
-     * @param _amount The amount of tokens to deposit.
+     * @notice Deposit fee tokens into the marketplace
      */
     function deposit(IERC20 _feeToken, address _depositor, uint _amount) external auth {
         require(_amount > 0, Error.FeeMarketplace__ZeroDeposit());
@@ -120,9 +89,7 @@ contract FeeMarketplace is CoreContract {
     }
 
     /**
-     * @notice Records unaccounted transferred tokens to the store and syncs internal accounting.
-     * @param _feeToken The fee token to record.
-     * @return _amount The actual amount transferred.
+     * @notice Record unaccounted transferred tokens and sync internal accounting
      */
     function recordTransferIn(
         IERC20 _feeToken
@@ -136,11 +103,8 @@ contract FeeMarketplace is CoreContract {
     }
 
     /**
-     * @notice Executes a fee redemption offer.
-     * @param _feeToken The fee token to be redeemed.
-     * @param _depositor The address making the redemption.
-     * @param _receiver The address receiving the fee tokens.
-     * @param _purchaseAmount The amount of fee tokens to redeem.
+     * @notice Execute fee redemption at fixed ask price
+     * @dev Burns portion of protocol tokens received based on config
      */
     function acceptOffer(IERC20 _feeToken, address _depositor, address _receiver, uint _purchaseAmount) external auth {
         uint _currentAskAmount = askAmount[_feeToken];
@@ -171,10 +135,7 @@ contract FeeMarketplace is CoreContract {
     }
 
     /**
-     * @notice Sets the fixed redemption price for a fee token.
-     * @dev This sets the protocol token cost required to redeem any amount of unlocked fee tokens.
-     * @param _feeToken The fee token.
-     * @param _amount The fixed price in protocol tokens.
+     * @notice Set fixed redemption price for a fee token
      */
     function setAskPrice(IERC20 _feeToken, uint _amount) external auth {
         askAmount[_feeToken] = _amount;
@@ -182,9 +143,7 @@ contract FeeMarketplace is CoreContract {
     }
 
     /**
-     * @notice Transfers protocol tokens to receiver
-     * @param _receiver Address to receive the tokens
-     * @param _amount Amount of protocol tokens to transfer
+     * @notice Transfer protocol tokens from distribution balance
      */
     function collectDistribution(address _receiver, uint _amount) external auth {
         require(_receiver != address(0), Error.FeeMarketplace__InvalidReceiver());
@@ -198,10 +157,6 @@ contract FeeMarketplace is CoreContract {
         store.transferOut(config.transferOutGasLimit, protocolToken, _receiver, _amount);
     }
 
-    /**
-     * @notice Internal function to update the unlocked balance for fee tokens.
-     * @param _feeToken The fee token to update.
-     */
     function _updateUnlockedBalance(
         IERC20 _feeToken
     ) internal {

@@ -315,18 +315,18 @@ contract Mirror is CoreContract, ReentrancyGuardTransient {
             if (_puppetAllocation == 0) continue;
 
             uint _remainingPuppets = _puppetCount - _i;
-            uint _executionFee = (_remainingKeeperFeeToCollect + _remainingPuppets - 1) / _remainingPuppets;
+            uint _feePerRemainingPuppet = (_remainingKeeperFeeToCollect + _remainingPuppets - 1) / _remainingPuppets;
 
-            if (_executionFee > _remainingKeeperFeeToCollect) {
-                _executionFee = _remainingKeeperFeeToCollect;
+            if (_feePerRemainingPuppet > _remainingKeeperFeeToCollect) {
+                _feePerRemainingPuppet = _remainingKeeperFeeToCollect;
             }
 
-            if (_nextBalanceList[_i] >= _executionFee) {
-                _nextBalanceList[_i] -= _executionFee;
-                _remainingKeeperFeeToCollect -= _executionFee;
+            if (_nextBalanceList[_i] >= _feePerRemainingPuppet) {
+                _nextBalanceList[_i] -= _feePerRemainingPuppet;
+                _remainingKeeperFeeToCollect -= _feePerRemainingPuppet;
             } else {
-                if (_puppetAllocation > _executionFee) {
-                    _allocationList[_i] = _puppetAllocation - _executionFee;
+                if (_puppetAllocation > _feePerRemainingPuppet) {
+                    _allocationList[_i] = _puppetAllocation - _feePerRemainingPuppet;
                 } else {
                     _keeperExecutionFeeInsolvency += _puppetAllocation;
                     _allocationList[_i] = 0;
