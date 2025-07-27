@@ -19,7 +19,7 @@ import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
 import {Error} from "src/utils/Error.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
-import {MockGmxExchangeRouter} from "test/mock/MockGmxExchangeRouter.sol";
+import {MockGmxExchangeRouter} from "test/mock/MockGmxExchangeRouter.t.sol";
 
 import {Const} from "script/Const.sol";
 

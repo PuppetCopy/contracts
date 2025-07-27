@@ -7,7 +7,7 @@ import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
 
 import {Test} from "forge-std/src/Test.sol";
-import {MockERC20} from "test/mock/MockERC20.sol";
+import {MockERC20} from "test/mock/MockERC20.t.sol";
 
 contract BasicSetup is Test {
     struct Users {
