@@ -507,7 +507,18 @@ contract Mirror is CoreContract {
 
         if (_request.isIncrease == false && _request.sizeDelta >= _position.size) {
             delete positionMap[_request.allocationAddress];
-            _logEvent("Execute", abi.encode(_request.allocationAddress, _requestKey, 0, 0, 0, 0));
+            _logEvent(
+                "Execute",
+                abi.encode(
+                    _request.allocationAddress,
+                    _requestKey,
+                    false,
+                    _request.traderIsIncrease,
+                    0, // size
+                    0, // traderSize
+                    0 // traderCollateral
+                )
+            );
             return;
         }
 
@@ -541,8 +552,8 @@ contract Mirror is CoreContract {
             abi.encode(
                 _request.allocationAddress,
                 _requestKey,
-                _request.traderIsIncrease,
                 _request.isIncrease,
+                _request.traderIsIncrease,
                 _position.size,
                 _position.traderSize,
                 _position.traderCollateral

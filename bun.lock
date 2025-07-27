@@ -4,9 +4,8 @@
     "": {
       "name": "@puppet/contracts",
       "devDependencies": {
-        "@balancer-labs/v2-interfaces": "0.4.0",
         "@gmx": "github:gmx-io/gmx-synthetics#v2.1",
-        "@openzeppelin/contracts": "5.3.0",
+        "@openzeppelin/contracts": "5.4.0",
         "@uniswap/v3-core": "1.0.1",
         "dotenv": "16.5.0",
         "forge-std": "github:foundry-rs/forge-std#v1.9.7",
@@ -65,8 +64,6 @@
     "@babel/traverse": ["@babel/traverse@7.28.0", "", { "dependencies": { "@babel/code-frame": "^7.27.1", "@babel/generator": "^7.28.0", "@babel/helper-globals": "^7.28.0", "@babel/parser": "^7.28.0", "@babel/template": "^7.27.2", "@babel/types": "^7.28.0", "debug": "^4.3.1" } }, "sha512-mGe7UK5wWyh0bKRfupsUchrQGqvDbZDbKJw+kcRGSmdHVYrv+ltd0pnpDTVpiTqnaBru9iEvA8pz8W46v0Amwg=="],
 
     "@babel/types": ["@babel/types@7.28.1", "", { "dependencies": { "@babel/helper-string-parser": "^7.27.1", "@babel/helper-validator-identifier": "^7.27.1" } }, "sha512-x0LvFTekgSX+83TI28Y9wYPUfzrnl2aT5+5QLnO6v7mSJYtEEevuDRN0F0uSHRk1G1IWZC43o00Y0xDDrpBGPQ=="],
-
-    "@balancer-labs/v2-interfaces": ["@balancer-labs/v2-interfaces@0.4.0", "", {}, "sha512-K0ij26m8/UOvdPmrAnuh/C7kT8OQupsgV8KRyIt+aTHW1KbPOi4v8zLMwW2AwSYMSRjPK2A/ttlnNizT0iA4Qg=="],
 
     "@chainlink/contracts": ["@chainlink/contracts@1.4.0", "", { "dependencies": { "@arbitrum/nitro-contracts": "3.0.0", "@changesets/cli": "~2.28.1", "@changesets/get-github-info": "^0.6.0", "@eth-optimism/contracts": "0.6.0", "@openzeppelin/contracts": "4.9.6", "@openzeppelin/contracts-upgradeable": "4.9.6", "@scroll-tech/contracts": "0.1.0", "@zksync/contracts": "github:matter-labs/era-contracts#446d391d34bdb48255d5f8fef8a8248925fc98b9", "semver": "^7.7.1" } }, "sha512-SpNCJ0TPOI6pa2l702Wk4WIP8ccw5ARcRP1E/ZTqaFffXNoZeF03WhsVL8f3l3OTRFA9Z40O5KcZzmJmZQkoFA=="],
 
@@ -342,7 +339,7 @@
 
     "@offchainlabs/upgrade-executor": ["@offchainlabs/upgrade-executor@1.1.0-beta.0", "", { "dependencies": { "@openzeppelin/contracts": "4.7.3", "@openzeppelin/contracts-upgradeable": "4.7.3" } }, "sha512-mpn6PHjH/KDDjNX0pXHEKdyv8m6DVGQiI2nGzQn0JbM1nOSHJpWx6fvfjtH7YxHJ6zBZTcsKkqGkFKDtCfoSLw=="],
 
-    "@openzeppelin/contracts": ["@openzeppelin/contracts@5.3.0", "", {}, "sha512-zj/KGoW7zxWUE8qOI++rUM18v+VeLTTzKs/DJFkSzHpQFPD/jKKF0TrMxBfGLl3kpdELCNccvB3zmofSzm4nlA=="],
+    "@openzeppelin/contracts": ["@openzeppelin/contracts@5.4.0", "", {}, "sha512-eCYgWnLg6WO+X52I16TZt8uEjbtdkgLC0SUX/xnAksjjrQI4Xfn4iBRoI5j55dmlOhDv1Y7BoR3cU7e3WWhC6A=="],
 
     "@openzeppelin/contracts-upgradeable": ["@openzeppelin/contracts-upgradeable@4.9.6", "", {}, "sha512-m4iHazOsOCv1DgM7eD7GupTJ+NFVujRZt1wzddDPSVGpWdKq1SKkla5htKG7+IS4d2XOCtzkUNwRZ7Vq5aEUMA=="],
 
