@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/src/console.sol";
 
-import {SequencerRouter} from "src/sequencerRouter.sol";
+import {SequencerRouter} from "src/SequencerRouter.sol";
 
 import {Account as AccountContract} from "src/position/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
@@ -32,21 +32,19 @@ contract DeployPosition is BaseScript {
     function run() public {
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
 
-        // // Deploy each contract with their permissions
-        // AccountStore accountStore = deployAccountStore();
-        // AccountContract account = deployAccount(accountStore);
-        // Rule ruleContract = deployRule();
-        // Mirror mirror = deployMirror(account);
-        // Settle settle = deploySettle(account);
-        // deploySequencerRouter(mirror, ruleContract, settle, account);
+        // Deploy each contract with their permissions
+        AccountStore accountStore = deployAccountStore();
+        AccountContract account = deployAccount(accountStore);
+        Rule ruleContract = deployRule();
+        Mirror mirror = deployMirror(account);
+        Settle settle = deploySettle(account);
+        deploySequencerRouter(mirror, ruleContract, settle, account);
 
-        // // Set up cross-contract permissions
-        // setupCrossContractPermissions(mirror, ruleContract);
+        // Set up cross-contract permissions
+        setupCrossContractPermissions(mirror, ruleContract);
 
-        // // Setup upkeeping configuration
-        // setupUpkeepingConfig(account, settle);
-
-        upgradeMirror();
+        // Setup upkeeping configuration
+        setupUpkeepingConfig(account, settle);
 
         vm.stopBroadcast();
     }
@@ -226,7 +224,9 @@ contract DeployPosition is BaseScript {
         dictator.setPermission(sequencerRouter, sequencerRouter.refundExecutionFee.selector, Const.gmxOrderHandler);
 
         // Additional GMX handler permissions
-        dictator.setPermission(sequencerRouter, sequencerRouter.afterOrderExecution.selector, Const.gmxLiquidationHandler);
+        dictator.setPermission(
+            sequencerRouter, sequencerRouter.afterOrderExecution.selector, Const.gmxLiquidationHandler
+        );
         dictator.setPermission(sequencerRouter, sequencerRouter.afterOrderExecution.selector, Const.gmxAdlHandler);
 
         // Self-permission for refund

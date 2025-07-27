@@ -14,7 +14,6 @@ import {Error} from "./utils/Error.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
 /**
- * @title SequencerRouter
  * @notice Handles sequencer-specific operations for the copy trading system
  * @dev Separates sequencer operations from user operations for better security and access control
  */

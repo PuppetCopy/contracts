@@ -11,7 +11,6 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
- * @title Account
  * @notice Handles user account management including deposits, withdrawals, and balance tracking
  * @dev Central contract for all account-related functionality and AllocationAccount management
  */
