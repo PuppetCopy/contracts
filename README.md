@@ -12,6 +12,3 @@ This package is licensed under the **Business Source License 1.1** (BSL-1.1).
 
 See [LICENSE.md](./LICENSE.md) for the full license text.
 
----
-
-For more information about Puppet, visit the [main repository](https://github.com/PuppetCopy/monorepo).
