@@ -32,23 +32,21 @@ contract DeployPosition is BaseScript {
     function run() public {
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
 
-        console.log("=== Deploying Position Contracts ===");
+        // // Deploy each contract with their permissions
+        // AccountStore accountStore = deployAccountStore();
+        // AccountContract account = deployAccount(accountStore);
+        // Rule ruleContract = deployRule();
+        // Mirror mirror = deployMirror(account);
+        // Settle settle = deploySettle(account);
+        // deployKeeperRouter(mirror, ruleContract, settle, account);
 
-        // Deploy each contract with their permissions
-        AccountStore accountStore = deployAccountStore();
-        AccountContract account = deployAccount(accountStore);
-        Rule ruleContract = deployRule();
-        Mirror mirror = deployMirror(account);
-        Settle settle = deploySettle(account);
-        deployKeeperRouter(mirror, ruleContract, settle, account);
+        // // Set up cross-contract permissions
+        // setupCrossContractPermissions(mirror, ruleContract);
 
-        // Set up cross-contract permissions
-        setupCrossContractPermissions(mirror, ruleContract);
+        // // Setup upkeeping configuration
+        // setupUpkeepingConfig(account, settle);
 
-        // Setup upkeeping configuration
-        setupUpkeepingConfig(account, settle);
-
-        console.log("=== Position Contracts Deployment Complete ===");
+        upgradeMirror();
 
         vm.stopBroadcast();
     }
@@ -277,5 +275,23 @@ contract DeployPosition is BaseScript {
         settle.setTokenDustThresholdList(allowedTokens, dustTokenThresholds);
 
         console.log("Upkeeping configuration complete");
+    }
+
+    function upgradeMirror() public {
+        console.log("=== Upgrading Mirror Contract and KeeperRouter ===");
+
+        AccountContract account = AccountContract(getDeployedAddress("Account"));
+        Rule ruleContract = Rule(getDeployedAddress("Rule"));
+        Settle settle = Settle(getDeployedAddress("Settle"));
+
+        Mirror mirror = deployMirror(account);
+        KeeperRouter keeperRouter = deployKeeperRouter(mirror, ruleContract, settle, account);
+
+        setupCrossContractPermissions(mirror, ruleContract);
+
+        console.log("\n=== Mirror and KeeperRouter Upgrade Complete ===");
+        console.log("New Mirror address:", address(mirror));
+        console.log("New KeeperRouter address:", address(keeperRouter));
+        console.log("\nIMPORTANT: Update keeper services to use the new KeeperRouter address");
     }
 }

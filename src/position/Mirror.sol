@@ -39,7 +39,7 @@ contract Mirror is CoreContract {
     struct RequestAdjustment {
         address allocationAddress;
         bool traderIsIncrease;
-        uint traderTargetLeverage;
+        bool isIncrease;
         uint traderCollateralDelta;
         uint traderSizeDelta;
         uint sizeDelta;
@@ -244,7 +244,7 @@ contract Mirror is CoreContract {
         requestAdjustmentMap[_requestKey] = RequestAdjustment({
             allocationAddress: _allocationAddress,
             traderIsIncrease: true,
-            traderTargetLeverage: _traderTargetLeverage,
+            isIncrease: true,
             traderSizeDelta: _callParams.sizeDeltaInUsd,
             traderCollateralDelta: _callParams.collateralDelta,
             sizeDelta: _sizeDelta
@@ -335,8 +335,7 @@ contract Mirror is CoreContract {
         _account.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
 
         require(
-            _remainingKeeperFeeToCollect == 0,
-            Error.Mirror__KeeperFeeNotFullyCovered(0, _remainingKeeperFeeToCollect)
+            _remainingKeeperFeeToCollect == 0, Error.Mirror__KeeperFeeNotFullyCovered(0, _remainingKeeperFeeToCollect)
         );
 
         _allocated -= _keeperExecutionFeeInsolvency;
@@ -401,7 +400,7 @@ contract Mirror is CoreContract {
         requestAdjustmentMap[_requestKey] = RequestAdjustment({
             allocationAddress: _allocationAddress,
             traderIsIncrease: _callParams.isIncrease,
-            traderTargetLeverage: _traderTargetLeverage,
+            isIncrease: _isIncrease,
             traderSizeDelta: _callParams.sizeDeltaInUsd,
             traderCollateralDelta: _callParams.collateralDelta,
             sizeDelta: _sizeDelta
@@ -482,20 +481,14 @@ contract Mirror is CoreContract {
         requestAdjustmentMap[_requestKey] = RequestAdjustment({
             allocationAddress: _allocationAddress,
             traderIsIncrease: false,
-            traderTargetLeverage: 0,
+            isIncrease: false,
             traderSizeDelta: _position.size,
             traderCollateralDelta: 0,
             sizeDelta: _position.size
         });
 
         _logEvent(
-            "RequestCloseStalledPosition",
-            abi.encode(
-                _params,
-                _allocationAddress,
-                _traderPositionKey,
-                _requestKey
-            )
+            "RequestCloseStalledPosition", abi.encode(_params, _allocationAddress, _traderPositionKey, _requestKey)
         );
     }
 
@@ -512,7 +505,7 @@ contract Mirror is CoreContract {
         Position memory _position = positionMap[_request.allocationAddress];
         delete requestAdjustmentMap[_requestKey];
 
-        if (_request.traderTargetLeverage == 0) {
+        if (_request.isIncrease == false && _request.sizeDelta >= _position.size) {
             delete positionMap[_request.allocationAddress];
             _logEvent("Execute", abi.encode(_request.allocationAddress, _requestKey, 0, 0, 0, 0));
             return;
@@ -522,33 +515,34 @@ contract Mirror is CoreContract {
             _position.traderSize += _request.traderSizeDelta;
             _position.traderCollateral += _request.traderCollateralDelta;
         } else {
-            _position.traderSize =
-                (_position.traderSize > _request.traderSizeDelta) ? _position.traderSize - _request.traderSizeDelta : 0;
-            _position.traderCollateral = (_position.traderCollateral > _request.traderCollateralDelta)
-                ? _position.traderCollateral - _request.traderCollateralDelta
-                : 0;
-        }
-
-        if (_request.traderTargetLeverage > 0) {
-            if (_request.traderIsIncrease) {
-                _position.size += _request.sizeDelta;
+            if (_position.traderSize > _request.traderSizeDelta) {
+                _position.traderSize -= _request.traderSizeDelta;
             } else {
-                _position.size = (_position.size > _request.sizeDelta) ? _position.size - _request.sizeDelta : 0;
+                _position.traderSize = 0;
+            }
+
+            if (_position.traderCollateral > _request.traderCollateralDelta) {
+                _position.traderCollateral -= _request.traderCollateralDelta;
+            } else {
+                _position.traderCollateral = 0;
             }
         }
 
-        if (_position.size == 0) {
-            delete positionMap[_request.allocationAddress];
+        if (_request.isIncrease) {
+            _position.size += _request.sizeDelta;
         } else {
-            positionMap[_request.allocationAddress] = _position;
+            _position.size -= _request.sizeDelta;
         }
+
+        positionMap[_request.allocationAddress] = _position;
 
         _logEvent(
             "Execute",
             abi.encode(
                 _request.allocationAddress,
                 _requestKey,
-                _request.traderTargetLeverage,
+                _request.traderIsIncrease,
+                _request.isIncrease,
                 _position.size,
                 _position.traderSize,
                 _position.traderCollateral
