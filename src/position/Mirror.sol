@@ -26,8 +26,8 @@ contract Mirror is CoreContract {
         uint increaseCallbackGasLimit;
         uint decreaseCallbackGasLimit;
         uint maxPuppetList;
-        uint maxKeeperFeeToAllocationRatio;
-        uint maxKeeperFeeToAdjustmentRatio;
+        uint maxSequencerFeeToAllocationRatio;
+        uint maxSequencerFeeToAdjustmentRatio;
     }
 
     struct Position {
@@ -50,7 +50,7 @@ contract Mirror is CoreContract {
         bytes32 traderRequestKey;
         address trader;
         address market;
-        address keeperFeeReceiver;
+        address sequencerFeeReceiver;
         bool isIncrease;
         bool isLong;
         uint executionFee;
@@ -59,7 +59,7 @@ contract Mirror is CoreContract {
         uint acceptablePrice;
         uint triggerPrice;
         uint allocationId;
-        uint keeperFee;
+        uint sequencerFee;
     }
 
     struct StalledPositionParams {
@@ -185,7 +185,7 @@ contract Mirror is CoreContract {
         _allocationAddress = _account.createAllocationAccount(_allocationKey);
 
         Rule.RuleParams[] memory _rules = _ruleContract.getRuleList(_traderMatchingKey, _puppetList);
-        uint _feePerPuppet = _callParams.keeperFee / _puppetCount;
+        uint _feePerPuppet = _callParams.sequencerFee / _puppetCount;
         uint[] memory _allocatedList = new uint[](_puppetCount);
         uint[] memory _balanceList = _account.getBalanceList(_callParams.collateralToken, _puppetList);
         allocationPuppetList[_allocationAddress] = new uint[](_puppetCount);
@@ -202,7 +202,7 @@ contract Mirror is CoreContract {
             ) {
                 uint _puppetAllocation = Precision.applyBasisPoints(_rule.allowanceRate, _balanceList[_i]);
 
-                if (_feePerPuppet > Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _puppetAllocation)) {
+                if (_feePerPuppet > Precision.applyFactor(config.maxSequencerFeeToAllocationRatio, _puppetAllocation)) {
                     continue;
                 }
 
@@ -217,14 +217,14 @@ contract Mirror is CoreContract {
         _account.setBalanceList(_callParams.collateralToken, _puppetList, _balanceList);
 
         require(
-            _callParams.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAllocationRatio, _allocated),
-            Error.Mirror__KeeperFeeExceedsCostFactor(_callParams.keeperFee, _allocated)
+            _callParams.sequencerFee < Precision.applyFactor(config.maxSequencerFeeToAllocationRatio, _allocated),
+            Error.Mirror__SequencerFeeExceedsCostFactor(_callParams.sequencerFee, _allocated)
         );
 
-        _allocated -= _callParams.keeperFee;
+        _allocated -= _callParams.sequencerFee;
         allocationMap[_allocationAddress] = _allocated;
 
-        _account.transferOut(_callParams.collateralToken, _callParams.keeperFeeReceiver, _callParams.keeperFee);
+        _account.transferOut(_callParams.collateralToken, _callParams.sequencerFeeReceiver, _callParams.sequencerFee);
         _account.transferOut(_callParams.collateralToken, config.gmxOrderVault, _allocated);
 
         uint _traderTargetLeverage = Precision.toBasisPoints(_callParams.sizeDeltaInUsd, _callParams.collateralDelta);
@@ -269,7 +269,7 @@ contract Mirror is CoreContract {
 
     /**
      * @notice Adjusts an existing mirrored position to match trader's leverage changes
-     * @dev Handles keeper fee collection from puppets, calculates new leverage target, submits GMX order
+     * @dev Handles sequencer fee collection from puppets, calculates new leverage target, submits GMX order
      */
     function requestAdjust(
         Account _account,
@@ -286,10 +286,10 @@ contract Mirror is CoreContract {
 
         uint _allocated = allocationMap[_allocationAddress];
         require(_allocated > 0, Error.Mirror__InvalidAllocation(_allocationAddress));
-        require(_callParams.keeperFee > 0, Error.Mirror__InvalidKeeperExecutionFeeAmount());
+        require(_callParams.sequencerFee > 0, Error.Mirror__InvalidSequencerExecutionFeeAmount());
         require(
-            _callParams.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAdjustmentRatio, _allocated),
-            Error.Mirror__KeeperFeeExceedsAdjustmentRatio(_callParams.keeperFee, _allocated)
+            _callParams.sequencerFee < Precision.applyFactor(config.maxSequencerFeeToAdjustmentRatio, _allocated),
+            Error.Mirror__SequencerFeeExceedsAdjustmentRatio(_callParams.sequencerFee, _allocated)
         );
 
         uint[] memory _allocationList = allocationPuppetList[_allocationAddress];
@@ -299,12 +299,12 @@ contract Mirror is CoreContract {
             Error.Mirror__PuppetListMismatch(_allocationList.length, _puppetCount)
         );
         require(
-            _allocated > _callParams.keeperFee,
-            Error.Mirror__InsufficientAllocationForKeeperFee(_allocated, _callParams.keeperFee)
+            _allocated > _callParams.sequencerFee,
+            Error.Mirror__InsufficientAllocationForSequencerFee(_allocated, _callParams.sequencerFee)
         );
 
-        uint _remainingKeeperFeeToCollect = _callParams.keeperFee;
-        uint _keeperExecutionFeeInsolvency = 0;
+        uint _remainingSequencerFeeToCollect = _callParams.sequencerFee;
+        uint _sequencerExecutionFeeInsolvency = 0;
         uint[] memory _nextBalanceList = _account.getBalanceList(_callParams.collateralToken, _puppetList);
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
@@ -313,20 +313,20 @@ contract Mirror is CoreContract {
             if (_puppetAllocation == 0) continue;
 
             uint _remainingPuppets = _puppetCount - _i;
-            uint _feePerRemainingPuppet = (_remainingKeeperFeeToCollect + _remainingPuppets - 1) / _remainingPuppets;
+            uint _feePerRemainingPuppet = (_remainingSequencerFeeToCollect + _remainingPuppets - 1) / _remainingPuppets;
 
-            if (_feePerRemainingPuppet > _remainingKeeperFeeToCollect) {
-                _feePerRemainingPuppet = _remainingKeeperFeeToCollect;
+            if (_feePerRemainingPuppet > _remainingSequencerFeeToCollect) {
+                _feePerRemainingPuppet = _remainingSequencerFeeToCollect;
             }
 
             if (_nextBalanceList[_i] >= _feePerRemainingPuppet) {
                 _nextBalanceList[_i] -= _feePerRemainingPuppet;
-                _remainingKeeperFeeToCollect -= _feePerRemainingPuppet;
+                _remainingSequencerFeeToCollect -= _feePerRemainingPuppet;
             } else {
                 if (_puppetAllocation > _feePerRemainingPuppet) {
                     _allocationList[_i] = _puppetAllocation - _feePerRemainingPuppet;
                 } else {
-                    _keeperExecutionFeeInsolvency += _puppetAllocation;
+                    _sequencerExecutionFeeInsolvency += _puppetAllocation;
                     _allocationList[_i] = 0;
                 }
             }
@@ -335,18 +335,18 @@ contract Mirror is CoreContract {
         _account.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
 
         require(
-            _remainingKeeperFeeToCollect == 0, Error.Mirror__KeeperFeeNotFullyCovered(0, _remainingKeeperFeeToCollect)
+            _remainingSequencerFeeToCollect == 0, Error.Mirror__SequencerFeeNotFullyCovered(0, _remainingSequencerFeeToCollect)
         );
 
-        _allocated -= _keeperExecutionFeeInsolvency;
+        _allocated -= _sequencerExecutionFeeInsolvency;
         require(
-            _callParams.keeperFee < Precision.applyFactor(config.maxKeeperFeeToAdjustmentRatio, _allocated),
-            Error.Mirror__KeeperFeeExceedsAdjustmentRatio(_callParams.keeperFee, _allocated)
+            _callParams.sequencerFee < Precision.applyFactor(config.maxSequencerFeeToAdjustmentRatio, _allocated),
+            Error.Mirror__SequencerFeeExceedsAdjustmentRatio(_callParams.sequencerFee, _allocated)
         );
         allocationPuppetList[_allocationAddress] = _allocationList;
         allocationMap[_allocationAddress] = _allocated;
 
-        _account.transferOut(_callParams.collateralToken, _callParams.keeperFeeReceiver, _callParams.keeperFee);
+        _account.transferOut(_callParams.collateralToken, _callParams.sequencerFeeReceiver, _callParams.sequencerFee);
 
         Position memory _position = positionMap[_allocationAddress];
         require(_position.size > 0, Error.Mirror__PositionNotFound(_allocationAddress));
@@ -418,7 +418,7 @@ contract Mirror is CoreContract {
                 _allocated,
                 _sizeDelta,
                 _traderTargetLeverage,
-                _keeperExecutionFeeInsolvency,
+                _sequencerExecutionFeeInsolvency,
                 _allocationList
             )
         );
@@ -467,8 +467,8 @@ contract Mirror is CoreContract {
                 acceptablePrice: _params.acceptablePrice,
                 triggerPrice: 0,
                 allocationId: 0,
-                keeperFee: 0,
-                keeperFeeReceiver: address(0)
+                sequencerFee: 0,
+                sequencerFeeReceiver: address(0)
             }),
             _allocationAddress,
             GmxPositionUtils.OrderType.MarketDecrease,
@@ -644,8 +644,8 @@ contract Mirror is CoreContract {
         require(_config.increaseCallbackGasLimit > 0, "Invalid Increase Callback Gas Limit");
         require(_config.decreaseCallbackGasLimit > 0, "Invalid Decrease Callback Gas Limit");
         require(_config.maxPuppetList > 0, "Invalid max puppet list");
-        require(_config.maxKeeperFeeToAllocationRatio > 0, "Invalid max keeper fee to allocation ratio");
-        require(_config.maxKeeperFeeToAdjustmentRatio > 0, "Invalid max keeper fee to adjustment ratio");
+        require(_config.maxSequencerFeeToAllocationRatio > 0, "Invalid max sequencer fee to allocation ratio");
+        require(_config.maxSequencerFeeToAdjustmentRatio > 0, "Invalid max sequencer fee to adjustment ratio");
 
         config = _config;
     }

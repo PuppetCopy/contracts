@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/src/console.sol";
 
-import {KeeperRouter} from "src/keeperRouter.sol";
+import {SequencerRouter} from "src/sequencerRouter.sol";
 
 import {Account as AccountContract} from "src/position/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
@@ -38,7 +38,7 @@ contract DeployPosition is BaseScript {
         // Rule ruleContract = deployRule();
         // Mirror mirror = deployMirror(account);
         // Settle settle = deploySettle(account);
-        // deployKeeperRouter(mirror, ruleContract, settle, account);
+        // deploySequencerRouter(mirror, ruleContract, settle, account);
 
         // // Set up cross-contract permissions
         // setupCrossContractPermissions(mirror, ruleContract);
@@ -99,7 +99,7 @@ contract DeployPosition is BaseScript {
             Settle.Config({
                 transferOutGasLimit: 200_000,
                 platformSettleFeeFactor: 0.01e30, // 1%
-                maxKeeperFeeToSettleRatio: 0.1e30, // 10%
+                maxSequencerFeeToSettleRatio: 0.1e30, // 10%
                 maxPuppetList: 50,
                 allocationAccountTransferGasLimit: 100_000
             })
@@ -158,8 +158,8 @@ contract DeployPosition is BaseScript {
                 increaseCallbackGasLimit: 2e6,
                 decreaseCallbackGasLimit: 2e6,
                 maxPuppetList: 50,
-                maxKeeperFeeToAllocationRatio: 0.1e30,
-                maxKeeperFeeToAdjustmentRatio: 0.1e30
+                maxSequencerFeeToAllocationRatio: 0.1e30,
+                maxSequencerFeeToAdjustmentRatio: 0.1e30
             })
         );
         console.log("Mirror deployed at:", address(mirror));
@@ -177,22 +177,22 @@ contract DeployPosition is BaseScript {
         return mirror;
     }
 
-    function deployKeeperRouter(
+    function deploySequencerRouter(
         Mirror mirror,
         Rule ruleContract,
         Settle settle,
         AccountContract account
-    ) internal returns (KeeperRouter) {
-        console.log("\n--- Deploying KeeperRouter ---");
+    ) internal returns (SequencerRouter) {
+        console.log("\n--- Deploying SequencerRouter ---");
 
         // Deploy contract with empirical gas configuration
-        KeeperRouter keeperRouter = new KeeperRouter(
+        SequencerRouter sequencerRouter = new SequencerRouter(
             dictator,
             account,
             ruleContract,
             mirror,
             settle,
-            KeeperRouter.Config({
+            SequencerRouter.Config({
                 mirrorBaseGasLimit: 1_283_731,
                 mirrorPerPuppetGasLimit: 30_000,
                 adjustBaseGasLimit: 910_663,
@@ -202,48 +202,48 @@ contract DeployPosition is BaseScript {
                 fallbackRefundExecutionFeeReceiver: Const.dao
             })
         );
-        console.log("KeeperRouter deployed at:", address(keeperRouter));
+        console.log("SequencerRouter deployed at:", address(sequencerRouter));
 
-        // Set up permissions for KeeperRouter to call other contracts
-        console.log("Setting up KeeperRouter permissions...");
+        // Set up permissions for SequencerRouter to call other contracts
+        console.log("Setting up SequencerRouter permissions...");
 
         // Settle permissions
-        dictator.setPermission(settle, settle.settle.selector, address(keeperRouter));
-        dictator.setPermission(settle, settle.collectAllocationAccountDust.selector, address(keeperRouter));
+        dictator.setPermission(settle, settle.settle.selector, address(sequencerRouter));
+        dictator.setPermission(settle, settle.collectAllocationAccountDust.selector, address(sequencerRouter));
 
         // Mirror permissions
-        dictator.setPermission(mirror, mirror.requestOpen.selector, address(keeperRouter));
-        dictator.setPermission(mirror, mirror.requestAdjust.selector, address(keeperRouter));
-        dictator.setPermission(mirror, mirror.requestCloseStalledPosition.selector, address(keeperRouter));
-        dictator.setPermission(mirror, mirror.execute.selector, address(keeperRouter));
-        dictator.setPermission(mirror, mirror.liquidate.selector, address(keeperRouter));
+        dictator.setPermission(mirror, mirror.requestOpen.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.requestAdjust.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.requestCloseStalledPosition.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.execute.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.liquidate.selector, address(sequencerRouter));
 
-        // GMX callback permissions for KeeperRouter
+        // GMX callback permissions for SequencerRouter
         console.log("Setting up GMX callback permissions...");
-        dictator.setPermission(keeperRouter, keeperRouter.afterOrderExecution.selector, Const.gmxOrderHandler);
-        dictator.setPermission(keeperRouter, keeperRouter.afterOrderCancellation.selector, Const.gmxOrderHandler);
-        dictator.setPermission(keeperRouter, keeperRouter.afterOrderFrozen.selector, Const.gmxOrderHandler);
-        dictator.setPermission(keeperRouter, keeperRouter.refundExecutionFee.selector, Const.gmxOrderHandler);
+        dictator.setPermission(sequencerRouter, sequencerRouter.afterOrderExecution.selector, Const.gmxOrderHandler);
+        dictator.setPermission(sequencerRouter, sequencerRouter.afterOrderCancellation.selector, Const.gmxOrderHandler);
+        dictator.setPermission(sequencerRouter, sequencerRouter.afterOrderFrozen.selector, Const.gmxOrderHandler);
+        dictator.setPermission(sequencerRouter, sequencerRouter.refundExecutionFee.selector, Const.gmxOrderHandler);
 
         // Additional GMX handler permissions
-        dictator.setPermission(keeperRouter, keeperRouter.afterOrderExecution.selector, Const.gmxLiquidationHandler);
-        dictator.setPermission(keeperRouter, keeperRouter.afterOrderExecution.selector, Const.gmxAdlHandler);
+        dictator.setPermission(sequencerRouter, sequencerRouter.afterOrderExecution.selector, Const.gmxLiquidationHandler);
+        dictator.setPermission(sequencerRouter, sequencerRouter.afterOrderExecution.selector, Const.gmxAdlHandler);
 
         // Self-permission for refund
-        dictator.setPermission(keeperRouter, keeperRouter.refundExecutionFee.selector, address(keeperRouter));
+        dictator.setPermission(sequencerRouter, sequencerRouter.refundExecutionFee.selector, address(sequencerRouter));
 
-        // External keeper permissions
-        console.log("Setting up external keeper permissions...");
-        dictator.setPermission(keeperRouter, keeperRouter.requestOpen.selector, Const.keeper);
-        dictator.setPermission(keeperRouter, keeperRouter.requestAdjust.selector, Const.keeper);
-        dictator.setPermission(keeperRouter, keeperRouter.settleAllocation.selector, Const.keeper);
-        dictator.setPermission(keeperRouter, keeperRouter.collectAllocationAccountDust.selector, Const.keeper);
+        // External sequencer permissions
+        console.log("Setting up external sequencer permissions...");
+        dictator.setPermission(sequencerRouter, sequencerRouter.requestOpen.selector, Const.sequencer);
+        dictator.setPermission(sequencerRouter, sequencerRouter.requestAdjust.selector, Const.sequencer);
+        dictator.setPermission(sequencerRouter, sequencerRouter.settleAllocation.selector, Const.sequencer);
+        dictator.setPermission(sequencerRouter, sequencerRouter.collectAllocationAccountDust.selector, Const.sequencer);
 
         // Initialize contract
-        dictator.registerContract(keeperRouter);
-        console.log("KeeperRouter initialized and permissions configured");
+        dictator.registerContract(sequencerRouter);
+        console.log("SequencerRouter initialized and permissions configured");
 
-        return keeperRouter;
+        return sequencerRouter;
     }
 
     function setupCrossContractPermissions(Mirror mirror, Rule ruleContract) internal {
@@ -278,20 +278,20 @@ contract DeployPosition is BaseScript {
     }
 
     function upgradeMirror() public {
-        console.log("=== Upgrading Mirror Contract and KeeperRouter ===");
+        console.log("=== Upgrading Mirror Contract and SequencerRouter ===");
 
         AccountContract account = AccountContract(getDeployedAddress("Account"));
         Rule ruleContract = Rule(getDeployedAddress("Rule"));
         Settle settle = Settle(getDeployedAddress("Settle"));
 
         Mirror mirror = deployMirror(account);
-        KeeperRouter keeperRouter = deployKeeperRouter(mirror, ruleContract, settle, account);
+        SequencerRouter sequencerRouter = deploySequencerRouter(mirror, ruleContract, settle, account);
 
         setupCrossContractPermissions(mirror, ruleContract);
 
-        console.log("\n=== Mirror and KeeperRouter Upgrade Complete ===");
+        console.log("\n=== Mirror and SequencerRouter Upgrade Complete ===");
         console.log("New Mirror address:", address(mirror));
-        console.log("New KeeperRouter address:", address(keeperRouter));
-        console.log("\nIMPORTANT: Update keeper services to use the new KeeperRouter address");
+        console.log("New SequencerRouter address:", address(sequencerRouter));
+        console.log("\nIMPORTANT: Update sequencer services to use the new SequencerRouter address");
     }
 }

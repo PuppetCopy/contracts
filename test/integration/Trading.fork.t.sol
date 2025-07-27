@@ -5,7 +5,7 @@ pragma solidity ^0.8.29;
 // import {console} from "forge-std/src/console.sol";
 // import {Const} from "script/Const.sol";
 
-// import {KeeperRouter} from "src/keeperRouter.sol";
+// import {SequencerRouter} from "src/SequencerRouter.sol";
 
 // import {Mirror} from "src/position/Mirror.sol";
 // import {Rule} from "src/position/Rule.sol";
@@ -26,7 +26,7 @@ pragma solidity ^0.8.29;
 //     uint constant PUPPET2_BALANCE = 30000e6; // 30k USDC
 //     uint constant PUPPET1_DEPOSIT = 25000e6; // 25k USDC
 //     uint constant PUPPET2_DEPOSIT = 15000e6; // 15k USDC
-//     uint constant KEEPER_FEE = 50e6; // 50 USDC
+//     uint constant SEQUENCER_FEE = 50e6; // 50 USDC
 //     uint constant EXECUTION_FEE = 0.05 ether;
 
 //     /**
@@ -107,7 +107,7 @@ pragma solidity ^0.8.29;
 //         console.log("\n--- Initial State ---");
 //         console.log("Puppet1 Balance:", account.userBalanceMap(USDC, puppet1));
 //         console.log("Puppet2 Balance:", account.userBalanceMap(USDC, puppet2));
-//         console.log("Keeper Balance:", USDC.balanceOf(keeper));
+//         console.log("Sequencer Balance:", USDC.balanceOf(sequencer));
 //         console.log("GMX ExchangeRouter:", address(Const.gmxExchangeRouter));
 //         console.log("GMX OrderVault:", Const.gmxOrderVault);
 
@@ -125,8 +125,8 @@ pragma solidity ^0.8.29;
 //             acceptablePrice: acceptablePrice,
 //             triggerPrice: 0,
 //             allocationId: allocationId,
-//             keeperFee: KEEPER_FEE,
-//             keeperFeeReceiver: keeper
+//             sequencerFee: SEQUENCER_FEE,
+//             sequencerFeeReceiver: sequencer
 //         });
 
 //         console.log("\n--- Position Parameters ---");
@@ -135,7 +135,7 @@ pragma solidity ^0.8.29;
 //         console.log("Leverage:", (positionSize * 1e18) / collateralAmount, "x");
 //         console.log("Acceptable Price:", acceptablePrice);
 //         console.log("Execution Fee:", EXECUTION_FEE);
-//         console.log("Keeper Fee:", KEEPER_FEE);
+//         console.log("Sequencer Fee:", SEQUENCER_FEE);
 
 //         // Create trader position on GMX first
 //         createTraderPosition(callParams);
@@ -145,9 +145,9 @@ pragma solidity ^0.8.29;
 //         uint timestampStart = block.timestamp;
 
 //         // Execute mirror request
-//         vm.prank(keeper);
+//         vm.prank(sequencer);
 //         (address allocationAddress, bytes32 requestKey) =
-//             keeperRouter.requestOpen{value: EXECUTION_FEE}(callParams, puppetList);
+//             sequencerRouter.requestOpen{value: EXECUTION_FEE}(callParams, puppetList);
 
 //         uint gasUsed = gasStart - gasleft();
 //         uint timestampEnd = block.timestamp;
@@ -177,8 +177,8 @@ pragma solidity ^0.8.29;
 //             console.log("Puppet2 Percentage (basis points):", puppet2Percent);
 //         }
 
-//         // Log gas configuration from KeeperRouter
-//         KeeperRouter.Config memory gasConfig = keeperRouter.getConfig();
+//         // Log gas configuration from SequencerRouter
+//         SequencerRouter.Config memory gasConfig = sequencerRouter.getConfig();
 //         console.log("\n--- Gas Configuration ---");
 //         console.log("Mirror Base Gas Limit:", gasConfig.mirrorBaseGasLimit);
 //         console.log("Mirror Per-Puppet Gas Limit:", gasConfig.mirrorPerPuppetGasLimit);
@@ -187,7 +187,7 @@ pragma solidity ^0.8.29;
 
 //         // Debug: Also check the config() function output
 
-//         KeeperRouter.Config memory config = keeperRouter.getConfig();
+//         SequencerRouter.Config memory config = sequencerRouter.getConfig();
 //         console.log("\n--- Debug: Config Bytes Length ---");
 //         bytes memory configBytes = abi.encode(config);
 //         console.log("Config bytes length:", configBytes.length);
@@ -201,13 +201,13 @@ pragma solidity ^0.8.29;
 //         console.log("\n--- Final State ---");
 //         console.log("Puppet1 Remaining Balance:", account.userBalanceMap(USDC, puppet1));
 //         console.log("Puppet2 Remaining Balance:", account.userBalanceMap(USDC, puppet2));
-//         console.log("Keeper Final Balance:", USDC.balanceOf(keeper));
+//         console.log("Sequencer Final Balance:", USDC.balanceOf(sequencer));
 
 //         // Assertions for test validity
 //         assertNotEq(requestKey, bytes32(0), "Should generate GMX request key");
 //         assertNotEq(allocationAddress, address(0), "Should create allocation address");
 //         assertGt(totalAllocation, 0, "Should create non-zero allocation");
-//         assertEq(USDC.balanceOf(keeper), 10000e6 + KEEPER_FEE, "Keeper should receive fee");
+//         assertEq(USDC.balanceOf(sequencer), 10000e6 + SEQUENCER_FEE, "Sequencer should receive fee");
 
 //         console.log("\n=== Test Complete - Results logged for analysis ===");
 //     }
@@ -218,8 +218,8 @@ pragma solidity ^0.8.29;
 //      */
 //     function testGasAnalysisReport() public {
 //         console.log("\n=== Gas Analysis Report ===");
-//         console.log("Purpose: Determine accurate gas limits for keeper operations");
-//         console.log("Note: Results exclude keeper-side buffers");
+//         console.log("Purpose: Determine accurate gas limits for sequencer operations");
+//         console.log("Note: Results exclude sequencer-side buffers");
 
 //         // Test with 1 puppet
 //         uint gas1Puppet = _testMirrorGasUsage(1, "1 Puppet");
@@ -410,15 +410,15 @@ pragma solidity ^0.8.29;
 //             acceptablePrice: 4000e30,
 //             triggerPrice: 0,
 //             allocationId: allocationId,
-//             keeperFee: KEEPER_FEE,
-//             keeperFeeReceiver: keeper
+//             sequencerFee: SEQUENCER_FEE,
+//             sequencerFeeReceiver: sequencer
 //         });
 
 //         // Create trader position on GMX first
 //         createTraderPosition(callParams);
 
-//         vm.prank(keeper);
-//         (address allocationAddress,) = keeperRouter.requestOpen{value: EXECUTION_FEE}(callParams, puppetList);
+//         vm.prank(sequencer);
+//         (address allocationAddress,) = sequencerRouter.requestOpen{value: EXECUTION_FEE}(callParams, puppetList);
 
 //         console.log("Created allocation:", allocationAddress);
 
@@ -434,17 +434,17 @@ pragma solidity ^0.8.29;
 //         Settle.CallSettle memory settleParams = Settle.CallSettle({
 //             collateralToken: USDC,
 //             distributionToken: USDC,
-//             keeperFeeReceiver: keeper,
+//             sequencerFeeReceiver: sequencer,
 //             trader: trader,
 //             allocationId: allocationId,
-//             keeperExecutionFee: KEEPER_FEE
+//             sequencerExecutionFee: SEQUENCER_FEE
 //         });
 
 //         // Measure settle gas
 //         uint gasStart = gasleft();
 
-//         vm.prank(keeper);
-//         keeperRouter.settleAllocation(settleParams, puppetList);
+//         vm.prank(sequencer);
+//         sequencerRouter.settleAllocation(settleParams, puppetList);
 
 //         gasUsed = gasStart - gasleft();
 
@@ -479,8 +479,8 @@ pragma solidity ^0.8.29;
 //             acceptablePrice: 4000e30,
 //             triggerPrice: 0,
 //             allocationId: allocationId,
-//             keeperFee: KEEPER_FEE,
-//             keeperFeeReceiver: keeper
+//             sequencerFee: SEQUENCER_FEE,
+//             sequencerFeeReceiver: sequencer
 //         });
 
 //         // Create trader position on GMX first
@@ -489,9 +489,9 @@ pragma solidity ^0.8.29;
 //         // Measure gas
 //         uint gasStart = gasleft();
 
-//         vm.prank(keeper);
+//         vm.prank(sequencer);
 //         (address allocationAddress, bytes32 requestKey) =
-//             keeperRouter.requestOpen{value: EXECUTION_FEE}(callParams, puppetList);
+//             sequencerRouter.requestOpen{value: EXECUTION_FEE}(callParams, puppetList);
 
 //         gasUsed = gasStart - gasleft();
 
@@ -533,20 +533,20 @@ pragma solidity ^0.8.29;
 //             acceptablePrice: acceptablePrice,
 //             triggerPrice: 0,
 //             allocationId: allocationId,
-//             keeperFee: KEEPER_FEE,
-//             keeperFeeReceiver: keeper
+//             sequencerFee: SEQUENCER_FEE,
+//             sequencerFeeReceiver: sequencer
 //         });
 
 //         // Create trader position on GMX first
 //         createTraderPosition(callParams);
 
-//         // Step 1: Mirror Request - Keeper submits position to GMX
+//         // Step 1: Mirror Request - Sequencer submits position to GMX
 //         console.log("\n--- Step 1: Mirror Request ---");
 //         uint gasStart = gasleft();
 
-//         vm.prank(keeper);
+//         vm.prank(sequencer);
 //         (address allocationAddress, bytes32 requestKey) =
-//             keeperRouter.requestOpen{value: EXECUTION_FEE}(callParams, puppetList);
+//             sequencerRouter.requestOpen{value: EXECUTION_FEE}(callParams, puppetList);
 
 //         uint mirrorGasUsed = gasStart - gasleft();
 //         console.log("Mirror Gas Used:", mirrorGasUsed);
@@ -566,7 +566,7 @@ pragma solidity ^0.8.29;
 
 //         // Simulate successful GMX execution by calling execute directly
 //         // In real flow, this would be called by GMX callback
-//         vm.prank(address(keeperRouter));
+//         vm.prank(address(sequencerRouter));
 //         mirror.execute(requestKey);
 
 //         console.log("Position executed successfully");
@@ -583,14 +583,14 @@ pragma solidity ^0.8.29;
 //         // Record pre-settlement balances
 //         uint puppet1BalanceBefore = account.userBalanceMap(USDC, puppet1);
 //         uint puppet2BalanceBefore = account.userBalanceMap(USDC, puppet2);
-//         uint keeperBalanceBefore = USDC.balanceOf(keeper);
+//         uint sequencerBalanceBefore = USDC.balanceOf(sequencer);
 
 //         console.log("Pre-Settlement Balances:");
 //         console.log("  Puppet1:", puppet1BalanceBefore);
 //         console.log("  Puppet2:", puppet2BalanceBefore);
-//         console.log("  Keeper:", keeperBalanceBefore);
+//         console.log("  Sequencer:", sequencerBalanceBefore);
 
-//         // Simulate settlement by calling keeperRouter.settleAllocation
+//         // Simulate settlement by calling sequencerRouter.settleAllocation
 //         // Note: This might revert if position isn't in a settleable state
 //         // We'll wrap in try-catch to handle gracefully
 
@@ -602,16 +602,16 @@ pragma solidity ^0.8.29;
 //         Settle.CallSettle memory settleParams = Settle.CallSettle({
 //             collateralToken: USDC,
 //             distributionToken: USDC,
-//             keeperFeeReceiver: keeper,
+//             sequencerFeeReceiver: sequencer,
 //             trader: trader,
 //             allocationId: allocationId,
-//             keeperExecutionFee: KEEPER_FEE
+//             sequencerExecutionFee: SEQUENCER_FEE
 //         });
 
 //         // For this test, we'll simulate that funds are available for settlement
 //         // In real scenario, this comes from GMX position closure
 
-//         try keeperRouter.settleAllocation(settleParams, settleList) {
+//         try sequencerRouter.settleAllocation(settleParams, settleList) {
 //             console.log("Settlement completed successfully");
 
 //             // Step 4: Validate final distributions
@@ -619,12 +619,12 @@ pragma solidity ^0.8.29;
 
 //             uint puppet1BalanceAfter = account.userBalanceMap(USDC, puppet1);
 //             uint puppet2BalanceAfter = account.userBalanceMap(USDC, puppet2);
-//             uint keeperBalanceAfter = USDC.balanceOf(keeper);
+//             uint sequencerBalanceAfter = USDC.balanceOf(sequencer);
 
 //             console.log("Post-Settlement Balances:");
 //             console.log("  Puppet1:", puppet1BalanceAfter);
 //             console.log("  Puppet2:", puppet2BalanceAfter);
-//             console.log("  Keeper:", keeperBalanceAfter);
+//             console.log("  Sequencer:", sequencerBalanceAfter);
 
 //             // Calculate changes
 //             console.log("Balance Changes:");
@@ -643,8 +643,8 @@ pragma solidity ^0.8.29;
 //                     : puppet2BalanceBefore - puppet2BalanceAfter
 //             );
 
-//             // Validate keeper received settlement fee
-//             assert(keeperBalanceAfter >= keeperBalanceBefore);
+//             // Validate sequencer received settlement fee
+//             assert(sequencerBalanceAfter >= sequencerBalanceBefore);
 //         } catch (bytes memory reason) {
 //             console.log("Settlement failed - this is expected for test simulation");
 
@@ -662,8 +662,8 @@ pragma solidity ^0.8.29;
 //         console.log("\n--- Step 5: Performance Analysis ---");
 //         console.log("Total Gas for Mirror:", mirrorGasUsed);
 
-//         // Get gas configuration from KeeperRouter
-//         KeeperRouter.Config memory gasConfig = keeperRouter.getConfig();
+//         // Get gas configuration from SequencerRouter
+//         SequencerRouter.Config memory gasConfig = sequencerRouter.getConfig();
 
 //         // Calculate expected vs actual gas using contract configuration
 //         uint expectedGas = gasConfig.mirrorBaseGasLimit + (gasConfig.mirrorPerPuppetGasLimit * puppetList.length);

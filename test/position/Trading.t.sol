@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {KeeperRouter} from "src/keeperRouter.sol";
+import {SequencerRouter} from "src/SequencerRouter.sol";
 import {Account as AccountContract} from "src/position/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
 import {Rule} from "src/position/Rule.sol";
@@ -26,7 +26,7 @@ import {Const} from "script/Const.sol";
 /**
  * @title TradingTest
  * @notice Test suite for position mirroring and trading operations
- * @dev Tests integration between Mirror, Settle, KeeperRouter, Rule, and Deposit
+ * @dev Tests integration between Mirror, Settle, SequencerRouter, Rule, and Deposit
  * Updated to work with the decoupled Rule/Deposit architecture.
  */
 contract TradingTest is BasicSetup {
@@ -35,7 +35,7 @@ contract TradingTest is BasicSetup {
     Settle settle;
     Rule ruleContract;
     Mirror mirror;
-    KeeperRouter keeperRouter;
+    SequencerRouter sequencerRouter;
     MockGmxExchangeRouter mockGmxExchangeRouter;
 
     uint nextAllocationId = 0;
@@ -80,8 +80,8 @@ contract TradingTest is BasicSetup {
                 increaseCallbackGasLimit: 2e6,
                 decreaseCallbackGasLimit: 2e6,
                 maxPuppetList: 50,
-                maxKeeperFeeToAllocationRatio: 0.1e30,
-                maxKeeperFeeToAdjustmentRatio: 0.1e30
+                maxSequencerFeeToAllocationRatio: 0.1e30,
+                maxSequencerFeeToAdjustmentRatio: 0.1e30
             })
         );
 
@@ -90,19 +90,19 @@ contract TradingTest is BasicSetup {
             Settle.Config({
                 transferOutGasLimit: 200_000,
                 platformSettleFeeFactor: 0.05e30, // 5%
-                maxKeeperFeeToSettleRatio: 0.1e30, // 10%
+                maxSequencerFeeToSettleRatio: 0.1e30, // 10%
                 maxPuppetList: 50,
                 allocationAccountTransferGasLimit: 100_000
             })
         );
 
-        keeperRouter = new KeeperRouter(
+        sequencerRouter = new SequencerRouter(
             dictator,
             account,
             ruleContract,
             mirror,
             settle,
-            KeeperRouter.Config({
+            SequencerRouter.Config({
                 mirrorBaseGasLimit: 1_300_853,
                 mirrorPerPuppetGasLimit: 30_000,
                 adjustBaseGasLimit: 910_663,
@@ -133,21 +133,21 @@ contract TradingTest is BasicSetup {
 
         // Mirror Contract Permissions
         dictator.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(ruleContract));
-        dictator.setPermission(mirror, mirror.requestOpen.selector, address(keeperRouter));
-        dictator.setPermission(mirror, mirror.requestAdjust.selector, address(keeperRouter));
-        dictator.setPermission(mirror, mirror.execute.selector, address(keeperRouter));
-        dictator.setPermission(mirror, mirror.liquidate.selector, address(keeperRouter));
+        dictator.setPermission(mirror, mirror.requestOpen.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.requestAdjust.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.execute.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.liquidate.selector, address(sequencerRouter));
 
         // Settle Contract Permissions
-        dictator.setPermission(settle, settle.settle.selector, address(keeperRouter));
-        dictator.setPermission(settle, settle.collectAllocationAccountDust.selector, address(keeperRouter));
+        dictator.setPermission(settle, settle.settle.selector, address(sequencerRouter));
+        dictator.setPermission(settle, settle.collectAllocationAccountDust.selector, address(sequencerRouter));
 
         // Initialize contracts
         dictator.registerContract(account);
         dictator.registerContract(settle);
         dictator.registerContract(ruleContract);
         dictator.registerContract(mirror);
-        dictator.registerContract(keeperRouter);
+        dictator.registerContract(sequencerRouter);
 
         // Mock GMX DataStore calls to simulate trader positions
         _setupGmxDataStoreMocks();
@@ -163,11 +163,11 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(account, account.deposit.selector, users.owner);
         dictator.setPermission(ruleContract, ruleContract.setRule.selector, users.owner);
         dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, users.owner);
-        dictator.setPermission(keeperRouter, keeperRouter.requestOpen.selector, users.owner);
-        dictator.setPermission(keeperRouter, keeperRouter.requestAdjust.selector, users.owner);
-        dictator.setPermission(keeperRouter, keeperRouter.settleAllocation.selector, users.owner);
-        dictator.setPermission(keeperRouter, keeperRouter.collectAllocationAccountDust.selector, users.owner);
-        dictator.setPermission(keeperRouter, keeperRouter.afterOrderExecution.selector, users.owner);
+        dictator.setPermission(sequencerRouter, sequencerRouter.requestOpen.selector, users.owner);
+        dictator.setPermission(sequencerRouter, sequencerRouter.requestAdjust.selector, users.owner);
+        dictator.setPermission(sequencerRouter, sequencerRouter.settleAllocation.selector, users.owner);
+        dictator.setPermission(sequencerRouter, sequencerRouter.collectAllocationAccountDust.selector, users.owner);
+        dictator.setPermission(sequencerRouter, sequencerRouter.afterOrderExecution.selector, users.owner);
 
         account.setDepositCapList(allowedTokens, allowanceCaps);
 
@@ -211,7 +211,7 @@ contract TradingTest is BasicSetup {
         puppetList[1] = puppet2;
 
         uint allocationId = getNextAllocationId();
-        uint keeperFee = 1e6; // 1 USDC
+        uint sequencerFee = 1e6; // 1 USDC
 
         Mirror.CallPosition memory callParams = Mirror.CallPosition({
             collateralToken: usdc,
@@ -226,13 +226,13 @@ contract TradingTest is BasicSetup {
             acceptablePrice: 3000e30,
             triggerPrice: 0,
             allocationId: allocationId,
-            keeperFee: keeperFee,
-            keeperFeeReceiver: users.owner
+            sequencerFee: sequencerFee,
+            sequencerFeeReceiver: users.owner
         });
 
         vm.deal(users.owner, 1 ether);
         (address allocationAddress, bytes32 requestKey) =
-            keeperRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
+            sequencerRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
 
         // Verify allocation was created
         assertGt(mirror.allocationMap(allocationAddress), 0, "Allocation should be created");
@@ -240,8 +240,8 @@ contract TradingTest is BasicSetup {
         // Verify request was submitted to GMX
         assertNotEq(requestKey, bytes32(0), "Request key should be generated");
 
-        // Verify keeper fee was paid (owner had 200e6 initial balance from BasicSetup)
-        assertEq(usdc.balanceOf(users.owner), 200e6 + keeperFee, "Keeper should receive fee");
+        // Verify sequencer fee was paid (owner had 200e6 initial balance from BasicSetup)
+        assertEq(usdc.balanceOf(users.owner), 200e6 + sequencerFee, "Sequencer should receive fee");
     }
 
     function testRequestOpenInsufficientFunds() public {
@@ -250,7 +250,7 @@ contract TradingTest is BasicSetup {
         puppetList[1] = puppet2;
 
         uint allocationId = getNextAllocationId();
-        uint keeperFee = 10000e6; // Excessive keeper fee
+        uint sequencerFee = 10000e6; // Excessive sequencer fee
 
         Mirror.CallPosition memory callParams = Mirror.CallPosition({
             collateralToken: usdc,
@@ -265,13 +265,13 @@ contract TradingTest is BasicSetup {
             acceptablePrice: 3000e30,
             triggerPrice: 0,
             allocationId: allocationId,
-            keeperFee: keeperFee,
-            keeperFeeReceiver: users.owner
+            sequencerFee: sequencerFee,
+            sequencerFeeReceiver: users.owner
         });
 
         vm.deal(users.owner, 1 ether);
         vm.expectRevert();
-        keeperRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
+        sequencerRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
     }
 
     function testRequestAdjustSuccess() public {
@@ -281,7 +281,7 @@ contract TradingTest is BasicSetup {
         puppetList[1] = puppet2;
 
         uint allocationId = getNextAllocationId();
-        uint keeperFee = 1e6; // 1 USDC
+        uint sequencerFee = 1e6; // 1 USDC
 
         Mirror.CallPosition memory initialCallParams = Mirror.CallPosition({
             collateralToken: usdc,
@@ -296,17 +296,17 @@ contract TradingTest is BasicSetup {
             acceptablePrice: 3000e30,
             triggerPrice: 0,
             allocationId: allocationId,
-            keeperFee: keeperFee,
-            keeperFeeReceiver: users.owner
+            sequencerFee: sequencerFee,
+            sequencerFeeReceiver: users.owner
         });
 
         vm.deal(users.owner, 1 ether);
-        (, bytes32 requestKey) = keeperRouter.requestOpen{value: 0.001 ether}(initialCallParams, puppetList);
+        (, bytes32 requestKey) = sequencerRouter.requestOpen{value: 0.001 ether}(initialCallParams, puppetList);
 
         executeOrder(requestKey);
 
         // Now test adjustment
-        uint adjustKeeperFee = 0.5e6; // 0.5 USDC
+        uint adjustSequencerFee = 0.5e6; // 0.5 USDC
 
         // Adjust position - trader increases leverage by adding more size without proportional collateral
         Mirror.CallPosition memory adjustCallParams = Mirror.CallPosition({
@@ -322,12 +322,12 @@ contract TradingTest is BasicSetup {
             acceptablePrice: 3100e30,
             triggerPrice: 0,
             allocationId: allocationId,
-            keeperFee: adjustKeeperFee,
-            keeperFeeReceiver: users.owner
+            sequencerFee: adjustSequencerFee,
+            sequencerFeeReceiver: users.owner
         });
 
         vm.deal(users.owner, 1 ether);
-        bytes32 adjustRequestKey = keeperRouter.requestAdjust{value: 0.001 ether}(adjustCallParams, puppetList);
+        bytes32 adjustRequestKey = sequencerRouter.requestAdjust{value: 0.001 ether}(adjustCallParams, puppetList);
 
         // Verify request was submitted
         assertNotEq(adjustRequestKey, bytes32(0), "Adjust request should be generated");
@@ -350,17 +350,17 @@ contract TradingTest is BasicSetup {
         Settle.CallSettle memory settleParams = Settle.CallSettle({
             collateralToken: usdc,
             distributionToken: usdc,
-            keeperFeeReceiver: users.owner,
+            sequencerFeeReceiver: users.owner,
             trader: trader,
             allocationId: allocationId,
-            keeperExecutionFee: 0.1e6
+            sequencerExecutionFee: 0.1e6
         });
 
         uint puppet1BalanceBefore = account.userBalanceMap(usdc, puppet1);
         uint puppet2BalanceBefore = account.userBalanceMap(usdc, puppet2);
 
         (uint settledAmount, uint distributionAmount, uint platformFeeAmount) =
-            keeperRouter.settleAllocation(settleParams, puppetList);
+            sequencerRouter.settleAllocation(settleParams, puppetList);
 
         // Verify settlement occurred
         assertGt(settledAmount, 0, "Should have settled some amount");
@@ -397,7 +397,7 @@ contract TradingTest is BasicSetup {
 
         uint ownerBalanceBefore = usdc.balanceOf(users.owner);
 
-        uint dustCollected = keeperRouter.collectAllocationAccountDust(allocationAddress, usdc, users.owner);
+        uint dustCollected = sequencerRouter.collectAllocationAccountDust(allocationAddress, usdc, users.owner);
 
         assertEq(dustCollected, 5e6, "Should collect all dust");
         assertEq(usdc.balanceOf(users.owner), ownerBalanceBefore + 5e6, "Owner should receive dust");
@@ -424,13 +424,13 @@ contract TradingTest is BasicSetup {
             acceptablePrice: 3000e30,
             triggerPrice: 0,
             allocationId: allocationId,
-            keeperFee: 1e6,
-            keeperFeeReceiver: users.owner
+            sequencerFee: 1e6,
+            sequencerFeeReceiver: users.owner
         });
 
         vm.deal(users.owner, 1 ether);
         vm.expectRevert(Error.Mirror__PuppetListEmpty.selector);
-        keeperRouter.requestOpen{value: 0.001 ether}(callParams, emptyPuppetList);
+        sequencerRouter.requestOpen{value: 0.001 ether}(callParams, emptyPuppetList);
     }
 
     function testExpiredRule() public {
@@ -442,7 +442,7 @@ contract TradingTest is BasicSetup {
         vm.warp(block.timestamp + 31 days);
 
         uint allocationId = getNextAllocationId();
-        uint keeperFee = 1e6; // Non-zero keeper fee
+        uint sequencerFee = 1e6; // Non-zero sequencer fee
 
         Mirror.CallPosition memory callParams = Mirror.CallPosition({
             collateralToken: usdc,
@@ -457,14 +457,14 @@ contract TradingTest is BasicSetup {
             acceptablePrice: 3000e30,
             triggerPrice: 0,
             allocationId: allocationId,
-            keeperFee: keeperFee,
-            keeperFeeReceiver: users.owner
+            sequencerFee: sequencerFee,
+            sequencerFeeReceiver: users.owner
         });
 
         vm.deal(users.owner, 1 ether);
-        // Should revert because no valid puppets means no allocation, and keeper fee check fails
+        // Should revert because no valid puppets means no allocation, and sequencer fee check fails
         vm.expectRevert();
-        keeperRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
+        sequencerRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
     }
 
     function testThrottleActivity() public {
@@ -477,7 +477,7 @@ contract TradingTest is BasicSetup {
 
         // Try to create another position immediately (should be throttled)
         uint allocationId = getNextAllocationId();
-        uint keeperFee = 0.1e6; // Small keeper fee
+        uint sequencerFee = 0.1e6; // Small sequencer fee
 
         Mirror.CallPosition memory callParams = Mirror.CallPosition({
             collateralToken: usdc,
@@ -492,15 +492,15 @@ contract TradingTest is BasicSetup {
             acceptablePrice: 3000e30,
             triggerPrice: 0,
             allocationId: allocationId,
-            keeperFee: keeperFee,
-            keeperFeeReceiver: users.owner
+            sequencerFee: sequencerFee,
+            sequencerFeeReceiver: users.owner
         });
 
         vm.deal(users.owner, 1 ether);
         // For this test, let's advance time just past puppet1's throttle (1 hour) but not puppet2's (2 hours)
         vm.warp(block.timestamp + 1.5 hours);
 
-        (address allocationAddress,) = keeperRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
+        (address allocationAddress,) = sequencerRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
 
         // Should get allocation only from puppet1 since puppet2 is still throttled
         uint allocatedAmount = mirror.allocationMap(allocationAddress);
@@ -535,7 +535,7 @@ contract TradingTest is BasicSetup {
 
         // Should revert when trying to collect
         vm.expectRevert();
-        keeperRouter.collectAllocationAccountDust(allocationAddress, usdc, users.owner);
+        sequencerRouter.collectAllocationAccountDust(allocationAddress, usdc, users.owner);
     }
 
     function testDecreasePosition() public {
@@ -545,7 +545,7 @@ contract TradingTest is BasicSetup {
         puppetList[1] = puppet2;
 
         uint allocationId = getNextAllocationId();
-        uint keeperFee = 1e6;
+        uint sequencerFee = 1e6;
 
         Mirror.CallPosition memory openParams = Mirror.CallPosition({
             collateralToken: usdc,
@@ -560,12 +560,12 @@ contract TradingTest is BasicSetup {
             acceptablePrice: 3000e30,
             triggerPrice: 0,
             allocationId: allocationId,
-            keeperFee: keeperFee,
-            keeperFeeReceiver: users.owner
+            sequencerFee: sequencerFee,
+            sequencerFeeReceiver: users.owner
         });
 
         vm.deal(users.owner, 2 ether);
-        (, bytes32 requestKey) = keeperRouter.requestOpen{value: 0.001 ether}(openParams, puppetList);
+        (, bytes32 requestKey) = sequencerRouter.requestOpen{value: 0.001 ether}(openParams, puppetList);
 
         // Execute the open position
         executeOrder(requestKey);
@@ -584,11 +584,11 @@ contract TradingTest is BasicSetup {
             acceptablePrice: 2900e30,
             triggerPrice: 0,
             allocationId: allocationId,
-            keeperFee: 0.5e6,
-            keeperFeeReceiver: users.owner
+            sequencerFee: 0.5e6,
+            sequencerFeeReceiver: users.owner
         });
 
-        bytes32 decreaseRequestKey = keeperRouter.requestAdjust{value: 0.001 ether}(decreaseParams, puppetList);
+        bytes32 decreaseRequestKey = sequencerRouter.requestAdjust{value: 0.001 ether}(decreaseParams, puppetList);
         assertNotEq(decreaseRequestKey, bytes32(0), "Decrease request should be generated");
     }
 
@@ -632,8 +632,8 @@ contract TradingTest is BasicSetup {
             acceptablePrice: 3000e30,
             triggerPrice: 0,
             allocationId: allocationId1,
-            keeperFee: 0.5e6,
-            keeperFeeReceiver: users.owner
+            sequencerFee: 0.5e6,
+            sequencerFeeReceiver: users.owner
         });
 
         Mirror.CallPosition memory callParams2 = Mirror.CallPosition({
@@ -649,17 +649,17 @@ contract TradingTest is BasicSetup {
             acceptablePrice: 3000e30,
             triggerPrice: 0,
             allocationId: allocationId2,
-            keeperFee: 0.5e6,
-            keeperFeeReceiver: users.owner
+            sequencerFee: 0.5e6,
+            sequencerFeeReceiver: users.owner
         });
 
         vm.deal(users.owner, 2 ether);
 
         // Create position for trader1
-        (address allocation1,) = keeperRouter.requestOpen{value: 0.001 ether}(callParams1, puppetList1);
+        (address allocation1,) = sequencerRouter.requestOpen{value: 0.001 ether}(callParams1, puppetList1);
 
         // Create position for trader2
-        (address allocation2,) = keeperRouter.requestOpen{value: 0.001 ether}(callParams2, puppetList2);
+        (address allocation2,) = sequencerRouter.requestOpen{value: 0.001 ether}(callParams2, puppetList2);
 
         // Verify both allocations were created
         assertGt(mirror.allocationMap(allocation1), 0, "Trader1 allocation should exist");
@@ -678,27 +678,27 @@ contract TradingTest is BasicSetup {
         Settle.CallSettle memory settleParams1 = Settle.CallSettle({
             collateralToken: usdc,
             distributionToken: usdc,
-            keeperFeeReceiver: users.owner,
+            sequencerFeeReceiver: users.owner,
             trader: trader,
             allocationId: allocationId1,
-            keeperExecutionFee: 0.1e6 // 0.1 USDC keeper fee
+            sequencerExecutionFee: 0.1e6 // 0.1 USDC sequencer fee
         });
 
         (uint settled1, uint distributed1, uint platformFee1) =
-            keeperRouter.settleAllocation(settleParams1, puppetList1);
+            sequencerRouter.settleAllocation(settleParams1, puppetList1);
 
         // Settle trader2's position (puppet2 gets the profit)
         Settle.CallSettle memory settleParams2 = Settle.CallSettle({
             collateralToken: usdc,
             distributionToken: usdc,
-            keeperFeeReceiver: users.owner,
+            sequencerFeeReceiver: users.owner,
             trader: trader2,
             allocationId: allocationId2,
-            keeperExecutionFee: 0.1e6 // 0.1 USDC keeper fee
+            sequencerExecutionFee: 0.1e6 // 0.1 USDC sequencer fee
         });
 
         (uint settled2, uint distributed2, uint platformFee2) =
-            keeperRouter.settleAllocation(settleParams2, puppetList2);
+            sequencerRouter.settleAllocation(settleParams2, puppetList2);
 
         // Verify settlements occurred
         assertEq(settled1, 100e6, "Should settle full trader1 profit");
@@ -724,7 +724,7 @@ contract TradingTest is BasicSetup {
         assertGt(puppet2ProfitShare, 0, "Puppet2 should have positive profit share");
 
         // Both puppets should have received their respective trader's profits
-        // (minus keeper fees and platform fees)
+        // (minus sequencer fees and platform fees)
         assertLt(puppet1ProfitShare, 100e6, "Puppet1 profit should be less than gross due to fees");
         assertLt(puppet2ProfitShare, 80e6, "Puppet2 profit should be less than gross due to fees");
     }
@@ -736,7 +736,7 @@ contract TradingTest is BasicSetup {
     function executeOrder(
         bytes32 _requestKey
     ) internal {
-        keeperRouter.afterOrderExecution(
+        sequencerRouter.afterOrderExecution(
             _requestKey,
             GmxPositionUtils.Props({
                 addresses: GmxPositionUtils.Addresses({

@@ -44,7 +44,7 @@ library Error {
     error Mirror__TraderPositionNotFound(address trader, bytes32 positionKey);
     error Mirror__InvalidCollateralDelta();
     error Mirror__InvalidCurrentLeverage();
-    error Mirror__InvalidKeeperExecutionFeeAmount();
+    error Mirror__InvalidSequencerExecutionFeeAmount();
     error Mirror__InvalidSizeDelta();
     error Mirror__PuppetListEmpty();
     error Mirror__ExecutionRequestMissing(bytes32 requestKey);
@@ -55,17 +55,17 @@ library Error {
     error Mirror__TraderCollateralZero(address allocationAddress);
     error Mirror__DustTransferFailed(address token, address account);
     error Mirror__InsufficientGmxExecutionFee(uint provided, uint required);
-    error Mirror__InsufficientAllocationForKeeperFee(uint allocation, uint keeperFee);
-    error Mirror__KeeperFeeExceedsCostFactor(uint keeperFee, uint allocationAmount);
+    error Mirror__InsufficientAllocationForSequencerFee(uint allocation, uint sequencerFee);
+    error Mirror__SequencerFeeExceedsCostFactor(uint sequencerFee, uint allocationAmount);
     error Mirror__OrderCreationFailed();
-    error Mirror__KeeperFeeExceedsAdjustmentRatio(uint keeperFee, uint allocationAmount);
+    error Mirror__SequencerFeeExceedsAdjustmentRatio(uint sequencerFee, uint allocationAmount);
     error Mirror__PuppetListMismatch(uint expected, uint provided);
-    error Mirror__KeeperFeeNotFullyCovered(uint totalPaid, uint requiredFee);
+    error Mirror__SequencerFeeNotFullyCovered(uint totalPaid, uint requiredFee);
 
     error Settle__InvalidAllocation(address allocationAddress);
-    error Settle__InvalidKeeperExecutionFeeAmount();
-    error Settle__InvalidKeeperExecutionFeeReceiver();
-    error Settle__KeeperFeeExceedsSettledAmount(uint keeperFee, uint settledAmount);
+    error Settle__InvalidSequencerExecutionFeeAmount();
+    error Settle__InvalidSequencerExecutionFeeReceiver();
+    error Settle__SequencerFeeExceedsSettledAmount(uint sequencerFee, uint settledAmount);
     error Settle__PuppetListExceedsMaximum(uint provided, uint maximum);
     error Settle__InvalidReceiver();
     error Settle__DustThresholdNotSet(address token);
@@ -82,7 +82,7 @@ library Error {
     error AllocationAccount__UnauthorizedOperator();
     error AllocationAccount__InsufficientBalance();
 
-    error KeeperRouter__FailedRefundExecutionFee();
+    error SequencerRouter__FailedRefundExecutionFee();
 
     error FeeMarketplace__NotAuctionableToken();
     error FeeMarketplace__InsufficientUnlockedBalance(uint accruedReward);

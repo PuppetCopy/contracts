@@ -14,14 +14,14 @@ import {PositionUtils} from "./utils/PositionUtils.sol";
 
 /**
  * @title Settle
- * @notice Handles settlement and distribution of funds for puppet copy trading positions
+ * @notice Handles settlement and distribution of funds for puppet's positions
  * @dev Manages the settlement process when positions are closed or partially closed
  */
 contract Settle is CoreContract {
     struct Config {
         uint transferOutGasLimit;
         uint platformSettleFeeFactor;
-        uint maxKeeperFeeToSettleRatio;
+        uint maxSequencerFeeToSettleRatio;
         uint maxPuppetList;
         uint allocationAccountTransferGasLimit;
     }
@@ -29,10 +29,10 @@ contract Settle is CoreContract {
     struct CallSettle {
         IERC20 collateralToken;
         IERC20 distributionToken;
-        address keeperFeeReceiver;
+        address sequencerFeeReceiver;
         address trader;
         uint allocationId;
-        uint keeperExecutionFee;
+        uint sequencerExecutionFee;
     }
 
     Config config;
@@ -68,10 +68,10 @@ contract Settle is CoreContract {
             Error.Settle__PuppetListExceedsMaximum(_puppetCount, config.maxPuppetList)
         );
 
-        uint _keeperFee = _callParams.keeperExecutionFee;
-        require(_keeperFee > 0, Error.Settle__InvalidKeeperExecutionFeeAmount());
-        address _keeperFeeReceiver = _callParams.keeperFeeReceiver;
-        require(_keeperFeeReceiver != address(0), Error.Settle__InvalidKeeperExecutionFeeReceiver());
+        uint _sequencerFee = _callParams.sequencerExecutionFee;
+        require(_sequencerFee > 0, Error.Settle__InvalidSequencerExecutionFeeAmount());
+        address _sequencerFeeReceiver = _callParams.sequencerFeeReceiver;
+        require(_sequencerFeeReceiver != address(0), Error.Settle__InvalidSequencerExecutionFeeReceiver());
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
         address _allocationAddress = _account.getAllocationAddress(
@@ -86,14 +86,14 @@ contract Settle is CoreContract {
         );
 
         require(
-            _callParams.keeperExecutionFee < Precision.applyFactor(config.maxKeeperFeeToSettleRatio, _settledAmount),
-            Error.Settle__KeeperFeeExceedsSettledAmount(_callParams.keeperExecutionFee, _settledAmount)
+            _callParams.sequencerExecutionFee < Precision.applyFactor(config.maxSequencerFeeToSettleRatio, _settledAmount),
+            Error.Settle__SequencerFeeExceedsSettledAmount(_callParams.sequencerExecutionFee, _settledAmount)
         );
 
-        _distributionAmount = _settledAmount - _callParams.keeperExecutionFee;
+        _distributionAmount = _settledAmount - _callParams.sequencerExecutionFee;
 
         _account.transferOut(
-            _callParams.distributionToken, _callParams.keeperFeeReceiver, _callParams.keeperExecutionFee
+            _callParams.distributionToken, _callParams.sequencerFeeReceiver, _callParams.sequencerExecutionFee
         );
 
         if (config.platformSettleFeeFactor > 0) {
@@ -220,7 +220,7 @@ contract Settle is CoreContract {
         Config memory _config = abi.decode(_data, (Config));
 
         require(_config.platformSettleFeeFactor > 0, "Invalid Platform Settle Fee Factor");
-        require(_config.maxKeeperFeeToSettleRatio > 0, "Invalid Max Keeper Fee To Settle Ratio");
+        require(_config.maxSequencerFeeToSettleRatio > 0, "Invalid Max Sequencer Fee To Settle Ratio");
         require(_config.maxPuppetList > 0, "Invalid Max Puppet List");
         require(_config.allocationAccountTransferGasLimit > 0, "Invalid Token Transfer Gas Limit");
 

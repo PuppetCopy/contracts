@@ -14,11 +14,11 @@ import {Error} from "./utils/Error.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
 /**
- * @title KeeperRouter
- * @notice Handles keeper-specific operations for the copy trading system
- * @dev Separates keeper operations from user operations for better security and access control
+ * @title SequencerRouter
+ * @notice Handles sequencer-specific operations for the copy trading system
+ * @dev Separates sequencer operations from user operations for better security and access control
  */
-contract KeeperRouter is CoreContract, IGmxOrderCallbackReceiver {
+contract SequencerRouter is CoreContract, IGmxOrderCallbackReceiver {
     struct Config {
         uint mirrorBaseGasLimit;
         uint mirrorPerPuppetGasLimit;
@@ -56,7 +56,7 @@ contract KeeperRouter is CoreContract, IGmxOrderCallbackReceiver {
     }
 
     /**
-     * @notice Get gas configuration for keeper operations
+     * @notice Get gas configuration for sequencer operations
      * @return Current gas configuration
      */
     function getConfig() external view returns (Config memory) {
@@ -213,7 +213,7 @@ contract KeeperRouter is CoreContract, IGmxOrderCallbackReceiver {
 
         // Refund the execution fee to the configured receiver
         (bool success,) = config.fallbackRefundExecutionFeeReceiver.call{value: msg.value}("");
-        require(success, Error.KeeperRouter__FailedRefundExecutionFee());
+        require(success, Error.SequencerRouter__FailedRefundExecutionFee());
 
         _logEvent("RefundExecutionFee", abi.encode(key, msg.value));
     }
