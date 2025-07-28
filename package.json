@@ -27,8 +27,5 @@
     "dotenv": "16.5.0",
     "forge-std": "github:foundry-rs/forge-std#v1.9.7",
     "viem": "2.31.6"
-  },
-  "peerDependencies": {
-    "typescript": "5.8.3"
   }
 }
