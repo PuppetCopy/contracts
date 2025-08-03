@@ -1,7 +1,7 @@
 {
   "name": "@puppet/contracts",
   "license": "BSL-1.1",
-  "packageManager": "bun@1.2.12",
+  "packageManager": "bun@1.2.19",
   "scripts": {
     "test": "forge test --match-contract TradingTest -vvv",
     "test:target": "bun run test --match-test testCollectDust",
@@ -26,6 +26,6 @@
     "@gmx": "github:gmx-io/gmx-synthetics#v2.1",
     "dotenv": "16.5.0",
     "forge-std": "github:foundry-rs/forge-std#v1.9.7",
-    "viem": "2.31.6"
+    "viem": "2.33.2"
   }
 }
