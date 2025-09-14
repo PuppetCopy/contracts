@@ -180,8 +180,8 @@ pragma solidity ^0.8.29;
 //         // Log gas configuration from SequencerRouter
 //         SequencerRouter.Config memory gasConfig = sequencerRouter.getConfig();
 //         console.log("\n--- Gas Configuration ---");
-//         console.log("Mirror Base Gas Limit:", gasConfig.mirrorBaseGasLimit);
-//         console.log("Mirror Per-Puppet Gas Limit:", gasConfig.mirrorPerPuppetGasLimit);
+//         console.log("Mirror Base Gas Limit:", gasConfig.openBaseGasLimit);
+//         console.log("Mirror Per-Puppet Gas Limit:", gasConfig.openPerPuppetGasLimit);
 //         console.log("Adjust Base Gas Limit:", gasConfig.adjustBaseGasLimit);
 //         console.log("Adjust Per-Puppet Gas Limit:", gasConfig.adjustPerPuppetGasLimit);
 
@@ -666,7 +666,7 @@ pragma solidity ^0.8.29;
 //         SequencerRouter.Config memory gasConfig = sequencerRouter.getConfig();
 
 //         // Calculate expected vs actual gas using contract configuration
-//         uint expectedGas = gasConfig.mirrorBaseGasLimit + (gasConfig.mirrorPerPuppetGasLimit * puppetList.length);
+//         uint expectedGas = gasConfig.openBaseGasLimit + (gasConfig.openPerPuppetGasLimit * puppetList.length);
 //         uint variance = mirrorGasUsed > expectedGas
 //             ? ((mirrorGasUsed - expectedGas) * 10000) / expectedGas
 //             : ((expectedGas - mirrorGasUsed) * 10000) / expectedGas;

@@ -61,6 +61,7 @@ library Error {
     error Mirror__SequencerFeeExceedsAdjustmentRatio(uint sequencerFee, uint allocationAmount);
     error Mirror__PuppetListMismatch(uint expected, uint provided);
     error Mirror__SequencerFeeNotFullyCovered(uint totalPaid, uint requiredFee);
+    error Mirror__AllocationNotFullyRedistributed(uint remainingAllocation);
 
     error Settle__InvalidAllocation(address allocationAddress);
     error Settle__InvalidSequencerExecutionFeeAmount();
@@ -77,7 +78,7 @@ library Error {
     error Account__InvalidAmount();
     error Account__TokenNotAllowed();
     error Account__DepositExceedsLimit(uint depositCap);
-    error Account__InsufficientBalance();
+    error Account__InsufficientBalance(uint actualBalance, uint requiredAmount);
 
     error AllocationAccount__UnauthorizedOperator();
     error AllocationAccount__InsufficientBalance();

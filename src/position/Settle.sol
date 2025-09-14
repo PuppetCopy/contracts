@@ -33,6 +33,7 @@ contract Settle is CoreContract {
         address trader;
         uint allocationId;
         uint sequencerExecutionFee;
+        uint amount; // Amount to be settled (passed by sequencer)
     }
 
     Config config;
@@ -60,7 +61,7 @@ contract Settle is CoreContract {
         Mirror _mirror,
         CallSettle calldata _callParams,
         address[] calldata _puppetList
-    ) external auth returns (uint _settledAmount, uint _distributionAmount, uint _platformFeeAmount) {
+    ) external auth returns (uint _distributedAmount, uint _platformFeeAmount) {
         uint _puppetCount = _puppetList.length;
         require(_puppetCount > 0, Error.Mirror__PuppetListEmpty());
         require(
@@ -81,28 +82,34 @@ contract Settle is CoreContract {
         uint _allocation = _mirror.allocationMap(_allocationAddress);
         require(_allocation > 0, Error.Settle__InvalidAllocation(_allocationAddress));
 
-        _settledAmount = _account.transferInAllocation(
-            _allocationAddress, _callParams.distributionToken, config.allocationAccountTransferGasLimit
+        // Transfer the specified amount from allocation account
+        // transferInAllocation already verifies the amount matches
+        _account.transferInAllocation(
+            _allocationAddress,
+            _callParams.distributionToken,
+            _callParams.amount,
+            config.allocationAccountTransferGasLimit
         );
 
         require(
-            _callParams.sequencerExecutionFee < Precision.applyFactor(config.maxSequencerFeeToSettleRatio, _settledAmount),
-            Error.Settle__SequencerFeeExceedsSettledAmount(_callParams.sequencerExecutionFee, _settledAmount)
+            _callParams.sequencerExecutionFee
+                < Precision.applyFactor(config.maxSequencerFeeToSettleRatio, _callParams.amount),
+            Error.Settle__SequencerFeeExceedsSettledAmount(_callParams.sequencerExecutionFee, _callParams.amount)
         );
 
-        _distributionAmount = _settledAmount - _callParams.sequencerExecutionFee;
+        _distributedAmount = _callParams.amount - _callParams.sequencerExecutionFee;
 
         _account.transferOut(
             _callParams.distributionToken, _callParams.sequencerFeeReceiver, _callParams.sequencerExecutionFee
         );
 
         if (config.platformSettleFeeFactor > 0) {
-            _platformFeeAmount = Precision.applyFactor(config.platformSettleFeeFactor, _distributionAmount);
+            _platformFeeAmount = Precision.applyFactor(config.platformSettleFeeFactor, _distributedAmount);
 
-            if (_platformFeeAmount > _distributionAmount) {
-                _platformFeeAmount = _distributionAmount;
+            if (_platformFeeAmount > _distributedAmount) {
+                _platformFeeAmount = _distributedAmount;
             }
-            _distributionAmount -= _platformFeeAmount;
+            _distributedAmount -= _platformFeeAmount;
             platformFeeMap[_callParams.distributionToken] += _platformFeeAmount;
         }
 
@@ -110,7 +117,7 @@ contract Settle is CoreContract {
         uint[] memory _puppetAllocations = _mirror.getAllocationPuppetList(_allocationAddress);
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
-            _nextBalanceList[_i] += Math.mulDiv(_distributionAmount, _puppetAllocations[_i], _allocation);
+            _nextBalanceList[_i] += Math.mulDiv(_distributedAmount, _puppetAllocations[_i], _allocation);
         }
         _account.setBalanceList(_callParams.distributionToken, _puppetList, _nextBalanceList);
 
@@ -120,8 +127,7 @@ contract Settle is CoreContract {
                 _callParams,
                 _allocationAddress,
                 _traderMatchingKey,
-                _settledAmount,
-                _distributionAmount,
+                _distributedAmount,
                 _platformFeeAmount,
                 _nextBalanceList
             )
@@ -136,30 +142,27 @@ contract Settle is CoreContract {
         Account _account,
         address _allocationAccount,
         IERC20 _dustToken,
-        address _receiver
+        address _receiver,
+        uint _amount
     ) external auth returns (uint _dustAmount) {
         require(_receiver != address(0), Error.Settle__InvalidReceiver());
 
-        _dustAmount = _dustToken.balanceOf(_allocationAccount);
         uint _dustThreshold = tokenDustThresholdAmountMap[_dustToken];
-
         require(_dustThreshold > 0, Error.Settle__DustThresholdNotSet(address(_dustToken)));
-        require(_dustAmount > 0, Error.Settle__NoDustToCollect(address(_dustToken), _allocationAccount));
-        require(
-            _dustAmount <= _dustThreshold, Error.Settle__AmountExceedsDustThreshold(_dustAmount, _dustThreshold)
-        );
+        require(_amount <= _dustThreshold, Error.Settle__AmountExceedsDustThreshold(_amount, _dustThreshold));
 
-        _dustAmount =
-            _account.transferInAllocation(_allocationAccount, _dustToken, config.allocationAccountTransferGasLimit);
+        // Transfer the specified dust amount from allocation account
+        // transferInAllocation already verifies the amount and balance
+        _account.transferInAllocation(_allocationAccount, _dustToken, _amount, config.allocationAccountTransferGasLimit);
 
-        _account.transferOut(_dustToken, _receiver, _dustAmount);
+        _account.transferOut(_dustToken, _receiver, _amount);
 
         _logEvent(
             "CollectAllocationAccountDust",
-            abi.encode(_dustToken, _allocationAccount, _receiver, _dustThreshold, _dustAmount)
+            abi.encode(_dustToken, _allocationAccount, _receiver, _dustThreshold, _amount)
         );
 
-        return _dustAmount;
+        return _amount;
     }
 
     /**

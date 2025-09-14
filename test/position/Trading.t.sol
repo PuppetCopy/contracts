@@ -103,8 +103,8 @@ contract TradingTest is BasicSetup {
             mirror,
             settle,
             SequencerRouter.Config({
-                mirrorBaseGasLimit: 1_300_853,
-                mirrorPerPuppetGasLimit: 30_000,
+                openBaseGasLimit: 1_300_853,
+                openPerPuppetGasLimit: 30_000,
                 adjustBaseGasLimit: 910_663,
                 adjustPerPuppetGasLimit: 3_412,
                 settleBaseGasLimit: 1_300_853,
@@ -353,17 +353,17 @@ contract TradingTest is BasicSetup {
             sequencerFeeReceiver: users.owner,
             trader: trader,
             allocationId: allocationId,
-            sequencerExecutionFee: 0.1e6
+            sequencerExecutionFee: 0.1e6,
+            amount: 500e6 // The amount we minted to the allocation account
         });
 
         uint puppet1BalanceBefore = account.userBalanceMap(usdc, puppet1);
         uint puppet2BalanceBefore = account.userBalanceMap(usdc, puppet2);
 
-        (uint settledAmount, uint distributionAmount, uint platformFeeAmount) =
-            sequencerRouter.settleAllocation(settleParams, puppetList);
+        (uint distributionAmount, uint platformFeeAmount) = sequencerRouter.settleAllocation(settleParams, puppetList);
 
         // Verify settlement occurred
-        assertGt(settledAmount, 0, "Should have settled some amount");
+        assertEq(settleParams.amount, 500e6, "Should have correct settlement amount");
         assertGt(distributionAmount, 0, "Should have distributed some amount");
 
         // Verify puppet balances increased
@@ -397,7 +397,7 @@ contract TradingTest is BasicSetup {
 
         uint ownerBalanceBefore = usdc.balanceOf(users.owner);
 
-        uint dustCollected = sequencerRouter.collectAllocationAccountDust(allocationAddress, usdc, users.owner);
+        uint dustCollected = sequencerRouter.collectAllocationAccountDust(allocationAddress, usdc, users.owner, 5e6);
 
         assertEq(dustCollected, 5e6, "Should collect all dust");
         assertEq(usdc.balanceOf(users.owner), ownerBalanceBefore + 5e6, "Owner should receive dust");
@@ -535,7 +535,7 @@ contract TradingTest is BasicSetup {
 
         // Should revert when trying to collect
         vm.expectRevert();
-        sequencerRouter.collectAllocationAccountDust(allocationAddress, usdc, users.owner);
+        sequencerRouter.collectAllocationAccountDust(allocationAddress, usdc, users.owner, 15e6);
     }
 
     function testDecreasePosition() public {
@@ -681,11 +681,11 @@ contract TradingTest is BasicSetup {
             sequencerFeeReceiver: users.owner,
             trader: trader,
             allocationId: allocationId1,
-            sequencerExecutionFee: 0.1e6 // 0.1 USDC sequencer fee
+            sequencerExecutionFee: 0.1e6, // 0.1 USDC sequencer fee
+            amount: 100e6 // The profit amount to settle (100 USDC)
         });
 
-        (uint settled1, uint distributed1, uint platformFee1) =
-            sequencerRouter.settleAllocation(settleParams1, puppetList1);
+        (uint distributed1, uint platformFee1) = sequencerRouter.settleAllocation(settleParams1, puppetList1);
 
         // Settle trader2's position (puppet2 gets the profit)
         Settle.CallSettle memory settleParams2 = Settle.CallSettle({
@@ -694,15 +694,15 @@ contract TradingTest is BasicSetup {
             sequencerFeeReceiver: users.owner,
             trader: trader2,
             allocationId: allocationId2,
-            sequencerExecutionFee: 0.1e6 // 0.1 USDC sequencer fee
+            sequencerExecutionFee: 0.1e6, // 0.1 USDC sequencer fee
+            amount: 80e6 // The profit amount to settle (80 USDC)
         });
 
-        (uint settled2, uint distributed2, uint platformFee2) =
-            sequencerRouter.settleAllocation(settleParams2, puppetList2);
+        (uint distributed2, uint platformFee2) = sequencerRouter.settleAllocation(settleParams2, puppetList2);
 
         // Verify settlements occurred
-        assertEq(settled1, 100e6, "Should settle full trader1 profit");
-        assertEq(settled2, 80e6, "Should settle full trader2 profit");
+        assertEq(settleParams1.amount, 100e6, "Should settle full trader1 profit");
+        assertEq(settleParams2.amount, 80e6, "Should settle full trader2 profit");
         assertGt(distributed1, 0, "Should distribute trader1 profits");
         assertGt(distributed2, 0, "Should distribute trader2 profits");
         assertGt(platformFee1, 0, "Should collect platform fee from trader1");

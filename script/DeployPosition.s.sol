@@ -191,8 +191,8 @@ contract DeployPosition is BaseScript {
             mirror,
             settle,
             SequencerRouter.Config({
-                mirrorBaseGasLimit: 1_283_731,
-                mirrorPerPuppetGasLimit: 30_000,
+                openBaseGasLimit: 1_283_731,
+                openPerPuppetGasLimit: 30_000,
                 adjustBaseGasLimit: 910_663,
                 adjustPerPuppetGasLimit: 3_412,
                 settleBaseGasLimit: 90_847,
@@ -212,7 +212,7 @@ contract DeployPosition is BaseScript {
         // Mirror permissions
         dictator.setPermission(mirror, mirror.requestOpen.selector, address(sequencerRouter));
         dictator.setPermission(mirror, mirror.requestAdjust.selector, address(sequencerRouter));
-        dictator.setPermission(mirror, mirror.requestCloseStalledPosition.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.requestCloseStalled.selector, address(sequencerRouter));
         dictator.setPermission(mirror, mirror.execute.selector, address(sequencerRouter));
         dictator.setPermission(mirror, mirror.liquidate.selector, address(sequencerRouter));
 

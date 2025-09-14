@@ -118,7 +118,7 @@ contract Account is CoreContract {
 
         uint balance = userBalanceMap[_collateralToken][_user];
 
-        require(_amount <= balance, Error.Account__InsufficientBalance());
+        require(_amount <= balance, Error.Account__InsufficientBalance(balance, _amount));
 
         uint nextBalance = balance - _amount;
 
@@ -169,10 +169,12 @@ contract Account is CoreContract {
     /**
      * @notice Transfers allocation balance to AccountStore, tracking any unaccounted funds
      * @dev Records unaccounted balances before transferring allocation funds
+     * @param _amount The expected amount to transfer (passed by sequencer for validation)
      */
     function transferInAllocation(
         address _allocationAddress,
         IERC20 _token,
+        uint _amount,
         uint _gasLimit
     ) external auth returns (uint _recordedAmountIn) {
         uint _unaccountedBalance = accountStore.recordTransferIn(_token);
@@ -182,22 +184,18 @@ contract Account is CoreContract {
             _logEvent("UnaccountedBalance", abi.encode(_token, _unaccountedBalance));
         }
 
-        uint _settledAmount = _token.balanceOf(_allocationAddress);
-
-        require(_settledAmount > 0, Error.Account__NoFundsToTransfer(_allocationAddress, address(_token)));
+        // Validate there's sufficient balance in the allocation account
+        uint _actualBalance = _token.balanceOf(_allocationAddress);
+        require(_actualBalance >= _amount, Error.Account__InsufficientBalance(_actualBalance, _amount));
+        require(_amount > 0, Error.Account__NoFundsToTransfer(_allocationAddress, address(_token)));
 
         AllocationAccount(_allocationAddress).execute(
-            address(_token),
-            abi.encodeWithSelector(IERC20.transfer.selector, address(accountStore), _settledAmount),
-            _gasLimit
+            address(_token), abi.encodeWithSelector(IERC20.transfer.selector, address(accountStore), _amount), _gasLimit
         );
 
         _recordedAmountIn = accountStore.recordTransferIn(_token);
 
-        require(
-            _recordedAmountIn == _settledAmount,
-            Error.Account__InvalidSettledAmount(_token, _recordedAmountIn, _settledAmount)
-        );
+        require(_recordedAmountIn == _amount, Error.Account__InvalidSettledAmount(_token, _recordedAmountIn, _amount));
     }
     /**
      * @notice Create a new allocation account with deterministic address

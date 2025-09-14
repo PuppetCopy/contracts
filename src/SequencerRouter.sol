@@ -19,8 +19,8 @@ import {IAuthority} from "./utils/interfaces/IAuthority.sol";
  */
 contract SequencerRouter is CoreContract, IGmxOrderCallbackReceiver {
     struct Config {
-        uint mirrorBaseGasLimit;
-        uint mirrorPerPuppetGasLimit;
+        uint openBaseGasLimit;
+        uint openPerPuppetGasLimit;
         uint adjustBaseGasLimit;
         uint adjustPerPuppetGasLimit;
         uint settleBaseGasLimit;
@@ -95,25 +95,24 @@ contract SequencerRouter is CoreContract, IGmxOrderCallbackReceiver {
      * @param _puppetList The list of puppet addresses in the allocation
      * @return _requestKey The GMX request key for the close order
      */
-    function requestCloseStalledPosition(
+    function requestCloseStalled(
         Mirror.StalledPositionParams calldata _params,
         address[] calldata _puppetList
     ) external payable auth returns (bytes32) {
-        return mirror.requestCloseStalledPosition{value: msg.value}(account, _params, _puppetList, address(this));
+        return mirror.requestCloseStalled{value: msg.value}(account, _params, _puppetList, address(this));
     }
 
     /**
      * @notice Settles an allocation by distributing funds back to puppets
      * @param _settleParams Settlement parameters
      * @param _puppetList List of puppet addresses involved
-     * @return settledBalance Total amount settled
      * @return distributionAmount Amount distributed to puppets
      * @return platformFeeAmount Platform fee collected
      */
     function settleAllocation(
         Settle.CallSettle calldata _settleParams,
         address[] calldata _puppetList
-    ) external auth returns (uint settledBalance, uint distributionAmount, uint platformFeeAmount) {
+    ) external auth returns (uint distributionAmount, uint platformFeeAmount) {
         return settle.settle(account, mirror, _settleParams, _puppetList);
     }
 
@@ -122,14 +121,16 @@ contract SequencerRouter is CoreContract, IGmxOrderCallbackReceiver {
      * @param _allocationAccount The allocation account to collect dust from
      * @param _dustToken The token to collect
      * @param _receiver The address to receive the dust
+     * @param _amount The amount of dust to collect
      * @return The amount of dust collected
      */
     function collectAllocationAccountDust(
         address _allocationAccount,
         IERC20 _dustToken,
-        address _receiver
+        address _receiver,
+        uint _amount
     ) external auth returns (uint) {
-        return settle.collectAllocationAccountDust(account, _allocationAccount, _dustToken, _receiver);
+        return settle.collectAllocationAccountDust(account, _allocationAccount, _dustToken, _receiver, _amount);
     }
 
     /**
@@ -141,8 +142,8 @@ contract SequencerRouter is CoreContract, IGmxOrderCallbackReceiver {
     ) internal override {
         Config memory _config = abi.decode(_data, (Config));
 
-        require(_config.mirrorBaseGasLimit > 0, "Invalid mirror base gas limit");
-        require(_config.mirrorPerPuppetGasLimit > 0, "Invalid mirror per-puppet gas limit");
+        require(_config.openBaseGasLimit > 0, "Invalid mirror base gas limit");
+        require(_config.openPerPuppetGasLimit > 0, "Invalid mirror per-puppet gas limit");
         require(_config.adjustBaseGasLimit > 0, "Invalid adjust base gas limit");
         require(_config.adjustPerPuppetGasLimit > 0, "Invalid adjust per-puppet gas limit");
 
