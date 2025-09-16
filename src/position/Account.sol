@@ -30,7 +30,7 @@ contract Account is CoreContract {
     // Deposit configuration
     IERC20[] public depositTokenList;
     mapping(IERC20 token => uint) depositCapMap;
-    uint public unaccountedBalance;
+    mapping(IERC20 token => uint) public unaccountedTokenBalance;
 
     constructor(
         IAuthority _authority,
@@ -180,8 +180,8 @@ contract Account is CoreContract {
         uint _unaccountedBalance = accountStore.recordTransferIn(_token);
 
         if (_unaccountedBalance > 0) {
-            unaccountedBalance += _unaccountedBalance;
-            _logEvent("UnaccountedBalance", abi.encode(_token, _unaccountedBalance));
+            uint _totalUnaccounted = unaccountedTokenBalance[_token] += _unaccountedBalance;
+            _logEvent("UnaccountedBalance", abi.encode(_token, _totalUnaccounted, _unaccountedBalance));
         }
 
         // Validate there's sufficient balance in the allocation account
@@ -212,6 +212,20 @@ contract Account is CoreContract {
      */
     function transferOut(IERC20 _token, address _receiver, uint _amount) external auth {
         accountStore.transferOut(config.transferOutGasLimit, _token, _receiver, _amount);
+    }
+
+    /**
+     * @notice Recover unaccounted tokens that were sent to AccountStore outside normal flows
+     * @dev Can only recover up to the tracked unaccounted balance for each token
+     * @param _token The token to recover
+     * @param _receiver The address to send recovered tokens to
+     * @param _amount The amount to recover
+     */
+    function recoverUnaccountedTokens(IERC20 _token, address _receiver, uint _amount) external auth {
+        require(_amount <= unaccountedTokenBalance[_token], "Amount exceeds unaccounted balance");
+        unaccountedTokenBalance[_token] -= _amount;
+        accountStore.transferOut(config.transferOutGasLimit, _token, _receiver, _amount);
+        _logEvent("RecoverUnaccountedTokens", abi.encode(_token, _receiver, _amount, unaccountedTokenBalance[_token]));
     }
 
     /**

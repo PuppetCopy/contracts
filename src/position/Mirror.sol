@@ -326,7 +326,7 @@ contract Mirror is CoreContract {
                 // Solvent puppet - pays full fee and gets proportional share of redistribution
                 _nextBalanceList[_i] -= _feeToCollect;
                 _remainingSequencerFeeToCollect -= _feeToCollect;
-                
+
                 // Give this puppet their fair share of accumulated redistribution
                 if (_allocationToRedistribute > 0) {
                     uint _shareOfRedistribution = _allocationToRedistribute / _remainingPuppets;
@@ -345,28 +345,18 @@ contract Mirror is CoreContract {
             }
         }
 
-        // Add any remaining redistribution (from rounding) to the last puppet
-        if (_allocationToRedistribute > 0) {
-            _allocationList[_puppetCount - 1] += _allocationToRedistribute;
-            _allocationToRedistribute = 0;
-        }
-
         _account.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
 
         require(
             _remainingSequencerFeeToCollect == 0,
             Error.Mirror__SequencerFeeNotFullyCovered(0, _remainingSequencerFeeToCollect)
         );
-        if (_allocationToRedistribute != 0) {
-            revert Error.Mirror__AllocationNotFullyRedistributed(_allocationToRedistribute);
-        }
         require(
             _callParams.sequencerFee < Precision.applyFactor(config.maxSequencerFeeToAdjustmentRatio, _allocated),
             Error.Mirror__SequencerFeeExceedsAdjustmentRatio(_callParams.sequencerFee, _allocated)
         );
-        allocationPuppetList[_allocationAddress] = _allocationList;
-        allocationMap[_allocationAddress] = _allocated;
 
+        allocationPuppetList[_allocationAddress] = _allocationList;
         _account.transferOut(_callParams.collateralToken, _callParams.sequencerFeeReceiver, _callParams.sequencerFee);
 
         Position memory _position = positionMap[_allocationAddress];
@@ -436,10 +426,8 @@ contract Mirror is CoreContract {
                 _traderPositionKey,
                 _requestKey,
                 _isIncrease,
-                _allocated,
                 _sizeDelta,
                 _traderTargetLeverage,
-                _allocationToRedistribute,  // Any remaining redistribution (should be 0)
                 _allocationList
             )
         );
@@ -507,7 +495,7 @@ contract Mirror is CoreContract {
                 // Solvent puppet - pays full fee and gets proportional share of redistribution
                 _nextBalanceList[_i] -= _feeToCollect;
                 _remainingSequencerFeeToCollect -= _feeToCollect;
-                
+
                 // Give this puppet their fair share of accumulated redistribution
                 if (_allocationToRedistribute > 0) {
                     uint _shareOfRedistribution = _allocationToRedistribute / _remainingPuppets;
@@ -526,27 +514,17 @@ contract Mirror is CoreContract {
             }
         }
 
-        // Add any remaining redistribution (from rounding) to the last puppet
-        if (_allocationToRedistribute > 0) {
-            _allocationList[_puppetCount - 1] += _allocationToRedistribute;
-            _allocationToRedistribute = 0;
-        }
-
         _account.setBalanceList(_params.collateralToken, _puppetList, _nextBalanceList);
 
         require(
             _remainingSequencerFeeToCollect == 0,
             Error.Mirror__SequencerFeeNotFullyCovered(0, _remainingSequencerFeeToCollect)
         );
-        if (_allocationToRedistribute != 0) {
-            revert Error.Mirror__AllocationNotFullyRedistributed(_allocationToRedistribute);
-        }
         require(
             _params.sequencerFee < Precision.applyFactor(config.maxSequencerFeeToAdjustmentRatio, _allocated),
             Error.Mirror__SequencerFeeExceedsAdjustmentRatio(_params.sequencerFee, _allocated)
         );
         allocationPuppetList[_allocationAddress] = _allocationList;
-        allocationMap[_allocationAddress] = _allocated;
 
         _account.transferOut(_params.collateralToken, _params.sequencerFeeReceiver, _params.sequencerFee);
 
@@ -587,14 +565,7 @@ contract Mirror is CoreContract {
 
         _logEvent(
             "RequestCloseStalledPosition",
-            abi.encode(
-                _params,
-                _allocationAddress,
-                _traderPositionKey,
-                _requestKey,
-                _allocationToRedistribute,  // Any remaining redistribution (should be 0)
-                _allocationList
-            )
+            abi.encode(_params, _allocationAddress, _traderPositionKey, _requestKey, _allocationList)
         );
     }
 
