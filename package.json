@@ -26,6 +26,6 @@
     "@gmx": "github:gmx-io/gmx-synthetics#v2.1",
     "dotenv": "16.5.0",
     "forge-std": "github:foundry-rs/forge-std#v1.10.0",
-    "viem": "2.37.5"
+    "viem": "2.37.7"
   }
 }

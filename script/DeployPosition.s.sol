@@ -38,13 +38,13 @@ contract DeployPosition is BaseScript {
         Rule ruleContract = deployRule();
         Mirror mirror = deployMirror(account);
         Settle settle = deploySettle(account);
-        deploySequencerRouter(mirror, ruleContract, settle, account);
+        SequencerRouter sequencerRouter = deploySequencerRouter(mirror, ruleContract, settle, account);
 
         // Set up cross-contract permissions
         setupCrossContractPermissions(mirror, ruleContract);
 
         // Setup upkeeping configuration
-        setupUpkeepingConfig(account, settle);
+        setupUpkeepingConfig(account, settle, sequencerRouter);
 
         vm.stopBroadcast();
     }
@@ -255,12 +255,13 @@ contract DeployPosition is BaseScript {
         console.log("Cross-contract permissions configured");
     }
 
-    function setupUpkeepingConfig(AccountContract account, Settle settle) internal {
+    function setupUpkeepingConfig(AccountContract account, Settle settle, SequencerRouter sequencerRouter) internal {
         console.log("\n--- Setting up upkeeping configuration ---");
 
         // Set up DAO permissions for configuration
         dictator.setPermission(account, account.setDepositCapList.selector, Const.dao);
         dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, Const.dao);
+        dictator.setPermission(sequencerRouter, sequencerRouter.recoverUnaccountedTokens.selector, Const.dao);
 
         // Configure USDC as allowed token
         IERC20[] memory allowedTokens = new IERC20[](1);

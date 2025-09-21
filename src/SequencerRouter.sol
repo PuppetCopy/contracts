@@ -134,6 +134,20 @@ contract SequencerRouter is CoreContract, IGmxOrderCallbackReceiver {
     }
 
     /**
+     * @notice Recovers unaccounted tokens that were sent to AccountStore outside normal flows
+     * @param _token The token to recover
+     * @param _receiver The address to receive recovered tokens
+     * @param _amount The amount to recover
+     */
+    function recoverUnaccountedTokens(
+        IERC20 _token,
+        address _receiver,
+        uint _amount
+    ) external auth {
+        account.recoverUnaccountedTokens(_token, _receiver, _amount);
+    }
+
+    /**
      * @notice Internal function to set gas configuration
      * @param _data Encoded configuration data containing the Config struct
      */
