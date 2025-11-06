@@ -1,15 +1,14 @@
 {
   "name": "@puppet/contracts",
   "license": "BSL-1.1",
-  "packageManager": "bun@1.2.20",
+  "packageManager": "bun@1.3.0",
   "scripts": {
     "test": "forge test --match-contract TradingTest -vvv",
     "test:target": "bun run test --match-test testCollectDust",
     "test:fork": "forge test --match-contract TradingForkTest -vvvv --fork-url=arbitrum",
-    "build": "forge build --sizes ",
+    "build": "forge build --sizes",
     "build:prod": "FOUNDRY_PROFILE=prod forge build --sizes",
     "script:deploy": "FOUNDRY_PROFILE=prod bun ./script/deploy.ts",
-    "script:deployUserRouter": "FOUNDRY_PROFILE=prod forge script script/DeployUserRouter.s.sol:DeployUserRouter --broadcast --verify --rpc-url arbitrum -- --vvvvv",
     "docgen": "forge doc --out '.docgen' --build",
     "gas-report": "forge test --match-contract TradingTest --gas-report",
     "lint:sol": "forge fmt --check",
@@ -21,11 +20,11 @@
     "./deployments.json"
   ],
   "devDependencies": {
+    "@gmx": "github:gmx-io/gmx-synthetics#v2.1",
     "@openzeppelin/contracts": "5.4.0",
     "@uniswap/v3-core": "1.0.1",
-    "@gmx": "github:gmx-io/gmx-synthetics#v2.1",
-    "dotenv": "16.5.0",
+    "dotenv": "catalog:",
     "forge-std": "github:foundry-rs/forge-std#v1.10.0",
-    "viem": "2.37.7"
+    "viem": "catalog:"
   }
 }
