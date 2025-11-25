@@ -40,8 +40,7 @@ contract DeployUserRouter is BaseScript {
         UserRouter newRouter = new UserRouter(account, ruleContract, feeMarketplace, mirror);
         routerProxy.update(address(newRouter));
 
-        UserRouter(address(routerProxy)).setRule(
-            mirror,
+        UserRouter(address(routerProxy)).setMatchingRule(
             IERC20(Const.usdc),
             DEPLOYER_ADDRESS,
             Rule.RuleParams({allowanceRate: 1000, throttleActivity: 1 hours, expiry: block.timestamp + 830 days})

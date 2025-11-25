@@ -7,9 +7,9 @@
         "@gmx": "github:gmx-io/gmx-synthetics#v2.1",
         "@openzeppelin/contracts": "5.4.0",
         "@uniswap/v3-core": "1.0.1",
-        "dotenv": "16.5.0",
-        "forge-std": "github:foundry-rs/forge-std#v1.10.0",
-        "viem": "2.37.7",
+        "dotenv": "17.2.3",
+        "forge-std": "github:foundry-rs/forge-std#v1.11.0",
+        "viem": "2.39.3",
       },
     },
   },
@@ -970,7 +970,7 @@
 
     "dom-walk": ["dom-walk@0.1.2", "", {}, "sha512-6QvTW9mrGeIegrFXdtQi9pk7O/nSK6lSdXW2eqUspN5LWD7UTji2Fqw5V2YLjBpHEoU9Xl/eUWNpDeZvoyOv2w=="],
 
-    "dotenv": ["dotenv@16.5.0", "", {}, "sha512-m/C+AwOAr9/W1UOIZUo232ejMNnJAJtYQjUbHoNTBNTJSvqzzDh7vnrei3o3r3m9blf6ZoDkvcw0VmozNRFJxg=="],
+    "dotenv": ["dotenv@17.2.3", "", {}, "sha512-JVUnt+DUIzu87TABbhPmNfVdBDt18BLOWjMUFJMSi/Qqg7NTYtabbvSNJGOJ7afbRuv9D/lngizHtP7QyLQ+9w=="],
 
     "dtrace-provider": ["dtrace-provider@0.8.8", "", { "dependencies": { "nan": "^2.14.0" } }, "sha512-b7Z7cNtHPhH9EJhNNbbeqTcXB8LGFFZhq1PGgEvpeHlzd36bhbdTWoE/Ba/YguqpBSlAPKnARWhVlhunCMwfxg=="],
 
@@ -1144,7 +1144,7 @@
 
     "forever-agent": ["forever-agent@0.6.1", "", {}, "sha512-j0KLYPhm6zeac4lz3oJ3o65qvgQCcPubiyotZrXqEaG4hNagNYO8qdlUrX5vwqv9ohqeT/Z3j6+yW067yWWdUw=="],
 
-    "forge-std": ["forge-std@github:foundry-rs/forge-std#8bbcf6e", {}, "foundry-rs-forge-std-8bbcf6e"],
+    "forge-std": ["forge-std@github:foundry-rs/forge-std#8e40513", {}, "foundry-rs-forge-std-8e40513"],
 
     "form-data": ["form-data@2.3.3", "", { "dependencies": { "asynckit": "^0.4.0", "combined-stream": "^1.0.6", "mime-types": "^2.1.12" } }, "sha512-1lLKB2Mu3aGP1Q/2eCOx0fNbRMe7XdwktwOruhfqqd0rIJWwN4Dh+E3hrPSlDCXnSR7UtZ1N38rVXm+6+MEhJQ=="],
 
@@ -2106,7 +2106,7 @@
 
     "verror": ["verror@1.10.0", "", { "dependencies": { "assert-plus": "^1.0.0", "core-util-is": "1.0.2", "extsprintf": "^1.2.0" } }, "sha512-ZZKSmDAEFOijERBLkmYfJ+vmk3w+7hOLYDNkRCuRuMJGEmqYNCNLyBBFwWKVMhfwaEF3WOd0Zlw86U/WC/+nYw=="],
 
-    "viem": ["viem@2.37.7", "", { "dependencies": { "@noble/curves": "1.9.1", "@noble/hashes": "1.8.0", "@scure/bip32": "1.7.0", "@scure/bip39": "1.6.0", "abitype": "1.1.0", "isows": "1.0.7", "ox": "0.9.6", "ws": "8.18.3" }, "peerDependencies": { "typescript": ">=5.0.4" }, "optionalPeers": ["typescript"] }, "sha512-KmTK/xc6790I0V9iaiJz8C3RdGevpU+fPvg53eOlfEfsfz0wCypXqOlOmCcjzkpmf2XFoEtu9MAxhMqk8YdNNA=="],
+    "viem": ["viem@2.39.3", "", { "dependencies": { "@noble/curves": "1.9.1", "@noble/hashes": "1.8.0", "@scure/bip32": "1.7.0", "@scure/bip39": "1.6.0", "abitype": "1.1.0", "isows": "1.0.7", "ox": "0.9.6", "ws": "8.18.3" }, "peerDependencies": { "typescript": ">=5.0.4" }, "optionalPeers": ["typescript"] }, "sha512-s11rPQRvUEdc5qHK3xT4fIk4qvgPAaLwaTFq+EbFlcJJD+Xn3R4mc9H6B6fquEiHl/mdsdbG/uKCnYpoNtHNHw=="],
 
     "vite": ["vite@5.4.19", "", { "dependencies": { "esbuild": "^0.21.3", "postcss": "^8.4.43", "rollup": "^4.20.0" }, "optionalDependencies": { "fsevents": "~2.3.3" }, "peerDependencies": { "@types/node": "^18.0.0 || >=20.0.0", "less": "*", "lightningcss": "^1.21.0", "sass": "*", "sass-embedded": "*", "stylus": "*", "sugarss": "*", "terser": "^5.4.0" }, "optionalPeers": ["@types/node", "less", "lightningcss", "sass", "sass-embedded", "stylus", "sugarss", "terser"], "bin": { "vite": "bin/vite.js" } }, "sha512-qO3aKv3HoQC8QKiNSTuUM1l9o/XX3+c+VTgLHbJWHZGeTPVAg2XwazI9UWzoxjIJCGCV2zU60uqMzjeLZuULqA=="],
 

@@ -71,7 +71,8 @@ contract Rule is CoreContract {
         );
 
         require(
-            _ruleParams.expiry >= config.minExpiryDuration, Error.Rule__InvalidExpiryDuration(config.minExpiryDuration)
+            _ruleParams.expiry >= block.timestamp + config.minExpiryDuration,
+            Error.Rule__InvalidExpiryDuration(config.minExpiryDuration)
         );
 
         require(
@@ -85,6 +86,7 @@ contract Rule is CoreContract {
 
         _logEvent("SetMatchingRule", abi.encode(_ruleParams, _collateralToken, _trader, _user, _traderMatchingKey));
     }
+
 
     function _setConfig(
         bytes memory _data

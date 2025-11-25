@@ -12,7 +12,6 @@ import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
 import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
-import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {AccountStore} from "src/shared/AccountStore.sol";
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
@@ -359,6 +358,7 @@ contract TradingTest is BasicSetup {
 
         uint puppet1BalanceBefore = account.userBalanceMap(usdc, puppet1);
         uint puppet2BalanceBefore = account.userBalanceMap(usdc, puppet2);
+        uint ownerFeeBalanceBefore = usdc.balanceOf(users.owner);
 
         (uint distributionAmount, uint platformFeeAmount) = sequencerRouter.settleAllocation(settleParams, puppetList);
 
@@ -372,7 +372,85 @@ contract TradingTest is BasicSetup {
 
         // Verify platform fee was collected
         assertGt(platformFeeAmount, 0, "Platform fee should be collected");
+
+        // Verify keeper fee paid out and total distribution matches available less fees
+        uint ownerFeeBalanceAfter = usdc.balanceOf(users.owner);
+        assertEq(ownerFeeBalanceAfter - ownerFeeBalanceBefore, settleParams.sequencerExecutionFee, "Keeper fee payout mismatch");
+
+        // Allocation sum should match stored allocation map and Puppet shares
+        uint[] memory puppetAllocations = mirror.getAllocationPuppetList(allocationAddress);
+        uint allocationTotal = puppetAllocations[0] + puppetAllocations[1];
+        assertEq(allocationTotal, mirror.allocationMap(allocationAddress), "Allocation sum mismatch");
+
+        // Distributed amount should equal user balance delta + platform fee + keeper fee
+        uint puppet1Delta = account.userBalanceMap(usdc, puppet1) - puppet1BalanceBefore;
+        uint puppet2Delta = account.userBalanceMap(usdc, puppet2) - puppet2BalanceBefore;
+        uint distributedTotal = puppet1Delta + puppet2Delta;
+        uint accounted = distributedTotal + platformFeeAmount + settleParams.sequencerExecutionFee;
+        // Allow for minor rounding dust from mulDiv
+        assertTrue(accounted <= settleParams.amount, "Settlement over-accounted");
+        assertLe(settleParams.amount - accounted, puppetList.length, "Settlement accounting mismatch");
     }
+
+    function testSettleInvariantSumAllocations() public {
+        testRequestOpenSuccess();
+
+        address[] memory puppetList = new address[](2);
+        puppetList[0] = puppet1;
+        puppetList[1] = puppet2;
+
+        uint allocationId = 1;
+        address allocationAddress = getAllocationAddress(usdc, trader, puppetList, allocationId);
+
+        // Puppet allocations should sum to allocation map
+        uint allocationMapValue = mirror.allocationMap(allocationAddress);
+        uint[] memory puppetAllocations = mirror.getAllocationPuppetList(allocationAddress);
+        uint sumAllocations = 0;
+        for (uint i = 0; i < puppetAllocations.length; i++) {
+            sumAllocations += puppetAllocations[i];
+        }
+        assertEq(sumAllocations, allocationMapValue, "Allocation sum mismatch");
+
+        // After settle, distribution should not exceed settled funds (accounting for rounding)
+        usdc.mint(allocationAddress, 500e6);
+        Settle.CallSettle memory settleParams = Settle.CallSettle({
+            collateralToken: usdc,
+            distributionToken: usdc,
+            sequencerFeeReceiver: users.owner,
+            trader: trader,
+            allocationId: allocationId,
+            sequencerExecutionFee: 0.1e6,
+            amount: 500e6
+        });
+
+        uint puppet1Before = account.userBalanceMap(usdc, puppet1);
+        uint puppet2Before = account.userBalanceMap(usdc, puppet2);
+
+        (uint distributed, uint platformFee) = sequencerRouter.settleAllocation(settleParams, puppetList);
+
+        uint delta1 = account.userBalanceMap(usdc, puppet1) - puppet1Before;
+        uint delta2 = account.userBalanceMap(usdc, puppet2) - puppet2Before;
+        uint accounted = delta1 + delta2 + platformFee + settleParams.sequencerExecutionFee;
+        assertTrue(accounted <= settleParams.amount, "Post-settle over-account");
+        assertLe(settleParams.amount - accounted, puppetList.length, "Post-settle dust exceeds tolerance");
+    }
+
+    function testSetRuleExpiryTooSoonReverts() public {
+        address[] memory puppetList = new address[](1);
+        puppetList[0] = puppet1;
+
+        uint shortExpiry = block.timestamp + 10 minutes;
+
+        vm.expectRevert(abi.encodeWithSelector(Error.Rule__InvalidExpiryDuration.selector, ruleContract.getConfig().minExpiryDuration));
+        ruleContract.setRule(
+            mirror,
+            usdc,
+            puppet1,
+            trader,
+            Rule.RuleParams({allowanceRate: 2000, throttleActivity: 1 hours, expiry: shortExpiry})
+        );
+    }
+
 
     function testCollectDust() public {
         // Create an allocation first

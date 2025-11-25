@@ -113,6 +113,7 @@ contract Mirror is CoreContract {
         return allocationMap[_allocationAddress];
     }
 
+
     /**
      * @notice Get puppet allocation amounts for an allocation
      */
@@ -120,6 +121,16 @@ contract Mirror is CoreContract {
         address _allocationAddress
     ) external view returns (uint[] memory) {
         return allocationPuppetList[_allocationAddress];
+    }
+
+    /**
+     * @notice Convenience getter returning total allocation and per-puppet amounts
+     */
+    function getAllocationWithPuppets(
+        address _allocationAddress
+    ) external view returns (uint total, uint[] memory puppetAllocations) {
+        total = allocationMap[_allocationAddress];
+        puppetAllocations = allocationPuppetList[_allocationAddress];
     }
 
     /**
@@ -188,33 +199,52 @@ contract Mirror is CoreContract {
         _allocationAddress = _account.createAllocationAccount(_allocationKey);
 
         Rule.RuleParams[] memory _rules = _ruleContract.getRuleList(_traderMatchingKey, _puppetList);
-        uint _feePerPuppet = _callParams.sequencerFee / _puppetCount;
         uint[] memory _allocatedList = new uint[](_puppetCount);
         uint[] memory _balanceList = _account.getBalanceList(_callParams.collateralToken, _puppetList);
         allocationPuppetList[_allocationAddress] = new uint[](_puppetCount);
 
         uint _allocated = 0;
+        uint _remainingSequencerFee = _callParams.sequencerFee;
+        uint _lastActiveIndex = type(uint).max;
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
             address _puppet = _puppetList[_i];
             Rule.RuleParams memory _rule = _rules[_i];
 
             if (
-                _rule.expiry > block.timestamp
-                    && block.timestamp >= lastActivityThrottleMap[_traderMatchingKey][_puppet]
-            ) {
-                uint _puppetAllocation = Precision.applyBasisPoints(_rule.allowanceRate, _balanceList[_i]);
+                !(_rule.expiry > block.timestamp
+                    && block.timestamp >= lastActivityThrottleMap[_traderMatchingKey][_puppet])
+            ) continue;
 
-                if (_feePerPuppet > Precision.applyFactor(config.maxSequencerFeeToAllocationRatio, _puppetAllocation)) {
-                    continue;
-                }
+            uint _puppetAllocation = Precision.applyBasisPoints(_rule.allowanceRate, _balanceList[_i]);
 
-                _allocatedList[_i] = _puppetAllocation;
-                allocationPuppetList[_allocationAddress][_i] = _puppetAllocation;
-                _balanceList[_i] -= _puppetAllocation;
-                _allocated += _puppetAllocation;
-                lastActivityThrottleMap[_traderMatchingKey][_puppet] = block.timestamp + _rule.throttleActivity;
+            uint _feeShareUpperBound = (_remainingSequencerFee + (_puppetCount - _i) - 1) / (_puppetCount - _i);
+            uint _feeCap = Precision.applyFactor(config.maxSequencerFeeToAllocationRatio, _puppetAllocation);
+            uint _feeShare = Math.min(_feeShareUpperBound, _puppetAllocation);
+            if (_feeCap > 0 && _feeShare > _feeCap) {
+                _feeShare = _feeCap;
             }
+
+            uint _netAllocation = _puppetAllocation - _feeShare;
+            _remainingSequencerFee -= _feeShare;
+
+            _allocatedList[_i] = _netAllocation;
+            allocationPuppetList[_allocationAddress][_i] = _netAllocation;
+            _balanceList[_i] -= _puppetAllocation;
+            _allocated += _netAllocation;
+            lastActivityThrottleMap[_traderMatchingKey][_puppet] = block.timestamp + _rule.throttleActivity;
+            _lastActiveIndex = _i;
+        }
+
+        if (_remainingSequencerFee > 0) {
+            require(_lastActiveIndex != type(uint).max, Error.Mirror__SequencerFeeNotFullyCovered(0, _remainingSequencerFee));
+            uint _availableToReassign = _allocatedList[_lastActiveIndex];
+            require(_availableToReassign >= _remainingSequencerFee, Error.Mirror__SequencerFeeNotFullyCovered(0, _remainingSequencerFee));
+
+            _allocatedList[_lastActiveIndex] = _availableToReassign - _remainingSequencerFee;
+            allocationPuppetList[_allocationAddress][_lastActiveIndex] = _allocatedList[_lastActiveIndex];
+            _allocated -= _remainingSequencerFee;
+            _remainingSequencerFee = 0;
         }
 
         _account.setBalanceList(_callParams.collateralToken, _puppetList, _balanceList);
@@ -223,8 +253,7 @@ contract Mirror is CoreContract {
             _callParams.sequencerFee < Precision.applyFactor(config.maxSequencerFeeToAllocationRatio, _allocated),
             Error.Mirror__SequencerFeeExceedsCostFactor(_callParams.sequencerFee, _allocated)
         );
-
-        _allocated -= _callParams.sequencerFee;
+        require(_remainingSequencerFee == 0, Error.Mirror__SequencerFeeNotFullyCovered(0, _remainingSequencerFee));
         allocationMap[_allocationAddress] = _allocated;
 
         _account.transferOut(_callParams.collateralToken, _callParams.sequencerFeeReceiver, _callParams.sequencerFee);
@@ -351,12 +380,9 @@ contract Mirror is CoreContract {
             _remainingSequencerFeeToCollect == 0,
             Error.Mirror__SequencerFeeNotFullyCovered(0, _remainingSequencerFeeToCollect)
         );
-        require(
-            _callParams.sequencerFee < Precision.applyFactor(config.maxSequencerFeeToAdjustmentRatio, _allocated),
-            Error.Mirror__SequencerFeeExceedsAdjustmentRatio(_callParams.sequencerFee, _allocated)
-        );
 
         allocationPuppetList[_allocationAddress] = _allocationList;
+        require(_allocationToRedistribute == 0, Error.Mirror__AllocationNotFullyRedistributed(_allocationToRedistribute));
         _account.transferOut(_callParams.collateralToken, _callParams.sequencerFeeReceiver, _callParams.sequencerFee);
 
         Position memory _position = positionMap[_allocationAddress];
@@ -525,6 +551,7 @@ contract Mirror is CoreContract {
             Error.Mirror__SequencerFeeExceedsAdjustmentRatio(_params.sequencerFee, _allocated)
         );
         allocationPuppetList[_allocationAddress] = _allocationList;
+        require(_allocationToRedistribute == 0, Error.Mirror__AllocationNotFullyRedistributed(_allocationToRedistribute));
 
         _account.transferOut(_params.collateralToken, _params.sequencerFeeReceiver, _params.sequencerFee);
 
@@ -716,6 +743,7 @@ contract Mirror is CoreContract {
         Config memory _config = abi.decode(_data, (Config));
 
         require(_config.gmxExchangeRouter != IGmxExchangeRouter(address(0)), "Invalid GMX Router address");
+        require(_config.gmxDataStore != IGmxReadDataStore(address(0)), "Invalid GMX Data Store address");
         require(_config.gmxOrderVault != address(0), "Invalid GMX Order Vault address");
         require(_config.referralCode != bytes32(0), "Invalid Referral Code");
         require(_config.increaseCallbackGasLimit > 0, "Invalid Increase Callback Gas Limit");

@@ -115,10 +115,18 @@ contract Settle is CoreContract {
 
         uint[] memory _nextBalanceList = _account.getBalanceList(_callParams.distributionToken, _puppetList);
         uint[] memory _puppetAllocations = _mirror.getAllocationPuppetList(_allocationAddress);
+        require(
+            _puppetAllocations.length == _puppetCount,
+            Error.Mirror__PuppetListMismatch(_puppetAllocations.length, _puppetCount)
+        );
 
+        uint _allocationTotal = 0;
         for (uint _i = 0; _i < _puppetCount; _i++) {
-            _nextBalanceList[_i] += Math.mulDiv(_distributedAmount, _puppetAllocations[_i], _allocation);
+            uint _alloc = _puppetAllocations[_i];
+            _allocationTotal += _alloc;
+            _nextBalanceList[_i] += Math.mulDiv(_distributedAmount, _alloc, _allocation);
         }
+        require(_allocationTotal == _allocation, Error.Settle__InvalidAllocation(_allocationAddress));
         _account.setBalanceList(_callParams.distributionToken, _puppetList, _nextBalanceList);
 
         _logEvent(

@@ -10,6 +10,9 @@ broadcast
 cache/
 /CLAUDE.md
 
+*.local.md
+
+
 # foundry files
 forge-artifacts/
 forge-artifacts-prod/
