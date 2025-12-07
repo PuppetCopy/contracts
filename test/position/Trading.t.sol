@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.29;
+pragma solidity ^0.8.31;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -75,7 +75,7 @@ contract TradingTest is BasicSetup {
                 gmxExchangeRouter: IGmxExchangeRouter(address(mockGmxExchangeRouter)),
                 gmxDataStore: IGmxReadDataStore(Const.gmxDataStore),
                 gmxOrderVault: address(0x1234),
-                referralCode: bytes32("PUPPET"),
+                referralCode: 0x5055505045540000000000000000000000000000000000000000000000000000,
                 increaseCallbackGasLimit: 2e6,
                 decreaseCallbackGasLimit: 2e6,
                 maxPuppetList: 50,

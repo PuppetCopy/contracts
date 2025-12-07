@@ -6,15 +6,16 @@
   cache_path = 'forge-cache'
   libs = ['node_modules']
   evm_version = 'cancun'
-  solc_version = '0.8.29'
+  solc_version = '0.8.31'
   via_ir = true
-  extra_output = ["storageLayout", "evm.bytecode.generatedSources", "evm.legacyAssembly", "evm.deployedBytecode.immutableReferences"]
+  extra_output = ["storageLayout", "evm.deployedBytecode.immutableReferences"]
   bytecode_hash = "ipfs"
   cbor_metadata = true
   build_info = true
   optimizer = true
   optimizer_runs = 200
-  verbosity = 5
+  verbosity = 3
+  gas_reports = ["Mirror", "Account", "Settle", "Rule", "SequencerRouter"]
 
 [doc]
   ignore = ["**/interface/**/*.sol", "**/utils/**/*.sol", "**/shared/**/*.sol"]
@@ -25,11 +26,12 @@
   fs_permissions = [{ access = "read-write", path = "./deployments.json" }]
   optimizer_runs = 100_000
 
-
+[profile.ci.fuzz]
+  runs = 1000
 
 [profile.default.fuzz]
   max_test_rejects = 1_000_000 # Number of times `vm.assume` can fail
-  runs = 50
+  runs = 256
 
 [fmt]
   bracket_spacing = false
@@ -43,8 +45,7 @@
   func_attrs_with_params_multiline = true
 
 [rpc_endpoints]
-  localhost = "http://localhost:8545"
-  arbitrum = "${RPC_URL}"
+  arbitrum = { url = "${RPC_URL}", chain_id = 42161 }
 
 [etherscan]
   arbitrum = { key = "${ETHERSCAN_API_KEY}" }
@@ -53,9 +54,10 @@
   # Disable all style/informational lints during build
   exclude_lints = [
     "screaming-snake-case-immutable",
-    "screaming-snake-case-const", 
+    "screaming-snake-case-const",
     "mixed-case-variable",
     "mixed-case-function",
     "unused-import",
-    "asm-keccak256"
+    "asm-keccak256",
+    "unsafe-cheatcode"
   ]

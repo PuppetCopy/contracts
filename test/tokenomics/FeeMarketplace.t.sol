@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.29;
+pragma solidity ^0.8.31;
 
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";

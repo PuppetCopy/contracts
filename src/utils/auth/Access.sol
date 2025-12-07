@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.29;
+pragma solidity ^0.8.31;
 
 import {TransientSlot} from "@openzeppelin/contracts/utils/TransientSlot.sol";
 import {Error} from "./../../utils/Error.sol"; // Adjust path
@@ -40,21 +40,31 @@ abstract contract Access {
     /// @notice Modifier to restrict access to authorized users only.
     /// @dev Reverts if `canCall(msg.sender)` returns false. Includes reentrancy protection.
     modifier auth() {
+        _authBefore();
+        _;
+        _authAfter();
+    }
+
+    function _authBefore() internal {
         if (TransientSlot.tload(TransientSlot.asBoolean(REENTRANCY_GUARD_SLOT))) {
             revert ReentrancyGuardReentrantCall();
         }
         TransientSlot.tstore(TransientSlot.asBoolean(REENTRANCY_GUARD_SLOT), true);
-        
         require(canCall(msg.sender), Error.Access__Unauthorized());
-        _;
-        
+    }
+
+    function _authAfter() internal {
         TransientSlot.tstore(TransientSlot.asBoolean(REENTRANCY_GUARD_SLOT), false);
     }
 
     /// @notice Modifier to restrict access to the central Authority contract only.
     modifier onlyAuthority() {
-        require(msg.sender == address(authority), Error.Access__CallerNotAuthority());
+        _onlyAuthority();
         _;
+    }
+
+    function _onlyAuthority() internal view {
+        require(msg.sender == address(authority), Error.Access__CallerNotAuthority());
     }
 
     /// @notice Grants or revokes general access for a specific user.
