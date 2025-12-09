@@ -11,7 +11,7 @@
     "build": "forge build --sizes",
     "build:prod": "FOUNDRY_PROFILE=prod forge build --sizes",
     "generate": "bun run script/generate.ts",
-    "build:ts": "forge build && bun run generate && tsc -b",
+    "build:ts": "tsc -b",
     "script:deploy": "FOUNDRY_PROFILE=prod bun ./script/deploy.ts",
     "docgen": "forge doc --out '.docgen' --build",
     "gas-report": "forge test --match-contract TradingTest --gas-report",
