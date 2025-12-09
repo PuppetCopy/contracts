@@ -293,4 +293,45 @@ library GmxPositionUtils {
         bytes32 collateralKey = keccak256(abi.encode(positionKey, COLLATERAL_AMOUNT_KEY));
         return dataStore.getUint(collateralKey);
     }
+
+    /**
+     * @notice Reads the timestamp when position was last increased from GMX DataStore
+     * @param dataStore The GMX DataStore contract
+     * @param positionKey The position key
+     * @return The timestamp of last increase (0 if position was never increased)
+     */
+    function getPositionIncreasedAtTime(
+        IGmxReadDataStore dataStore,
+        bytes32 positionKey
+    ) internal view returns (uint) {
+        return dataStore.getUint(keccak256(abi.encode(positionKey, INCREASED_AT_TIME)));
+    }
+
+    /**
+     * @notice Reads the timestamp when position was last decreased from GMX DataStore
+     * @param dataStore The GMX DataStore contract
+     * @param positionKey The position key
+     * @return The timestamp of last decrease (0 if position was never decreased)
+     */
+    function getPositionDecreasedAtTime(
+        IGmxReadDataStore dataStore,
+        bytes32 positionKey
+    ) internal view returns (uint) {
+        return dataStore.getUint(keccak256(abi.encode(positionKey, DECREASED_AT_TIME)));
+    }
+
+    /**
+     * @notice Gets the last time a position was modified (max of increased/decreased time)
+     * @param dataStore The GMX DataStore contract
+     * @param positionKey The position key
+     * @return The timestamp of last modification
+     */
+    function getPositionLastUpdateTime(
+        IGmxReadDataStore dataStore,
+        bytes32 positionKey
+    ) internal view returns (uint) {
+        uint increasedAt = dataStore.getUint(keccak256(abi.encode(positionKey, INCREASED_AT_TIME)));
+        uint decreasedAt = dataStore.getUint(keccak256(abi.encode(positionKey, DECREASED_AT_TIME)));
+        return increasedAt > decreasedAt ? increasedAt : decreasedAt;
+    }
 }

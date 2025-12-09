@@ -10,13 +10,10 @@ broadcast
 cache/
 /CLAUDE.md
 
-*.local.md
-
+*.local.*
 
 # foundry files
 forge-artifacts/
 forge-artifacts-prod/
 forge-cache/
 forge-cache-prod/
-
-CLAUDE.local.md

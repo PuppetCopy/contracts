@@ -157,7 +157,8 @@ contract DeployPosition is BaseScript {
                 decreaseCallbackGasLimit: 2e6,
                 maxPuppetList: 50,
                 maxSequencerFeeToAllocationRatio: 0.1e30,
-                maxSequencerFeeToAdjustmentRatio: 0.1e30
+                maxSequencerFeeToAdjustmentRatio: 0.1e30,
+                stalledPositionThreshold: 5 minutes
             })
         );
         console.log("Mirror deployed at:", address(mirror));

@@ -71,7 +71,7 @@ contract Rule is CoreContract {
         );
 
         require(
-            _ruleParams.expiry >= block.timestamp + config.minExpiryDuration,
+            _ruleParams.expiry == 0 || _ruleParams.expiry >= block.timestamp + config.minExpiryDuration,
             Error.Rule__InvalidExpiryDuration(config.minExpiryDuration)
         );
 

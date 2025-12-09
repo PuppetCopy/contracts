@@ -28,12 +28,14 @@ contract Mirror is CoreContract {
         uint maxPuppetList;
         uint maxSequencerFeeToAllocationRatio;
         uint maxSequencerFeeToAdjustmentRatio;
+        uint stalledPositionThreshold; // Minimum time (seconds) since GMX position closed before allowing force-close
     }
 
     struct Position {
         uint size;
         uint traderSize;
         uint traderCollateral;
+        uint lastUpdateTime;
     }
 
     struct RequestAdjustment {
@@ -482,8 +484,16 @@ contract Mirror is CoreContract {
 
         bytes32 _traderPositionKey =
             GmxPositionUtils.getPositionKey(_params.trader, _params.market, _params.collateralToken, _params.isLong);
+
+        // Position can be force-closed if:
+        // 1. Trader's GMX position is closed (size = 0), OR
+        // 2. Trader's last update is ahead of puppet's last update by more than threshold (unmatched)
+        bool _traderPositionClosed = GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, _traderPositionKey) == 0;
+        uint _traderLastUpdateTime = GmxPositionUtils.getPositionLastUpdateTime(config.gmxDataStore, _traderPositionKey);
+        bool _positionUnmatched = _traderLastUpdateTime > _position.lastUpdateTime + config.stalledPositionThreshold;
+
         require(
-            GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, _traderPositionKey) == 0,
+            _traderPositionClosed || _positionUnmatched,
             Error.Mirror__PositionNotStalled(_allocationAddress, _traderPositionKey)
         );
 
@@ -591,7 +601,7 @@ contract Mirror is CoreContract {
         });
 
         _logEvent(
-            "RequestCloseStalledPosition",
+            "RequestCloseStalled",
             abi.encode(_params, _allocationAddress, _traderPositionKey, _requestKey, _allocationList)
         );
     }
@@ -649,6 +659,7 @@ contract Mirror is CoreContract {
             _position.size -= _request.sizeDelta;
         }
 
+        _position.lastUpdateTime = block.timestamp;
         positionMap[_request.allocationAddress] = _position;
 
         _logEvent(
@@ -751,6 +762,7 @@ contract Mirror is CoreContract {
         require(_config.maxPuppetList > 0, "Invalid max puppet list");
         require(_config.maxSequencerFeeToAllocationRatio > 0, "Invalid max sequencer fee to allocation ratio");
         require(_config.maxSequencerFeeToAdjustmentRatio > 0, "Invalid max sequencer fee to adjustment ratio");
+        require(_config.stalledPositionThreshold > 0, "Invalid stalled position threshold");
 
         config = _config;
     }
