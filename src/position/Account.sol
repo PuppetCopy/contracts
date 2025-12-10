@@ -95,13 +95,13 @@ contract Account is CoreContract {
      * @dev Validates against deposit cap and updates user balance
      */
     function deposit(IERC20 _collateralToken, address _depositor, address _user, uint _amount) external auth {
-        require(_amount > 0, Error.Account__InvalidAmount());
+        if (_amount == 0) revert Error.Account__InvalidAmount();
 
         uint depositCap = depositCapMap[_collateralToken];
-        require(depositCap > 0, Error.Account__TokenNotAllowed());
+        if (depositCap == 0) revert Error.Account__TokenNotAllowed();
 
         uint nextBalance = userBalanceMap[_collateralToken][_user] + _amount;
-        require(nextBalance <= depositCap, Error.Account__DepositExceedsLimit(depositCap));
+        if (nextBalance > depositCap) revert Error.Account__DepositExceedsLimit(depositCap);
 
         accountStore.transferIn(_collateralToken, _depositor, _amount);
         userBalanceMap[_collateralToken][_user] = nextBalance;
@@ -114,11 +114,11 @@ contract Account is CoreContract {
      * @dev Validates sufficient balance and transfers to receiver
      */
     function withdraw(IERC20 _collateralToken, address _user, address _receiver, uint _amount) external auth {
-        require(_amount > 0, Error.Account__InvalidAmount());
+        if (_amount == 0) revert Error.Account__InvalidAmount();
 
         uint balance = userBalanceMap[_collateralToken][_user];
 
-        require(_amount <= balance, Error.Account__InsufficientBalance(balance, _amount));
+        if (_amount > balance) revert Error.Account__InsufficientBalance(balance, _amount);
 
         uint nextBalance = balance - _amount;
 
@@ -132,7 +132,7 @@ contract Account is CoreContract {
      * @notice Configure deposit caps for allowed tokens
      */
     function setDepositCapList(IERC20[] calldata _depositTokenList, uint[] calldata _depositCapList) external auth {
-        require(_depositTokenList.length == _depositCapList.length, "Invalid deposit token list");
+        if (_depositTokenList.length != _depositCapList.length) revert("Invalid deposit token list");
 
         for (uint i = 0; i < depositTokenList.length; i++) {
             delete depositCapMap[depositTokenList[i]];
@@ -142,8 +142,8 @@ contract Account is CoreContract {
             IERC20 _token = _depositTokenList[i];
             uint _cap = _depositCapList[i];
 
-            require(_cap > 0, "Invalid deposit cap");
-            require(address(_token) != address(0), "Invalid token address");
+            if (_cap == 0) revert("Invalid deposit cap");
+            if (address(_token) == address(0)) revert("Invalid token address");
 
             depositCapMap[_token] = _cap;
         }
@@ -186,8 +186,8 @@ contract Account is CoreContract {
 
         // Validate there's sufficient balance in the allocation account
         uint _actualBalance = _token.balanceOf(_allocationAddress);
-        require(_actualBalance >= _amount, Error.Account__InsufficientBalance(_actualBalance, _amount));
-        require(_amount > 0, Error.Account__NoFundsToTransfer(_allocationAddress, address(_token)));
+        if (_actualBalance < _amount) revert Error.Account__InsufficientBalance(_actualBalance, _amount);
+        if (_amount == 0) revert Error.Account__NoFundsToTransfer(_allocationAddress, address(_token));
 
         AllocationAccount(_allocationAddress).execute(
             address(_token), abi.encodeWithSelector(IERC20.transfer.selector, address(accountStore), _amount), _gasLimit
@@ -195,7 +195,7 @@ contract Account is CoreContract {
 
         _recordedAmountIn = accountStore.recordTransferIn(_token);
 
-        require(_recordedAmountIn == _amount, Error.Account__InvalidSettledAmount(_token, _recordedAmountIn, _amount));
+        if (_recordedAmountIn != _amount) revert Error.Account__InvalidSettledAmount(_token, _recordedAmountIn, _amount);
     }
     /**
      * @notice Create a new allocation account with deterministic address
@@ -222,7 +222,7 @@ contract Account is CoreContract {
      * @param _amount The amount to recover
      */
     function recoverUnaccountedTokens(IERC20 _token, address _receiver, uint _amount) external auth {
-        require(_amount <= unaccountedTokenBalance[_token], "Amount exceeds unaccounted balance");
+        if (_amount > unaccountedTokenBalance[_token]) revert("Amount exceeds unaccounted balance");
         unaccountedTokenBalance[_token] -= _amount;
         accountStore.transferOut(config.transferOutGasLimit, _token, _receiver, _amount);
         _logEvent("RecoverUnaccountedTokens", abi.encode(_token, _receiver, _amount, unaccountedTokenBalance[_token]));
@@ -236,7 +236,7 @@ contract Account is CoreContract {
         bytes memory _data
     ) internal override {
         Config memory _config = abi.decode(_data, (Config));
-        require(_config.transferOutGasLimit > 0, "Invalid transfer out gas limit");
+        if (_config.transferOutGasLimit == 0) revert("Invalid transfer out gas limit");
 
         config = _config;
     }

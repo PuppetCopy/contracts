@@ -74,7 +74,7 @@ contract RewardDistributor is CoreContract {
     /// @param _depositor The address depositing rewards.
     /// @param _amount Amount of reward tokens to deposit.
     function deposit(address _depositor, uint _amount) external auth {
-        require(_amount > 0, Error.RewardDistributor__InvalidAmount());
+        if (_amount == 0) revert Error.RewardDistributor__InvalidAmount();
 
         _distribute();
         totalUndistributed += _amount;
@@ -88,7 +88,7 @@ contract RewardDistributor is CoreContract {
     /// @param _receiver The address receiving the rewards.
     /// @param _amount The amount of rewards to claim.
     function claim(address _user, address _receiver, uint _amount) external auth {
-        require(_amount > 0, Error.RewardDistributor__InvalidAmount());
+        if (_amount == 0) revert Error.RewardDistributor__InvalidAmount();
 
         uint _currentCumulative = _distribute();
         UserRewards memory _userReward = userRewardMap[_user];
@@ -96,7 +96,7 @@ contract RewardDistributor is CoreContract {
         uint _nextAccrued = _userReward.accrued
             + _calculatePendingRewardPerToken(_userReward.cumulativeRewardCheckpoint, _currentCumulative, _userBalance);
 
-        require(_amount <= _nextAccrued, Error.RewardDistributor__InsufficientRewards(_userReward.accrued));
+        if (_amount > _nextAccrued) revert Error.RewardDistributor__InsufficientRewards(_userReward.accrued);
 
         // Update the user's accrued rewards up to now.
         _userReward.cumulativeRewardCheckpoint = _currentCumulative;
@@ -153,7 +153,7 @@ contract RewardDistributor is CoreContract {
         bytes memory _data
     ) internal override {
         Config memory newConfig = abi.decode(_data, (Config));
-        require(newConfig.distributionWindow > 0, "RewardDistributor: distribution period must be > 0");
+        if (newConfig.distributionWindow == 0) revert("RewardDistributor: distribution period must be > 0");
         config = newConfig;
     }
 }

@@ -30,9 +30,9 @@ contract AllocationAccount {
         uint _ethAmount,
         uint _gasLimit
     ) public payable returns (bool _success, bytes memory _returnData) {
-        require(store.canCall(msg.sender), Error.AllocationAccount__UnauthorizedOperator());
-        require(address(this).balance >= _ethAmount, Error.AllocationAccount__InsufficientBalance());
-        require(_gasLimit > 0, "Gas limit must be greater than 0");
+        if (!store.canCall(msg.sender)) revert Error.AllocationAccount__UnauthorizedOperator();
+        if (address(this).balance < _ethAmount) revert Error.AllocationAccount__InsufficientBalance();
+        if (_gasLimit == 0) revert("Gas limit must be greater than 0");
 
         return _contract.call{value: _ethAmount, gas: _gasLimit}(_data);
     }

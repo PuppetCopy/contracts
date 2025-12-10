@@ -33,7 +33,7 @@ abstract contract Access {
     constructor(
         IAuthority _authority
     ) {
-        require(address(_authority) != address(0), "Access: Zero authority address");
+        if (address(_authority) == address(0)) revert("Access: Zero authority address");
         authority = _authority;
     }
 
@@ -50,7 +50,7 @@ abstract contract Access {
             revert ReentrancyGuardReentrantCall();
         }
         TransientSlot.tstore(TransientSlot.asBoolean(REENTRANCY_GUARD_SLOT), true);
-        require(canCall(msg.sender), Error.Access__Unauthorized());
+        if (!canCall(msg.sender)) revert Error.Access__Unauthorized();
     }
 
     function _authAfter() internal {
@@ -64,7 +64,7 @@ abstract contract Access {
     }
 
     function _onlyAuthority() internal view {
-        require(msg.sender == address(authority), Error.Access__CallerNotAuthority());
+        if (msg.sender != address(authority)) revert Error.Access__CallerNotAuthority();
     }
 
     /// @notice Grants or revokes general access for a specific user.

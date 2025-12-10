@@ -32,7 +32,7 @@ abstract contract Permission {
     constructor(
         IAuthority _authority
     ) {
-        require(address(_authority) != address(0), "Permission: Zero authority address");
+        if (address(_authority) == address(0)) revert("Permission: Zero authority address");
         authority = _authority;
     }
 
@@ -49,7 +49,7 @@ abstract contract Permission {
             revert ReentrancyGuardReentrantCall();
         }
         TransientSlot.tstore(TransientSlot.asBoolean(REENTRANCY_GUARD_SLOT), true);
-        require(canCall(msg.sig, msg.sender), Error.Permission__Unauthorized());
+        if (!canCall(msg.sig, msg.sender)) revert Error.Permission__Unauthorized();
     }
 
     function _authAfter() internal {
@@ -63,7 +63,7 @@ abstract contract Permission {
     }
 
     function _onlyAuthority() internal view {
-        require(msg.sender == address(authority), Error.Permission__CallerNotAuthority());
+        if (msg.sender != address(authority)) revert Error.Permission__CallerNotAuthority();
     }
 
     /// @notice Grants or revokes permission for a specific function signature and user.

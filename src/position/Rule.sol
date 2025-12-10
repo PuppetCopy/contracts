@@ -64,21 +64,18 @@ contract Rule is CoreContract {
         address _trader,
         RuleParams calldata _ruleParams
     ) external auth {
-        require(
-            _ruleParams.throttleActivity >= config.minActivityThrottle
-                && _ruleParams.throttleActivity <= config.maxActivityThrottle,
-            Error.Rule__InvalidActivityThrottle(config.minActivityThrottle, config.maxActivityThrottle)
-        );
+        if (
+            _ruleParams.throttleActivity < config.minActivityThrottle
+                || _ruleParams.throttleActivity > config.maxActivityThrottle
+        ) revert Error.Rule__InvalidActivityThrottle(config.minActivityThrottle, config.maxActivityThrottle);
 
-        require(
-            _ruleParams.expiry == 0 || _ruleParams.expiry >= block.timestamp + config.minExpiryDuration,
-            Error.Rule__InvalidExpiryDuration(config.minExpiryDuration)
-        );
+        if (_ruleParams.expiry != 0 && _ruleParams.expiry < block.timestamp + config.minExpiryDuration) {
+            revert Error.Rule__InvalidExpiryDuration(config.minExpiryDuration);
+        }
 
-        require(
-            _ruleParams.allowanceRate >= config.minAllowanceRate && _ruleParams.allowanceRate <= config.maxAllowanceRate,
-            Error.Rule__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate)
-        );
+        if (
+            _ruleParams.allowanceRate < config.minAllowanceRate || _ruleParams.allowanceRate > config.maxAllowanceRate
+        ) revert Error.Rule__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate);
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_collateralToken, _trader);
         matchingRuleMap[_traderMatchingKey][_user] = _ruleParams;
@@ -93,10 +90,10 @@ contract Rule is CoreContract {
     ) internal override {
         config = abi.decode(_data, (Config));
 
-        require(config.minExpiryDuration > 0, "Invalid min expiry duration");
-        require(config.minAllowanceRate > 0, "Invalid min allowance rate");
-        require(config.maxAllowanceRate > config.minAllowanceRate, "Invalid max allowance rate");
-        require(config.minActivityThrottle > 0, "Invalid min activity throttle");
-        require(config.maxActivityThrottle > config.minActivityThrottle, "Invalid max activity throttle");
+        if (config.minExpiryDuration == 0) revert("Invalid min expiry duration");
+        if (config.minAllowanceRate == 0) revert("Invalid min allowance rate");
+        if (config.maxAllowanceRate <= config.minAllowanceRate) revert("Invalid max allowance rate");
+        if (config.minActivityThrottle == 0) revert("Invalid min activity throttle");
+        if (config.maxActivityThrottle <= config.minActivityThrottle) revert("Invalid max activity throttle");
     }
 }

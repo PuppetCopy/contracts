@@ -53,7 +53,7 @@ abstract contract BankStore is Access {
      * @notice Transfer tokens out with gas limit
      */
     function transferOut(uint gasLimit, IERC20 _token, address _receiver, uint _value) public auth {
-        require(tokenBalanceMap[_token] >= _value, Error.BankStore__InsufficientBalance());
+        if (tokenBalanceMap[_token] < _value) revert Error.BankStore__InsufficientBalance();
 
         tokenBalanceMap[_token] -= _value;
 

@@ -42,6 +42,6 @@ contract TokenRouter is CoreContract {
     ) internal virtual override {
         config = abi.decode(_data, (Config));
 
-        require(config.transferGasLimit > 0, Error.TokenRouter__EmptyTokenTranferGasLimit());
+        if (config.transferGasLimit == 0) revert Error.TokenRouter__EmptyTokenTranferGasLimit();
     }
 }

@@ -26,7 +26,7 @@ library TransferUtils {
      */
     function sendNativeToken(IWNT wnt, address holdingAddress, uint gasLimit, address receiver, uint amount) internal {
         if (amount == 0) return;
-        require(receiver != address(0), Error.TransferUtils__InvalidReceiver());
+        if (receiver == address(0)) revert Error.TransferUtils__InvalidReceiver();
 
         bool success;
         // use an assembly call to avoid loading large data into memory
@@ -70,7 +70,7 @@ library TransferUtils {
         uint amount
     ) internal {
         if (amount == 0) return;
-        require(receiver != address(0), Error.TransferUtils__InvalidReceiver());
+        if (receiver == address(0)) revert Error.TransferUtils__InvalidReceiver();
 
         wnt.deposit{value: amount}();
 
@@ -97,7 +97,7 @@ library TransferUtils {
         uint amount
     ) internal {
         if (amount == 0) return;
-        require(receiver != address(0), Error.TransferUtils__InvalidReceiver());
+        if (receiver == address(0)) revert Error.TransferUtils__InvalidReceiver();
 
         wnt.withdraw(amount);
 
@@ -144,22 +144,20 @@ library TransferUtils {
         uint amount
     ) internal {
         if (amount == 0) return;
-        require(receiver != address(0), Error.TransferUtils__InvalidReceiver());
-
-        require(gasLimit > 0, Error.TransferUtils__EmptyTokenTransferGasLimit(token));
+        if (receiver == address(0)) revert Error.TransferUtils__InvalidReceiver();
+        if (gasLimit == 0) revert Error.TransferUtils__EmptyTokenTransferGasLimit(token);
 
         // Try transfer to primary receiver using improved internal method
         if (_callOptionalReturnBool(gasLimit, token, abi.encodeCall(token.transfer, (receiver, amount)))) {
             return;
         }
 
-        require(holdingAddress != address(0), Error.TransferUtils__EmptyHoldingAddress());
+        if (holdingAddress == address(0)) revert Error.TransferUtils__EmptyHoldingAddress();
 
         // Fallback: transfer to holding address to avoid gaming through reverting
-        require(
-            _callOptionalReturnBool(gasLimit, token, abi.encodeCall(token.transfer, (holdingAddress, amount))),
-            Error.TransferUtils__TokenTransferError(token, holdingAddress, amount)
-        );
+        if (!_callOptionalReturnBool(gasLimit, token, abi.encodeCall(token.transfer, (holdingAddress, amount)))) {
+            revert Error.TransferUtils__TokenTransferError(token, holdingAddress, amount);
+        }
     }
 
     /**
@@ -173,10 +171,9 @@ library TransferUtils {
      * @param value Amount to transfer
      */
     function transferStrictly(uint gasLimit, IERC20 token, address to, uint value) internal {
-        require(
-            _callOptionalReturnBool(gasLimit, token, abi.encodeCall(token.transfer, (to, value))),
-            Error.TransferUtils__TokenTransferError(token, to, value)
-        );
+        if (!_callOptionalReturnBool(gasLimit, token, abi.encodeCall(token.transfer, (to, value)))) {
+            revert Error.TransferUtils__TokenTransferError(token, to, value);
+        }
     }
 
     /**
@@ -191,10 +188,9 @@ library TransferUtils {
      * @param value Amount to transfer
      */
     function transferStrictlyFrom(uint gasLimit, IERC20 token, address from, address to, uint value) internal {
-        require(
-            _callOptionalReturnBool(gasLimit, token, abi.encodeCall(token.transferFrom, (from, to, value))),
-            Error.TransferUtils__TokenTransferFromError(token, from, to, value)
-        );
+        if (!_callOptionalReturnBool(gasLimit, token, abi.encodeCall(token.transferFrom, (from, to, value)))) {
+            revert Error.TransferUtils__TokenTransferFromError(token, from, to, value);
+        }
     }
 
     /**

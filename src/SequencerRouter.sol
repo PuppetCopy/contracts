@@ -43,10 +43,10 @@ contract SequencerRouter is CoreContract, IGmxOrderCallbackReceiver {
         Settle _settle,
         Config memory _config
     ) CoreContract(_authority, abi.encode(_config)) {
-        require(address(_account) != address(0), "Account not set correctly");
-        require(address(_ruleContract) != address(0), "Rule contract not set correctly");
-        require(address(_mirror) != address(0), "Mirror not set correctly");
-        require(address(_settle) != address(0), "Settle not set correctly");
+        if (address(_account) == address(0)) revert("Account not set correctly");
+        if (address(_ruleContract) == address(0)) revert("Rule contract not set correctly");
+        if (address(_mirror) == address(0)) revert("Mirror not set correctly");
+        if (address(_settle) == address(0)) revert("Settle not set correctly");
 
         mirror = _mirror;
         ruleContract = _ruleContract;
@@ -156,10 +156,10 @@ contract SequencerRouter is CoreContract, IGmxOrderCallbackReceiver {
     ) internal override {
         Config memory _config = abi.decode(_data, (Config));
 
-        require(_config.openBaseGasLimit > 0, "Invalid mirror base gas limit");
-        require(_config.openPerPuppetGasLimit > 0, "Invalid mirror per-puppet gas limit");
-        require(_config.adjustBaseGasLimit > 0, "Invalid adjust base gas limit");
-        require(_config.adjustPerPuppetGasLimit > 0, "Invalid adjust per-puppet gas limit");
+        if (_config.openBaseGasLimit == 0) revert("Invalid mirror base gas limit");
+        if (_config.openPerPuppetGasLimit == 0) revert("Invalid mirror per-puppet gas limit");
+        if (_config.adjustBaseGasLimit == 0) revert("Invalid adjust base gas limit");
+        if (_config.adjustPerPuppetGasLimit == 0) revert("Invalid adjust per-puppet gas limit");
 
         config = _config;
     }
@@ -223,11 +223,11 @@ contract SequencerRouter is CoreContract, IGmxOrderCallbackReceiver {
         bytes32 key,
         GmxPositionUtils.EventLogData calldata /* eventData */
     ) external payable auth {
-        require(msg.value > 0, "No execution fee to refund");
+        if (msg.value == 0) revert("No execution fee to refund");
 
         // Refund the execution fee to the configured receiver
         (bool success,) = config.fallbackRefundExecutionFeeReceiver.call{value: msg.value}("");
-        require(success, Error.SequencerRouter__FailedRefundExecutionFee());
+        if (!success) revert Error.SequencerRouter__FailedRefundExecutionFee();
 
         _logEvent("RefundExecutionFee", abi.encode(key, msg.value));
     }

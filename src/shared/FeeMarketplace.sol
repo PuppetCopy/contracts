@@ -82,7 +82,7 @@ contract FeeMarketplace is CoreContract {
         address _depositor,
         uint _amount
     ) external auth {
-        require(_amount > 0, Error.FeeMarketplace__ZeroDeposit());
+        if (_amount == 0) revert Error.FeeMarketplace__ZeroDeposit();
 
         _updateUnlockedBalance(_feeToken);
 
@@ -101,7 +101,7 @@ contract FeeMarketplace is CoreContract {
         _updateUnlockedBalance(_feeToken);
 
         uint _unaccountedAmount = store.recordTransferIn(_feeToken);
-        require(_unaccountedAmount > 0, Error.FeeMarketplace__ZeroDeposit());
+        if (_unaccountedAmount == 0) revert Error.FeeMarketplace__ZeroDeposit();
 
         accountedBalance[_feeToken] += _unaccountedAmount;
 
@@ -118,17 +118,19 @@ contract FeeMarketplace is CoreContract {
         address _receiver,
         uint _purchaseAmount
     ) external auth {
-        require(_purchaseAmount > 0, Error.FeeMarketplace__InvalidAmount());
+        if (_purchaseAmount == 0) revert Error.FeeMarketplace__InvalidAmount();
 
         uint _currentAskAmount = askAmount[_feeToken];
 
-        require(_currentAskAmount > 0, Error.FeeMarketplace__NotAuctionableToken());
+        if (_currentAskAmount == 0) revert Error.FeeMarketplace__NotAuctionableToken();
 
         // Update the fee token's unlocked balance before redemption.
         _updateUnlockedBalance(_feeToken);
 
         uint _accruedFees = unclockedFees[_feeToken];
-        require(_accruedFees >= _purchaseAmount, Error.FeeMarketplace__InsufficientUnlockedBalance(_accruedFees));
+        if (_accruedFees < _purchaseAmount) {
+            revert Error.FeeMarketplace__InsufficientUnlockedBalance(_accruedFees);
+        }
 
         store.transferIn(protocolToken, _depositor, _currentAskAmount);
         store.burn(_currentAskAmount);
@@ -166,7 +168,8 @@ contract FeeMarketplace is CoreContract {
     ) internal override {
         Config memory _config = abi.decode(_data, (Config));
 
-        require(_config.transferOutGasLimit > 0 && _config.distributionTimeframe > 0);
+        if (_config.transferOutGasLimit == 0) revert("Invalid transfer out gas limit");
+        if (_config.distributionTimeframe == 0) revert("Invalid distribution timeframe");
 
         config = _config;
     }

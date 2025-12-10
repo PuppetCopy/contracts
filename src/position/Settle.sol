@@ -63,16 +63,15 @@ contract Settle is CoreContract {
         address[] calldata _puppetList
     ) external auth returns (uint _distributedAmount, uint _platformFeeAmount) {
         uint _puppetCount = _puppetList.length;
-        require(_puppetCount > 0, Error.Mirror__PuppetListEmpty());
-        require(
-            _puppetCount <= config.maxPuppetList,
-            Error.Settle__PuppetListExceedsMaximum(_puppetCount, config.maxPuppetList)
-        );
+        if (_puppetCount == 0) revert Error.Mirror__PuppetListEmpty();
+        if (_puppetCount > config.maxPuppetList) {
+            revert Error.Settle__PuppetListExceedsMaximum(_puppetCount, config.maxPuppetList);
+        }
 
         uint _sequencerFee = _callParams.sequencerExecutionFee;
-        require(_sequencerFee > 0, Error.Settle__InvalidSequencerExecutionFeeAmount());
+        if (_sequencerFee == 0) revert Error.Settle__InvalidSequencerExecutionFeeAmount();
         address _sequencerFeeReceiver = _callParams.sequencerFeeReceiver;
-        require(_sequencerFeeReceiver != address(0), Error.Settle__InvalidSequencerExecutionFeeReceiver());
+        if (_sequencerFeeReceiver == address(0)) revert Error.Settle__InvalidSequencerExecutionFeeReceiver();
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
         address _allocationAddress = _account.getAllocationAddress(
@@ -80,7 +79,7 @@ contract Settle is CoreContract {
         );
 
         uint _allocation = _mirror.allocationMap(_allocationAddress);
-        require(_allocation > 0, Error.Settle__InvalidAllocation(_allocationAddress));
+        if (_allocation == 0) revert Error.Settle__InvalidAllocation(_allocationAddress);
 
         // Transfer the specified amount from allocation account
         // transferInAllocation already verifies the amount matches
@@ -91,11 +90,10 @@ contract Settle is CoreContract {
             config.allocationAccountTransferGasLimit
         );
 
-        require(
+        if (
             _callParams.sequencerExecutionFee
-                < Precision.applyFactor(config.maxSequencerFeeToSettleRatio, _callParams.amount),
-            Error.Settle__SequencerFeeExceedsSettledAmount(_callParams.sequencerExecutionFee, _callParams.amount)
-        );
+                >= Precision.applyFactor(config.maxSequencerFeeToSettleRatio, _callParams.amount)
+        ) revert Error.Settle__SequencerFeeExceedsSettledAmount(_callParams.sequencerExecutionFee, _callParams.amount);
 
         _distributedAmount = _callParams.amount - _callParams.sequencerExecutionFee;
 
@@ -115,10 +113,9 @@ contract Settle is CoreContract {
 
         uint[] memory _nextBalanceList = _account.getBalanceList(_callParams.distributionToken, _puppetList);
         uint[] memory _puppetAllocations = _mirror.getAllocationPuppetList(_allocationAddress);
-        require(
-            _puppetAllocations.length == _puppetCount,
-            Error.Mirror__PuppetListMismatch(_puppetAllocations.length, _puppetCount)
-        );
+        if (_puppetAllocations.length != _puppetCount) {
+            revert Error.Mirror__PuppetListMismatch(_puppetAllocations.length, _puppetCount);
+        }
 
         uint _allocationTotal = 0;
         for (uint _i = 0; _i < _puppetCount; _i++) {
@@ -126,7 +123,7 @@ contract Settle is CoreContract {
             _allocationTotal += _alloc;
             _nextBalanceList[_i] += Math.mulDiv(_distributedAmount, _alloc, _allocation);
         }
-        require(_allocationTotal == _allocation, Error.Settle__InvalidAllocation(_allocationAddress));
+        if (_allocationTotal != _allocation) revert Error.Settle__InvalidAllocation(_allocationAddress);
         _account.setBalanceList(_callParams.distributionToken, _puppetList, _nextBalanceList);
 
         _logEvent(
@@ -153,11 +150,11 @@ contract Settle is CoreContract {
         address _receiver,
         uint _amount
     ) external auth returns (uint _dustAmount) {
-        require(_receiver != address(0), Error.Settle__InvalidReceiver());
+        if (_receiver == address(0)) revert Error.Settle__InvalidReceiver();
 
         uint _dustThreshold = tokenDustThresholdAmountMap[_dustToken];
-        require(_dustThreshold > 0, Error.Settle__DustThresholdNotSet(address(_dustToken)));
-        require(_amount <= _dustThreshold, Error.Settle__AmountExceedsDustThreshold(_amount, _dustThreshold));
+        if (_dustThreshold == 0) revert Error.Settle__DustThresholdNotSet(address(_dustToken));
+        if (_amount > _dustThreshold) revert Error.Settle__AmountExceedsDustThreshold(_amount, _dustThreshold);
 
         // Transfer the specified dust amount from allocation account
         // transferInAllocation already verifies the amount and balance
@@ -178,9 +175,9 @@ contract Settle is CoreContract {
      * @dev Validates amount doesn't exceed accumulated fees before transfer
      */
     function collectPlatformFees(Account _account, IERC20 _token, address _receiver, uint _amount) external auth {
-        require(_receiver != address(0), "Invalid receiver");
-        require(_amount > 0, "Invalid amount");
-        require(_amount <= platformFeeMap[_token], "Amount exceeds accumulated fees");
+        if (_receiver == address(0)) revert("Invalid receiver");
+        if (_amount == 0) revert("Invalid amount");
+        if (_amount > platformFeeMap[_token]) revert("Amount exceeds accumulated fees");
 
         platformFeeMap[_token] -= _amount;
         _account.transferOut(_token, _receiver, _amount);
@@ -195,9 +192,9 @@ contract Settle is CoreContract {
         IERC20[] calldata _tokenDustThresholdList,
         uint[] calldata _tokenDustThresholdCapList
     ) external auth {
-        require(
-            _tokenDustThresholdList.length == _tokenDustThresholdCapList.length, "Invalid token dust threshold list"
-        );
+        if (_tokenDustThresholdList.length != _tokenDustThresholdCapList.length) {
+            revert("Invalid token dust threshold list");
+        }
 
         // Clear existing thresholds
         for (uint i = 0; i < tokenDustThresholdList.length; i++) {
@@ -209,8 +206,8 @@ contract Settle is CoreContract {
             IERC20 _token = _tokenDustThresholdList[i];
             uint _cap = _tokenDustThresholdCapList[i];
 
-            require(_cap > 0, "Invalid token dust threshold cap");
-            require(address(_token) != address(0), "Invalid token address");
+            if (_cap == 0) revert("Invalid token dust threshold cap");
+            if (address(_token) == address(0)) revert("Invalid token address");
 
             tokenDustThresholdAmountMap[_token] = _cap;
         }
@@ -230,10 +227,10 @@ contract Settle is CoreContract {
     ) internal override {
         Config memory _config = abi.decode(_data, (Config));
 
-        require(_config.platformSettleFeeFactor > 0, "Invalid Platform Settle Fee Factor");
-        require(_config.maxSequencerFeeToSettleRatio > 0, "Invalid Max Sequencer Fee To Settle Ratio");
-        require(_config.maxPuppetList > 0, "Invalid Max Puppet List");
-        require(_config.allocationAccountTransferGasLimit > 0, "Invalid Token Transfer Gas Limit");
+        if (_config.platformSettleFeeFactor == 0) revert("Invalid Platform Settle Fee Factor");
+        if (_config.maxSequencerFeeToSettleRatio == 0) revert("Invalid Max Sequencer Fee To Settle Ratio");
+        if (_config.maxPuppetList == 0) revert("Invalid Max Puppet List");
+        if (_config.allocationAccountTransferGasLimit == 0) revert("Invalid Token Transfer Gas Limit");
 
         config = _config;
     }

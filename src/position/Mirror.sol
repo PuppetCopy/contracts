@@ -178,22 +178,21 @@ contract Mirror is CoreContract {
         CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth returns (address _allocationAddress, bytes32 _requestKey) {
-        require(_callParams.isIncrease, Error.Mirror__InitialMustBeIncrease());
-        require(_callParams.collateralDelta > 0, Error.Mirror__InvalidCollateralDelta());
-        require(_callParams.sizeDeltaInUsd > 0, Error.Mirror__InvalidSizeDelta());
-        require(_callParams.sequencerFee > 0, Error.Mirror__InvalidSequencerExecutionFeeAmount());
+        if (!_callParams.isIncrease) revert Error.Mirror__InitialMustBeIncrease();
+        if (_callParams.collateralDelta == 0) revert Error.Mirror__InvalidCollateralDelta();
+        if (_callParams.sizeDeltaInUsd == 0) revert Error.Mirror__InvalidSizeDelta();
+        if (_callParams.sequencerFee == 0) revert Error.Mirror__InvalidSequencerExecutionFeeAmount();
 
         bytes32 _traderPositionKey = GmxPositionUtils.getPositionKey(
             _callParams.trader, _callParams.market, _callParams.collateralToken, _callParams.isLong
         );
 
-        require(
-            GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, _traderPositionKey) > 0,
-            Error.Mirror__TraderPositionNotFound(_callParams.trader, _traderPositionKey)
-        );
+        if (GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, _traderPositionKey) == 0) {
+            revert Error.Mirror__TraderPositionNotFound(_callParams.trader, _traderPositionKey);
+        }
 
         uint _puppetCount = _puppetList.length;
-        require(_puppetCount > 0, Error.Mirror__PuppetListEmpty());
+        if (_puppetCount == 0) revert Error.Mirror__PuppetListEmpty();
         if (_puppetCount > config.maxPuppetList) revert Error.Mirror__PuppetListTooLarge(_puppetCount, config.maxPuppetList);
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
@@ -229,11 +228,13 @@ contract Mirror is CoreContract {
             lastActivityThrottleMap[_traderMatchingKey][_puppet] = block.timestamp + _rule.throttleActivity;
         }
 
-        require(_remainingFee == 0, Error.Mirror__SequencerFeeNotFullyCovered(_callParams.sequencerFee - _remainingFee, _callParams.sequencerFee));
-        require(
-            _callParams.sequencerFee < Precision.applyFactor(config.maxSequencerFeeToAllocationRatio, _allocated + _callParams.sequencerFee),
-            Error.Mirror__SequencerFeeExceedsCostFactor(_callParams.sequencerFee, _allocated + _callParams.sequencerFee)
-        );
+        if (_remainingFee != 0) {
+            revert Error.Mirror__SequencerFeeNotFullyCovered(_callParams.sequencerFee - _remainingFee, _callParams.sequencerFee);
+        }
+        if (
+            _callParams.sequencerFee
+                >= Precision.applyFactor(config.maxSequencerFeeToAllocationRatio, _allocated + _callParams.sequencerFee)
+        ) revert Error.Mirror__SequencerFeeExceedsCostFactor(_callParams.sequencerFee, _allocated + _callParams.sequencerFee);
 
         allocationMap[_allocationAddress] = _allocated;
 
@@ -293,7 +294,9 @@ contract Mirror is CoreContract {
         CallPosition calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth returns (bytes32 _requestKey) {
-        require(_callParams.collateralDelta > 0 || _callParams.sizeDeltaInUsd > 0, Error.Mirror__NoAdjustmentRequired());
+        if (_callParams.collateralDelta == 0 && _callParams.sizeDeltaInUsd == 0) {
+            revert Error.Mirror__NoAdjustmentRequired();
+        }
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
         address _allocationAddress = _account.getAllocationAddress(
@@ -301,23 +304,20 @@ contract Mirror is CoreContract {
         );
 
         uint _allocated = allocationMap[_allocationAddress];
-        require(_allocated > 0, Error.Mirror__InvalidAllocation(_allocationAddress));
-        require(_callParams.sequencerFee > 0, Error.Mirror__InvalidSequencerExecutionFeeAmount());
-        require(
-            _callParams.sequencerFee < Precision.applyFactor(config.maxSequencerFeeToAdjustmentRatio, _allocated),
-            Error.Mirror__SequencerFeeExceedsAdjustmentRatio(_callParams.sequencerFee, _allocated)
-        );
+        if (_allocated == 0) revert Error.Mirror__InvalidAllocation(_allocationAddress);
+        if (_callParams.sequencerFee == 0) revert Error.Mirror__InvalidSequencerExecutionFeeAmount();
+        if (_callParams.sequencerFee >= Precision.applyFactor(config.maxSequencerFeeToAdjustmentRatio, _allocated)) {
+            revert Error.Mirror__SequencerFeeExceedsAdjustmentRatio(_callParams.sequencerFee, _allocated);
+        }
 
         uint[] memory _allocationList = allocationPuppetList[_allocationAddress];
         uint _puppetCount = _puppetList.length;
-        require(
-            _allocationList.length == _puppetCount,
-            Error.Mirror__PuppetListMismatch(_allocationList.length, _puppetCount)
-        );
-        require(
-            _allocated > _callParams.sequencerFee,
-            Error.Mirror__InsufficientAllocationForSequencerFee(_allocated, _callParams.sequencerFee)
-        );
+        if (_allocationList.length != _puppetCount) {
+            revert Error.Mirror__PuppetListMismatch(_allocationList.length, _puppetCount);
+        }
+        if (_allocated <= _callParams.sequencerFee) {
+            revert Error.Mirror__InsufficientAllocationForSequencerFee(_allocated, _callParams.sequencerFee);
+        }
 
         uint[] memory _nextBalanceList = _account.getBalanceList(_callParams.collateralToken, _puppetList);
 
@@ -350,16 +350,20 @@ contract Mirror is CoreContract {
             }
         }
 
-        require(_remainingFee == 0, Error.Mirror__SequencerFeeNotFullyCovered(_callParams.sequencerFee - _remainingFee, _callParams.sequencerFee));
-        require(_allocationToRedistribute == 0, Error.Mirror__AllocationNotFullyRedistributed(_allocationToRedistribute));
+        if (_remainingFee != 0) {
+            revert Error.Mirror__SequencerFeeNotFullyCovered(_callParams.sequencerFee - _remainingFee, _callParams.sequencerFee);
+        }
+        if (_allocationToRedistribute != 0) {
+            revert Error.Mirror__AllocationNotFullyRedistributed(_allocationToRedistribute);
+        }
 
         allocationPuppetList[_allocationAddress] = _allocationList;
         _account.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
         _account.transferOut(_callParams.collateralToken, _callParams.sequencerFeeReceiver, _callParams.sequencerFee);
 
         Position memory _position = positionMap[_allocationAddress];
-        require(_position.size > 0, Error.Mirror__PositionNotFound(_allocationAddress));
-        require(_position.traderCollateral > 0, Error.Mirror__TraderCollateralZero(_allocationAddress));
+        if (_position.size == 0) revert Error.Mirror__PositionNotFound(_allocationAddress);
+        if (_position.traderCollateral == 0) revert Error.Mirror__TraderCollateralZero(_allocationAddress);
 
         uint _puppetLeverage = Precision.toBasisPoints(_position.size, _allocated);
         uint _traderTargetLeverage = _callParams.isIncrease
@@ -372,8 +376,8 @@ contract Mirror is CoreContract {
                 )
                 : 0;
 
-        require(_traderTargetLeverage != _puppetLeverage, Error.Mirror__NoAdjustmentRequired());
-        require(_puppetLeverage > 0, Error.Mirror__InvalidCurrentLeverage());
+        if (_traderTargetLeverage == _puppetLeverage) revert Error.Mirror__NoAdjustmentRequired();
+        if (_puppetLeverage == 0) revert Error.Mirror__InvalidCurrentLeverage();
 
         bool _isIncrease = _traderTargetLeverage > _puppetLeverage;
         uint _sizeDelta = _traderTargetLeverage == 0
@@ -389,10 +393,9 @@ contract Mirror is CoreContract {
         );
 
         if (_isIncrease) {
-            require(
-                GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, _traderPositionKey) > 0,
-                Error.Mirror__TraderPositionNotFound(_callParams.trader, _traderPositionKey)
-            );
+            if (GmxPositionUtils.getPositionSizeInUsd(config.gmxDataStore, _traderPositionKey) == 0) {
+                revert Error.Mirror__TraderPositionNotFound(_callParams.trader, _traderPositionKey);
+            }
         }
 
         _requestKey = _submitOrder(
@@ -448,7 +451,7 @@ contract Mirror is CoreContract {
         );
 
         Position memory _position = positionMap[_allocationAddress];
-        require(_position.size > 0, Error.Mirror__PositionNotFound(_allocationAddress));
+        if (_position.size == 0) revert Error.Mirror__PositionNotFound(_allocationAddress);
 
         bytes32 _traderPositionKey =
             GmxPositionUtils.getPositionKey(_params.trader, _params.market, _params.collateralToken, _params.isLong);
@@ -460,20 +463,18 @@ contract Mirror is CoreContract {
         uint _traderLastUpdateTime = GmxPositionUtils.getPositionLastUpdateTime(config.gmxDataStore, _traderPositionKey);
         bool _positionUnmatched = _traderLastUpdateTime > _position.lastUpdateTime + config.stalledPositionThreshold;
 
-        require(
-            _traderPositionClosed || _positionUnmatched,
-            Error.Mirror__PositionNotStalled(_allocationAddress, _traderPositionKey)
-        );
+        if (!(_traderPositionClosed || _positionUnmatched)) {
+            revert Error.Mirror__PositionNotStalled(_allocationAddress, _traderPositionKey);
+        }
 
         // Handle sequencer fee collection from puppet balances
         uint _puppetCount = _puppetList.length;
         uint _allocated = allocationMap[_allocationAddress];
 
-        require(_params.sequencerFee > 0, Error.Mirror__InvalidSequencerExecutionFeeAmount());
-        require(
-            _params.sequencerFee < Precision.applyFactor(config.maxSequencerFeeToAdjustmentRatio, _allocated),
-            Error.Mirror__SequencerFeeExceedsAdjustmentRatio(_params.sequencerFee, _allocated)
-        );
+        if (_params.sequencerFee == 0) revert Error.Mirror__InvalidSequencerExecutionFeeAmount();
+        if (_params.sequencerFee >= Precision.applyFactor(config.maxSequencerFeeToAdjustmentRatio, _allocated)) {
+            revert Error.Mirror__SequencerFeeExceedsAdjustmentRatio(_params.sequencerFee, _allocated);
+        }
 
         uint _remainingSequencerFeeToCollect = _params.sequencerFee;
         uint[] memory _nextBalanceList = _account.getBalanceList(_params.collateralToken, _puppetList);
@@ -495,10 +496,9 @@ contract Mirror is CoreContract {
 
         _account.setBalanceList(_params.collateralToken, _puppetList, _nextBalanceList);
 
-        require(
-            _remainingSequencerFeeToCollect == 0,
-            Error.Mirror__SequencerFeeNotFullyCovered(0, _remainingSequencerFeeToCollect)
-        );
+        if (_remainingSequencerFeeToCollect != 0) {
+            revert Error.Mirror__SequencerFeeNotFullyCovered(0, _remainingSequencerFeeToCollect);
+        }
 
         _account.transferOut(_params.collateralToken, _params.sequencerFeeReceiver, _params.sequencerFee);
 
@@ -551,7 +551,7 @@ contract Mirror is CoreContract {
         bytes32 _requestKey
     ) external auth {
         RequestAdjustment memory _request = requestAdjustmentMap[_requestKey];
-        require(_request.allocationAddress != address(0), Error.Mirror__ExecutionRequestMissing(_requestKey));
+        if (_request.allocationAddress == address(0)) revert Error.Mirror__ExecutionRequestMissing(_requestKey);
 
         Position memory _position = positionMap[_request.allocationAddress];
         delete requestAdjustmentMap[_requestKey];
@@ -621,7 +621,7 @@ contract Mirror is CoreContract {
         address _allocationAddress
     ) external auth {
         Position memory _position = positionMap[_allocationAddress];
-        require(_position.size > 0, Error.Mirror__PositionNotFound(_allocationAddress));
+        if (_position.size == 0) revert Error.Mirror__PositionNotFound(_allocationAddress);
 
         delete positionMap[_allocationAddress];
         _logEvent("Liquidate", abi.encode(_allocationAddress));
@@ -637,9 +637,9 @@ contract Mirror is CoreContract {
         uint _initialCollateralDeltaAmount,
         address _callbackContract
     ) internal returns (bytes32 requestKey) {
-        require(
-            msg.value >= _order.executionFee, Error.Mirror__InsufficientGmxExecutionFee(msg.value, _order.executionFee)
-        );
+        if (msg.value < _order.executionFee) {
+            revert Error.Mirror__InsufficientGmxExecutionFee(msg.value, _order.executionFee);
+        }
 
         bytes memory gmxCallData = abi.encodeWithSelector(
             config.gmxExchangeRouter.createOrder.selector,
@@ -682,7 +682,7 @@ contract Mirror is CoreContract {
         }
 
         requestKey = abi.decode(returnData, (bytes32));
-        require(requestKey != bytes32(0), Error.Mirror__OrderCreationFailed());
+        if (requestKey == bytes32(0)) revert Error.Mirror__OrderCreationFailed();
     }
 
     function _setConfig(
@@ -690,16 +690,16 @@ contract Mirror is CoreContract {
     ) internal override {
         Config memory _config = abi.decode(_data, (Config));
 
-        require(_config.gmxExchangeRouter != IGmxExchangeRouter(address(0)), "Invalid GMX Router address");
-        require(_config.gmxDataStore != IGmxReadDataStore(address(0)), "Invalid GMX Data Store address");
-        require(_config.gmxOrderVault != address(0), "Invalid GMX Order Vault address");
-        require(_config.referralCode != bytes32(0), "Invalid Referral Code");
-        require(_config.increaseCallbackGasLimit > 0, "Invalid Increase Callback Gas Limit");
-        require(_config.decreaseCallbackGasLimit > 0, "Invalid Decrease Callback Gas Limit");
-        require(_config.maxPuppetList > 0, "Invalid max puppet list");
-        require(_config.maxSequencerFeeToAllocationRatio > 0, "Invalid max sequencer fee to allocation ratio");
-        require(_config.maxSequencerFeeToAdjustmentRatio > 0, "Invalid max sequencer fee to adjustment ratio");
-        require(_config.stalledPositionThreshold > 0, "Invalid stalled position threshold");
+        if (_config.gmxExchangeRouter == IGmxExchangeRouter(address(0))) revert("Invalid GMX Router address");
+        if (_config.gmxDataStore == IGmxReadDataStore(address(0))) revert("Invalid GMX Data Store address");
+        if (_config.gmxOrderVault == address(0)) revert("Invalid GMX Order Vault address");
+        if (_config.referralCode == bytes32(0)) revert("Invalid Referral Code");
+        if (_config.increaseCallbackGasLimit == 0) revert("Invalid Increase Callback Gas Limit");
+        if (_config.decreaseCallbackGasLimit == 0) revert("Invalid Decrease Callback Gas Limit");
+        if (_config.maxPuppetList == 0) revert("Invalid max puppet list");
+        if (_config.maxSequencerFeeToAllocationRatio == 0) revert("Invalid max sequencer fee to allocation ratio");
+        if (_config.maxSequencerFeeToAdjustmentRatio == 0) revert("Invalid max sequencer fee to adjustment ratio");
+        if (_config.stalledPositionThreshold == 0) revert("Invalid stalled position threshold");
 
         config = _config;
     }
