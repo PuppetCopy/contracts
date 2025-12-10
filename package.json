@@ -51,7 +51,7 @@
     "viem": "catalog:"
   },
   "devDependencies": {
-    "@gmx": "github:gmx-io/gmx-synthetics#v2.1",
+    "@gmx": "github:gmx-io/gmx-synthetics",
     "@openzeppelin/contracts": "5.4.0",
     "@types/bun": "catalog:",
     "@uniswap/v3-core": "1.0.1",

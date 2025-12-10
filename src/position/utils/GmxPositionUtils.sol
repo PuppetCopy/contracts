@@ -40,6 +40,7 @@ library GmxPositionUtils {
         Addresses addresses;
         Numbers numbers;
         Flags flags;
+        bytes32[] _dataList;
     }
 
     struct Addresses {
@@ -65,6 +66,7 @@ library GmxPositionUtils {
         uint minOutputAmount;
         uint updatedAtTime;
         uint validFromTime;
+        uint srcChainId;
     }
 
     struct Flags {

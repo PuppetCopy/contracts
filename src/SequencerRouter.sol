@@ -168,22 +168,24 @@ contract SequencerRouter is CoreContract, IGmxOrderCallbackReceiver {
      * @notice GMX callback handler for successful order execution
      * @dev Called by GMX when an order is successfully executed
      * @param key The request key for the executed order
-     * @param order Order details from GMX
+     * @param orderData Order data encoded as EventLogData
      */
     function afterOrderExecution(
         bytes32 key,
-        GmxPositionUtils.Props calldata order,
-        GmxPositionUtils.EventLogData calldata /* eventData */
+        GmxPositionUtils.EventLogData memory orderData,
+        GmxPositionUtils.EventLogData memory /* eventData */
     ) external auth {
+        uint orderType = _getOrderType(orderData);
         if (
-            GmxPositionUtils.isIncreaseOrder(GmxPositionUtils.OrderType(order.numbers.orderType))
-                || GmxPositionUtils.isDecreaseOrder(GmxPositionUtils.OrderType(order.numbers.orderType))
+            GmxPositionUtils.isIncreaseOrder(GmxPositionUtils.OrderType(orderType))
+                || GmxPositionUtils.isDecreaseOrder(GmxPositionUtils.OrderType(orderType))
         ) {
             // Call Mirror.execute for successful order execution
             mirror.execute(key);
-        } else if (GmxPositionUtils.isLiquidateOrder(GmxPositionUtils.OrderType(order.numbers.orderType))) {
+        } else if (GmxPositionUtils.isLiquidateOrder(GmxPositionUtils.OrderType(orderType))) {
             // Handle liquidation by calling Mirror.liquidate
-            mirror.liquidate(order.addresses.account);
+            address orderAccount = _getOrderAccount(orderData);
+            mirror.liquidate(orderAccount);
         }
         // Note: Invalid order types are silently ignored to avoid reverting GMX callbacks
     }
@@ -194,8 +196,8 @@ contract SequencerRouter is CoreContract, IGmxOrderCallbackReceiver {
      */
     function afterOrderCancellation(
         bytes32, /* key */
-        GmxPositionUtils.Props calldata, /* order */
-        GmxPositionUtils.EventLogData calldata /* eventData */
+        GmxPositionUtils.EventLogData memory, /* orderData */
+        GmxPositionUtils.EventLogData memory /* eventData */
     ) external auth {
         // For now, cancellations are handled silently
         // Future implementation could add retry logic or cleanup
@@ -207,8 +209,8 @@ contract SequencerRouter is CoreContract, IGmxOrderCallbackReceiver {
      */
     function afterOrderFrozen(
         bytes32, /* key */
-        GmxPositionUtils.Props calldata, /* order */
-        GmxPositionUtils.EventLogData calldata /* eventData */
+        GmxPositionUtils.EventLogData memory, /* orderData */
+        GmxPositionUtils.EventLogData memory /* eventData */
     ) external auth {
         // For now, frozen orders are handled silently
         // Future implementation could add retry logic or cleanup
@@ -221,7 +223,7 @@ contract SequencerRouter is CoreContract, IGmxOrderCallbackReceiver {
      */
     function refundExecutionFee(
         bytes32 key,
-        GmxPositionUtils.EventLogData calldata /* eventData */
+        GmxPositionUtils.EventLogData memory /* eventData */
     ) external payable auth {
         if (msg.value == 0) revert("No execution fee to refund");
 
@@ -230,5 +232,39 @@ contract SequencerRouter is CoreContract, IGmxOrderCallbackReceiver {
         if (!success) revert Error.SequencerRouter__FailedRefundExecutionFee();
 
         _logEvent("RefundExecutionFee", abi.encode(key, msg.value));
+    }
+
+    /**
+     * @notice Extract order type from EventLogData
+     */
+    function _getOrderType(
+        GmxPositionUtils.EventLogData memory orderData
+    ) internal pure returns (uint) {
+        GmxPositionUtils.UintItems memory uintItems = orderData.uintItems;
+        for (uint i = 0; i < uintItems.items.length; i++) {
+            if (_compareStrings(uintItems.items[i].key, "orderType")) {
+                return uintItems.items[i].value;
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * @notice Extract account address from EventLogData
+     */
+    function _getOrderAccount(
+        GmxPositionUtils.EventLogData memory orderData
+    ) internal pure returns (address) {
+        GmxPositionUtils.AddressItems memory addressItems = orderData.addressItems;
+        for (uint i = 0; i < addressItems.items.length; i++) {
+            if (_compareStrings(addressItems.items[i].key, "account")) {
+                return addressItems.items[i].value;
+            }
+        }
+        return address(0);
+    }
+
+    function _compareStrings(string memory a, string memory b) internal pure returns (bool) {
+        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 }

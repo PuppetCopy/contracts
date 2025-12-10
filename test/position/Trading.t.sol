@@ -813,70 +813,60 @@ contract TradingTest is BasicSetup {
     function executeOrder(
         bytes32 _requestKey
     ) internal {
-        sequencerRouter.afterOrderExecution(
-            _requestKey,
-            GmxPositionUtils.Props({
-                addresses: GmxPositionUtils.Addresses({
-                    account: trader,
-                    receiver: address(0),
-                    cancellationReceiver: address(0),
-                    callbackContract: address(0),
-                    uiFeeReceiver: address(0),
-                    market: address(wnt),
-                    initialCollateralToken: address(0),
-                    swapPath: new address[](0)
-                }),
-                numbers: GmxPositionUtils.Numbers({
-                    orderType: GmxPositionUtils.OrderType.MarketIncrease,
-                    decreasePositionSwapType: GmxPositionUtils.DecreasePositionSwapType.NoSwap,
-                    sizeDeltaUsd: 0,
-                    initialCollateralDeltaAmount: 0,
-                    triggerPrice: 0,
-                    acceptablePrice: 0,
-                    executionFee: 0,
-                    callbackGasLimit: 0,
-                    minOutputAmount: 0,
-                    updatedAtTime: 0,
-                    validFromTime: 0
-                }),
-                flags: GmxPositionUtils.Flags({
-                    isLong: true,
-                    shouldUnwrapNativeToken: false,
-                    isFrozen: false,
-                    autoCancel: false
-                })
+        // Build orderData with orderType set to MarketIncrease (0)
+        GmxPositionUtils.EventLogData memory orderData = _createEmptyEventLogData();
+
+        // Set orderType in uintItems
+        orderData.uintItems.items = new GmxPositionUtils.UintKeyValue[](1);
+        orderData.uintItems.items[0] = GmxPositionUtils.UintKeyValue({
+            key: "orderType",
+            value: uint(GmxPositionUtils.OrderType.MarketIncrease)
+        });
+
+        // Set account in addressItems
+        orderData.addressItems.items = new GmxPositionUtils.AddressKeyValue[](1);
+        orderData.addressItems.items[0] = GmxPositionUtils.AddressKeyValue({
+            key: "account",
+            value: trader
+        });
+
+        // Empty eventData
+        GmxPositionUtils.EventLogData memory eventData = _createEmptyEventLogData();
+
+        sequencerRouter.afterOrderExecution(_requestKey, orderData, eventData);
+    }
+
+    function _createEmptyEventLogData() internal pure returns (GmxPositionUtils.EventLogData memory) {
+        return GmxPositionUtils.EventLogData({
+            addressItems: GmxPositionUtils.AddressItems({
+                items: new GmxPositionUtils.AddressKeyValue[](0),
+                arrayItems: new GmxPositionUtils.AddressArrayKeyValue[](0)
             }),
-            GmxPositionUtils.EventLogData({
-                addressItems: GmxPositionUtils.AddressItems({
-                    items: new GmxPositionUtils.AddressKeyValue[](0),
-                    arrayItems: new GmxPositionUtils.AddressArrayKeyValue[](0)
-                }),
-                uintItems: GmxPositionUtils.UintItems({
-                    items: new GmxPositionUtils.UintKeyValue[](0),
-                    arrayItems: new GmxPositionUtils.UintArrayKeyValue[](0)
-                }),
-                intItems: GmxPositionUtils.IntItems({
-                    items: new GmxPositionUtils.IntKeyValue[](0),
-                    arrayItems: new GmxPositionUtils.IntArrayKeyValue[](0)
-                }),
-                boolItems: GmxPositionUtils.BoolItems({
-                    items: new GmxPositionUtils.BoolKeyValue[](0),
-                    arrayItems: new GmxPositionUtils.BoolArrayKeyValue[](0)
-                }),
-                bytes32Items: GmxPositionUtils.Bytes32Items({
-                    items: new GmxPositionUtils.Bytes32KeyValue[](0),
-                    arrayItems: new GmxPositionUtils.Bytes32ArrayKeyValue[](0)
-                }),
-                bytesItems: GmxPositionUtils.BytesItems({
-                    items: new GmxPositionUtils.BytesKeyValue[](0),
-                    arrayItems: new GmxPositionUtils.BytesArrayKeyValue[](0)
-                }),
-                stringItems: GmxPositionUtils.StringItems({
-                    items: new GmxPositionUtils.StringKeyValue[](0),
-                    arrayItems: new GmxPositionUtils.StringArrayKeyValue[](0)
-                })
+            uintItems: GmxPositionUtils.UintItems({
+                items: new GmxPositionUtils.UintKeyValue[](0),
+                arrayItems: new GmxPositionUtils.UintArrayKeyValue[](0)
+            }),
+            intItems: GmxPositionUtils.IntItems({
+                items: new GmxPositionUtils.IntKeyValue[](0),
+                arrayItems: new GmxPositionUtils.IntArrayKeyValue[](0)
+            }),
+            boolItems: GmxPositionUtils.BoolItems({
+                items: new GmxPositionUtils.BoolKeyValue[](0),
+                arrayItems: new GmxPositionUtils.BoolArrayKeyValue[](0)
+            }),
+            bytes32Items: GmxPositionUtils.Bytes32Items({
+                items: new GmxPositionUtils.Bytes32KeyValue[](0),
+                arrayItems: new GmxPositionUtils.Bytes32ArrayKeyValue[](0)
+            }),
+            bytesItems: GmxPositionUtils.BytesItems({
+                items: new GmxPositionUtils.BytesKeyValue[](0),
+                arrayItems: new GmxPositionUtils.BytesArrayKeyValue[](0)
+            }),
+            stringItems: GmxPositionUtils.StringItems({
+                items: new GmxPositionUtils.StringKeyValue[](0),
+                arrayItems: new GmxPositionUtils.StringArrayKeyValue[](0)
             })
-        );
+        });
     }
 
     function getAllocationAddress(
