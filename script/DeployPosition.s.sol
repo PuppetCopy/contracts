@@ -155,12 +155,10 @@ contract DeployPosition is BaseScript {
                 gmxDataStore: IGmxReadDataStore(Const.gmxDataStore),
                 gmxOrderVault: Const.gmxOrderVault,
                 referralCode: Const.referralCode,
-                increaseCallbackGasLimit: 2e6,
-                decreaseCallbackGasLimit: 2e6,
                 maxPuppetList: 50,
                 maxSequencerFeeToAllocationRatio: 0.1e30,
                 maxSequencerFeeToAdjustmentRatio: 0.1e30,
-                stalledPositionThreshold: 5 minutes
+                maxSequencerFeeToCloseRatio: 0.1e30
             })
         );
         console.log("Mirror deployed at:", address(mirror));
@@ -200,7 +198,7 @@ contract DeployPosition is BaseScript {
                 adjustPerPuppetGasLimit: 3_412,
                 settleBaseGasLimit: 90_847,
                 settlePerPuppetGasLimit: 15_000,
-                fallbackRefundExecutionFeeReceiver: Const.dao
+                gasPriceBufferBasisPoints: 12000 // 120% (20% buffer)
             })
         );
         console.log("SequencerRouter deployed at:", address(sequencerRouter));
@@ -215,30 +213,13 @@ contract DeployPosition is BaseScript {
         // Mirror permissions
         dictator.setPermission(mirror, mirror.requestOpen.selector, address(sequencerRouter));
         dictator.setPermission(mirror, mirror.requestAdjust.selector, address(sequencerRouter));
-        dictator.setPermission(mirror, mirror.requestCloseStalled.selector, address(sequencerRouter));
-        dictator.setPermission(mirror, mirror.execute.selector, address(sequencerRouter));
-        dictator.setPermission(mirror, mirror.liquidate.selector, address(sequencerRouter));
-
-        // GMX callback permissions for SequencerRouter
-        console.log("Setting up GMX callback permissions...");
-        dictator.setPermission(sequencerRouter, sequencerRouter.afterOrderExecution.selector, Const.gmxOrderHandler);
-        dictator.setPermission(sequencerRouter, sequencerRouter.afterOrderCancellation.selector, Const.gmxOrderHandler);
-        dictator.setPermission(sequencerRouter, sequencerRouter.afterOrderFrozen.selector, Const.gmxOrderHandler);
-        dictator.setPermission(sequencerRouter, sequencerRouter.refundExecutionFee.selector, Const.gmxOrderHandler);
-
-        // Additional GMX handler permissions
-        dictator.setPermission(
-            sequencerRouter, sequencerRouter.afterOrderExecution.selector, Const.gmxLiquidationHandler
-        );
-        dictator.setPermission(sequencerRouter, sequencerRouter.afterOrderExecution.selector, Const.gmxAdlHandler);
-
-        // Self-permission for refund
-        dictator.setPermission(sequencerRouter, sequencerRouter.refundExecutionFee.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.requestClose.selector, address(sequencerRouter));
 
         // External sequencer permissions
         console.log("Setting up external sequencer permissions...");
         dictator.setPermission(sequencerRouter, sequencerRouter.requestOpen.selector, Const.sequencer);
         dictator.setPermission(sequencerRouter, sequencerRouter.requestAdjust.selector, Const.sequencer);
+        dictator.setPermission(sequencerRouter, sequencerRouter.requestClose.selector, Const.sequencer);
         dictator.setPermission(sequencerRouter, sequencerRouter.settleAllocation.selector, Const.sequencer);
         dictator.setPermission(sequencerRouter, sequencerRouter.collectAllocationAccountDust.selector, Const.sequencer);
 

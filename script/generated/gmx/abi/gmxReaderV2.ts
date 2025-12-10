@@ -1,5 +1,5 @@
 // This file is auto-generated. Do not edit manually.
-// Source: GMX deployment files from GitHub (main branch)
+// Source: GMX deployment files from @gmx node_modules
 
 export default [
   {

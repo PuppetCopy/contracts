@@ -2,18 +2,18 @@
 pragma solidity ^0.8.31;
 
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
-import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
+import {IBaseOrderUtils} from "@gmx/contracts/order/IBaseOrderUtils.sol";
 
 contract MockGmxExchangeRouter is IGmxExchangeRouter {
     // This mapping can be used to track created orders for testing purposes
-    mapping(bytes32 => GmxPositionUtils.CreateOrderParams) public orders;
+    mapping(bytes32 => IBaseOrderUtils.CreateOrderParams) public orders;
     uint public orderCount;
 
     // Other functions from the interface can be left unimplemented for brevity
     // ...
 
     function createOrder(
-        GmxPositionUtils.CreateOrderParams calldata params
+        IBaseOrderUtils.CreateOrderParams calldata params
     ) external payable override returns (bytes32) {
         // Increment the order count to simulate a unique order ID
         orderCount++;
@@ -32,7 +32,7 @@ contract MockGmxExchangeRouter is IGmxExchangeRouter {
     }
 
     // Events are useful for testing to ensure that certain actions took place
-    event OrderCreated(bytes32 indexed orderId, GmxPositionUtils.CreateOrderParams params);
+    event OrderCreated(bytes32 indexed orderId, IBaseOrderUtils.CreateOrderParams params);
 
     // Other functions from the interface can be mocked as needed for testing
     // ...

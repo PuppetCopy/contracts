@@ -41,30 +41,24 @@ library Error {
     error Rule__InvalidExpiryDuration(uint minExpiryDuration);
 
     error Mirror__InvalidAllocation(address allocationAddress);
-    error Mirror__TraderPositionNotFound(address trader, bytes32 positionKey);
     error Mirror__InvalidCollateralDelta();
-    error Mirror__InvalidCurrentLeverage();
     error Mirror__InvalidSequencerExecutionFeeAmount();
     error Mirror__InvalidSizeDelta();
     error Mirror__PuppetListEmpty();
     error Mirror__PuppetListTooLarge(uint provided, uint maximum);
-    error Mirror__ExecutionRequestMissing(bytes32 requestKey);
-    error Mirror__InitialMustBeIncrease();
-    error Mirror__NoAdjustmentRequired();
-    error Mirror__PositionNotFound(address allocationAddress);
-    error Mirror__PositionNotStalled(address allocationAddress, bytes32 positionKey);
-    error Mirror__TraderCollateralZero(address allocationAddress);
-    error Mirror__DustTransferFailed(address token, address account);
     error Mirror__InsufficientGmxExecutionFee(uint provided, uint required);
-    error Mirror__InsufficientAllocationForSequencerFee(uint allocation, uint sequencerFee);
     error Mirror__SequencerFeeExceedsCostFactor(uint sequencerFee, uint allocationAmount);
     error Mirror__OrderCreationFailed();
     error Mirror__SequencerFeeExceedsAdjustmentRatio(uint sequencerFee, uint allocationAmount);
-    error Mirror__PuppetListMismatch(uint expected, uint provided);
+    error Mirror__SequencerFeeExceedsCloseRatio(uint sequencerFee, uint allocationAmount);
     error Mirror__SequencerFeeNotFullyCovered(uint totalPaid, uint requiredFee);
-    error Mirror__AllocationNotFullyRedistributed(uint remainingAllocation);
+    error Mirror__RequestPending();
+    error Mirror__NoPosition();
+    error Mirror__PositionAlreadyOpen();
+    error Mirror__DecreaseTooLarge(uint requested, uint available);
 
     error Settle__InvalidAllocation(address allocationAddress);
+    error Settle__PuppetListMismatch(uint provided, uint expected);
     error Settle__InvalidSequencerExecutionFeeAmount();
     error Settle__InvalidSequencerExecutionFeeReceiver();
     error Settle__SequencerFeeExceedsSettledAmount(uint sequencerFee, uint settledAmount);

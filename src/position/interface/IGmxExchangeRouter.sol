@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.31;
 
-import {GmxPositionUtils} from "./../utils/GmxPositionUtils.sol";
+import {IBaseOrderUtils} from "@gmx/contracts/order/IBaseOrderUtils.sol";
 
 interface IGmxExchangeRouter {
     /// @dev Executes multiple calls in a single transaction, and returns the results of each call.
@@ -19,7 +19,7 @@ interface IGmxExchangeRouter {
     ///      order store, and then calling the `createOrder()` function on the order handler contract. The
     ///      referral code is also set on the caller's account using the referral storage contract.
     function createOrder(
-        GmxPositionUtils.CreateOrderParams calldata params
+        IBaseOrderUtils.CreateOrderParams calldata params
     ) external payable returns (bytes32);
 
     /**

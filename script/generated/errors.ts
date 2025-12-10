@@ -234,28 +234,7 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Mirror__TraderPositionNotFound',
-    inputs: [
-      {
-        name: 'trader',
-        internalType: 'address',
-        type: 'address'
-      },
-      {
-        name: 'positionKey',
-        internalType: 'bytes32',
-        type: 'bytes32'
-      }
-    ]
-  },
-  {
-    type: 'error',
     name: 'Mirror__InvalidCollateralDelta',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Mirror__InvalidCurrentLeverage',
     inputs: []
   },
   {
@@ -275,76 +254,17 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Mirror__ExecutionRequestMissing',
+    name: 'Mirror__PuppetListTooLarge',
     inputs: [
       {
-        name: 'requestKey',
-        internalType: 'bytes32',
-        type: 'bytes32'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Mirror__InitialMustBeIncrease',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Mirror__NoAdjustmentRequired',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Mirror__PositionNotFound',
-    inputs: [
-      {
-        name: 'allocationAddress',
-        internalType: 'address',
-        type: 'address'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Mirror__PositionNotStalled',
-    inputs: [
-      {
-        name: 'allocationAddress',
-        internalType: 'address',
-        type: 'address'
+        name: 'provided',
+        internalType: 'uint256',
+        type: 'uint256'
       },
       {
-        name: 'positionKey',
-        internalType: 'bytes32',
-        type: 'bytes32'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Mirror__TraderCollateralZero',
-    inputs: [
-      {
-        name: 'allocationAddress',
-        internalType: 'address',
-        type: 'address'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Mirror__DustTransferFailed',
-    inputs: [
-      {
-        name: 'token',
-        internalType: 'address',
-        type: 'address'
-      },
-      {
-        name: 'account',
-        internalType: 'address',
-        type: 'address'
+        name: 'maximum',
+        internalType: 'uint256',
+        type: 'uint256'
       }
     ]
   },
@@ -359,22 +279,6 @@ export const puppetErrorAbi = [
       },
       {
         name: 'required',
-        internalType: 'uint256',
-        type: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Mirror__InsufficientAllocationForSequencerFee',
-    inputs: [
-      {
-        name: 'allocation',
-        internalType: 'uint256',
-        type: 'uint256'
-      },
-      {
-        name: 'sequencerFee',
         internalType: 'uint256',
         type: 'uint256'
       }
@@ -419,15 +323,15 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Mirror__PuppetListMismatch',
+    name: 'Mirror__SequencerFeeExceedsCloseRatio',
     inputs: [
       {
-        name: 'expected',
+        name: 'sequencerFee',
         internalType: 'uint256',
         type: 'uint256'
       },
       {
-        name: 'provided',
+        name: 'allocationAmount',
         internalType: 'uint256',
         type: 'uint256'
       }
@@ -451,10 +355,30 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Mirror__AllocationNotFullyRedistributed',
+    name: 'Mirror__RequestPending',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Mirror__NoPosition',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Mirror__PositionAlreadyOpen',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Mirror__DecreaseTooLarge',
     inputs: [
       {
-        name: 'remainingAllocation',
+        name: 'requested',
+        internalType: 'uint256',
+        type: 'uint256'
+      },
+      {
+        name: 'available',
         internalType: 'uint256',
         type: 'uint256'
       }
@@ -468,6 +392,22 @@ export const puppetErrorAbi = [
         name: 'allocationAddress',
         internalType: 'address',
         type: 'address'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Settle__PuppetListMismatch',
+    inputs: [
+      {
+        name: 'provided',
+        internalType: 'uint256',
+        type: 'uint256'
+      },
+      {
+        name: 'expected',
+        internalType: 'uint256',
+        type: 'uint256'
       }
     ]
   },
@@ -673,28 +613,7 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'FeeMarketplace__InvalidReceiver',
-    inputs: []
-  },
-  {
-    type: 'error',
     name: 'FeeMarketplace__InvalidAmount',
     inputs: []
-  },
-  {
-    type: 'error',
-    name: 'FeeMarketplace__InsufficientDistributionBalance',
-    inputs: [
-      {
-        name: 'requested',
-        internalType: 'uint256',
-        type: 'uint256'
-      },
-      {
-        name: 'available',
-        internalType: 'uint256',
-        type: 'uint256'
-      }
-    ]
   }
 ] as const

@@ -1,7 +1,6 @@
 import { $ } from 'bun'
 
-const GMX_REPO_URL = 'https://github.com/gmx-io/gmx-synthetics.git'
-const TEMP_DIR = './temp-gmx-repo'
+const GMX_NODE_MODULES_PATH = './node_modules/@gmx'
 
 // Contract name mappings (deployment name -> our name)
 const CONTRACT_MAPPINGS = {
@@ -26,20 +25,12 @@ type DeploymentData = {
 }
 
 async function fetchGmxDeployments(): Promise<DeploymentData> {
-  console.log('🔄 Fetching GMX deployments from GitHub (main branch)...')
+  console.log('🔄 Loading GMX deployments from node_modules...')
 
   try {
-    // Clone the repository (shallow clone for speed, specifically main branch)
-    console.log('📥 Cloning GMX synthetics repository (main branch)...')
-    await $`git clone --depth 1 --branch main --sparse ${GMX_REPO_URL} ${TEMP_DIR}`
-
-    // Set up sparse checkout to get deployments and contracts folders
-    await $`cd ${TEMP_DIR} && git sparse-checkout init --cone`
-    await $`cd ${TEMP_DIR} && git sparse-checkout set deployments/arbitrum contracts/error`
-
-    // Read all deployment files into memory
+    // Read all deployment files from node_modules
     console.log('📁 Loading Arbitrum deployments...')
-    const deploymentFiles = await $`find ${TEMP_DIR}/deployments/arbitrum -name "*.json" -not -name "*metadata*"`.text()
+    const deploymentFiles = await $`find ${GMX_NODE_MODULES_PATH}/deployments/arbitrum -name "*.json" -not -name "*metadata*"`.text()
     const files = deploymentFiles.trim().split('\n').filter(Boolean)
 
     const deployments: DeploymentData = {}
@@ -56,12 +47,8 @@ async function fetchGmxDeployments(): Promise<DeploymentData> {
     console.log(`✅ Successfully loaded ${Object.keys(deployments).length} deployments`)
     return deployments
   } catch (error) {
-    // Try to clean up temp directory on error
-    await $`rm -rf ${TEMP_DIR}`.catch(() => {})
-
-    // Always throw error to fail the script
     throw new Error(
-      `Failed to fetch GMX deployments from GitHub: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to load GMX deployments from node_modules: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }
@@ -70,8 +57,8 @@ async function generateGmxErrors(): Promise<number> {
   console.log('⚠️  Generating GMX error ABI...')
 
   try {
-    // Read the Errors.sol file from the cloned repo
-    const errorsFile = Bun.file(`${TEMP_DIR}/contracts/error/Errors.sol`)
+    // Read the Errors.sol file from node_modules
+    const errorsFile = Bun.file(`${GMX_NODE_MODULES_PATH}/contracts/error/Errors.sol`)
     const content = await errorsFile.text()
 
     // Parse custom errors from the Solidity file
@@ -146,7 +133,7 @@ async function generateGmxErrors(): Promise<number> {
 
     // Write the GMX error ABI file
     const abiContent = `// This file is auto-generated. Do not edit manually.
-// Source: GMX contracts/error/Errors.sol from GitHub (main branch)
+// Source: GMX contracts/error/Errors.sol from @gmx node_modules
 
 export const gmxErrorAbi = ${JSON.stringify(errors, null, 2)} as const
 `
@@ -185,19 +172,16 @@ export const gmxErrorAbi = ${JSON.stringify(errors, null, 2)} as const
 }
 
 try {
-  // Always fetch from GitHub main branch to ensure we have the latest addresses and ABIs
+  // Load from node_modules/@gmx
   const deployments = await fetchGmxDeployments()
 
-  // Generate GMX errors while we still have the repo cloned
+  // Generate GMX errors
   let errorFilesUpdated = 0
   try {
     errorFilesUpdated = await generateGmxErrors()
   } catch (error) {
     console.warn('⚠️  Failed to generate GMX errors, continuing with contracts...')
   }
-
-  // Clean up temp directory after we're done with it
-  await $`rm -rf ${TEMP_DIR}`.catch(() => {})
 
   console.log()
 
@@ -253,7 +237,7 @@ try {
       const abiFilePath = `./script/generated/gmx/abi/${abiFileName}.ts`
 
       const abiContent = `// This file is auto-generated. Do not edit manually.
-// Source: GMX deployment files from GitHub (main branch)
+// Source: GMX deployment files from @gmx node_modules
 
 export default ${JSON.stringify(contract.abi, null, 2)} as const
 `
@@ -271,7 +255,7 @@ export default ${JSON.stringify(contract.abi, null, 2)} as const
 
   // Write the main contracts file
   const contractListContent = `// This file is auto-generated. Do not edit manually.
-// Source: GMX deployment files from GitHub (main branch)
+// Source: GMX deployment files from @gmx node_modules
 
 // Import generated ABIs
 ${contracts

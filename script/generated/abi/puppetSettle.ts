@@ -402,22 +402,6 @@ export default [
   },
   {
     type: 'error',
-    name: 'Mirror__PuppetListMismatch',
-    inputs: [
-      {
-        name: 'expected',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'provided',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
     name: 'Permission__CallerNotAuthority',
     inputs: []
   },
@@ -495,6 +479,22 @@ export default [
       },
       {
         name: 'maximum',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Settle__PuppetListMismatch',
+    inputs: [
+      {
+        name: 'provided',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'expected',
         type: 'uint256',
         internalType: 'uint256'
       }

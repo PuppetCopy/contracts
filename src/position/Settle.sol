@@ -114,7 +114,7 @@ contract Settle is CoreContract {
         uint[] memory _nextBalanceList = _account.getBalanceList(_callParams.distributionToken, _puppetList);
         uint[] memory _puppetAllocations = _mirror.getAllocationPuppetList(_allocationAddress);
         if (_puppetAllocations.length != _puppetCount) {
-            revert Error.Mirror__PuppetListMismatch(_puppetAllocations.length, _puppetCount);
+            revert Error.Settle__PuppetListMismatch(_puppetAllocations.length, _puppetCount);
         }
 
         uint _allocationTotal = 0;

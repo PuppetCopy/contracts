@@ -1,5 +1,5 @@
 // This file is auto-generated. Do not edit manually.
-// Source: GMX contracts/error/Errors.sol from GitHub (main branch)
+// Source: GMX contracts/error/Errors.sol from @gmx node_modules
 
 export const gmxErrorAbi = [
   {

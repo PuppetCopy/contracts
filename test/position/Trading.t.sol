@@ -11,14 +11,14 @@ import {Rule} from "src/position/Rule.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
-import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
+import {Position} from "@gmx/contracts/position/Position.sol";
+import {PositionStoreUtils} from "@gmx/contracts/position/PositionStoreUtils.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {AccountStore} from "src/shared/AccountStore.sol";
 import {Error} from "src/utils/Error.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockGmxExchangeRouter} from "test/mock/MockGmxExchangeRouter.t.sol";
-
-import {Const} from "script/Const.sol";
+import {MockGmxDataStore} from "test/mock/MockGmxDataStore.t.sol";
 
 /**
  * @title TradingTest
@@ -34,6 +34,7 @@ contract TradingTest is BasicSetup {
     Mirror mirror;
     SequencerRouter sequencerRouter;
     MockGmxExchangeRouter mockGmxExchangeRouter;
+    MockGmxDataStore mockGmxDataStore;
 
     uint nextAllocationId = 0;
 
@@ -66,20 +67,19 @@ contract TradingTest is BasicSetup {
         );
 
         mockGmxExchangeRouter = new MockGmxExchangeRouter();
+        mockGmxDataStore = new MockGmxDataStore();
 
         mirror = new Mirror(
             dictator,
             Mirror.Config({
                 gmxExchangeRouter: IGmxExchangeRouter(address(mockGmxExchangeRouter)),
-                gmxDataStore: IGmxReadDataStore(Const.gmxDataStore),
+                gmxDataStore: IGmxReadDataStore(address(mockGmxDataStore)),
                 gmxOrderVault: address(0x1234),
                 referralCode: 0x5055505045540000000000000000000000000000000000000000000000000000,
-                increaseCallbackGasLimit: 2e6,
-                decreaseCallbackGasLimit: 2e6,
                 maxPuppetList: 50,
                 maxSequencerFeeToAllocationRatio: 0.1e30,
                 maxSequencerFeeToAdjustmentRatio: 0.1e30,
-                stalledPositionThreshold: 5 minutes
+                maxSequencerFeeToCloseRatio: 0.1e30
             })
         );
 
@@ -107,7 +107,7 @@ contract TradingTest is BasicSetup {
                 adjustPerPuppetGasLimit: 3_412,
                 settleBaseGasLimit: 1_300_853,
                 settlePerPuppetGasLimit: 30_000,
-                fallbackRefundExecutionFeeReceiver: address(0x9999)
+                gasPriceBufferBasisPoints: 12000 // 120% (20% buffer)
             })
         );
 
@@ -133,8 +133,7 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(ruleContract));
         dictator.setPermission(mirror, mirror.requestOpen.selector, address(sequencerRouter));
         dictator.setPermission(mirror, mirror.requestAdjust.selector, address(sequencerRouter));
-        dictator.setPermission(mirror, mirror.execute.selector, address(sequencerRouter));
-        dictator.setPermission(mirror, mirror.liquidate.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.requestClose.selector, address(sequencerRouter));
 
         // Settle Contract Permissions
         dictator.setPermission(settle, settle.settle.selector, address(sequencerRouter));
@@ -163,9 +162,9 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, users.owner);
         dictator.setPermission(sequencerRouter, sequencerRouter.requestOpen.selector, users.owner);
         dictator.setPermission(sequencerRouter, sequencerRouter.requestAdjust.selector, users.owner);
+        dictator.setPermission(sequencerRouter, sequencerRouter.requestClose.selector, users.owner);
         dictator.setPermission(sequencerRouter, sequencerRouter.settleAllocation.selector, users.owner);
         dictator.setPermission(sequencerRouter, sequencerRouter.collectAllocationAccountDust.selector, users.owner);
-        dictator.setPermission(sequencerRouter, sequencerRouter.afterOrderExecution.selector, users.owner);
 
         account.setDepositCapList(allowedTokens, allowanceCaps);
 
@@ -211,21 +210,15 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint sequencerFee = 1e6; // 1 USDC
 
-        Mirror.CallPosition memory callParams = Mirror.CallPosition({
+        Mirror.CallParams memory callParams = Mirror.CallParams({
             collateralToken: usdc,
-            traderRequestKey: bytes32(0),
             trader: trader,
             market: address(wnt),
-            isIncrease: true,
+            sequencerFeeReceiver: users.owner,
             isLong: true,
             executionFee: 0.001 ether,
-            collateralDelta: 1000e30,
-            sizeDeltaInUsd: 5000e30,
-            acceptablePrice: 3000e30,
-            triggerPrice: 0,
             allocationId: allocationId,
-            sequencerFee: sequencerFee,
-            sequencerFeeReceiver: users.owner
+            sequencerFee: sequencerFee
         });
 
         vm.deal(users.owner, 1 ether);
@@ -250,21 +243,15 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint sequencerFee = 10000e6; // Excessive sequencer fee
 
-        Mirror.CallPosition memory callParams = Mirror.CallPosition({
+        Mirror.CallParams memory callParams = Mirror.CallParams({
             collateralToken: usdc,
-            traderRequestKey: bytes32(0),
             trader: trader,
             market: address(wnt),
-            isIncrease: true,
+            sequencerFeeReceiver: users.owner,
             isLong: true,
             executionFee: 0.001 ether,
-            collateralDelta: 1000e30,
-            sizeDeltaInUsd: 5000e30,
-            acceptablePrice: 3000e30,
-            triggerPrice: 0,
             allocationId: allocationId,
-            sequencerFee: sequencerFee,
-            sequencerFeeReceiver: users.owner
+            sequencerFee: sequencerFee
         });
 
         vm.deal(users.owner, 1 ether);
@@ -281,47 +268,41 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint sequencerFee = 1e6; // 1 USDC
 
-        Mirror.CallPosition memory initialCallParams = Mirror.CallPosition({
+        Mirror.CallParams memory initialCallParams = Mirror.CallParams({
             collateralToken: usdc,
-            traderRequestKey: bytes32(0),
             trader: trader,
             market: address(wnt),
-            isIncrease: true,
+            sequencerFeeReceiver: users.owner,
             isLong: true,
             executionFee: 0.001 ether,
-            collateralDelta: 1000e30,
-            sizeDeltaInUsd: 5000e30,
-            acceptablePrice: 3000e30,
-            triggerPrice: 0,
             allocationId: allocationId,
-            sequencerFee: sequencerFee,
-            sequencerFeeReceiver: users.owner
+            sequencerFee: sequencerFee
         });
 
         vm.deal(users.owner, 1 ether);
-        (, bytes32 requestKey) = sequencerRouter.requestOpen{value: 0.001 ether}(initialCallParams, puppetList);
+        (address allocationAddress,) = sequencerRouter.requestOpen{value: 0.001 ether}(initialCallParams, puppetList);
 
-        executeOrder(requestKey);
+        // Simulate GMX execution - mock the puppet position as existing with lastTargetSize
+        uint lastTargetSize = mirror.lastTargetSizeMap(
+            Position.getPositionKey(allocationAddress, address(wnt), address(usdc), true)
+        );
+        _mockPuppetPosition(allocationAddress, lastTargetSize);
+
+        // Simulate trader increased their position (size increased by 50%)
+        _updateTraderPosition(trader, 7500e30, 1000e6); // 7500 USD size, same collateral
 
         // Now test adjustment
         uint adjustSequencerFee = 0.5e6; // 0.5 USDC
 
-        // Adjust position - trader increases leverage by adding more size without proportional collateral
-        Mirror.CallPosition memory adjustCallParams = Mirror.CallPosition({
+        Mirror.CallParams memory adjustCallParams = Mirror.CallParams({
             collateralToken: usdc,
-            traderRequestKey: bytes32(0),
             trader: trader,
             market: address(wnt),
-            isIncrease: true,
+            sequencerFeeReceiver: users.owner,
             isLong: true,
             executionFee: 0.001 ether,
-            collateralDelta: 100e30, // Small collateral increase
-            sizeDeltaInUsd: 3000e30, // Large size increase (changes leverage)
-            acceptablePrice: 3100e30,
-            triggerPrice: 0,
             allocationId: allocationId,
-            sequencerFee: adjustSequencerFee,
-            sequencerFeeReceiver: users.owner
+            sequencerFee: adjustSequencerFee
         });
 
         vm.deal(users.owner, 1 ether);
@@ -488,21 +469,15 @@ contract TradingTest is BasicSetup {
         address[] memory emptyPuppetList = new address[](0);
         uint allocationId = getNextAllocationId();
 
-        Mirror.CallPosition memory callParams = Mirror.CallPosition({
+        Mirror.CallParams memory callParams = Mirror.CallParams({
             collateralToken: usdc,
-            traderRequestKey: bytes32(0),
             trader: trader,
             market: address(wnt),
-            isIncrease: true,
+            sequencerFeeReceiver: users.owner,
             isLong: true,
             executionFee: 0.001 ether,
-            collateralDelta: 1000e30,
-            sizeDeltaInUsd: 5000e30,
-            acceptablePrice: 3000e30,
-            triggerPrice: 0,
             allocationId: allocationId,
-            sequencerFee: 1e6,
-            sequencerFeeReceiver: users.owner
+            sequencerFee: 1e6
         });
 
         vm.deal(users.owner, 1 ether);
@@ -521,21 +496,15 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint sequencerFee = 1e6; // Non-zero sequencer fee
 
-        Mirror.CallPosition memory callParams = Mirror.CallPosition({
+        Mirror.CallParams memory callParams = Mirror.CallParams({
             collateralToken: usdc,
-            traderRequestKey: bytes32(0),
             trader: trader,
             market: address(wnt),
-            isIncrease: true,
+            sequencerFeeReceiver: users.owner,
             isLong: true,
             executionFee: 0.001 ether,
-            collateralDelta: 1000e30,
-            sizeDeltaInUsd: 5000e30,
-            acceptablePrice: 3000e30,
-            triggerPrice: 0,
             allocationId: allocationId,
-            sequencerFee: sequencerFee,
-            sequencerFeeReceiver: users.owner
+            sequencerFee: sequencerFee
         });
 
         vm.deal(users.owner, 1 ether);
@@ -559,21 +528,15 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint sequencerFee = 0.01e6; // Small sequencer fee
 
-        Mirror.CallPosition memory callParams = Mirror.CallPosition({
+        Mirror.CallParams memory callParams = Mirror.CallParams({
             collateralToken: usdc,
-            traderRequestKey: bytes32(0),
             trader: trader,
             market: address(wnt),
-            isIncrease: true,
+            sequencerFeeReceiver: users.owner,
             isLong: true,
             executionFee: 0.001 ether,
-            collateralDelta: 1000e30,
-            sizeDeltaInUsd: 5000e30,
-            acceptablePrice: 3000e30,
-            triggerPrice: 0,
             allocationId: allocationId,
-            sequencerFee: sequencerFee,
-            sequencerFeeReceiver: users.owner
+            sequencerFee: sequencerFee
         });
 
         vm.deal(users.owner, 1 ether);
@@ -624,45 +587,38 @@ contract TradingTest is BasicSetup {
         uint allocationId = getNextAllocationId();
         uint sequencerFee = 1e6;
 
-        Mirror.CallPosition memory openParams = Mirror.CallPosition({
+        Mirror.CallParams memory openParams = Mirror.CallParams({
             collateralToken: usdc,
-            traderRequestKey: bytes32(0),
             trader: trader,
             market: address(wnt),
-            isIncrease: true,
+            sequencerFeeReceiver: users.owner,
             isLong: true,
             executionFee: 0.001 ether,
-            collateralDelta: 1000e30,
-            sizeDeltaInUsd: 5000e30,
-            acceptablePrice: 3000e30,
-            triggerPrice: 0,
             allocationId: allocationId,
-            sequencerFee: sequencerFee,
-            sequencerFeeReceiver: users.owner
+            sequencerFee: sequencerFee
         });
 
         vm.deal(users.owner, 2 ether);
-        (, bytes32 requestKey) = sequencerRouter.requestOpen{value: 0.001 ether}(openParams, puppetList);
+        (address allocationAddress,) = sequencerRouter.requestOpen{value: 0.001 ether}(openParams, puppetList);
 
-        // Execute the open position
-        executeOrder(requestKey);
+        // Simulate GMX execution - mock the puppet position as existing with lastTargetSize
+        uint lastTargetSize = mirror.lastTargetSizeMap(
+            Position.getPositionKey(allocationAddress, address(wnt), address(usdc), true)
+        );
+        _mockPuppetPosition(allocationAddress, lastTargetSize);
 
-        // Now decrease the position
-        Mirror.CallPosition memory decreaseParams = Mirror.CallPosition({
+        // Simulate trader decreased their position (size decreased by 50%)
+        _updateTraderPosition(trader, 2500e30, 1000e6); // 2500 USD size, same collateral
+
+        Mirror.CallParams memory decreaseParams = Mirror.CallParams({
             collateralToken: usdc,
-            traderRequestKey: bytes32(0),
             trader: trader,
             market: address(wnt),
-            isIncrease: false, // Decrease
+            sequencerFeeReceiver: users.owner,
             isLong: true,
             executionFee: 0.001 ether,
-            collateralDelta: 300e30, // Remove some collateral
-            sizeDeltaInUsd: 2000e30, // Reduce size
-            acceptablePrice: 2900e30,
-            triggerPrice: 0,
             allocationId: allocationId,
-            sequencerFee: 0.5e6,
-            sequencerFeeReceiver: users.owner
+            sequencerFee: 0.5e6
         });
 
         bytes32 decreaseRequestKey = sequencerRouter.requestAdjust{value: 0.001 ether}(decreaseParams, puppetList);
@@ -696,38 +652,26 @@ contract TradingTest is BasicSetup {
         uint allocationId1 = getNextAllocationId();
         uint allocationId2 = getNextAllocationId();
 
-        Mirror.CallPosition memory callParams1 = Mirror.CallPosition({
+        Mirror.CallParams memory callParams1 = Mirror.CallParams({
             collateralToken: usdc,
-            traderRequestKey: bytes32(0),
             trader: trader,
             market: address(wnt),
-            isIncrease: true,
+            sequencerFeeReceiver: users.owner,
             isLong: true,
             executionFee: 0.001 ether,
-            collateralDelta: 500e30,
-            sizeDeltaInUsd: 2000e30,
-            acceptablePrice: 3000e30,
-            triggerPrice: 0,
             allocationId: allocationId1,
-            sequencerFee: 0.5e6,
-            sequencerFeeReceiver: users.owner
+            sequencerFee: 0.5e6
         });
 
-        Mirror.CallPosition memory callParams2 = Mirror.CallPosition({
+        Mirror.CallParams memory callParams2 = Mirror.CallParams({
             collateralToken: usdc,
-            traderRequestKey: bytes32(0),
             trader: trader2,
             market: address(wnt),
-            isIncrease: true,
+            sequencerFeeReceiver: users.owner,
             isLong: true,
             executionFee: 0.001 ether,
-            collateralDelta: 500e30,
-            sizeDeltaInUsd: 2000e30,
-            acceptablePrice: 3000e30,
-            triggerPrice: 0,
             allocationId: allocationId2,
-            sequencerFee: 0.5e6,
-            sequencerFeeReceiver: users.owner
+            sequencerFee: 0.5e6
         });
 
         vm.deal(users.owner, 2 ether);
@@ -810,65 +754,6 @@ contract TradingTest is BasicSetup {
     // Helper Functions
     //----------------------------------------------------------------------------
 
-    function executeOrder(
-        bytes32 _requestKey
-    ) internal {
-        // Build orderData with orderType set to MarketIncrease (0)
-        GmxPositionUtils.EventLogData memory orderData = _createEmptyEventLogData();
-
-        // Set orderType in uintItems
-        orderData.uintItems.items = new GmxPositionUtils.UintKeyValue[](1);
-        orderData.uintItems.items[0] = GmxPositionUtils.UintKeyValue({
-            key: "orderType",
-            value: uint(GmxPositionUtils.OrderType.MarketIncrease)
-        });
-
-        // Set account in addressItems
-        orderData.addressItems.items = new GmxPositionUtils.AddressKeyValue[](1);
-        orderData.addressItems.items[0] = GmxPositionUtils.AddressKeyValue({
-            key: "account",
-            value: trader
-        });
-
-        // Empty eventData
-        GmxPositionUtils.EventLogData memory eventData = _createEmptyEventLogData();
-
-        sequencerRouter.afterOrderExecution(_requestKey, orderData, eventData);
-    }
-
-    function _createEmptyEventLogData() internal pure returns (GmxPositionUtils.EventLogData memory) {
-        return GmxPositionUtils.EventLogData({
-            addressItems: GmxPositionUtils.AddressItems({
-                items: new GmxPositionUtils.AddressKeyValue[](0),
-                arrayItems: new GmxPositionUtils.AddressArrayKeyValue[](0)
-            }),
-            uintItems: GmxPositionUtils.UintItems({
-                items: new GmxPositionUtils.UintKeyValue[](0),
-                arrayItems: new GmxPositionUtils.UintArrayKeyValue[](0)
-            }),
-            intItems: GmxPositionUtils.IntItems({
-                items: new GmxPositionUtils.IntKeyValue[](0),
-                arrayItems: new GmxPositionUtils.IntArrayKeyValue[](0)
-            }),
-            boolItems: GmxPositionUtils.BoolItems({
-                items: new GmxPositionUtils.BoolKeyValue[](0),
-                arrayItems: new GmxPositionUtils.BoolArrayKeyValue[](0)
-            }),
-            bytes32Items: GmxPositionUtils.Bytes32Items({
-                items: new GmxPositionUtils.Bytes32KeyValue[](0),
-                arrayItems: new GmxPositionUtils.Bytes32ArrayKeyValue[](0)
-            }),
-            bytesItems: GmxPositionUtils.BytesItems({
-                items: new GmxPositionUtils.BytesKeyValue[](0),
-                arrayItems: new GmxPositionUtils.BytesArrayKeyValue[](0)
-            }),
-            stringItems: GmxPositionUtils.StringItems({
-                items: new GmxPositionUtils.StringKeyValue[](0),
-                arrayItems: new GmxPositionUtils.StringArrayKeyValue[](0)
-            })
-        });
-    }
-
     function getAllocationAddress(
         IERC20 _collateralToken,
         address _trader,
@@ -904,28 +789,40 @@ contract TradingTest is BasicSetup {
     function _mockTraderPosition(
         address _trader
     ) internal {
-        // Create a trader position key for the specified trader
-        bytes32 traderPositionKey = GmxPositionUtils.getPositionKey(
-            _trader,
-            address(0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f), // market
-            IERC20(address(usdc)),
-            true // isLong
-        );
+        bytes32 traderPositionKey = Position.getPositionKey(_trader, address(wnt), address(usdc), true);
 
-        // Mock position size in USD (simulate existing position)
-        bytes32 sizeInUsdKey = keccak256(abi.encode(traderPositionKey, GmxPositionUtils.SIZE_IN_USD_KEY));
-        vm.mockCall(
-            Const.gmxDataStore,
-            abi.encodeWithSelector(IGmxReadDataStore.getUint.selector, sizeInUsdKey),
-            abi.encode(5000000000000000000000000000000000) // 5000 USD position
-        );
+        bytes32 sizeInUsdKey = keccak256(abi.encode(traderPositionKey, PositionStoreUtils.SIZE_IN_USD));
+        mockGmxDataStore.setUint(sizeInUsdKey, 5000e30); // 5000 USD position
 
-        // Mock position collateral amount
-        bytes32 collateralKey = keccak256(abi.encode(traderPositionKey, GmxPositionUtils.COLLATERAL_AMOUNT_KEY));
-        vm.mockCall(
-            Const.gmxDataStore,
-            abi.encodeWithSelector(IGmxReadDataStore.getUint.selector, collateralKey),
-            abi.encode(1000000000000000000000000000000000) // 1000 USD collateral
-        );
+        bytes32 collateralKey = keccak256(abi.encode(traderPositionKey, PositionStoreUtils.COLLATERAL_AMOUNT));
+        mockGmxDataStore.setUint(collateralKey, 1000e6); // 1000 USDC collateral (6 decimals)
+    }
+
+    /**
+     * @notice Helper function to mock a puppet allocation position after GMX execution
+     * @param _allocationAddress The allocation account address
+     * @param _sizeInUsd The position size in USD
+     */
+    function _mockPuppetPosition(address _allocationAddress, uint _sizeInUsd) internal {
+        bytes32 puppetPositionKey = Position.getPositionKey(_allocationAddress, address(wnt), address(usdc), true);
+
+        bytes32 sizeInUsdKey = keccak256(abi.encode(puppetPositionKey, PositionStoreUtils.SIZE_IN_USD));
+        mockGmxDataStore.setUint(sizeInUsdKey, _sizeInUsd);
+    }
+
+    /**
+     * @notice Helper function to update a trader's position (simulate position change on GMX)
+     * @param _trader The trader address
+     * @param _newSizeInUsd New position size in USD
+     * @param _newCollateral New collateral amount
+     */
+    function _updateTraderPosition(address _trader, uint _newSizeInUsd, uint _newCollateral) internal {
+        bytes32 traderPositionKey = Position.getPositionKey(_trader, address(wnt), address(usdc), true);
+
+        bytes32 sizeInUsdKey = keccak256(abi.encode(traderPositionKey, PositionStoreUtils.SIZE_IN_USD));
+        mockGmxDataStore.setUint(sizeInUsdKey, _newSizeInUsd);
+
+        bytes32 collateralKey = keccak256(abi.encode(traderPositionKey, PositionStoreUtils.COLLATERAL_AMOUNT));
+        mockGmxDataStore.setUint(collateralKey, _newCollateral);
     }
 }

@@ -34,11 +34,6 @@ export default [
             name: 'distributionTimeframe',
             type: 'uint256',
             internalType: 'uint256'
-          },
-          {
-            name: 'burnBasisPoints',
-            type: 'uint256',
-            internalType: 'uint256'
           }
         ]
       }
@@ -72,6 +67,25 @@ export default [
     ],
     outputs: [],
     stateMutability: 'nonpayable'
+  },
+  {
+    type: 'function',
+    name: 'accountedBalance',
+    inputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'contract IERC20'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    stateMutability: 'view'
   },
   {
     type: 'function',
@@ -131,24 +145,6 @@ export default [
   },
   {
     type: 'function',
-    name: 'collectDistribution',
-    inputs: [
-      {
-        name: '_receiver',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: '_amount',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
     name: 'deposit',
     inputs: [
       {
@@ -172,19 +168,6 @@ export default [
   },
   {
     type: 'function',
-    name: 'distributionBalance',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
     name: 'getConfig',
     inputs: [],
     outputs: [
@@ -202,11 +185,6 @@ export default [
             name: 'distributionTimeframe',
             type: 'uint256',
             internalType: 'uint256'
-          },
-          {
-            name: 'burnBasisPoints',
-            type: 'uint256',
-            internalType: 'uint256'
           }
         ]
       }
@@ -218,14 +196,14 @@ export default [
     name: 'getPendingUnlock',
     inputs: [
       {
-        name: 'feeToken',
+        name: '_feeToken',
         type: 'address',
         internalType: 'contract IERC20'
       }
     ],
     outputs: [
       {
-        name: 'pending',
+        name: '_pending',
         type: 'uint256',
         internalType: 'uint256'
       }
@@ -237,7 +215,7 @@ export default [
     name: 'getTotalUnlocked',
     inputs: [
       {
-        name: 'feeToken',
+        name: '_feeToken',
         type: 'address',
         internalType: 'contract IERC20'
       }
@@ -282,25 +260,6 @@ export default [
       }
     ],
     stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'recordTransferIn',
-    inputs: [
-      {
-        name: '_feeToken',
-        type: 'address',
-        internalType: 'contract IERC20'
-      }
-    ],
-    outputs: [
-      {
-        name: '_amount',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    stateMutability: 'nonpayable'
   },
   {
     type: 'function',
@@ -390,6 +349,19 @@ export default [
   },
   {
     type: 'function',
+    name: 'syncBalance',
+    inputs: [
+      {
+        name: '_feeToken',
+        type: 'address',
+        internalType: 'contract IERC20'
+      }
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable'
+  },
+  {
+    type: 'function',
     name: 'unclockedFees',
     inputs: [
       {
@@ -409,22 +381,6 @@ export default [
   },
   {
     type: 'error',
-    name: 'FeeMarketplace__InsufficientDistributionBalance',
-    inputs: [
-      {
-        name: 'requested',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'available',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
     name: 'FeeMarketplace__InsufficientUnlockedBalance',
     inputs: [
       {
@@ -437,11 +393,6 @@ export default [
   {
     type: 'error',
     name: 'FeeMarketplace__InvalidAmount',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'FeeMarketplace__InvalidReceiver',
     inputs: []
   },
   {

@@ -36,16 +36,6 @@ export default [
             internalType: 'bytes32'
           },
           {
-            name: 'increaseCallbackGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'decreaseCallbackGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
             name: 'maxPuppetList',
             type: 'uint256',
             internalType: 'uint256'
@@ -61,7 +51,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'stalledPositionThreshold',
+            name: 'maxSequencerFeeToCloseRatio',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -176,16 +166,6 @@ export default [
         internalType: 'bytes32'
       },
       {
-        name: 'increaseCallbackGasLimit',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'decreaseCallbackGasLimit',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
         name: 'maxPuppetList',
         type: 'uint256',
         internalType: 'uint256'
@@ -201,25 +181,12 @@ export default [
         internalType: 'uint256'
       },
       {
-        name: 'stalledPositionThreshold',
+        name: 'maxSequencerFeeToCloseRatio',
         type: 'uint256',
         internalType: 'uint256'
       }
     ],
     stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'execute',
-    inputs: [
-      {
-        name: '_requestKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
   },
   {
     type: 'function',
@@ -261,30 +228,6 @@ export default [
   },
   {
     type: 'function',
-    name: 'getAllocationWithPuppets',
-    inputs: [
-      {
-        name: '_allocationAddress',
-        type: 'address',
-        internalType: 'address'
-      }
-    ],
-    outputs: [
-      {
-        name: 'total',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'puppetAllocations',
-        type: 'uint256[]',
-        internalType: 'uint256[]'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
     name: 'getConfig',
     inputs: [],
     outputs: [
@@ -314,16 +257,6 @@ export default [
             internalType: 'bytes32'
           },
           {
-            name: 'increaseCallbackGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'decreaseCallbackGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
             name: 'maxPuppetList',
             type: 'uint256',
             internalType: 'uint256'
@@ -339,7 +272,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'stalledPositionThreshold',
+            name: 'maxSequencerFeeToCloseRatio',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -374,72 +307,27 @@ export default [
   },
   {
     type: 'function',
-    name: 'getPosition',
+    name: 'getPositionSizeInUsd',
     inputs: [
       {
         name: '_allocationAddress',
         type: 'address',
         internalType: 'address'
-      }
-    ],
-    outputs: [
+      },
       {
-        name: '',
-        type: 'tuple',
-        internalType: 'struct Mirror.Position',
-        components: [
-          {
-            name: 'size',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'traderSize',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'traderCollateral',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'lastUpdateTime',
-            type: 'uint256',
-            internalType: 'uint256'
-          }
-        ]
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'getTraderPositionCollateralAmount',
-    inputs: [
+        name: '_market',
+        type: 'address',
+        internalType: 'address'
+      },
       {
-        name: '_traderPositionKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
-      }
-    ],
-    outputs: [
+        name: '_collateralToken',
+        type: 'address',
+        internalType: 'contract IERC20'
+      },
       {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'getTraderPositionSizeInUsd',
-    inputs: [
-      {
-        name: '_traderPositionKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
+        name: '_isLong',
+        type: 'bool',
+        internalType: 'bool'
       }
     ],
     outputs: [
@@ -495,45 +383,17 @@ export default [
   },
   {
     type: 'function',
-    name: 'liquidate',
+    name: 'lastTargetSizeMap',
     inputs: [
       {
-        name: '_allocationAddress',
-        type: 'address',
-        internalType: 'address'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'positionMap',
-    inputs: [
-      {
-        name: 'allocationAddress',
-        type: 'address',
-        internalType: 'address'
+        name: 'positionKey',
+        type: 'bytes32',
+        internalType: 'bytes32'
       }
     ],
     outputs: [
       {
-        name: 'size',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'traderSize',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'traderCollateral',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'lastUpdateTime',
+        name: '',
         type: 'uint256',
         internalType: 'uint256'
       }
@@ -550,24 +410,14 @@ export default [
         internalType: 'contract Account'
       },
       {
-        name: '_callbackContract',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
         name: '_callParams',
         type: 'tuple',
-        internalType: 'struct Mirror.CallPosition',
+        internalType: 'struct Mirror.CallParams',
         components: [
           {
             name: 'collateralToken',
             type: 'address',
             internalType: 'contract IERC20'
-          },
-          {
-            name: 'traderRequestKey',
-            type: 'bytes32',
-            internalType: 'bytes32'
           },
           {
             name: 'trader',
@@ -585,37 +435,12 @@ export default [
             internalType: 'address'
           },
           {
-            name: 'isIncrease',
-            type: 'bool',
-            internalType: 'bool'
-          },
-          {
             name: 'isLong',
             type: 'bool',
             internalType: 'bool'
           },
           {
             name: 'executionFee',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'collateralDelta',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'sizeDeltaInUsd',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'acceptablePrice',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'triggerPrice',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -648,51 +473,7 @@ export default [
   },
   {
     type: 'function',
-    name: 'requestAdjustmentMap',
-    inputs: [
-      {
-        name: 'requestKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
-      }
-    ],
-    outputs: [
-      {
-        name: 'allocationAddress',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: 'traderIsIncrease',
-        type: 'bool',
-        internalType: 'bool'
-      },
-      {
-        name: 'isIncrease',
-        type: 'bool',
-        internalType: 'bool'
-      },
-      {
-        name: 'traderCollateralDelta',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'traderSizeDelta',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'sizeDelta',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'requestCloseStalled',
+    name: 'requestClose',
     inputs: [
       {
         name: '_account',
@@ -700,9 +481,9 @@ export default [
         internalType: 'contract Account'
       },
       {
-        name: '_params',
+        name: '_callParams',
         type: 'tuple',
-        internalType: 'struct Mirror.StalledPositionParams',
+        internalType: 'struct Mirror.CallParams',
         components: [
           {
             name: 'collateralToken',
@@ -710,12 +491,12 @@ export default [
             internalType: 'contract IERC20'
           },
           {
-            name: 'market',
+            name: 'trader',
             type: 'address',
             internalType: 'address'
           },
           {
-            name: 'trader',
+            name: 'market',
             type: 'address',
             internalType: 'address'
           },
@@ -725,22 +506,12 @@ export default [
             internalType: 'address'
           },
           {
-            name: 'reasonEnum',
-            type: 'uint8',
-            internalType: 'uint8'
-          },
-          {
             name: 'isLong',
             type: 'bool',
             internalType: 'bool'
           },
           {
             name: 'executionFee',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'acceptablePrice',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -762,9 +533,9 @@ export default [
         internalType: 'address[]'
       },
       {
-        name: '_callbackContract',
-        type: 'address',
-        internalType: 'address'
+        name: '_reason',
+        type: 'uint8',
+        internalType: 'uint8'
       }
     ],
     outputs: [
@@ -791,24 +562,14 @@ export default [
         internalType: 'contract Rule'
       },
       {
-        name: '_callbackContract',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
         name: '_callParams',
         type: 'tuple',
-        internalType: 'struct Mirror.CallPosition',
+        internalType: 'struct Mirror.CallParams',
         components: [
           {
             name: 'collateralToken',
             type: 'address',
             internalType: 'contract IERC20'
-          },
-          {
-            name: 'traderRequestKey',
-            type: 'bytes32',
-            internalType: 'bytes32'
           },
           {
             name: 'trader',
@@ -826,37 +587,12 @@ export default [
             internalType: 'address'
           },
           {
-            name: 'isIncrease',
-            type: 'bool',
-            internalType: 'bool'
-          },
-          {
             name: 'isLong',
             type: 'bool',
             internalType: 'bool'
           },
           {
             name: 'executionFee',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'collateralDelta',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'sizeDeltaInUsd',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'acceptablePrice',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'triggerPrice',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -949,49 +685,6 @@ export default [
   },
   {
     type: 'error',
-    name: 'Mirror__AllocationNotFullyRedistributed',
-    inputs: [
-      {
-        name: 'remainingAllocation',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Mirror__ExecutionRequestMissing',
-    inputs: [
-      {
-        name: 'requestKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Mirror__InitialMustBeIncrease',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Mirror__InsufficientAllocationForSequencerFee',
-    inputs: [
-      {
-        name: 'allocation',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'sequencerFee',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
     name: 'Mirror__InsufficientGmxExecutionFee',
     inputs: [
       {
@@ -1019,16 +712,6 @@ export default [
   },
   {
     type: 'error',
-    name: 'Mirror__InvalidCollateralDelta',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Mirror__InvalidCurrentLeverage',
-    inputs: []
-  },
-  {
-    type: 'error',
     name: 'Mirror__InvalidSequencerExecutionFeeAmount',
     inputs: []
   },
@@ -1039,7 +722,7 @@ export default [
   },
   {
     type: 'error',
-    name: 'Mirror__NoAdjustmentRequired',
+    name: 'Mirror__NoPosition',
     inputs: []
   },
   {
@@ -1049,30 +732,8 @@ export default [
   },
   {
     type: 'error',
-    name: 'Mirror__PositionNotFound',
-    inputs: [
-      {
-        name: 'allocationAddress',
-        type: 'address',
-        internalType: 'address'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Mirror__PositionNotStalled',
-    inputs: [
-      {
-        name: 'allocationAddress',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: 'positionKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
-      }
-    ]
+    name: 'Mirror__PositionAlreadyOpen',
+    inputs: []
   },
   {
     type: 'error',
@@ -1081,15 +742,15 @@ export default [
   },
   {
     type: 'error',
-    name: 'Mirror__PuppetListMismatch',
+    name: 'Mirror__PuppetListTooLarge',
     inputs: [
       {
-        name: 'expected',
+        name: 'provided',
         type: 'uint256',
         internalType: 'uint256'
       },
       {
-        name: 'provided',
+        name: 'maximum',
         type: 'uint256',
         internalType: 'uint256'
       }
@@ -1097,7 +758,28 @@ export default [
   },
   {
     type: 'error',
+    name: 'Mirror__RequestPending',
+    inputs: []
+  },
+  {
+    type: 'error',
     name: 'Mirror__SequencerFeeExceedsAdjustmentRatio',
+    inputs: [
+      {
+        name: 'sequencerFee',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'allocationAmount',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Mirror__SequencerFeeExceedsCloseRatio',
     inputs: [
       {
         name: 'sequencerFee',
@@ -1140,33 +822,6 @@ export default [
         name: 'requiredFee',
         type: 'uint256',
         internalType: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Mirror__TraderCollateralZero',
-    inputs: [
-      {
-        name: 'allocationAddress',
-        type: 'address',
-        internalType: 'address'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Mirror__TraderPositionNotFound',
-    inputs: [
-      {
-        name: 'trader',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: 'positionKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
       }
     ]
   },
