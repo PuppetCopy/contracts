@@ -36,9 +36,9 @@ library Error {
     error Permission__Unauthorized();
     error Permission__CallerNotAuthority();
 
-    error Rule__InvalidAllowanceRate(uint min, uint max);
-    error Rule__InvalidActivityThrottle(uint minAllocationActivity, uint maxAllocationActivity);
-    error Rule__InvalidExpiryDuration(uint minExpiryDuration);
+    error Subscribe__InvalidAllowanceRate(uint min, uint max);
+    error Subscribe__InvalidActivityThrottle(uint minAllocationActivity, uint maxAllocationActivity);
+    error Subscribe__InvalidExpiryDuration(uint minExpiryDuration);
 
     error Mirror__InvalidAllocation(address allocationAddress);
     error Mirror__InvalidCollateralDelta();

@@ -7,7 +7,7 @@ import {Test} from "forge-std/src/Test.sol";
 import {SequencerRouter} from "src/SequencerRouter.sol";
 import {Account as AccountContract} from "src/position/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
-import {Rule} from "src/position/Rule.sol";
+import {Subscribe} from "src/position/Subscribe.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
@@ -45,7 +45,7 @@ contract TradingForkTest is Test {
     TokenRouter private tokenRouter;
     AccountStore private accountStore;
     AccountContract private account;
-    Rule private rule;
+    Subscribe private subscribe;
     Mirror private mirror;
     Settle private settle;
     SequencerRouter private sequencerRouter;
@@ -70,9 +70,9 @@ contract TradingForkTest is Test {
         accountStore = new AccountStore(authority, tokenRouter);
         account = new AccountContract(authority, accountStore, AccountContract.Config({transferOutGasLimit: 200_000}));
 
-        rule = new Rule(
+        subscribe = new Subscribe(
             authority,
-            Rule.Config({
+            Subscribe.Config({
                 minExpiryDuration: 1 hours,
                 minAllowanceRate: 100, // 1%
                 maxAllowanceRate: 10_000, // 100%
@@ -113,12 +113,12 @@ contract TradingForkTest is Test {
         sequencerRouter = new SequencerRouter(
             authority,
             account,
-            rule,
+            subscribe,
             mirror,
             settle,
             SequencerRouter.Config({
-                openBaseGasLimit: 1_300_853,
-                openPerPuppetGasLimit: 30_000,
+                matchBaseGasLimit: 1_300_853,
+                matchPerPuppetGasLimit: 30_000,
                 adjustBaseGasLimit: 910_663,
                 adjustPerPuppetGasLimit: 3_412,
                 settleBaseGasLimit: 1_300_853,
@@ -130,7 +130,7 @@ contract TradingForkTest is Test {
                 maxGasAge: 2000,
                 stalledCheckInterval: 30_000,
                 stalledPositionThreshold: 5 * 60 * 1000,
-                minOpenTraderCollateral: 25e30,
+                minMatchTraderCollateral: 25e30,
                 minAllocationUsd: 20e30,
                 minAdjustUsd: 10e30
             })
@@ -164,7 +164,7 @@ contract TradingForkTest is Test {
 
         vm.startPrank(sequencer);
         vm.deal(sequencer, executionFee + 1 ether); // ensure ETH for execution fee
-        (address allocationAddr, bytes32 orderKey) = sequencerRouter.requestOpen{value: executionFee}(params, puppetList);
+        (address allocationAddr, bytes32 orderKey) = sequencerRouter.matchmake{value: executionFee}(params, puppetList);
         vm.stopPrank();
 
         assertTrue(orderKey != bytes32(0), "GMX order key should be non-zero");
@@ -183,7 +183,7 @@ contract TradingForkTest is Test {
         authority.registerContract(tokenRouter);
         authority.registerContract(account);
         authority.registerContract(settle);
-        authority.registerContract(rule);
+        authority.registerContract(subscribe);
         authority.registerContract(mirror);
         authority.registerContract(sequencerRouter);
 
@@ -205,24 +205,24 @@ contract TradingForkTest is Test {
         authority.setPermission(account, account.transferOut.selector, address(settle));
 
         // Mirror permissions
-        authority.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(rule));
-        authority.setPermission(mirror, mirror.requestOpen.selector, address(sequencerRouter));
-        authority.setPermission(mirror, mirror.requestAdjust.selector, address(sequencerRouter));
-        authority.setPermission(mirror, mirror.requestClose.selector, address(sequencerRouter));
+        authority.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(subscribe));
+        authority.setPermission(mirror, mirror.matchmake.selector, address(sequencerRouter));
+        authority.setPermission(mirror, mirror.adjust.selector, address(sequencerRouter));
+        authority.setPermission(mirror, mirror.close.selector, address(sequencerRouter));
 
         // Settle permissions
         authority.setPermission(settle, settle.settle.selector, address(sequencerRouter));
         authority.setPermission(settle, settle.collectAllocationAccountDust.selector, address(sequencerRouter));
 
         // Sequencer entrypoints (use sequencer as the caller for this test)
-        authority.setPermission(sequencerRouter, sequencerRouter.requestOpen.selector, sequencer);
-        authority.setPermission(sequencerRouter, sequencerRouter.requestAdjust.selector, sequencer);
-        authority.setPermission(sequencerRouter, sequencerRouter.requestClose.selector, sequencer);
+        authority.setPermission(sequencerRouter, sequencerRouter.matchmake.selector, sequencer);
+        authority.setPermission(sequencerRouter, sequencerRouter.adjust.selector, sequencer);
+        authority.setPermission(sequencerRouter, sequencerRouter.close.selector, sequencer);
 
         // Administrative helpers
         authority.setPermission(account, account.setDepositCapList.selector, admin);
         authority.setPermission(account, account.deposit.selector, admin);
-        authority.setPermission(rule, rule.setRule.selector, admin);
+        authority.setPermission(subscribe, subscribe.rule.selector, admin);
 
         vm.stopPrank();
     }
@@ -244,19 +244,19 @@ contract TradingForkTest is Test {
         account.deposit(USDC, admin, puppet2, 800e6);
 
         // Set rules for puppets following trader
-        rule.setRule(
+        subscribe.rule(
             mirror,
             USDC,
             puppet1,
             trader,
-            Rule.RuleParams({allowanceRate: 5_000, throttleActivity: 1 hours, expiry: block.timestamp + 30 days})
+            Subscribe.RuleParams({allowanceRate: 5_000, throttleActivity: 1 hours, expiry: block.timestamp + 30 days})
         );
-        rule.setRule(
+        subscribe.rule(
             mirror,
             USDC,
             puppet2,
             trader,
-            Rule.RuleParams({allowanceRate: 5_000, throttleActivity: 1 hours, expiry: block.timestamp + 30 days})
+            Subscribe.RuleParams({allowanceRate: 5_000, throttleActivity: 1 hours, expiry: block.timestamp + 30 days})
         );
 
         vm.stopPrank();

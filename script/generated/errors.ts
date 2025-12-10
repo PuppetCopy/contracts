@@ -180,7 +180,7 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Rule__InvalidAllowanceRate',
+    name: 'Subscribe__InvalidAllowanceRate',
     inputs: [
       {
         name: 'min',
@@ -196,7 +196,7 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Rule__InvalidActivityThrottle',
+    name: 'Subscribe__InvalidActivityThrottle',
     inputs: [
       {
         name: 'minAllocationActivity',
@@ -212,7 +212,7 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Rule__InvalidExpiryDuration',
+    name: 'Subscribe__InvalidExpiryDuration',
     inputs: [
       {
         name: 'minExpiryDuration',

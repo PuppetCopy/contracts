@@ -10,7 +10,7 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Error} from "./../utils/Error.sol";
 import {Precision} from "./../utils/Precision.sol";
 import {Account} from "./Account.sol";
-import {Rule} from "./Rule.sol";
+import {Subscribe} from "./Subscribe.sol";
 import {IBaseOrderUtils} from "@gmx/contracts/order/IBaseOrderUtils.sol";
 import {Order} from "@gmx/contracts/order/Order.sol";
 import {Position} from "@gmx/contracts/position/Position.sol";
@@ -83,9 +83,9 @@ contract Mirror is CoreContract {
         return _getPositionSizeInUsd(positionKey);
     }
 
-    function requestOpen(
+    function matchmake(
         Account _account,
-        Rule _ruleContract,
+        Subscribe _subscribe,
         CallParams calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth returns (address _allocationAddress, bytes32 _requestKey) {
@@ -113,7 +113,7 @@ contract Mirror is CoreContract {
 
         _allocationAddress = _account.createAllocationAccount(_allocationKey);
 
-        Rule.RuleParams[] memory _rules = _ruleContract.getRuleList(_traderMatchingKey, _puppetList);
+        Subscribe.RuleParams[] memory _rules = _subscribe.getRuleList(_traderMatchingKey, _puppetList);
         uint[] memory _allocatedList = new uint[](_puppetCount);
         uint[] memory _nextBalanceList = _account.getBalanceList(_callParams.collateralToken, _puppetList);
         allocationPuppetList[_allocationAddress] = new uint[](_puppetCount);
@@ -123,7 +123,7 @@ contract Mirror is CoreContract {
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
             address _puppet = _puppetList[_i];
-            Rule.RuleParams memory _rule = _rules[_i];
+            Subscribe.RuleParams memory _rule = _rules[_i];
 
             if (_rule.expiry <= block.timestamp) continue;
             if (block.timestamp < lastActivityThrottleMap[_traderMatchingKey][_puppet]) continue;
@@ -174,7 +174,7 @@ contract Mirror is CoreContract {
         lastTargetSizeMap[_puppetPositionKey] = _sizeDelta;
 
         _logEvent(
-            "RequestMatch",
+            "Match",
             abi.encode(
                 _callParams.collateralToken,
                 _callParams.trader,
@@ -198,7 +198,7 @@ contract Mirror is CoreContract {
         );
     }
 
-    function requestAdjust(
+    function adjust(
         Account _account,
         CallParams calldata _callParams,
         address[] calldata _puppetList
@@ -281,7 +281,7 @@ contract Mirror is CoreContract {
         lastTargetSizeMap[_puppetPositionKey] = _puppetTargetSize;
 
         _logEvent(
-            "RequestAdjust",
+            "Adjust",
             abi.encode(
                 _allocationAddress,
                 _requestKey,
@@ -297,7 +297,7 @@ contract Mirror is CoreContract {
         );
     }
 
-    function requestClose(
+    function close(
         Account _account,
         CallParams calldata _callParams,
         address[] calldata _puppetList,
@@ -369,7 +369,7 @@ contract Mirror is CoreContract {
         lastTargetSizeMap[_puppetPositionKey] = 0;
 
         _logEvent(
-            "RequestClose",
+            "Close",
             abi.encode(
                 _allocationAddress,
                 _requestKey,

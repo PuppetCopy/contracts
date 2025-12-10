@@ -11,9 +11,9 @@ export default [
         internalType: 'contract Account'
       },
       {
-        name: '_ruleContract',
+        name: '_subscribe',
         type: 'address',
-        internalType: 'contract Rule'
+        internalType: 'contract Subscribe'
       },
       {
         name: '_feeMarketplace',
@@ -110,20 +110,7 @@ export default [
   },
   {
     type: 'function',
-    name: 'ruleContract',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'contract Rule'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'setMatchingRule',
+    name: 'setRule',
     inputs: [
       {
         name: 'collateralToken',
@@ -138,7 +125,7 @@ export default [
       {
         name: 'ruleParams',
         type: 'tuple',
-        internalType: 'struct Rule.RuleParams',
+        internalType: 'struct Subscribe.RuleParams',
         components: [
           {
             name: 'allowanceRate',
@@ -160,6 +147,19 @@ export default [
     ],
     outputs: [],
     stateMutability: 'nonpayable'
+  },
+  {
+    type: 'function',
+    name: 'subscribe',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'contract Subscribe'
+      }
+    ],
+    stateMutability: 'view'
   },
   {
     type: 'function',

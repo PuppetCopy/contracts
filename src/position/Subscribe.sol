@@ -9,7 +9,7 @@ import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Mirror} from "./Mirror.sol";
 
-contract Rule is CoreContract {
+contract Subscribe is CoreContract {
     struct RuleParams {
         uint allowanceRate;
         uint throttleActivity;
@@ -57,7 +57,7 @@ contract Rule is CoreContract {
      * @notice Set matching rule for a puppet to follow a trader
      * @dev Validates rule parameters against config limits and initializes activity throttle
      */
-    function setRule(
+    function rule(
         Mirror mirror,
         IERC20 _collateralToken,
         address _user,
@@ -67,21 +67,32 @@ contract Rule is CoreContract {
         if (
             _ruleParams.throttleActivity < config.minActivityThrottle
                 || _ruleParams.throttleActivity > config.maxActivityThrottle
-        ) revert Error.Rule__InvalidActivityThrottle(config.minActivityThrottle, config.maxActivityThrottle);
+        ) revert Error.Subscribe__InvalidActivityThrottle(config.minActivityThrottle, config.maxActivityThrottle);
 
         if (_ruleParams.expiry != 0 && _ruleParams.expiry < block.timestamp + config.minExpiryDuration) {
-            revert Error.Rule__InvalidExpiryDuration(config.minExpiryDuration);
+            revert Error.Subscribe__InvalidExpiryDuration(config.minExpiryDuration);
         }
 
         if (
             _ruleParams.allowanceRate < config.minAllowanceRate || _ruleParams.allowanceRate > config.maxAllowanceRate
-        ) revert Error.Rule__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate);
+        ) revert Error.Subscribe__InvalidAllowanceRate(config.minAllowanceRate, config.maxAllowanceRate);
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_collateralToken, _trader);
         matchingRuleMap[_traderMatchingKey][_user] = _ruleParams;
         mirror.initializeTraderActivityThrottle(_traderMatchingKey, _user);
 
-        _logEvent("SetMatchingRule", abi.encode(_ruleParams, _collateralToken, _trader, _user, _traderMatchingKey));
+        _logEvent(
+            "Rule",
+            abi.encode(
+                _ruleParams.allowanceRate,
+                _ruleParams.throttleActivity,
+                _ruleParams.expiry,
+                _collateralToken,
+                _trader,
+                _user,
+                _traderMatchingKey
+            )
+        );
     }
 
 

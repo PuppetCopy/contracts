@@ -16,9 +16,9 @@ export default [
         internalType: 'contract Account'
       },
       {
-        name: '_ruleContract',
+        name: '_subscribe',
         type: 'address',
-        internalType: 'contract Rule'
+        internalType: 'contract Subscribe'
       },
       {
         name: '_mirror',
@@ -36,12 +36,12 @@ export default [
         internalType: 'struct SequencerRouter.Config',
         components: [
           {
-            name: 'openBaseGasLimit',
+            name: 'matchBaseGasLimit',
             type: 'uint256',
             internalType: 'uint256'
           },
           {
-            name: 'openPerPuppetGasLimit',
+            name: 'matchPerPuppetGasLimit',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -101,7 +101,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'minOpenTraderCollateral',
+            name: 'minMatchTraderCollateral',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -135,209 +135,7 @@ export default [
   },
   {
     type: 'function',
-    name: 'authority',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'contract IAuthority'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'canCall',
-    inputs: [
-      {
-        name: 'signatureHash',
-        type: 'bytes4',
-        internalType: 'bytes4'
-      },
-      {
-        name: 'user',
-        type: 'address',
-        internalType: 'address'
-      }
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'collectAllocationAccountDust',
-    inputs: [
-      {
-        name: '_allocationAccount',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: '_dustToken',
-        type: 'address',
-        internalType: 'contract IERC20'
-      },
-      {
-        name: '_receiver',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: '_amount',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'getConfig',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'tuple',
-        internalType: 'struct SequencerRouter.Config',
-        components: [
-          {
-            name: 'openBaseGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'openPerPuppetGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'adjustBaseGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'adjustPerPuppetGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'settleBaseGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'settlePerPuppetGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'gasPriceBufferBasisPoints',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'maxEthPriceAge',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'maxIndexPriceAge',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'maxFiatPriceAge',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'maxGasAge',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'stalledCheckInterval',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'stalledPositionThreshold',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'minOpenTraderCollateral',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'minAllocationUsd',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'minAdjustUsd',
-            type: 'uint256',
-            internalType: 'uint256'
-          }
-        ]
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'mirror',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'contract Mirror'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'recoverUnaccountedTokens',
-    inputs: [
-      {
-        name: '_token',
-        type: 'address',
-        internalType: 'contract IERC20'
-      },
-      {
-        name: '_receiver',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: '_amount',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'requestAdjust',
+    name: 'adjust',
     inputs: [
       {
         name: '_callParams',
@@ -403,7 +201,44 @@ export default [
   },
   {
     type: 'function',
-    name: 'requestClose',
+    name: 'authority',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'contract IAuthority'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'canCall',
+    inputs: [
+      {
+        name: 'signatureHash',
+        type: 'bytes4',
+        internalType: 'bytes4'
+      },
+      {
+        name: 'user',
+        type: 'address',
+        internalType: 'address'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'bool',
+        internalType: 'bool'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'close',
     inputs: [
       {
         name: '_callParams',
@@ -474,7 +309,136 @@ export default [
   },
   {
     type: 'function',
-    name: 'requestOpen',
+    name: 'collectAllocationAccountDust',
+    inputs: [
+      {
+        name: '_allocationAccount',
+        type: 'address',
+        internalType: 'address'
+      },
+      {
+        name: '_dustToken',
+        type: 'address',
+        internalType: 'contract IERC20'
+      },
+      {
+        name: '_receiver',
+        type: 'address',
+        internalType: 'address'
+      },
+      {
+        name: '_amount',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    stateMutability: 'nonpayable'
+  },
+  {
+    type: 'function',
+    name: 'getConfig',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple',
+        internalType: 'struct SequencerRouter.Config',
+        components: [
+          {
+            name: 'matchBaseGasLimit',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'matchPerPuppetGasLimit',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'adjustBaseGasLimit',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'adjustPerPuppetGasLimit',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'settleBaseGasLimit',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'settlePerPuppetGasLimit',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'gasPriceBufferBasisPoints',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'maxEthPriceAge',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'maxIndexPriceAge',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'maxFiatPriceAge',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'maxGasAge',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'stalledCheckInterval',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'stalledPositionThreshold',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'minMatchTraderCollateral',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'minAllocationUsd',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'minAdjustUsd',
+            type: 'uint256',
+            internalType: 'uint256'
+          }
+        ]
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'matchmake',
     inputs: [
       {
         name: '_callParams',
@@ -545,16 +509,39 @@ export default [
   },
   {
     type: 'function',
-    name: 'ruleContract',
+    name: 'mirror',
     inputs: [],
     outputs: [
       {
         name: '',
         type: 'address',
-        internalType: 'contract Rule'
+        internalType: 'contract Mirror'
       }
     ],
     stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'recoverUnaccountedTokens',
+    inputs: [
+      {
+        name: '_token',
+        type: 'address',
+        internalType: 'contract IERC20'
+      },
+      {
+        name: '_receiver',
+        type: 'address',
+        internalType: 'address'
+      },
+      {
+        name: '_amount',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable'
   },
   {
     type: 'function',
@@ -670,6 +657,19 @@ export default [
       }
     ],
     stateMutability: 'nonpayable'
+  },
+  {
+    type: 'function',
+    name: 'subscribe',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'contract Subscribe'
+      }
+    ],
+    stateMutability: 'view'
   },
   {
     type: 'function',

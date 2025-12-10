@@ -129,7 +129,12 @@ contract Settle is CoreContract {
         _logEvent(
             "Settle",
             abi.encode(
-                _callParams,
+                _callParams.collateralToken,
+                _callParams.distributionToken,
+                _callParams.sequencerFeeReceiver,
+                _callParams.trader,
+                _callParams.allocationId,
+                _callParams.sequencerExecutionFee,
                 _allocationAddress,
                 _traderMatchingKey,
                 _distributedAmount,

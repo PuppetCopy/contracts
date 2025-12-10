@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SequencerRouter} from "src/SequencerRouter.sol";
 import {Account as AccountContract} from "src/position/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
-import {Rule} from "src/position/Rule.sol";
+import {Subscribe} from "src/position/Subscribe.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
@@ -23,14 +23,14 @@ import {MockGmxDataStore} from "test/mock/MockGmxDataStore.t.sol";
 /**
  * @title TradingTest
  * @notice Test suite for position mirroring and trading operations
- * @dev Tests integration between Mirror, Settle, SequencerRouter, Rule, and Deposit
- * Updated to work with the decoupled Rule/Deposit architecture.
+ * @dev Tests integration between Mirror, Settle, SequencerRouter, Subscribe, and Deposit
+ * Updated to work with the decoupled Subscribe/Deposit architecture.
  */
 contract TradingTest is BasicSetup {
     AccountStore allocationStore;
     AccountContract account;
     Settle settle;
-    Rule ruleContract;
+    Subscribe subscribe;
     Mirror mirror;
     SequencerRouter sequencerRouter;
     MockGmxExchangeRouter mockGmxExchangeRouter;
@@ -55,9 +55,9 @@ contract TradingTest is BasicSetup {
 
         account = new AccountContract(dictator, allocationStore, AccountContract.Config({transferOutGasLimit: 200_000}));
 
-        ruleContract = new Rule(
+        subscribe = new Subscribe(
             dictator,
-            Rule.Config({
+            Subscribe.Config({
                 minExpiryDuration: 1 hours,
                 minAllowanceRate: 100, // 1%
                 maxAllowanceRate: 10000, // 100%
@@ -99,12 +99,12 @@ contract TradingTest is BasicSetup {
         sequencerRouter = new SequencerRouter(
             dictator,
             account,
-            ruleContract,
+            subscribe,
             mirror,
             settle,
             SequencerRouter.Config({
-                openBaseGasLimit: 1_300_853,
-                openPerPuppetGasLimit: 30_000,
+                matchBaseGasLimit: 1_300_853,
+                matchPerPuppetGasLimit: 30_000,
                 adjustBaseGasLimit: 910_663,
                 adjustPerPuppetGasLimit: 3_412,
                 settleBaseGasLimit: 1_300_853,
@@ -116,7 +116,7 @@ contract TradingTest is BasicSetup {
                 maxGasAge: 2000,
                 stalledCheckInterval: 30_000,
                 stalledPositionThreshold: 5 * 60 * 1000,
-                minOpenTraderCollateral: 25e30,
+                minMatchTraderCollateral: 25e30,
                 minAllocationUsd: 20e30,
                 minAdjustUsd: 10e30
             })
@@ -141,10 +141,10 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(account, account.transferOut.selector, address(settle));
 
         // Mirror Contract Permissions
-        dictator.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(ruleContract));
-        dictator.setPermission(mirror, mirror.requestOpen.selector, address(sequencerRouter));
-        dictator.setPermission(mirror, mirror.requestAdjust.selector, address(sequencerRouter));
-        dictator.setPermission(mirror, mirror.requestClose.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(subscribe));
+        dictator.setPermission(mirror, mirror.matchmake.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.adjust.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.close.selector, address(sequencerRouter));
 
         // Settle Contract Permissions
         dictator.setPermission(settle, settle.settle.selector, address(sequencerRouter));
@@ -153,7 +153,7 @@ contract TradingTest is BasicSetup {
         // Initialize contracts
         dictator.registerContract(account);
         dictator.registerContract(settle);
-        dictator.registerContract(ruleContract);
+        dictator.registerContract(subscribe);
         dictator.registerContract(mirror);
         dictator.registerContract(sequencerRouter);
 
@@ -169,11 +169,11 @@ contract TradingTest is BasicSetup {
         // Owner Test Permissions
         dictator.setPermission(account, account.setDepositCapList.selector, users.owner);
         dictator.setPermission(account, account.deposit.selector, users.owner);
-        dictator.setPermission(ruleContract, ruleContract.setRule.selector, users.owner);
+        dictator.setPermission(subscribe, subscribe.rule.selector, users.owner);
         dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, users.owner);
-        dictator.setPermission(sequencerRouter, sequencerRouter.requestOpen.selector, users.owner);
-        dictator.setPermission(sequencerRouter, sequencerRouter.requestAdjust.selector, users.owner);
-        dictator.setPermission(sequencerRouter, sequencerRouter.requestClose.selector, users.owner);
+        dictator.setPermission(sequencerRouter, sequencerRouter.matchmake.selector, users.owner);
+        dictator.setPermission(sequencerRouter, sequencerRouter.adjust.selector, users.owner);
+        dictator.setPermission(sequencerRouter, sequencerRouter.close.selector, users.owner);
         dictator.setPermission(sequencerRouter, sequencerRouter.settleAllocation.selector, users.owner);
         dictator.setPermission(sequencerRouter, sequencerRouter.collectAllocationAccountDust.selector, users.owner);
 
@@ -184,24 +184,24 @@ contract TradingTest is BasicSetup {
         account.deposit(usdc, users.owner, puppet2, 800e6);
 
         // Set up trading rules using owner permissions
-        ruleContract.setRule(
+        subscribe.rule(
             mirror,
             usdc,
             puppet1,
             trader,
-            Rule.RuleParams({
+            Subscribe.RuleParams({
                 allowanceRate: 2000, // 20%
                 throttleActivity: 1 hours,
                 expiry: block.timestamp + 30 days
             })
         );
 
-        ruleContract.setRule(
+        subscribe.rule(
             mirror,
             usdc,
             puppet2,
             trader,
-            Rule.RuleParams({
+            Subscribe.RuleParams({
                 allowanceRate: 1500, // 15%
                 throttleActivity: 2 hours,
                 expiry: block.timestamp + 30 days
@@ -234,7 +234,7 @@ contract TradingTest is BasicSetup {
 
         vm.deal(users.owner, 1 ether);
         (address allocationAddress, bytes32 requestKey) =
-            sequencerRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
+            sequencerRouter.matchmake{value: 0.001 ether}(callParams, puppetList);
 
         // Verify allocation was created
         assertGt(mirror.allocationMap(allocationAddress), 0, "Allocation should be created");
@@ -267,7 +267,7 @@ contract TradingTest is BasicSetup {
 
         vm.deal(users.owner, 1 ether);
         vm.expectRevert();
-        sequencerRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
+        sequencerRouter.matchmake{value: 0.001 ether}(callParams, puppetList);
     }
 
     function testRequestAdjustSuccess() public {
@@ -291,7 +291,7 @@ contract TradingTest is BasicSetup {
         });
 
         vm.deal(users.owner, 1 ether);
-        (address allocationAddress,) = sequencerRouter.requestOpen{value: 0.001 ether}(initialCallParams, puppetList);
+        (address allocationAddress,) = sequencerRouter.matchmake{value: 0.001 ether}(initialCallParams, puppetList);
 
         // Simulate GMX execution - mock the puppet position as existing with lastTargetSize
         uint lastTargetSize = mirror.lastTargetSizeMap(
@@ -317,7 +317,7 @@ contract TradingTest is BasicSetup {
         });
 
         vm.deal(users.owner, 1 ether);
-        bytes32 adjustRequestKey = sequencerRouter.requestAdjust{value: 0.001 ether}(adjustCallParams, puppetList);
+        bytes32 adjustRequestKey = sequencerRouter.adjust{value: 0.001 ether}(adjustCallParams, puppetList);
 
         // Verify request was submitted
         assertNotEq(adjustRequestKey, bytes32(0), "Adjust request should be generated");
@@ -432,13 +432,13 @@ contract TradingTest is BasicSetup {
 
         uint shortExpiry = block.timestamp + 10 minutes;
 
-        vm.expectRevert(abi.encodeWithSelector(Error.Rule__InvalidExpiryDuration.selector, ruleContract.getConfig().minExpiryDuration));
-        ruleContract.setRule(
+        vm.expectRevert(abi.encodeWithSelector(Error.Subscribe__InvalidExpiryDuration.selector, subscribe.getConfig().minExpiryDuration));
+        subscribe.rule(
             mirror,
             usdc,
             puppet1,
             trader,
-            Rule.RuleParams({allowanceRate: 2000, throttleActivity: 1 hours, expiry: shortExpiry})
+            Subscribe.RuleParams({allowanceRate: 2000, throttleActivity: 1 hours, expiry: shortExpiry})
         );
     }
 
@@ -493,7 +493,7 @@ contract TradingTest is BasicSetup {
 
         vm.deal(users.owner, 1 ether);
         vm.expectRevert(Error.Mirror__PuppetListEmpty.selector);
-        sequencerRouter.requestOpen{value: 0.001 ether}(callParams, emptyPuppetList);
+        sequencerRouter.matchmake{value: 0.001 ether}(callParams, emptyPuppetList);
     }
 
     function testExpiredRule() public {
@@ -521,7 +521,7 @@ contract TradingTest is BasicSetup {
         vm.deal(users.owner, 1 ether);
         // Should revert because no valid puppets means no allocation, and sequencer fee check fails
         vm.expectRevert();
-        sequencerRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
+        sequencerRouter.matchmake{value: 0.001 ether}(callParams, puppetList);
     }
 
     function testThrottleActivity() public {
@@ -552,7 +552,7 @@ contract TradingTest is BasicSetup {
 
         vm.deal(users.owner, 1 ether);
 
-        (address allocationAddress,) = sequencerRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
+        (address allocationAddress,) = sequencerRouter.matchmake{value: 0.001 ether}(callParams, puppetList);
 
         // Should get allocation only from puppet1
         uint allocatedAmount = mirror.allocationMap(allocationAddress);
@@ -610,7 +610,7 @@ contract TradingTest is BasicSetup {
         });
 
         vm.deal(users.owner, 2 ether);
-        (address allocationAddress,) = sequencerRouter.requestOpen{value: 0.001 ether}(openParams, puppetList);
+        (address allocationAddress,) = sequencerRouter.matchmake{value: 0.001 ether}(openParams, puppetList);
 
         // Simulate GMX execution - mock the puppet position as existing with lastTargetSize
         uint lastTargetSize = mirror.lastTargetSizeMap(
@@ -632,7 +632,7 @@ contract TradingTest is BasicSetup {
             sequencerFee: 0.5e6
         });
 
-        bytes32 decreaseRequestKey = sequencerRouter.requestAdjust{value: 0.001 ether}(decreaseParams, puppetList);
+        bytes32 decreaseRequestKey = sequencerRouter.adjust{value: 0.001 ether}(decreaseParams, puppetList);
         assertNotEq(decreaseRequestKey, bytes32(0), "Decrease request should be generated");
     }
 
@@ -647,12 +647,12 @@ contract TradingTest is BasicSetup {
         puppetList2[0] = puppet2;
 
         // Set rule for puppet2 to follow trader2
-        ruleContract.setRule(
+        subscribe.rule(
             mirror,
             usdc,
             puppet2,
             trader2,
-            Rule.RuleParams({
+            Subscribe.RuleParams({
                 allowanceRate: 1000, // 10%
                 throttleActivity: 1 hours,
                 expiry: block.timestamp + 30 days
@@ -688,10 +688,10 @@ contract TradingTest is BasicSetup {
         vm.deal(users.owner, 2 ether);
 
         // Create position for trader1
-        (address allocation1,) = sequencerRouter.requestOpen{value: 0.001 ether}(callParams1, puppetList1);
+        (address allocation1,) = sequencerRouter.matchmake{value: 0.001 ether}(callParams1, puppetList1);
 
         // Create position for trader2
-        (address allocation2,) = sequencerRouter.requestOpen{value: 0.001 ether}(callParams2, puppetList2);
+        (address allocation2,) = sequencerRouter.matchmake{value: 0.001 ether}(callParams2, puppetList2);
 
         // Verify both allocations were created
         assertGt(mirror.allocationMap(allocation1), 0, "Trader1 allocation should exist");

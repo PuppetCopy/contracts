@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Account} from "./position/Account.sol";
 import {Mirror} from "./position/Mirror.sol";
-import {Rule} from "./position/Rule.sol";
+import {Subscribe} from "./position/Subscribe.sol";
 import {Settle} from "./position/Settle.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
@@ -17,8 +17,8 @@ import {IAuthority} from "./utils/interfaces/IAuthority.sol";
  */
 contract SequencerRouter is CoreContract {
     struct Config {
-        uint openBaseGasLimit;
-        uint openPerPuppetGasLimit;
+        uint matchBaseGasLimit;
+        uint matchPerPuppetGasLimit;
         uint adjustBaseGasLimit;
         uint adjustPerPuppetGasLimit;
         uint settleBaseGasLimit;
@@ -33,12 +33,12 @@ contract SequencerRouter is CoreContract {
         uint stalledCheckInterval; // How often to check for stalled positions (ms)
         uint stalledPositionThreshold; // Position is stalled after this duration (ms)
         // Minimum thresholds (in USD with 30 decimals)
-        uint minOpenTraderCollateral;
+        uint minMatchTraderCollateral;
         uint minAllocationUsd;
         uint minAdjustUsd;
     }
 
-    Rule public immutable ruleContract;
+    Subscribe public immutable subscribe;
     Mirror public immutable mirror;
     Settle public immutable settle;
     Account public immutable account;
@@ -48,18 +48,18 @@ contract SequencerRouter is CoreContract {
     constructor(
         IAuthority _authority,
         Account _account,
-        Rule _ruleContract,
+        Subscribe _subscribe,
         Mirror _mirror,
         Settle _settle,
         Config memory _config
     ) CoreContract(_authority, abi.encode(_config)) {
         if (address(_account) == address(0)) revert("Account not set correctly");
-        if (address(_ruleContract) == address(0)) revert("Rule contract not set correctly");
+        if (address(_subscribe) == address(0)) revert("Subscribe contract not set correctly");
         if (address(_mirror) == address(0)) revert("Mirror not set correctly");
         if (address(_settle) == address(0)) revert("Settle not set correctly");
 
         mirror = _mirror;
-        ruleContract = _ruleContract;
+        subscribe = _subscribe;
         settle = _settle;
         account = _account;
     }
@@ -68,26 +68,26 @@ contract SequencerRouter is CoreContract {
         return config;
     }
 
-    function requestOpen(
+    function matchmake(
         Mirror.CallParams calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth returns (address _allocationAddress, bytes32 _requestKey) {
-        return mirror.requestOpen{value: msg.value}(account, ruleContract, _callParams, _puppetList);
+        return mirror.matchmake{value: msg.value}(account, subscribe, _callParams, _puppetList);
     }
 
-    function requestAdjust(
+    function adjust(
         Mirror.CallParams calldata _callParams,
         address[] calldata _puppetList
     ) external payable auth returns (bytes32 _requestKey) {
-        return mirror.requestAdjust{value: msg.value}(account, _callParams, _puppetList);
+        return mirror.adjust{value: msg.value}(account, _callParams, _puppetList);
     }
 
-    function requestClose(
+    function close(
         Mirror.CallParams calldata _callParams,
         address[] calldata _puppetList,
         uint8 _reason
     ) external payable auth returns (bytes32 _requestKey) {
-        return mirror.requestClose{value: msg.value}(account, _callParams, _puppetList, _reason);
+        return mirror.close{value: msg.value}(account, _callParams, _puppetList, _reason);
     }
 
     /**
@@ -126,8 +126,8 @@ contract SequencerRouter is CoreContract {
     function _setConfig(bytes memory _data) internal override {
         Config memory _config = abi.decode(_data, (Config));
 
-        if (_config.openBaseGasLimit == 0) revert("Invalid open base gas limit");
-        if (_config.openPerPuppetGasLimit == 0) revert("Invalid open per-puppet gas limit");
+        if (_config.matchBaseGasLimit == 0) revert("Invalid match base gas limit");
+        if (_config.matchPerPuppetGasLimit == 0) revert("Invalid match per-puppet gas limit");
         if (_config.adjustBaseGasLimit == 0) revert("Invalid adjust base gas limit");
         if (_config.adjustPerPuppetGasLimit == 0) revert("Invalid adjust per-puppet gas limit");
         if (_config.gasPriceBufferBasisPoints < 10000) revert("Gas buffer must be >= 100%");

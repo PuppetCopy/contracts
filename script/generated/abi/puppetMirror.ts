@@ -72,6 +72,77 @@ export default [
   },
   {
     type: 'function',
+    name: 'adjust',
+    inputs: [
+      {
+        name: '_account',
+        type: 'address',
+        internalType: 'contract Account'
+      },
+      {
+        name: '_callParams',
+        type: 'tuple',
+        internalType: 'struct Mirror.CallParams',
+        components: [
+          {
+            name: 'collateralToken',
+            type: 'address',
+            internalType: 'contract IERC20'
+          },
+          {
+            name: 'trader',
+            type: 'address',
+            internalType: 'address'
+          },
+          {
+            name: 'market',
+            type: 'address',
+            internalType: 'address'
+          },
+          {
+            name: 'sequencerFeeReceiver',
+            type: 'address',
+            internalType: 'address'
+          },
+          {
+            name: 'isLong',
+            type: 'bool',
+            internalType: 'bool'
+          },
+          {
+            name: 'executionFee',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'allocationId',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'sequencerFee',
+            type: 'uint256',
+            internalType: 'uint256'
+          }
+        ]
+      },
+      {
+        name: '_puppetList',
+        type: 'address[]',
+        internalType: 'address[]'
+      }
+    ],
+    outputs: [
+      {
+        name: '_requestKey',
+        type: 'bytes32',
+        internalType: 'bytes32'
+      }
+    ],
+    stateMutability: 'payable'
+  },
+  {
+    type: 'function',
     name: 'allocationMap',
     inputs: [
       {
@@ -149,6 +220,82 @@ export default [
       }
     ],
     stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'close',
+    inputs: [
+      {
+        name: '_account',
+        type: 'address',
+        internalType: 'contract Account'
+      },
+      {
+        name: '_callParams',
+        type: 'tuple',
+        internalType: 'struct Mirror.CallParams',
+        components: [
+          {
+            name: 'collateralToken',
+            type: 'address',
+            internalType: 'contract IERC20'
+          },
+          {
+            name: 'trader',
+            type: 'address',
+            internalType: 'address'
+          },
+          {
+            name: 'market',
+            type: 'address',
+            internalType: 'address'
+          },
+          {
+            name: 'sequencerFeeReceiver',
+            type: 'address',
+            internalType: 'address'
+          },
+          {
+            name: 'isLong',
+            type: 'bool',
+            internalType: 'bool'
+          },
+          {
+            name: 'executionFee',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'allocationId',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'sequencerFee',
+            type: 'uint256',
+            internalType: 'uint256'
+          }
+        ]
+      },
+      {
+        name: '_puppetList',
+        type: 'address[]',
+        internalType: 'address[]'
+      },
+      {
+        name: '_reason',
+        type: 'uint8',
+        internalType: 'uint8'
+      }
+    ],
+    outputs: [
+      {
+        name: '_requestKey',
+        type: 'bytes32',
+        internalType: 'bytes32'
+      }
+    ],
+    stateMutability: 'payable'
   },
   {
     type: 'function',
@@ -432,7 +579,7 @@ export default [
   },
   {
     type: 'function',
-    name: 'requestAdjust',
+    name: 'matchmake',
     inputs: [
       {
         name: '_account',
@@ -440,156 +587,9 @@ export default [
         internalType: 'contract Account'
       },
       {
-        name: '_callParams',
-        type: 'tuple',
-        internalType: 'struct Mirror.CallParams',
-        components: [
-          {
-            name: 'collateralToken',
-            type: 'address',
-            internalType: 'contract IERC20'
-          },
-          {
-            name: 'trader',
-            type: 'address',
-            internalType: 'address'
-          },
-          {
-            name: 'market',
-            type: 'address',
-            internalType: 'address'
-          },
-          {
-            name: 'sequencerFeeReceiver',
-            type: 'address',
-            internalType: 'address'
-          },
-          {
-            name: 'isLong',
-            type: 'bool',
-            internalType: 'bool'
-          },
-          {
-            name: 'executionFee',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'allocationId',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'sequencerFee',
-            type: 'uint256',
-            internalType: 'uint256'
-          }
-        ]
-      },
-      {
-        name: '_puppetList',
-        type: 'address[]',
-        internalType: 'address[]'
-      }
-    ],
-    outputs: [
-      {
-        name: '_requestKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
-      }
-    ],
-    stateMutability: 'payable'
-  },
-  {
-    type: 'function',
-    name: 'requestClose',
-    inputs: [
-      {
-        name: '_account',
+        name: '_subscribe',
         type: 'address',
-        internalType: 'contract Account'
-      },
-      {
-        name: '_callParams',
-        type: 'tuple',
-        internalType: 'struct Mirror.CallParams',
-        components: [
-          {
-            name: 'collateralToken',
-            type: 'address',
-            internalType: 'contract IERC20'
-          },
-          {
-            name: 'trader',
-            type: 'address',
-            internalType: 'address'
-          },
-          {
-            name: 'market',
-            type: 'address',
-            internalType: 'address'
-          },
-          {
-            name: 'sequencerFeeReceiver',
-            type: 'address',
-            internalType: 'address'
-          },
-          {
-            name: 'isLong',
-            type: 'bool',
-            internalType: 'bool'
-          },
-          {
-            name: 'executionFee',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'allocationId',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'sequencerFee',
-            type: 'uint256',
-            internalType: 'uint256'
-          }
-        ]
-      },
-      {
-        name: '_puppetList',
-        type: 'address[]',
-        internalType: 'address[]'
-      },
-      {
-        name: '_reason',
-        type: 'uint8',
-        internalType: 'uint8'
-      }
-    ],
-    outputs: [
-      {
-        name: '_requestKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
-      }
-    ],
-    stateMutability: 'payable'
-  },
-  {
-    type: 'function',
-    name: 'requestOpen',
-    inputs: [
-      {
-        name: '_account',
-        type: 'address',
-        internalType: 'contract Account'
-      },
-      {
-        name: '_ruleContract',
-        type: 'address',
-        internalType: 'contract Rule'
+        internalType: 'contract Subscribe'
       },
       {
         name: '_callParams',

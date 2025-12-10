@@ -8,7 +8,7 @@ import {SequencerRouter} from "src/SequencerRouter.sol";
 import {UserRouter} from "src/UserRouter.sol";
 import {Account as AccountContract} from "src/position/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
-import {Rule} from "src/position/Rule.sol";
+import {Subscribe} from "src/position/Subscribe.sol";
 import {Settle} from "src/position/Settle.sol";
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
@@ -37,13 +37,13 @@ contract DeployPosition is BaseScript {
         // Deploy each contract with their permissions
         AccountStore accountStore = deployAccountStore();
         AccountContract account = deployAccount(accountStore);
-        Rule ruleContract = deployRule();
+        Subscribe subscribe = deploySubscribe();
         Mirror mirror = deployMirror(account);
         Settle settle = deploySettle(account);
-        SequencerRouter sequencerRouter = deploySequencerRouter(mirror, ruleContract, settle, account);
+        SequencerRouter sequencerRouter = deploySequencerRouter(mirror, subscribe, settle, account);
 
         // Set up cross-contract permissions
-        setupCrossContractPermissions(mirror, ruleContract);
+        setupCrossContractPermissions(mirror, subscribe);
 
         // Setup upkeeping configuration
         setupUpkeepingConfig(account, settle, sequencerRouter);
@@ -119,13 +119,13 @@ contract DeployPosition is BaseScript {
         return settle;
     }
 
-    function deployRule() internal returns (Rule ruleContract) {
-        console.log("\n--- Deploying Rule Contract ---");
+    function deploySubscribe() internal returns (Subscribe subscribe) {
+        console.log("\n--- Deploying Subscribe Contract ---");
 
-        // Deploy Rule contract
-        ruleContract = new Rule(
+        // Deploy Subscribe contract
+        subscribe = new Subscribe(
             dictator,
-            Rule.Config({
+            Subscribe.Config({
                 minExpiryDuration: 1 hours,
                 minAllowanceRate: 100, // 1%
                 maxAllowanceRate: 10000, // 100%
@@ -133,13 +133,13 @@ contract DeployPosition is BaseScript {
                 maxActivityThrottle: 30 days
             })
         );
-        console.log("Rule deployed at:", address(ruleContract));
+        console.log("Subscribe deployed at:", address(subscribe));
 
         // Initialize contract
-        dictator.registerContract(ruleContract);
-        console.log("Rule contract initialized and permissions configured");
+        dictator.registerContract(subscribe);
+        console.log("Subscribe contract initialized and permissions configured");
 
-        return ruleContract;
+        return subscribe;
     }
 
     function deployMirror(
@@ -180,7 +180,7 @@ contract DeployPosition is BaseScript {
 
     function deploySequencerRouter(
         Mirror mirror,
-        Rule ruleContract,
+        Subscribe subscribe,
         Settle settle,
         AccountContract account
     ) internal returns (SequencerRouter) {
@@ -190,12 +190,12 @@ contract DeployPosition is BaseScript {
         SequencerRouter sequencerRouter = new SequencerRouter(
             dictator,
             account,
-            ruleContract,
+            subscribe,
             mirror,
             settle,
             SequencerRouter.Config({
-                openBaseGasLimit: 1_283_731,
-                openPerPuppetGasLimit: 30_000,
+                matchBaseGasLimit: 1_283_731,
+                matchPerPuppetGasLimit: 30_000,
                 adjustBaseGasLimit: 910_663,
                 adjustPerPuppetGasLimit: 3_412,
                 settleBaseGasLimit: 90_847,
@@ -207,7 +207,7 @@ contract DeployPosition is BaseScript {
                 maxGasAge: 2000,
                 stalledCheckInterval: 30_000,
                 stalledPositionThreshold: 5 * 60 * 1000,
-                minOpenTraderCollateral: 25e30,
+                minMatchTraderCollateral: 25e30,
                 minAllocationUsd: 20e30,
                 minAdjustUsd: 10e30
             })
@@ -222,15 +222,15 @@ contract DeployPosition is BaseScript {
         dictator.setPermission(settle, settle.collectAllocationAccountDust.selector, address(sequencerRouter));
 
         // Mirror permissions
-        dictator.setPermission(mirror, mirror.requestOpen.selector, address(sequencerRouter));
-        dictator.setPermission(mirror, mirror.requestAdjust.selector, address(sequencerRouter));
-        dictator.setPermission(mirror, mirror.requestClose.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.matchmake.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.adjust.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.close.selector, address(sequencerRouter));
 
         // External sequencer permissions
         console.log("Setting up external sequencer permissions...");
-        dictator.setPermission(sequencerRouter, sequencerRouter.requestOpen.selector, Const.sequencer);
-        dictator.setPermission(sequencerRouter, sequencerRouter.requestAdjust.selector, Const.sequencer);
-        dictator.setPermission(sequencerRouter, sequencerRouter.requestClose.selector, Const.sequencer);
+        dictator.setPermission(sequencerRouter, sequencerRouter.matchmake.selector, Const.sequencer);
+        dictator.setPermission(sequencerRouter, sequencerRouter.adjust.selector, Const.sequencer);
+        dictator.setPermission(sequencerRouter, sequencerRouter.close.selector, Const.sequencer);
         dictator.setPermission(sequencerRouter, sequencerRouter.settleAllocation.selector, Const.sequencer);
         dictator.setPermission(sequencerRouter, sequencerRouter.collectAllocationAccountDust.selector, Const.sequencer);
 
@@ -241,11 +241,11 @@ contract DeployPosition is BaseScript {
         return sequencerRouter;
     }
 
-    function setupCrossContractPermissions(Mirror mirror, Rule ruleContract) internal {
+    function setupCrossContractPermissions(Mirror mirror, Subscribe subscribe) internal {
         console.log("\n--- Setting up cross-contract permissions ---");
 
-        // Rule needs permission to initialize trader activity throttle via Mirror
-        dictator.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(ruleContract));
+        // Subscribe needs permission to initialize trader activity throttle via Mirror
+        dictator.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(subscribe));
 
         console.log("Cross-contract permissions configured");
     }
@@ -277,13 +277,13 @@ contract DeployPosition is BaseScript {
         console.log("=== Upgrading Mirror Contract ===");
 
         AccountContract account = AccountContract(getDeployedAddress("Account"));
-        Rule ruleContract = Rule(getDeployedAddress("Rule"));
+        Subscribe subscribe = Subscribe(getDeployedAddress("Subscribe"));
         Settle settle = Settle(getDeployedAddress("Settle"));
 
         Mirror mirror = deployMirror(account);
-        SequencerRouter sequencerRouter = deploySequencerRouter(mirror, ruleContract, settle, account);
-        setupCrossContractPermissions(mirror, ruleContract);
-        deployUserRouter(account, ruleContract, mirror);
+        SequencerRouter sequencerRouter = deploySequencerRouter(mirror, subscribe, settle, account);
+        setupCrossContractPermissions(mirror, subscribe);
+        deployUserRouter(account, subscribe, mirror);
 
         console.log("\n=== Mirror Upgrade Complete ===");
         console.log("New Mirror address:", address(mirror));
@@ -291,35 +291,35 @@ contract DeployPosition is BaseScript {
         console.log("\nIMPORTANT: Update sequencer services to use the new SequencerRouter address");
     }
 
-    function upgradeRule() public {
-        console.log("=== Upgrading Rule Contract ===");
+    function upgradeSubscribe() public {
+        console.log("=== Upgrading Subscribe Contract ===");
 
         AccountContract account = AccountContract(getDeployedAddress("Account"));
         Mirror mirror = Mirror(getDeployedAddress("Mirror"));
         Settle settle = Settle(getDeployedAddress("Settle"));
 
-        Rule ruleContract = deployRule();
-        SequencerRouter sequencerRouter = deploySequencerRouter(mirror, ruleContract, settle, account);
-        setupCrossContractPermissions(mirror, ruleContract);
-        deployUserRouter(account, ruleContract, mirror);
+        Subscribe subscribe = deploySubscribe();
+        SequencerRouter sequencerRouter = deploySequencerRouter(mirror, subscribe, settle, account);
+        setupCrossContractPermissions(mirror, subscribe);
+        deployUserRouter(account, subscribe, mirror);
 
-        console.log("\n=== Rule Upgrade Complete ===");
-        console.log("New Rule address:", address(ruleContract));
+        console.log("\n=== Subscribe Upgrade Complete ===");
+        console.log("New Subscribe address:", address(subscribe));
         console.log("New SequencerRouter address:", address(sequencerRouter));
         console.log("\nIMPORTANT: Update sequencer services to use the new SequencerRouter address");
     }
 
-    function deployUserRouter(AccountContract account, Rule ruleContract, Mirror mirror) internal {
+    function deployUserRouter(AccountContract account, Subscribe subscribe, Mirror mirror) internal {
         console.log("\n--- Deploying UserRouter ---");
 
         RouterProxy routerProxy = RouterProxy(payable(getDeployedAddress("RouterProxy")));
         FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
 
-        dictator.setPermission(ruleContract, ruleContract.setRule.selector, address(routerProxy));
+        dictator.setPermission(subscribe, subscribe.rule.selector, address(routerProxy));
         dictator.setPermission(account, account.deposit.selector, address(routerProxy));
         dictator.setPermission(account, account.withdraw.selector, address(routerProxy));
 
-        UserRouter newRouter = new UserRouter(account, ruleContract, feeMarketplace, mirror);
+        UserRouter newRouter = new UserRouter(account, subscribe, feeMarketplace, mirror);
         routerProxy.update(address(newRouter));
 
         console.log("UserRouter deployed at:", address(newRouter));

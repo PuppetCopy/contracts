@@ -75,8 +75,8 @@ export const CONTRACT_EVENT_MAP = {
     }
   },
   Mirror: {
-    RequestAdjust: {
-      hash: '0xcfd2beed7e177f2444f38319718e9c701d76dc475a08300b632b15c2af3e072c',
+    Adjust: {
+      hash: '0x5b8ed69a4f24653f05791cdb161ade14eb6f876b7b4e96f8d9846c02cf407a7d',
       args: [
         { type: 'address', name: 'allocationAddress' },
         { type: 'bytes32', name: 'requestKey' },
@@ -90,8 +90,8 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'uint256[]', name: 'nextBalanceList' }
       ]
     },
-    RequestClose: {
-      hash: '0xa8ace304d8eb79561b2fc5eb18573449aaf94e2f2411f10b406d94fc9df266b0',
+    Close: {
+      hash: '0x2e8d9b385fe8ba591af7cdee7ebea35f1b676c032b3c41146d411996bc476835',
       args: [
         { type: 'address', name: 'allocationAddress' },
         { type: 'bytes32', name: 'requestKey' },
@@ -100,11 +100,11 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'uint256', name: 'sequencerFee' },
         { type: 'uint256', name: 'positionSize' },
         { type: 'uint8', name: 'reason' },
-        { type: 'uint256[]', name: 'nextBalanceLisft' }
+        { type: 'uint256[]', name: 'nextBalanceList' }
       ]
     },
-    RequestMatch: {
-      hash: '0x8ad9d84d3a32e043a8de52595be36a08f98a5a774b5735335db7418994c86de9',
+    Match: {
+      hash: '0x6e00d71ae900f49e5c2cc50dac9a932b70f04bf1c9199e0057b8f67f68a9d147',
       args: [
         { type: 'address', name: 'collateralToken' },
         { type: 'address', name: 'trader' },
@@ -151,22 +151,6 @@ export const CONTRACT_EVENT_MAP = {
       ]
     }
   },
-  Rule: {
-    SetMatchingRule: {
-      hash: '0x83e1399ac486b7475c2d6849c401edeabc97692030930375a0c67dbb77a58e62',
-      args: [
-        {
-          type: 'tuple',
-          name: 'ruleParams',
-          components: [{ type: 'uint256' }, { type: 'uint256' }, { type: 'uint256' }]
-        },
-        { type: 'address', name: 'collateralToken' },
-        { type: 'address', name: 'trader' },
-        { type: 'address', name: 'user' },
-        { type: 'bytes32', name: 'traderMatchingKey' }
-      ]
-    }
-  },
   Settle: {
     CollectAllocationAccountDust: {
       hash: '0xa37898b4f41de8a7f0d328410d8e26f69c589234ad4090832a36f9460799680b',
@@ -189,19 +173,12 @@ export const CONTRACT_EVENT_MAP = {
     Settle: {
       hash: '0xea8fbe0762c74a52b889978a4aff8df9447ec89ed00dff7346b7014a2d0754d2',
       args: [
-        {
-          type: 'tuple',
-          name: 'callParams',
-          components: [
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' }
-          ]
-        },
+        { type: 'address', name: 'collateralToken' },
+        { type: 'address', name: 'distributionToken' },
+        { type: 'address', name: 'sequencerFeeReceiver' },
+        { type: 'address', name: 'trader' },
+        { type: 'uint256', name: 'allocationId' },
+        { type: 'uint256', name: 'sequencerExecutionFee' },
         { type: 'address', name: 'allocationAddress' },
         { type: 'bytes32', name: 'traderMatchingKey' },
         { type: 'uint256', name: 'distributedAmount' },
@@ -214,6 +191,20 @@ export const CONTRACT_EVENT_MAP = {
       args: [
         { type: 'address[]', name: 'tokenDustThresholdList' },
         { type: 'uint256[]', name: 'tokenDustThresholdCapList' }
+      ]
+    }
+  },
+  Subscribe: {
+    Rule: {
+      hash: '0x41f4205e7cbe49973a9013a9bc5c7c72a03d9eff11f8342287f4f4de25795c01',
+      args: [
+        { type: 'uint256', name: 'allowanceRate' },
+        { type: 'uint256', name: 'throttleActivity' },
+        { type: 'uint256', name: 'expiry' },
+        { type: 'address', name: 'collateralToken' },
+        { type: 'address', name: 'trader' },
+        { type: 'address', name: 'user' },
+        { type: 'bytes32', name: 'traderMatchingKey' }
       ]
     }
   }

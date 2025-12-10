@@ -6,7 +6,7 @@ import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/Reentrancy
 
 import {Account} from "./position/Account.sol";
 import {Mirror} from "./position/Mirror.sol";
-import {Rule} from "./position/Rule.sol";
+import {Subscribe} from "./position/Subscribe.sol";
 import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
 
 /**
@@ -16,13 +16,13 @@ import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
  */
 contract UserRouter is ReentrancyGuardTransient {
     Account public immutable account;
-    Rule public immutable ruleContract;
+    Subscribe public immutable subscribe;
     FeeMarketplace public immutable feeMarketplace;
     Mirror public immutable mirror;
 
-    constructor(Account _account, Rule _ruleContract, FeeMarketplace _feeMarketplace, Mirror _mirror) {
+    constructor(Account _account, Subscribe _subscribe, FeeMarketplace _feeMarketplace, Mirror _mirror) {
         account = _account;
-        ruleContract = _ruleContract;
+        subscribe = _subscribe;
         feeMarketplace = _feeMarketplace;
         mirror = _mirror;
     }
@@ -52,12 +52,12 @@ contract UserRouter is ReentrancyGuardTransient {
      * @param trader The trader the caller wishes to potentially mirror.
      * @param ruleParams The parameters for the rule (allowance rate, throttle, expiry).
      */
-    function setMatchingRule(
+    function setRule(
         IERC20 collateralToken,
         address trader,
-        Rule.RuleParams calldata ruleParams
+        Subscribe.RuleParams calldata ruleParams
     ) external nonReentrant {
-        ruleContract.setRule(mirror, collateralToken, msg.sender, trader, ruleParams);
+        subscribe.rule(mirror, collateralToken, msg.sender, trader, ruleParams);
     }
 
     /**
