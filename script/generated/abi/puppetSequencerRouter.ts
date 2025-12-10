@@ -69,6 +69,51 @@ export default [
             name: 'gasPriceBufferBasisPoints',
             type: 'uint256',
             internalType: 'uint256'
+          },
+          {
+            name: 'maxEthPriceAge',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'maxIndexPriceAge',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'maxFiatPriceAge',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'maxGasAge',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'stalledCheckInterval',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'stalledPositionThreshold',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'minOpenTraderCollateral',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'minAllocationUsd',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'minAdjustUsd',
+            type: 'uint256',
+            internalType: 'uint256'
           }
         ]
       }
@@ -201,6 +246,51 @@ export default [
           },
           {
             name: 'gasPriceBufferBasisPoints',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'maxEthPriceAge',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'maxIndexPriceAge',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'maxFiatPriceAge',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'maxGasAge',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'stalledCheckInterval',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'stalledPositionThreshold',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'minOpenTraderCollateral',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'minAllocationUsd',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'minAdjustUsd',
             type: 'uint256',
             internalType: 'uint256'
           }

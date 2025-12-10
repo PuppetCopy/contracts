@@ -93,7 +93,9 @@ contract TradingForkTest is Test {
                 maxPuppetList: 50,
                 maxSequencerFeeToAllocationRatio: 0.1e30,
                 maxSequencerFeeToAdjustmentRatio: 0.1e30,
-                maxSequencerFeeToCloseRatio: 0.1e30
+                maxSequencerFeeToCloseRatio: 0.1e30,
+                maxMatchOpenDuration: 30 seconds,
+                maxMatchAdjustDuration: 60 seconds
             })
         );
 
@@ -121,7 +123,16 @@ contract TradingForkTest is Test {
                 adjustPerPuppetGasLimit: 3_412,
                 settleBaseGasLimit: 1_300_853,
                 settlePerPuppetGasLimit: 30_000,
-                gasPriceBufferBasisPoints: 12000 // 120% (20% buffer)
+                gasPriceBufferBasisPoints: 12000, // 120% (20% buffer)
+                maxEthPriceAge: 300,
+                maxIndexPriceAge: 3000,
+                maxFiatPriceAge: 60_000,
+                maxGasAge: 2000,
+                stalledCheckInterval: 30_000,
+                stalledPositionThreshold: 5 * 60 * 1000,
+                minOpenTraderCollateral: 25e30,
+                minAllocationUsd: 20e30,
+                minAdjustUsd: 10e30
             })
         );
 

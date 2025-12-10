@@ -30,7 +30,8 @@ async function fetchGmxDeployments(): Promise<DeploymentData> {
   try {
     // Read all deployment files from node_modules
     console.log('📁 Loading Arbitrum deployments...')
-    const deploymentFiles = await $`find ${GMX_NODE_MODULES_PATH}/deployments/arbitrum -name "*.json" -not -name "*metadata*"`.text()
+    const deploymentFiles =
+      await $`find ${GMX_NODE_MODULES_PATH}/deployments/arbitrum -name "*.json" -not -name "*metadata*"`.text()
     const files = deploymentFiles.trim().split('\n').filter(Boolean)
 
     const deployments: DeploymentData = {}

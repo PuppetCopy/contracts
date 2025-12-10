@@ -54,6 +54,16 @@ export default [
             name: 'maxSequencerFeeToCloseRatio',
             type: 'uint256',
             internalType: 'uint256'
+          },
+          {
+            name: 'maxMatchOpenDuration',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'maxMatchAdjustDuration',
+            type: 'uint256',
+            internalType: 'uint256'
           }
         ]
       }
@@ -184,6 +194,16 @@ export default [
         name: 'maxSequencerFeeToCloseRatio',
         type: 'uint256',
         internalType: 'uint256'
+      },
+      {
+        name: 'maxMatchOpenDuration',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'maxMatchAdjustDuration',
+        type: 'uint256',
+        internalType: 'uint256'
       }
     ],
     stateMutability: 'view'
@@ -273,6 +293,16 @@ export default [
           },
           {
             name: 'maxSequencerFeeToCloseRatio',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'maxMatchOpenDuration',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'maxMatchAdjustDuration',
             type: 'uint256',
             internalType: 'uint256'
           }

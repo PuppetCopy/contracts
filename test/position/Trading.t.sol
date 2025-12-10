@@ -79,7 +79,9 @@ contract TradingTest is BasicSetup {
                 maxPuppetList: 50,
                 maxSequencerFeeToAllocationRatio: 0.1e30,
                 maxSequencerFeeToAdjustmentRatio: 0.1e30,
-                maxSequencerFeeToCloseRatio: 0.1e30
+                maxSequencerFeeToCloseRatio: 0.1e30,
+                maxMatchOpenDuration: 30 seconds,
+                maxMatchAdjustDuration: 60 seconds
             })
         );
 
@@ -107,7 +109,16 @@ contract TradingTest is BasicSetup {
                 adjustPerPuppetGasLimit: 3_412,
                 settleBaseGasLimit: 1_300_853,
                 settlePerPuppetGasLimit: 30_000,
-                gasPriceBufferBasisPoints: 12000 // 120% (20% buffer)
+                gasPriceBufferBasisPoints: 12000, // 120% (20% buffer)
+                maxEthPriceAge: 300,
+                maxIndexPriceAge: 3000,
+                maxFiatPriceAge: 60_000,
+                maxGasAge: 2000,
+                stalledCheckInterval: 30_000,
+                stalledPositionThreshold: 5 * 60 * 1000,
+                minOpenTraderCollateral: 25e30,
+                minAllocationUsd: 20e30,
+                minAdjustUsd: 10e30
             })
         );
 
@@ -202,7 +213,7 @@ contract TradingTest is BasicSetup {
     // Core Trading Functionality Tests
     //----------------------------------------------------------------------------
 
-    function testRequestOpenSuccess() public {
+    function testRequestMatchSuccess() public {
         address[] memory puppetList = new address[](2);
         puppetList[0] = puppet1;
         puppetList[1] = puppet2;
@@ -235,7 +246,7 @@ contract TradingTest is BasicSetup {
         assertEq(usdc.balanceOf(users.owner), 200e6 + sequencerFee, "Sequencer should receive fee");
     }
 
-    function testRequestOpenInsufficientFunds() public {
+    function testRequestMatchInsufficientFunds() public {
         address[] memory puppetList = new address[](2);
         puppetList[0] = puppet1;
         puppetList[1] = puppet2;
@@ -314,7 +325,7 @@ contract TradingTest is BasicSetup {
 
     function testSettleSuccess() public {
         // First create allocation and position
-        testRequestOpenSuccess();
+        testRequestMatchSuccess();
 
         address[] memory puppetList = new address[](2);
         puppetList[0] = puppet1;
@@ -373,7 +384,7 @@ contract TradingTest is BasicSetup {
     }
 
     function testSettleInvariantSumAllocations() public {
-        testRequestOpenSuccess();
+        testRequestMatchSuccess();
 
         address[] memory puppetList = new address[](2);
         puppetList[0] = puppet1;
@@ -434,7 +445,7 @@ contract TradingTest is BasicSetup {
 
     function testCollectDust() public {
         // Create an allocation first
-        testRequestOpenSuccess();
+        testRequestMatchSuccess();
 
         address[] memory puppetList = new address[](2);
         puppetList[0] = puppet1;
@@ -515,7 +526,7 @@ contract TradingTest is BasicSetup {
 
     function testThrottleActivity() public {
         // First mirror position
-        testRequestOpenSuccess();
+        testRequestMatchSuccess();
 
         // For this test, let's advance time just past puppet1's throttle (1 hour) but not puppet2's (2 hours)
         vm.warp(block.timestamp + 1.5 hours);
@@ -554,7 +565,7 @@ contract TradingTest is BasicSetup {
 
     function testDustThresholdTooHigh() public {
         // Create an allocation first
-        testRequestOpenSuccess();
+        testRequestMatchSuccess();
 
         address[] memory puppetList = new address[](2);
         puppetList[0] = puppet1;

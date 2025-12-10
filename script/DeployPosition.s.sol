@@ -158,7 +158,9 @@ contract DeployPosition is BaseScript {
                 maxPuppetList: 50,
                 maxSequencerFeeToAllocationRatio: 0.1e30,
                 maxSequencerFeeToAdjustmentRatio: 0.1e30,
-                maxSequencerFeeToCloseRatio: 0.1e30
+                maxSequencerFeeToCloseRatio: 0.1e30,
+                maxMatchOpenDuration: 30 seconds,
+                maxMatchAdjustDuration: 60 seconds
             })
         );
         console.log("Mirror deployed at:", address(mirror));
@@ -198,7 +200,16 @@ contract DeployPosition is BaseScript {
                 adjustPerPuppetGasLimit: 3_412,
                 settleBaseGasLimit: 90_847,
                 settlePerPuppetGasLimit: 15_000,
-                gasPriceBufferBasisPoints: 12000 // 120% (20% buffer)
+                gasPriceBufferBasisPoints: 12000, // 120% (20% buffer)
+                maxEthPriceAge: 300,
+                maxIndexPriceAge: 3000,
+                maxFiatPriceAge: 60_000,
+                maxGasAge: 2000,
+                stalledCheckInterval: 30_000,
+                stalledPositionThreshold: 5 * 60 * 1000,
+                minOpenTraderCollateral: 25e30,
+                minAllocationUsd: 20e30,
+                minAdjustUsd: 10e30
             })
         );
         console.log("SequencerRouter deployed at:", address(sequencerRouter));

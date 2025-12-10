@@ -78,25 +78,11 @@ export const CONTRACT_EVENT_MAP = {
     RequestAdjust: {
       hash: '0xcfd2beed7e177f2444f38319718e9c701d76dc475a08300b632b15c2af3e072c',
       args: [
-        {
-          type: 'tuple',
-          name: 'callParams',
-          components: [
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'bool' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' }
-          ]
-        },
         { type: 'address', name: 'allocationAddress' },
-        { type: 'bytes32', name: 'traderMatchingKey' },
-        { type: 'bytes32', name: 'traderPositionKey' },
-        { type: 'bytes32', name: 'puppetPositionKey' },
         { type: 'bytes32', name: 'requestKey' },
+        { type: 'address', name: 'sequencerFeeReceiver' },
+        { type: 'uint256', name: 'executionFee' },
+        { type: 'uint256', name: 'sequencerFee' },
         { type: 'bool', name: 'isIncrease' },
         { type: 'uint256', name: 'sizeDelta' },
         { type: 'uint256', name: 'puppetCurrentSize' },
@@ -107,47 +93,27 @@ export const CONTRACT_EVENT_MAP = {
     RequestClose: {
       hash: '0xa8ace304d8eb79561b2fc5eb18573449aaf94e2f2411f10b406d94fc9df266b0',
       args: [
-        {
-          type: 'tuple',
-          name: 'callParams',
-          components: [
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'bool' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' }
-          ]
-        },
         { type: 'address', name: 'allocationAddress' },
-        { type: 'bytes32', name: 'traderMatchingKey' },
-        { type: 'bytes32', name: 'traderPositionKey' },
-        { type: 'bytes32', name: 'puppetPositionKey' },
         { type: 'bytes32', name: 'requestKey' },
+        { type: 'address', name: 'sequencerFeeReceiver' },
+        { type: 'uint256', name: 'executionFee' },
+        { type: 'uint256', name: 'sequencerFee' },
         { type: 'uint256', name: 'positionSize' },
         { type: 'uint8', name: 'reason' },
-        { type: 'uint256[]', name: 'nextBalanceList' }
+        { type: 'uint256[]', name: 'nextBalanceLisft' }
       ]
     },
-    RequestOpen: {
-      hash: '0x8ea2584fd754b03cf39f816e27b8a3d79ec2ff07b256107e6ab6cd6b407f4a9e',
+    RequestMatch: {
+      hash: '0x8ad9d84d3a32e043a8de52595be36a08f98a5a774b5735335db7418994c86de9',
       args: [
-        {
-          type: 'tuple',
-          name: 'callParams',
-          components: [
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'bool' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' }
-          ]
-        },
+        { type: 'address', name: 'collateralToken' },
+        { type: 'address', name: 'trader' },
+        { type: 'address', name: 'market' },
+        { type: 'address', name: 'sequencerFeeReceiver' },
+        { type: 'bool', name: 'isLong' },
+        { type: 'uint256', name: 'executionFee' },
+        { type: 'uint256', name: 'allocationId' },
+        { type: 'uint256', name: 'sequencerFee' },
         { type: 'address', name: 'allocationAddress' },
         { type: 'bytes32', name: 'traderMatchingKey' },
         { type: 'bytes32', name: 'traderPositionKey' },

@@ -29,6 +29,8 @@ contract Mirror is CoreContract {
         uint maxSequencerFeeToAllocationRatio;
         uint maxSequencerFeeToAdjustmentRatio;
         uint maxSequencerFeeToCloseRatio;
+        uint maxMatchOpenDuration;
+        uint maxMatchAdjustDuration;
     }
 
     struct CallParams {
@@ -172,9 +174,16 @@ contract Mirror is CoreContract {
         lastTargetSizeMap[_puppetPositionKey] = _sizeDelta;
 
         _logEvent(
-            "RequestOpen",
+            "RequestMatch",
             abi.encode(
-                _callParams,
+                _callParams.collateralToken,
+                _callParams.trader,
+                _callParams.market,
+                _callParams.sequencerFeeReceiver,
+                _callParams.isLong,
+                _callParams.executionFee,
+                _callParams.allocationId,
+                _callParams.sequencerFee,
                 _allocationAddress,
                 _traderMatchingKey,
                 _traderPositionKey,
@@ -274,12 +283,11 @@ contract Mirror is CoreContract {
         _logEvent(
             "RequestAdjust",
             abi.encode(
-                _callParams,
                 _allocationAddress,
-                _traderMatchingKey,
-                _traderPositionKey,
-                _puppetPositionKey,
                 _requestKey,
+                _callParams.sequencerFeeReceiver,
+                _callParams.executionFee,
+                _callParams.sequencerFee,
                 _isIncrease,
                 _sizeDelta,
                 _puppetCurrentSize,
@@ -363,12 +371,11 @@ contract Mirror is CoreContract {
         _logEvent(
             "RequestClose",
             abi.encode(
-                _callParams,
                 _allocationAddress,
-                _traderMatchingKey,
-                _traderPositionKey,
-                _puppetPositionKey,
                 _requestKey,
+                _callParams.sequencerFeeReceiver,
+                _callParams.executionFee,
+                _callParams.sequencerFee,
                 _positionSize,
                 _reason,
                 _nextBalanceList
