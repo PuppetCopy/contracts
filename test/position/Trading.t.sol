@@ -14,8 +14,6 @@ import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
 import {GmxPositionUtils} from "src/position/utils/GmxPositionUtils.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {AccountStore} from "src/shared/AccountStore.sol";
-import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
-import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
 import {Error} from "src/utils/Error.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockGmxExchangeRouter} from "test/mock/MockGmxExchangeRouter.t.sol";
@@ -550,13 +548,16 @@ contract TradingTest is BasicSetup {
         // First mirror position
         testRequestOpenSuccess();
 
-        address[] memory puppetList = new address[](2);
-        puppetList[0] = puppet1;
-        puppetList[1] = puppet2;
+        // For this test, let's advance time just past puppet1's throttle (1 hour) but not puppet2's (2 hours)
+        vm.warp(block.timestamp + 1.5 hours);
 
-        // Try to create another position immediately (should be throttled)
+        // Sequencer should only include active (non-throttled) puppets
+        // puppet2 is still throttled (2 hour throttle), so only puppet1 is included
+        address[] memory puppetList = new address[](1);
+        puppetList[0] = puppet1;
+
         uint allocationId = getNextAllocationId();
-        uint sequencerFee = 0.1e6; // Small sequencer fee
+        uint sequencerFee = 0.01e6; // Small sequencer fee
 
         Mirror.CallPosition memory callParams = Mirror.CallPosition({
             collateralToken: usdc,
@@ -576,16 +577,13 @@ contract TradingTest is BasicSetup {
         });
 
         vm.deal(users.owner, 1 ether);
-        // For this test, let's advance time just past puppet1's throttle (1 hour) but not puppet2's (2 hours)
-        vm.warp(block.timestamp + 1.5 hours);
 
         (address allocationAddress,) = sequencerRouter.requestOpen{value: 0.001 ether}(callParams, puppetList);
 
-        // Should get allocation only from puppet1 since puppet2 is still throttled
+        // Should get allocation only from puppet1
         uint allocatedAmount = mirror.allocationMap(allocationAddress);
         uint puppet1Expected = 1000e6 * 2000 / 10000; // 20% of 1000 USDC = 200 USDC
-        // But puppet1's balance has been reduced from previous test (200e6 initial balance from BasicSetup + allocation
-        // used)
+        // But puppet1's balance has been reduced from previous test
         // So let's just verify it's greater than 0 and less than expected
         assertGt(allocatedAmount, 0, "Should have some allocation from puppet1");
         assertLt(allocatedAmount, puppet1Expected, "Should be less than full expected due to reduced balance");

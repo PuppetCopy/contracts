@@ -619,6 +619,9 @@ if (import.meta.main) {
   console.log(`\nTotal: ${totalEvents} events across ${contractEvents.size} contracts`)
 
   const code = generateEventParamsCode(contractEvents)
-  console.log('\n--- Generated Code ---')
-  console.log(code)
+
+  // Write to file
+  const outputPath = './script/generated/events.ts'
+  await Bun.write(outputPath, code)
+  console.log(`\nWritten to ${outputPath}`)
 }

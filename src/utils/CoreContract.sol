@@ -26,7 +26,9 @@ abstract contract CoreContract is Permission {
 
     function setConfig(
         bytes calldata _data
-    ) external virtual onlyAuthority {}
+    ) external virtual onlyAuthority {
+        _setConfig(_data);
+    }
 
     /// @notice Helper function to log events through the central Authority.
     /// @param method A descriptor for the action or event type (e.g., "Deposit", "RuleUpdated").

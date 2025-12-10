@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/src/console.sol";
 
 import {SequencerRouter} from "src/SequencerRouter.sol";
-
+import {UserRouter} from "src/UserRouter.sol";
 import {Account as AccountContract} from "src/position/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
 import {Rule} from "src/position/Rule.sol";
@@ -14,7 +14,9 @@ import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol"
 import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
 import {AccountStore} from "src/shared/AccountStore.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
+import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
+import {RouterProxy} from "src/utils/RouterProxy.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
 import {Const} from "./Const.sol";
@@ -280,7 +282,7 @@ contract DeployPosition is BaseScript {
     }
 
     function upgradeMirror() public {
-        console.log("=== Upgrading Mirror Contract and SequencerRouter ===");
+        console.log("=== Upgrading Mirror Contract ===");
 
         AccountContract account = AccountContract(getDeployedAddress("Account"));
         Rule ruleContract = Rule(getDeployedAddress("Rule"));
@@ -288,12 +290,48 @@ contract DeployPosition is BaseScript {
 
         Mirror mirror = deployMirror(account);
         SequencerRouter sequencerRouter = deploySequencerRouter(mirror, ruleContract, settle, account);
-
         setupCrossContractPermissions(mirror, ruleContract);
+        deployUserRouter(account, ruleContract, mirror);
 
-        console.log("\n=== Mirror and SequencerRouter Upgrade Complete ===");
+        console.log("\n=== Mirror Upgrade Complete ===");
         console.log("New Mirror address:", address(mirror));
         console.log("New SequencerRouter address:", address(sequencerRouter));
         console.log("\nIMPORTANT: Update sequencer services to use the new SequencerRouter address");
     }
+
+    function upgradeRule() public {
+        console.log("=== Upgrading Rule Contract ===");
+
+        AccountContract account = AccountContract(getDeployedAddress("Account"));
+        Mirror mirror = Mirror(getDeployedAddress("Mirror"));
+        Settle settle = Settle(getDeployedAddress("Settle"));
+
+        Rule ruleContract = deployRule();
+        SequencerRouter sequencerRouter = deploySequencerRouter(mirror, ruleContract, settle, account);
+        setupCrossContractPermissions(mirror, ruleContract);
+        deployUserRouter(account, ruleContract, mirror);
+
+        console.log("\n=== Rule Upgrade Complete ===");
+        console.log("New Rule address:", address(ruleContract));
+        console.log("New SequencerRouter address:", address(sequencerRouter));
+        console.log("\nIMPORTANT: Update sequencer services to use the new SequencerRouter address");
+    }
+
+    function deployUserRouter(AccountContract account, Rule ruleContract, Mirror mirror) internal {
+        console.log("\n--- Deploying UserRouter ---");
+
+        RouterProxy routerProxy = RouterProxy(payable(getDeployedAddress("RouterProxy")));
+        FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
+
+        dictator.setPermission(ruleContract, ruleContract.setRule.selector, address(routerProxy));
+        dictator.setPermission(account, account.deposit.selector, address(routerProxy));
+        dictator.setPermission(account, account.withdraw.selector, address(routerProxy));
+
+        UserRouter newRouter = new UserRouter(account, ruleContract, feeMarketplace, mirror);
+        routerProxy.update(address(newRouter));
+
+        console.log("UserRouter deployed at:", address(newRouter));
+        console.log("RouterProxy updated to new UserRouter");
+    }
 }
+ 

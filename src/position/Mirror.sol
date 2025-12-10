@@ -181,6 +181,7 @@ contract Mirror is CoreContract {
         require(_callParams.isIncrease, Error.Mirror__InitialMustBeIncrease());
         require(_callParams.collateralDelta > 0, Error.Mirror__InvalidCollateralDelta());
         require(_callParams.sizeDeltaInUsd > 0, Error.Mirror__InvalidSizeDelta());
+        require(_callParams.sequencerFee > 0, Error.Mirror__InvalidSequencerExecutionFeeAmount());
 
         bytes32 _traderPositionKey = GmxPositionUtils.getPositionKey(
             _callParams.trader, _callParams.market, _callParams.collateralToken, _callParams.isLong
@@ -193,70 +194,50 @@ contract Mirror is CoreContract {
 
         uint _puppetCount = _puppetList.length;
         require(_puppetCount > 0, Error.Mirror__PuppetListEmpty());
-        require(_puppetCount <= config.maxPuppetList, "Puppet list too large");
+        if (_puppetCount > config.maxPuppetList) revert Error.Mirror__PuppetListTooLarge(_puppetCount, config.maxPuppetList);
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
-        bytes32 _allocationKey =
-            PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId);
-        _allocationAddress = _account.createAllocationAccount(_allocationKey);
+        _allocationAddress = _account.createAllocationAccount(PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId));
 
         Rule.RuleParams[] memory _rules = _ruleContract.getRuleList(_traderMatchingKey, _puppetList);
         uint[] memory _allocatedList = new uint[](_puppetCount);
-        uint[] memory _balanceList = _account.getBalanceList(_callParams.collateralToken, _puppetList);
+        uint[] memory _nextBalanceList = _account.getBalanceList(_callParams.collateralToken, _puppetList);
         allocationPuppetList[_allocationAddress] = new uint[](_puppetCount);
 
         uint _allocated = 0;
-        uint _remainingSequencerFee = _callParams.sequencerFee;
-        uint _lastActiveIndex = type(uint).max;
+        uint _remainingFee = _callParams.sequencerFee;
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
             address _puppet = _puppetList[_i];
             Rule.RuleParams memory _rule = _rules[_i];
 
-            if (
-                !(_rule.expiry > block.timestamp
-                    && block.timestamp >= lastActivityThrottleMap[_traderMatchingKey][_puppet])
-            ) continue;
+            if (_rule.expiry <= block.timestamp) continue;
+            if (block.timestamp < lastActivityThrottleMap[_traderMatchingKey][_puppet]) continue;
 
-            uint _puppetAllocation = Precision.applyBasisPoints(_rule.allowanceRate, _balanceList[_i]);
+            uint _contribution = Precision.applyBasisPoints(_rule.allowanceRate, _nextBalanceList[_i]);
+            uint _remainingPuppets = _puppetCount - _i;
+            uint _feeShare = (_remainingFee + _remainingPuppets - 1) / _remainingPuppets;
+            if (_feeShare > _contribution) _feeShare = _contribution;
 
-            uint _feeShareUpperBound = (_remainingSequencerFee + (_puppetCount - _i) - 1) / (_puppetCount - _i);
-            uint _feeCap = Precision.applyFactor(config.maxSequencerFeeToAllocationRatio, _puppetAllocation);
-            uint _feeShare = Math.min(_feeShareUpperBound, _puppetAllocation);
-            if (_feeCap > 0 && _feeShare > _feeCap) {
-                _feeShare = _feeCap;
-            }
-
-            uint _netAllocation = _puppetAllocation - _feeShare;
-            _remainingSequencerFee -= _feeShare;
+            uint _netAllocation = _contribution - _feeShare;
+            _remainingFee -= _feeShare;
 
             _allocatedList[_i] = _netAllocation;
             allocationPuppetList[_allocationAddress][_i] = _netAllocation;
-            _balanceList[_i] -= _puppetAllocation;
+            _nextBalanceList[_i] -= _contribution;
             _allocated += _netAllocation;
             lastActivityThrottleMap[_traderMatchingKey][_puppet] = block.timestamp + _rule.throttleActivity;
-            _lastActiveIndex = _i;
         }
 
-        if (_remainingSequencerFee > 0) {
-            require(_lastActiveIndex != type(uint).max, Error.Mirror__SequencerFeeNotFullyCovered(0, _remainingSequencerFee));
-            uint _availableToReassign = _allocatedList[_lastActiveIndex];
-            require(_availableToReassign >= _remainingSequencerFee, Error.Mirror__SequencerFeeNotFullyCovered(0, _remainingSequencerFee));
-
-            _allocatedList[_lastActiveIndex] = _availableToReassign - _remainingSequencerFee;
-            allocationPuppetList[_allocationAddress][_lastActiveIndex] = _allocatedList[_lastActiveIndex];
-            _allocated -= _remainingSequencerFee;
-            _remainingSequencerFee = 0;
-        }
-
-        _account.setBalanceList(_callParams.collateralToken, _puppetList, _balanceList);
-
+        require(_remainingFee == 0, Error.Mirror__SequencerFeeNotFullyCovered(_callParams.sequencerFee - _remainingFee, _callParams.sequencerFee));
         require(
-            _callParams.sequencerFee < Precision.applyFactor(config.maxSequencerFeeToAllocationRatio, _allocated),
-            Error.Mirror__SequencerFeeExceedsCostFactor(_callParams.sequencerFee, _allocated)
+            _callParams.sequencerFee < Precision.applyFactor(config.maxSequencerFeeToAllocationRatio, _allocated + _callParams.sequencerFee),
+            Error.Mirror__SequencerFeeExceedsCostFactor(_callParams.sequencerFee, _allocated + _callParams.sequencerFee)
         );
-        require(_remainingSequencerFee == 0, Error.Mirror__SequencerFeeNotFullyCovered(0, _remainingSequencerFee));
+
         allocationMap[_allocationAddress] = _allocated;
+
+        _account.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
 
         _account.transferOut(_callParams.collateralToken, _callParams.sequencerFeeReceiver, _callParams.sequencerFee);
         _account.transferOut(_callParams.collateralToken, config.gmxOrderVault, _allocated);
@@ -296,7 +277,8 @@ contract Mirror is CoreContract {
                 _traderTargetLeverage,
                 _allocated,
                 _allocatedList,
-                _puppetList
+                _puppetList,
+                _nextBalanceList
             )
         );
     }
@@ -337,54 +319,42 @@ contract Mirror is CoreContract {
             Error.Mirror__InsufficientAllocationForSequencerFee(_allocated, _callParams.sequencerFee)
         );
 
-        uint _remainingSequencerFeeToCollect = _callParams.sequencerFee;
-        uint _allocationToRedistribute = 0;
         uint[] memory _nextBalanceList = _account.getBalanceList(_callParams.collateralToken, _puppetList);
+
+        uint _remainingFee = _callParams.sequencerFee;
+        uint _allocationToRedistribute = 0;
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
             uint _puppetAllocation = _allocationList[_i];
-
             if (_puppetAllocation == 0) continue;
 
             uint _remainingPuppets = _puppetCount - _i;
-            uint _feeToCollect = (_remainingSequencerFeeToCollect + _remainingPuppets - 1) / _remainingPuppets;
+            uint _feeShare = (_remainingFee + _remainingPuppets - 1) / _remainingPuppets;
 
-            if (_feeToCollect > _remainingSequencerFeeToCollect) {
-                _feeToCollect = _remainingSequencerFeeToCollect;
-            }
+            if (_nextBalanceList[_i] >= _feeShare) {
+                // Solvent: pay fee from balance, receive share of redistribution
+                _nextBalanceList[_i] -= _feeShare;
+                _remainingFee -= _feeShare;
 
-            if (_nextBalanceList[_i] >= _feeToCollect) {
-                // Solvent puppet - pays full fee and gets proportional share of redistribution
-                _nextBalanceList[_i] -= _feeToCollect;
-                _remainingSequencerFeeToCollect -= _feeToCollect;
-
-                // Give this puppet their fair share of accumulated redistribution
                 if (_allocationToRedistribute > 0) {
-                    uint _shareOfRedistribution = _allocationToRedistribute / _remainingPuppets;
-                    _allocationList[_i] += _shareOfRedistribution;
-                    _allocationToRedistribute -= _shareOfRedistribution;
+                    uint _share = _allocationToRedistribute / _remainingPuppets;
+                    _allocationList[_i] += _share;
+                    _allocationToRedistribute -= _share;
                 }
             } else {
-                // Puppet has insufficient balance - deduct from allocation and accumulate for redistribution
-                if (_puppetAllocation > _feeToCollect) {
-                    _allocationList[_i] = _puppetAllocation - _feeToCollect;
-                    _allocationToRedistribute += _feeToCollect;
-                } else {
-                    _allocationToRedistribute += _puppetAllocation;
-                    _allocationList[_i] = 0;
-                }
+                // Insolvent: pay what they can, lose allocation for redistribution
+                _remainingFee -= _nextBalanceList[_i];
+                _nextBalanceList[_i] = 0;
+                _allocationToRedistribute += _puppetAllocation;
+                _allocationList[_i] = 0;
             }
         }
 
-        _account.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
-
-        require(
-            _remainingSequencerFeeToCollect == 0,
-            Error.Mirror__SequencerFeeNotFullyCovered(0, _remainingSequencerFeeToCollect)
-        );
+        require(_remainingFee == 0, Error.Mirror__SequencerFeeNotFullyCovered(_callParams.sequencerFee - _remainingFee, _callParams.sequencerFee));
+        require(_allocationToRedistribute == 0, Error.Mirror__AllocationNotFullyRedistributed(_allocationToRedistribute));
 
         allocationPuppetList[_allocationAddress] = _allocationList;
-        require(_allocationToRedistribute == 0, Error.Mirror__AllocationNotFullyRedistributed(_allocationToRedistribute));
+        _account.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
         _account.transferOut(_callParams.collateralToken, _callParams.sequencerFeeReceiver, _callParams.sequencerFee);
 
         Position memory _position = positionMap[_allocationAddress];
@@ -456,7 +426,8 @@ contract Mirror is CoreContract {
                 _isIncrease,
                 _sizeDelta,
                 _traderTargetLeverage,
-                _allocationList
+                _allocationList,
+                _nextBalanceList
             )
         );
     }
@@ -471,12 +442,9 @@ contract Mirror is CoreContract {
         address[] calldata _puppetList,
         address _callbackContract
     ) external payable auth returns (bytes32 _requestKey) {
+        bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_params.collateralToken, _params.trader);
         address _allocationAddress = _account.getAllocationAddress(
-            PositionUtils.getAllocationKey(
-                _puppetList,
-                PositionUtils.getTraderMatchingKey(_params.collateralToken, _params.trader),
-                _params.allocationId
-            )
+            PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _params.allocationId)
         );
 
         Position memory _position = positionMap[_allocationAddress];
@@ -497,56 +465,31 @@ contract Mirror is CoreContract {
             Error.Mirror__PositionNotStalled(_allocationAddress, _traderPositionKey)
         );
 
-        // Handle sequencer fee collection from puppet allocations
+        // Handle sequencer fee collection from puppet balances
         uint _puppetCount = _puppetList.length;
-        uint[] memory _allocationList = allocationPuppetList[_allocationAddress];
         uint _allocated = allocationMap[_allocationAddress];
 
+        require(_params.sequencerFee > 0, Error.Mirror__InvalidSequencerExecutionFeeAmount());
         require(
-            _allocationList.length == _puppetCount,
-            Error.Mirror__PuppetListMismatch(_allocationList.length, _puppetCount)
-        );
-        require(
-            _allocated > _params.sequencerFee,
-            Error.Mirror__InsufficientAllocationForSequencerFee(_allocated, _params.sequencerFee)
+            _params.sequencerFee < Precision.applyFactor(config.maxSequencerFeeToAdjustmentRatio, _allocated),
+            Error.Mirror__SequencerFeeExceedsAdjustmentRatio(_params.sequencerFee, _allocated)
         );
 
         uint _remainingSequencerFeeToCollect = _params.sequencerFee;
-        uint _allocationToRedistribute = 0;
         uint[] memory _nextBalanceList = _account.getBalanceList(_params.collateralToken, _puppetList);
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
-            uint _puppetAllocation = _allocationList[_i];
-
-            if (_puppetAllocation == 0) continue;
+            if (_nextBalanceList[_i] == 0) continue;
 
             uint _remainingPuppets = _puppetCount - _i;
             uint _feeToCollect = (_remainingSequencerFeeToCollect + _remainingPuppets - 1) / _remainingPuppets;
 
-            if (_feeToCollect > _remainingSequencerFeeToCollect) {
-                _feeToCollect = _remainingSequencerFeeToCollect;
-            }
-
             if (_nextBalanceList[_i] >= _feeToCollect) {
-                // Solvent puppet - pays full fee and gets proportional share of redistribution
                 _nextBalanceList[_i] -= _feeToCollect;
                 _remainingSequencerFeeToCollect -= _feeToCollect;
-
-                // Give this puppet their fair share of accumulated redistribution
-                if (_allocationToRedistribute > 0) {
-                    uint _shareOfRedistribution = _allocationToRedistribute / _remainingPuppets;
-                    _allocationList[_i] += _shareOfRedistribution;
-                    _allocationToRedistribute -= _shareOfRedistribution;
-                }
             } else {
-                // Puppet has insufficient balance - deduct from allocation and accumulate for redistribution
-                if (_puppetAllocation > _feeToCollect) {
-                    _allocationList[_i] = _puppetAllocation - _feeToCollect;
-                    _allocationToRedistribute += _feeToCollect;
-                } else {
-                    _allocationToRedistribute += _puppetAllocation;
-                    _allocationList[_i] = 0;
-                }
+                _remainingSequencerFeeToCollect -= _nextBalanceList[_i];
+                _nextBalanceList[_i] = 0;
             }
         }
 
@@ -556,12 +499,6 @@ contract Mirror is CoreContract {
             _remainingSequencerFeeToCollect == 0,
             Error.Mirror__SequencerFeeNotFullyCovered(0, _remainingSequencerFeeToCollect)
         );
-        require(
-            _params.sequencerFee < Precision.applyFactor(config.maxSequencerFeeToAdjustmentRatio, _allocated),
-            Error.Mirror__SequencerFeeExceedsAdjustmentRatio(_params.sequencerFee, _allocated)
-        );
-        allocationPuppetList[_allocationAddress] = _allocationList;
-        require(_allocationToRedistribute == 0, Error.Mirror__AllocationNotFullyRedistributed(_allocationToRedistribute));
 
         _account.transferOut(_params.collateralToken, _params.sequencerFeeReceiver, _params.sequencerFee);
 
@@ -602,7 +539,7 @@ contract Mirror is CoreContract {
 
         _logEvent(
             "RequestCloseStalled",
-            abi.encode(_params, _allocationAddress, _traderPositionKey, _requestKey, _allocationList)
+            abi.encode(_params, _allocationAddress, _traderMatchingKey, _traderPositionKey, _requestKey, _nextBalanceList)
         );
     }
 

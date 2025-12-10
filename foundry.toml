@@ -17,6 +17,12 @@
   verbosity = 3
   gas_reports = ["Mirror", "Account", "Settle", "Rule", "SequencerRouter"]
 
+[profile.default.optimizer_details]
+  yul = true
+
+[profile.default.optimizer_details.yulDetails]
+  stackAllocation = true
+
 [doc]
   ignore = ["**/interface/**/*.sol", "**/utils/**/*.sol", "**/shared/**/*.sol"]
 

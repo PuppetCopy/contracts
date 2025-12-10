@@ -2,9 +2,9 @@
 pragma solidity ^0.8.31;
 
 import {PuppetToken} from "../tokenomics/PuppetToken.sol";
-import {TokenRouter} from "./../shared/TokenRouter.sol";
-import {BankStore} from "./../utils/BankStore.sol";
-import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
+import {TokenRouter} from "./TokenRouter.sol";
+import {BankStore} from "../utils/BankStore.sol";
+import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 
 /**
  * @notice Token storage for FeeMarketplace with burn capability
@@ -21,7 +21,7 @@ contract FeeMarketplaceStore is BankStore {
     }
 
     /**
-     * @notice Burn protocol tokens
+     * @notice Burn protocol tokens held by the store
      */
     function burn(
         uint _amount

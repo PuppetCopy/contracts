@@ -5,282 +5,103 @@ export const CONTRACT_EVENT_MAP = {
   Account: {
     Deposit: {
       hash: '0xe09149d2123147c5f43d258257fef0b7b969db78269369ebcf5ebb9eef8592f2',
-      args: [
-        { type: 'address', name: 'collateralToken' },
-        { type: 'address', name: 'depositor' },
-        { type: 'address', name: 'user' },
-        { type: 'uint256', name: 'nextBalance' },
-        { type: 'uint256', name: 'amount' }
-      ]
+      args: [{type:"address",name:"collateralToken"},{type:"address",name:"depositor"},{type:"address",name:"user"},{type:"uint256",name:"nextBalance"},{type:"uint256",name:"amount"}]
     },
     RecoverUnaccountedTokens: {
       hash: '0x4c47f2d8e77b31d1f3485f6cded228712e008951c70f115391f180db5f8c140d',
-      args: [
-        { type: 'address', name: 'token' },
-        { type: 'address', name: 'receiver' },
-        { type: 'uint256', name: 'amount' },
-        { type: 'uint256', name: 'unaccountedTokenBalance' }
-      ]
+      args: [{type:"address",name:"token"},{type:"address",name:"receiver"},{type:"uint256",name:"amount"},{type:"uint256",name:"unaccountedTokenBalance"}]
     },
     SetDepositCapList: {
       hash: '0x9c1cb8eef3114519a49e1bd441573835d3a8d121bed4f62aa2c55020fce793f7',
-      args: [
-        { type: 'address[]', name: 'depositTokenList' },
-        { type: 'uint256[]', name: 'depositCapList' }
-      ]
+      args: [{type:"address[]",name:"depositTokenList"},{type:"uint256[]",name:"depositCapList"}]
     },
     UnaccountedBalance: {
       hash: '0x4fcc757938284a5208b31d3091edc5baac25f17d1dcb57efeddea0c0e026395f',
-      args: [
-        { type: 'address', name: 'token' },
-        { type: 'uint256', name: 'totalUnaccounted' },
-        { type: 'uint256', name: 'unaccountedBalance' }
-      ]
+      args: [{type:"address",name:"token"},{type:"uint256",name:"totalUnaccounted"},{type:"uint256",name:"unaccountedBalance"}]
     },
     Withdraw: {
       hash: '0x8d7f87ab38a7f75a63dc465e10aadacecfca64c44ca774040b039bfb004e3367',
-      args: [
-        { type: 'address', name: 'collateralToken' },
-        { type: 'address', name: 'user' },
-        { type: 'address', name: 'receiver' },
-        { type: 'uint256', name: 'nextBalance' },
-        { type: 'uint256', name: 'amount' }
-      ]
+      args: [{type:"address",name:"collateralToken"},{type:"address",name:"user"},{type:"address",name:"receiver"},{type:"uint256",name:"nextBalance"},{type:"uint256",name:"amount"}]
     }
   },
   FeeMarketplace: {
     AcceptOffer: {
       hash: '0x7d778e14025c4611dae90acde3cdf239063797ccb4dc030ab8c78b43e4558e02',
-      args: [
-        { type: 'address', name: 'feeToken' },
-        { type: 'address', name: 'receiver' },
-        { type: 'uint256', name: 'purchaseAmount' },
-        { type: 'uint256', name: 'burnAmount' },
-        { type: 'uint256', name: 'distributeAmount' }
-      ]
+      args: [{type:"address",name:"feeToken"},{type:"address",name:"receiver"},{type:"uint256",name:"purchaseAmount"},{type:"uint256",name:"currentAskAmount"}]
     },
     Deposit: {
       hash: '0xe09149d2123147c5f43d258257fef0b7b969db78269369ebcf5ebb9eef8592f2',
-      args: [
-        { type: 'address', name: 'feeToken' },
-        { type: 'uint256', name: 'amount' }
-      ]
+      args: [{type:"address",name:"feeToken"},{type:"uint256",name:"amount"}]
     },
     SetAskAmount: {
       hash: '0xcfe46361f1decd9f0703eed4590829d6e4caf041b08e3ef5c92ff03d27bf8851',
-      args: [
-        { type: 'address', name: 'feeToken' },
-        { type: 'uint256', name: 'amount' }
-      ]
+      args: [{type:"address",name:"feeToken"},{type:"uint256",name:"amount"}]
     }
   },
   Mirror: {
     Execute: {
       hash: '0x28d668beb286a0839c52825618abb539cbe274853731db4004ca7bcf1049a4ca',
-      args: [
-        { type: 'address', name: 'allocationAddress' },
-        { type: 'bytes32', name: 'requestKey' },
-        { type: 'bool', name: 'falseValue' },
-        { type: 'bool', name: 'traderIsIncrease' },
-        { type: 'uint256', name: 'param0' },
-        { type: 'uint256', name: 'param02' },
-        { type: 'uint256', name: 'param03' }
-      ]
+      args: [{type:"address",name:"allocationAddress"},{type:"bytes32",name:"requestKey"},{type:"bool",name:"falseValue"},{type:"bool",name:"traderIsIncrease"},{type:"uint256",name:"param0"},{type:"uint256",name:"param02"},{type:"uint256",name:"param03"}]
     },
     Liquidate: {
       hash: '0xcf20efd552d992294b62e23bcfa29f7703b7b899c22eb04973d36655afd06ddf',
-      args: [{ type: 'address', name: 'allocationAddress' }]
+      args: [{type:"address",name:"allocationAddress"}]
     },
     RequestAdjust: {
       hash: '0xcfd2beed7e177f2444f38319718e9c701d76dc475a08300b632b15c2af3e072c',
-      args: [
-        {
-          type: 'tuple',
-          name: 'callParams',
-          components: [
-            { type: 'address' },
-            { type: 'bytes32' },
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'bool' },
-            { type: 'bool' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' }
-          ]
-        },
-        { type: 'address', name: 'allocationAddress' },
-        { type: 'bytes32', name: 'traderMatchingKey' },
-        { type: 'bytes32', name: 'traderPositionKey' },
-        { type: 'bytes32', name: 'requestKey' },
-        { type: 'bool', name: 'isIncrease' },
-        { type: 'uint256', name: 'sizeDelta' },
-        { type: 'uint256', name: 'traderTargetLeverage' },
-        { type: 'uint256[]', name: 'allocationList' }
-      ]
+      args: [{type:"tuple",name:"callParams",components:[{type:"address"},{type:"bytes32"},{type:"address"},{type:"address"},{type:"address"},{type:"bool"},{type:"bool"},{type:"uint256"},{type:"uint256"},{type:"uint256"},{type:"uint256"},{type:"uint256"},{type:"uint256"},{type:"uint256"}]},{type:"address",name:"allocationAddress"},{type:"bytes32",name:"traderMatchingKey"},{type:"bytes32",name:"traderPositionKey"},{type:"bytes32",name:"requestKey"},{type:"bool",name:"isIncrease"},{type:"uint256",name:"sizeDelta"},{type:"uint256",name:"traderTargetLeverage"},{type:"uint256[]",name:"allocationList"},{type:"uint256[]",name:"nextBalanceList"}]
     },
     RequestCloseStalled: {
       hash: '0x59cd6325e62a6e8e3034342f16eead60b48bd1f5722d2fa76fb385ed33df4aee',
-      args: [
-        {
-          type: 'tuple',
-          name: 'params',
-          components: [
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'uint8' },
-            { type: 'bool' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' }
-          ]
-        },
-        { type: 'address', name: 'allocationAddress' },
-        { type: 'bytes32', name: 'traderPositionKey' },
-        { type: 'bytes32', name: 'requestKey' },
-        { type: 'uint256[]', name: 'allocationList' }
-      ]
+      args: [{type:"tuple",name:"params",components:[{type:"address"},{type:"address"},{type:"address"},{type:"address"},{type:"uint8"},{type:"bool"},{type:"uint256"},{type:"uint256"},{type:"uint256"},{type:"uint256"}]},{type:"address",name:"allocationAddress"},{type:"bytes32",name:"traderMatchingKey"},{type:"bytes32",name:"traderPositionKey"},{type:"bytes32",name:"requestKey"},{type:"uint256[]",name:"nextBalanceList"}]
     },
     RequestOpen: {
       hash: '0x8ea2584fd754b03cf39f816e27b8a3d79ec2ff07b256107e6ab6cd6b407f4a9e',
-      args: [
-        {
-          type: 'tuple',
-          name: 'callParams',
-          components: [
-            { type: 'address' },
-            { type: 'bytes32' },
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'bool' },
-            { type: 'bool' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' }
-          ]
-        },
-        { type: 'address', name: 'allocationAddress' },
-        { type: 'bytes32', name: 'traderMatchingKey' },
-        { type: 'bytes32', name: 'traderPositionKey' },
-        { type: 'bytes32', name: 'requestKey' },
-        { type: 'uint256', name: 'sizeDelta' },
-        { type: 'uint256', name: 'traderTargetLeverage' },
-        { type: 'uint256', name: 'allocated' },
-        { type: 'uint256[]', name: 'allocatedList' },
-        { type: 'address[]', name: 'puppetList' }
-      ]
+      args: [{type:"tuple",name:"callParams",components:[{type:"address"},{type:"bytes32"},{type:"address"},{type:"address"},{type:"address"},{type:"bool"},{type:"bool"},{type:"uint256"},{type:"uint256"},{type:"uint256"},{type:"uint256"},{type:"uint256"},{type:"uint256"},{type:"uint256"}]},{type:"address",name:"allocationAddress"},{type:"bytes32",name:"traderMatchingKey"},{type:"bytes32",name:"traderPositionKey"},{type:"bytes32",name:"requestKey"},{type:"uint256",name:"sizeDelta"},{type:"uint256",name:"traderTargetLeverage"},{type:"uint256",name:"allocated"},{type:"uint256[]",name:"allocatedList"},{type:"address[]",name:"puppetList"},{type:"uint256[]",name:"nextBalanceList"}]
     }
   },
   RewardDistributor: {
     Claim: {
       hash: '0x5c2db6855baf6c374b9d0065771a33d4c31a8627d7b9d40f3fc6aa5dbd7b8a48',
-      args: [
-        { type: 'address', name: 'user' },
-        { type: 'address', name: 'receiver' },
-        { type: 'uint256', name: 'amount' }
-      ]
+      args: [{type:"address",name:"user"},{type:"address",name:"receiver"},{type:"uint256",name:"amount"}]
     },
     Deposit: {
       hash: '0xe09149d2123147c5f43d258257fef0b7b969db78269369ebcf5ebb9eef8592f2',
-      args: [
-        { type: 'address', name: 'depositor' },
-        { type: 'uint256', name: 'amount' }
-      ]
+      args: [{type:"address",name:"depositor"},{type:"uint256",name:"amount"}]
     },
     Distribute: {
       hash: '0x12f2bd7a927376d1d2ab7929ec1cd8c356284e6726ffd41484976754d29559f1',
-      args: [
-        { type: 'uint256', name: 'cumulativeRewardPerToken' },
-        { type: 'uint256', name: 'emission' }
-      ]
+      args: [{type:"uint256",name:"cumulativeRewardPerToken"},{type:"uint256",name:"emission"}]
     }
   },
   Rule: {
     SetMatchingRule: {
       hash: '0x83e1399ac486b7475c2d6849c401edeabc97692030930375a0c67dbb77a58e62',
-      args: [
-        {
-          type: 'tuple',
-          name: 'ruleParams',
-          components: [{ type: 'uint256' }, { type: 'uint256' }, { type: 'uint256' }]
-        },
-        { type: 'address', name: 'collateralToken' },
-        { type: 'address', name: 'trader' },
-        { type: 'address', name: 'user' },
-        { type: 'bytes32', name: 'traderMatchingKey' }
-      ]
+      args: [{type:"tuple",name:"ruleParams",components:[{type:"uint256"},{type:"uint256"},{type:"uint256"}]},{type:"address",name:"collateralToken"},{type:"address",name:"trader"},{type:"address",name:"user"},{type:"bytes32",name:"traderMatchingKey"}]
     }
   },
   SequencerRouter: {
     RefundExecutionFee: {
       hash: '0x91f7cf7c2b0aefe7f1f8ada77d9363cfe51fbdad37a10a4adb4f945d45b2aea0',
-      args: [
-        { type: 'bytes32', name: 'key' },
-        { type: 'uint256', name: 'value' }
-      ]
+      args: [{type:"bytes32",name:"key"},{type:"uint256",name:"value"}]
     }
   },
   Settle: {
     CollectAllocationAccountDust: {
       hash: '0xa37898b4f41de8a7f0d328410d8e26f69c589234ad4090832a36f9460799680b',
-      args: [
-        { type: 'address', name: 'dustToken' },
-        { type: 'address', name: 'allocationAccount' },
-        { type: 'address', name: 'receiver' },
-        { type: 'uint256', name: 'dustThreshold' },
-        { type: 'uint256', name: 'amount' }
-      ]
+      args: [{type:"address",name:"dustToken"},{type:"address",name:"allocationAccount"},{type:"address",name:"receiver"},{type:"uint256",name:"dustThreshold"},{type:"uint256",name:"amount"}]
     },
     CollectPlatformFees: {
       hash: '0x6d80a7bf061a9b8e3965f5352eda85740cd09e3be7253a9f2ed4dd0b2a285f4b',
-      args: [
-        { type: 'address', name: 'token' },
-        { type: 'address', name: 'receiver' },
-        { type: 'uint256', name: 'amount' }
-      ]
+      args: [{type:"address",name:"token"},{type:"address",name:"receiver"},{type:"uint256",name:"amount"}]
     },
     Settle: {
       hash: '0xea8fbe0762c74a52b889978a4aff8df9447ec89ed00dff7346b7014a2d0754d2',
-      args: [
-        {
-          type: 'tuple',
-          name: 'callParams',
-          components: [
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'address' },
-            { type: 'uint256' },
-            { type: 'uint256' },
-            { type: 'uint256' }
-          ]
-        },
-        { type: 'address', name: 'allocationAddress' },
-        { type: 'bytes32', name: 'traderMatchingKey' },
-        { type: 'uint256', name: 'distributedAmount' },
-        { type: 'uint256', name: 'platformFeeAmount' },
-        { type: 'uint256[]', name: 'nextBalanceList' }
-      ]
+      args: [{type:"tuple",name:"callParams",components:[{type:"address"},{type:"address"},{type:"address"},{type:"address"},{type:"uint256"},{type:"uint256"},{type:"uint256"}]},{type:"address",name:"allocationAddress"},{type:"bytes32",name:"traderMatchingKey"},{type:"uint256",name:"distributedAmount"},{type:"uint256",name:"platformFeeAmount"},{type:"uint256[]",name:"nextBalanceList"}]
     },
     SetTokenDustThreshold: {
       hash: '0xabc588bbe2d6384ff53b244f5b3ff19a550fffbc6e40ecd9baa9d7eb97077258',
-      args: [
-        { type: 'address[]', name: 'tokenDustThresholdList' },
-        { type: 'uint256[]', name: 'tokenDustThresholdCapList' }
-      ]
+      args: [{type:"address[]",name:"tokenDustThresholdList"},{type:"uint256[]",name:"tokenDustThresholdCapList"}]
     }
   }
 } as const

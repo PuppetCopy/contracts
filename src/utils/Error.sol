@@ -47,6 +47,7 @@ library Error {
     error Mirror__InvalidSequencerExecutionFeeAmount();
     error Mirror__InvalidSizeDelta();
     error Mirror__PuppetListEmpty();
+    error Mirror__PuppetListTooLarge(uint provided, uint maximum);
     error Mirror__ExecutionRequestMissing(bytes32 requestKey);
     error Mirror__InitialMustBeIncrease();
     error Mirror__NoAdjustmentRequired();
@@ -88,7 +89,5 @@ library Error {
     error FeeMarketplace__NotAuctionableToken();
     error FeeMarketplace__InsufficientUnlockedBalance(uint accruedReward);
     error FeeMarketplace__ZeroDeposit();
-    error FeeMarketplace__InvalidReceiver();
     error FeeMarketplace__InvalidAmount();
-    error FeeMarketplace__InsufficientDistributionBalance(uint requested, uint available);
 }
