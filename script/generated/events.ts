@@ -127,30 +127,6 @@ export const CONTRACT_EVENT_MAP = {
       ]
     }
   },
-  RewardDistributor: {
-    Claim: {
-      hash: '0x5c2db6855baf6c374b9d0065771a33d4c31a8627d7b9d40f3fc6aa5dbd7b8a48',
-      args: [
-        { type: 'address', name: 'user' },
-        { type: 'address', name: 'receiver' },
-        { type: 'uint256', name: 'amount' }
-      ]
-    },
-    Deposit: {
-      hash: '0xe09149d2123147c5f43d258257fef0b7b969db78269369ebcf5ebb9eef8592f2',
-      args: [
-        { type: 'address', name: 'depositor' },
-        { type: 'uint256', name: 'amount' }
-      ]
-    },
-    Distribute: {
-      hash: '0x12f2bd7a927376d1d2ab7929ec1cd8c356284e6726ffd41484976754d29559f1',
-      args: [
-        { type: 'uint256', name: 'cumulativeRewardPerToken' },
-        { type: 'uint256', name: 'emission' }
-      ]
-    }
-  },
   Settle: {
     CollectAllocationAccountDust: {
       hash: '0xa37898b4f41de8a7f0d328410d8e26f69c589234ad4090832a36f9460799680b',

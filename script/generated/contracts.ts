@@ -9,9 +9,9 @@ import feemarketplacestoreAbi from './abi/puppetFeeMarketplaceStore.js'
 import mirrorAbi from './abi/puppetMirror.js'
 import puppettokenAbi from './abi/puppetPuppetToken.js'
 import routerproxyAbi from './abi/puppetRouterProxy.js'
-import ruleAbi from './abi/puppetRule.js'
 import sequencerrouterAbi from './abi/puppetSequencerRouter.js'
 import settleAbi from './abi/puppetSettle.js'
+import subscribeAbi from './abi/puppetSubscribe.js'
 import tokenrouterAbi from './abi/puppetTokenRouter.js'
 import userrouterAbi from './abi/puppetUserRouter.js'
 
@@ -76,9 +76,9 @@ export const PUPPET_CONTRACT_MAP = {
     chainId: 42161,
     abi: accountAbi
   },
-  Rule: {
+  Subscribe: {
     address: '0xb7C104b156A2933161a4Cb92B4981858258de649',
     chainId: 42161,
-    abi: ruleAbi
+    abi: subscribeAbi
   }
 } as const

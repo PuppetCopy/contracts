@@ -24,6 +24,10 @@ interface EventDefinition {
 
 type TypeMap = Record<string, string>
 
+// Map Solidity contract names to deployment names (for CONTRACT_EVENT_MAP keys)
+// Currently no mappings needed - use Solidity contract names directly
+const CONTRACT_NAME_MAP: Record<string, string> = {}
+
 const SOLIDITY_TO_ABI_TYPE: TypeMap = {
   uint: 'uint256',
   uint8: 'uint8',
@@ -577,7 +581,9 @@ export function generateEventParamsCode(contractEvents: Map<string, EventDefinit
   const sortedContracts = Array.from(contractEvents.entries()).sort((a, b) => a[0].localeCompare(b[0]))
 
   const contractLines = sortedContracts
-    .map(([contractName, events]) => {
+    .map(([solidityName, events]) => {
+      // Use mapped name if available (e.g., Subscribe -> Rule)
+      const contractName = CONTRACT_NAME_MAP[solidityName] || solidityName
       const sortedEvents = events.sort((a, b) => a.name.localeCompare(b.name))
       const eventLines = sortedEvents
         .map(event => {
