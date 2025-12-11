@@ -386,6 +386,11 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
+    name: 'Mirror__TraderPositionTooOld',
+    inputs: []
+  },
+  {
+    type: 'error',
     name: 'Settle__InvalidAllocation',
     inputs: [
       {

@@ -33,11 +33,10 @@ contract Mirror is CoreContract {
         uint maxMatchAdjustDuration;
     }
 
-    struct CallParams {
+    struct CallPosition {
         IERC20 collateralToken;
         address trader;
         address market;
-        address sequencerFeeReceiver;
         bool isLong;
         uint executionFee;
         uint allocationId;
@@ -86,40 +85,43 @@ contract Mirror is CoreContract {
     function matchmake(
         Account _account,
         Subscribe _subscribe,
-        CallParams calldata _callParams,
-        address[] calldata _puppetList
+        CallPosition calldata _callMatch,
+        address[] calldata _puppetList,
+        address _feeReceiver
     ) external payable auth returns (address _allocationAddress, bytes32 _requestKey) {
-        if (_callParams.sequencerFee == 0) revert Error.Mirror__InvalidSequencerExecutionFeeAmount();
-
+        if (_callMatch.sequencerFee == 0) revert Error.Mirror__InvalidSequencerExecutionFeeAmount();
         uint _puppetCount = _puppetList.length;
         if (_puppetCount == 0) revert Error.Mirror__PuppetListEmpty();
         if (_puppetCount > config.maxPuppetList) revert Error.Mirror__PuppetListTooLarge(_puppetCount, config.maxPuppetList);
 
-        bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
-        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId);
-        _allocationAddress = _account.getAllocationAddress(_allocationKey);
+        bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callMatch.collateralToken, _callMatch.trader);
+        bytes32 _allocationKey = PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callMatch.allocationId);
+        bytes32 _traderPositionKey = Position.getPositionKey(
+            _callMatch.trader, _callMatch.market, address(_callMatch.collateralToken), _callMatch.isLong
+        );
 
-        bytes32 _puppetPositionKey =
-            Position.getPositionKey(_allocationAddress, _callParams.market, address(_callParams.collateralToken), _callParams.isLong);
-
-        uint _gmxSize = _getPositionSizeInUsd(_puppetPositionKey);
-        if (_gmxSize != 0) revert Error.Mirror__PositionAlreadyOpen();
-
-        bytes32 _traderPositionKey =
-            Position.getPositionKey(_callParams.trader, _callParams.market, address(_callParams.collateralToken), _callParams.isLong);
         uint _traderSizeInUsd = _getPositionSizeInUsd(_traderPositionKey);
+        uint _traderSizeInTokens = _getPositionSizeInTokens(_traderPositionKey);
         uint _traderCollateral = _getPositionCollateral(_traderPositionKey);
         if (_traderSizeInUsd == 0 || _traderCollateral == 0) revert Error.Mirror__NoPosition();
 
-        _allocationAddress = _account.createAllocationAccount(_allocationKey);
+        uint _traderIncreasedAt = _getPositionIncreasedAtTime(_traderPositionKey);
+        if (block.timestamp > _traderIncreasedAt + config.maxMatchOpenDuration) {
+            revert Error.Mirror__TraderPositionTooOld();
+        }
+
+        _allocationAddress = _account.getAllocationAddress(_allocationKey);
+        bytes32 _puppetPositionKey = Position.getPositionKey(
+            _allocationAddress, _callMatch.market, address(_callMatch.collateralToken), _callMatch.isLong
+        );
+        if (_getPositionSizeInUsd(_puppetPositionKey) != 0) revert Error.Mirror__PositionAlreadyOpen();
 
         Subscribe.RuleParams[] memory _rules = _subscribe.getRuleList(_traderMatchingKey, _puppetList);
         uint[] memory _allocatedList = new uint[](_puppetCount);
-        uint[] memory _nextBalanceList = _account.getBalanceList(_callParams.collateralToken, _puppetList);
-        allocationPuppetList[_allocationAddress] = new uint[](_puppetCount);
+        uint[] memory _nextBalanceList = _account.getBalanceList(_callMatch.collateralToken, _puppetList);
 
         uint _allocated = 0;
-        uint _remainingFee = _callParams.sequencerFee;
+        uint _remainingFee = _callMatch.sequencerFee;
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
             address _puppet = _puppetList[_i];
@@ -137,38 +139,40 @@ contract Mirror is CoreContract {
             _remainingFee -= _feeShare;
 
             _allocatedList[_i] = _netAllocation;
-            allocationPuppetList[_allocationAddress][_i] = _netAllocation;
             _nextBalanceList[_i] -= _contribution;
             _allocated += _netAllocation;
             lastActivityThrottleMap[_traderMatchingKey][_puppet] = block.timestamp + _rule.throttleActivity;
         }
 
         if (_remainingFee != 0) {
-            revert Error.Mirror__SequencerFeeNotFullyCovered(_callParams.sequencerFee - _remainingFee, _callParams.sequencerFee);
+            revert Error.Mirror__SequencerFeeNotFullyCovered(_callMatch.sequencerFee - _remainingFee, _callMatch.sequencerFee);
         }
-        if (
-            _callParams.sequencerFee
-                >= Precision.applyFactor(config.maxSequencerFeeToAllocationRatio, _allocated + _callParams.sequencerFee)
-        ) revert Error.Mirror__SequencerFeeExceedsCostFactor(_callParams.sequencerFee, _allocated + _callParams.sequencerFee);
+        if (_callMatch.sequencerFee >= Precision.applyFactor(config.maxSequencerFeeToAllocationRatio, _allocated + _callMatch.sequencerFee)) {
+            revert Error.Mirror__SequencerFeeExceedsCostFactor(_callMatch.sequencerFee, _allocated + _callMatch.sequencerFee);
+        }
 
+        _allocationAddress = _account.createAllocationAccount(_allocationKey);
         allocationMap[_allocationAddress] = _allocated;
+        allocationPuppetList[_allocationAddress] = _allocatedList;
 
-        _account.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
-        _account.transferOut(_callParams.collateralToken, _callParams.sequencerFeeReceiver, _callParams.sequencerFee);
-        _account.transferOut(_callParams.collateralToken, config.gmxOrderVault, _allocated);
+        _account.setBalanceList(_callMatch.collateralToken, _puppetList, _nextBalanceList);
+        _account.transferOut(_callMatch.collateralToken, _feeReceiver, _callMatch.sequencerFee);
+        _account.transferOut(_callMatch.collateralToken, config.gmxOrderVault, _allocated);
 
         uint _sizeDelta = Math.mulDiv(_traderSizeInUsd, _allocated, _traderCollateral);
+        uint _acceptablePrice = _traderSizeInUsd / _traderSizeInTokens;
 
         _requestKey = _submitOrder(
             _account,
             _allocationAddress,
-            _callParams.collateralToken,
-            _callParams.market,
-            _callParams.isLong,
-            _callParams.executionFee,
+            _callMatch.collateralToken,
+            _callMatch.market,
+            _callMatch.isLong,
+            _callMatch.executionFee,
             Order.OrderType.MarketIncrease,
             _sizeDelta,
-            _allocated
+            _allocated,
+            _acceptablePrice
         );
 
         lastTargetSizeMap[_puppetPositionKey] = _sizeDelta;
@@ -176,14 +180,14 @@ contract Mirror is CoreContract {
         _logEvent(
             "Match",
             abi.encode(
-                _callParams.collateralToken,
-                _callParams.trader,
-                _callParams.market,
-                _callParams.sequencerFeeReceiver,
-                _callParams.isLong,
-                _callParams.executionFee,
-                _callParams.allocationId,
-                _callParams.sequencerFee,
+                _callMatch.collateralToken,
+                _callMatch.trader,
+                _callMatch.market,
+                _feeReceiver,
+                _callMatch.isLong,
+                _callMatch.executionFee,
+                _callMatch.allocationId,
+                _callMatch.sequencerFee,
                 _allocationAddress,
                 _traderMatchingKey,
                 _traderPositionKey,
@@ -200,49 +204,54 @@ contract Mirror is CoreContract {
 
     function adjust(
         Account _account,
-        CallParams calldata _callParams,
-        address[] calldata _puppetList
+        CallPosition calldata _callPosition,
+        address[] calldata _puppetList,
+        address _feeReceiver
     ) external payable auth returns (bytes32 _requestKey) {
-        if (_callParams.sequencerFee == 0) revert Error.Mirror__InvalidSequencerExecutionFeeAmount();
+        if (_callPosition.sequencerFee == 0) revert Error.Mirror__InvalidSequencerExecutionFeeAmount();
 
-        bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
+        bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callPosition.collateralToken, _callPosition.trader);
         address _allocationAddress = _account.getAllocationAddress(
-            PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId)
+            PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callPosition.allocationId)
         );
-
         uint _allocated = allocationMap[_allocationAddress];
         if (_allocated == 0) revert Error.Mirror__InvalidAllocation(_allocationAddress);
 
-        bytes32 _puppetPositionKey =
-            Position.getPositionKey(_allocationAddress, _callParams.market, address(_callParams.collateralToken), _callParams.isLong);
+        if (_callPosition.sequencerFee >= Precision.applyFactor(config.maxSequencerFeeToAdjustmentRatio, _allocated)) {
+            revert Error.Mirror__SequencerFeeExceedsAdjustmentRatio(_callPosition.sequencerFee, _allocated);
+        }
+
+        bytes32 _puppetPositionKey = Position.getPositionKey(
+            _allocationAddress, _callPosition.market, address(_callPosition.collateralToken), _callPosition.isLong
+        );
         uint _puppetCurrentSize = _getPositionSizeInUsd(_puppetPositionKey);
         if (_puppetCurrentSize == 0) revert Error.Mirror__NoPosition();
+        if (_puppetCurrentSize != lastTargetSizeMap[_puppetPositionKey]) revert Error.Mirror__RequestPending();
 
-        uint _lastTarget = lastTargetSizeMap[_puppetPositionKey];
-        if (_puppetCurrentSize != _lastTarget) revert Error.Mirror__RequestPending();
-
-        bytes32 _traderPositionKey =
-            Position.getPositionKey(_callParams.trader, _callParams.market, address(_callParams.collateralToken), _callParams.isLong);
+        bytes32 _traderPositionKey = Position.getPositionKey(
+            _callPosition.trader, _callPosition.market, address(_callPosition.collateralToken), _callPosition.isLong
+        );
         uint _traderSizeInUsd = _getPositionSizeInUsd(_traderPositionKey);
+        uint _traderSizeInTokens = _getPositionSizeInTokens(_traderPositionKey);
         uint _traderCollateral = _getPositionCollateral(_traderPositionKey);
         if (_traderSizeInUsd == 0 || _traderCollateral == 0) revert Error.Mirror__NoPosition();
 
-        uint _puppetTargetSize = Math.mulDiv(_traderSizeInUsd, _allocated, _traderCollateral);
-
-        bool _isIncrease = _puppetTargetSize > _puppetCurrentSize;
-        uint _sizeDelta = _isIncrease
-            ? _puppetTargetSize - _puppetCurrentSize
-            : _puppetCurrentSize - _puppetTargetSize;
-
-        if (_sizeDelta == 0) revert Error.Mirror__InvalidSizeDelta();
-
-        if (_callParams.sequencerFee >= Precision.applyFactor(config.maxSequencerFeeToAdjustmentRatio, _allocated)) {
-            revert Error.Mirror__SequencerFeeExceedsAdjustmentRatio(_callParams.sequencerFee, _allocated);
+        uint _traderLastUpdateTime = Math.max(
+            _getPositionIncreasedAtTime(_traderPositionKey),
+            _getPositionDecreasedAtTime(_traderPositionKey)
+        );
+        if (block.timestamp > _traderLastUpdateTime + config.maxMatchAdjustDuration) {
+            revert Error.Mirror__TraderPositionTooOld();
         }
 
+        uint _puppetTargetSize = Math.mulDiv(_traderSizeInUsd, _allocated, _traderCollateral);
+        bool _isIncrease = _puppetTargetSize > _puppetCurrentSize;
+        uint _sizeDelta = _isIncrease ? _puppetTargetSize - _puppetCurrentSize : _puppetCurrentSize - _puppetTargetSize;
+        if (_sizeDelta == 0) revert Error.Mirror__InvalidSizeDelta();
+
         uint _puppetCount = _puppetList.length;
-        uint[] memory _nextBalanceList = _account.getBalanceList(_callParams.collateralToken, _puppetList);
-        uint _remainingFee = _callParams.sequencerFee;
+        uint[] memory _nextBalanceList = _account.getBalanceList(_callPosition.collateralToken, _puppetList);
+        uint _remainingFee = _callPosition.sequencerFee;
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
             if (_nextBalanceList[_i] == 0) continue;
@@ -260,22 +269,25 @@ contract Mirror is CoreContract {
         }
 
         if (_remainingFee != 0) {
-            revert Error.Mirror__SequencerFeeNotFullyCovered(_callParams.sequencerFee - _remainingFee, _callParams.sequencerFee);
+            revert Error.Mirror__SequencerFeeNotFullyCovered(_callPosition.sequencerFee - _remainingFee, _callPosition.sequencerFee);
         }
 
-        _account.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
-        _account.transferOut(_callParams.collateralToken, _callParams.sequencerFeeReceiver, _callParams.sequencerFee);
+        _account.setBalanceList(_callPosition.collateralToken, _puppetList, _nextBalanceList);
+        _account.transferOut(_callPosition.collateralToken, _feeReceiver, _callPosition.sequencerFee);
+
+        uint _acceptablePrice = _traderSizeInUsd / _traderSizeInTokens;
 
         _requestKey = _submitOrder(
             _account,
             _allocationAddress,
-            _callParams.collateralToken,
-            _callParams.market,
-            _callParams.isLong,
-            _callParams.executionFee,
+            _callPosition.collateralToken,
+            _callPosition.market,
+            _callPosition.isLong,
+            _callPosition.executionFee,
             _isIncrease ? Order.OrderType.MarketIncrease : Order.OrderType.MarketDecrease,
             _sizeDelta,
-            0
+            0,
+            _acceptablePrice
         );
 
         lastTargetSizeMap[_puppetPositionKey] = _puppetTargetSize;
@@ -285,9 +297,9 @@ contract Mirror is CoreContract {
             abi.encode(
                 _allocationAddress,
                 _requestKey,
-                _callParams.sequencerFeeReceiver,
-                _callParams.executionFee,
-                _callParams.sequencerFee,
+                _feeReceiver,
+                _callPosition.executionFee,
+                _callPosition.sequencerFee,
                 _isIncrease,
                 _sizeDelta,
                 _puppetCurrentSize,
@@ -299,38 +311,34 @@ contract Mirror is CoreContract {
 
     function close(
         Account _account,
-        CallParams calldata _callParams,
+        CallPosition calldata _callPosition,
         address[] calldata _puppetList,
-        uint8 _reason
+        uint8 _reason,
+        address _feeReceiver
     ) external payable auth returns (bytes32 _requestKey) {
-        if (_callParams.sequencerFee == 0) revert Error.Mirror__InvalidSequencerExecutionFeeAmount();
+        if (_callPosition.sequencerFee == 0) revert Error.Mirror__InvalidSequencerExecutionFeeAmount();
 
-        bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
+        bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callPosition.collateralToken, _callPosition.trader);
         address _allocationAddress = _account.getAllocationAddress(
-            PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callParams.allocationId)
+            PositionUtils.getAllocationKey(_puppetList, _traderMatchingKey, _callPosition.allocationId)
         );
-
         uint _allocated = allocationMap[_allocationAddress];
         if (_allocated == 0) revert Error.Mirror__InvalidAllocation(_allocationAddress);
 
-        bytes32 _puppetPositionKey =
-            Position.getPositionKey(_allocationAddress, _callParams.market, address(_callParams.collateralToken), _callParams.isLong);
-        uint _positionSize = _getPositionSizeInUsd(_puppetPositionKey);
-        if (_positionSize == 0) revert Error.Mirror__NoPosition();
-
-        uint _lastTarget = lastTargetSizeMap[_puppetPositionKey];
-        if (_positionSize != _lastTarget) revert Error.Mirror__RequestPending();
-
-        bytes32 _traderPositionKey =
-            Position.getPositionKey(_callParams.trader, _callParams.market, address(_callParams.collateralToken), _callParams.isLong);
-
-        if (_callParams.sequencerFee >= Precision.applyFactor(config.maxSequencerFeeToCloseRatio, _allocated)) {
-            revert Error.Mirror__SequencerFeeExceedsCloseRatio(_callParams.sequencerFee, _allocated);
+        if (_callPosition.sequencerFee >= Precision.applyFactor(config.maxSequencerFeeToCloseRatio, _allocated)) {
+            revert Error.Mirror__SequencerFeeExceedsCloseRatio(_callPosition.sequencerFee, _allocated);
         }
 
+        bytes32 _puppetPositionKey = Position.getPositionKey(
+            _allocationAddress, _callPosition.market, address(_callPosition.collateralToken), _callPosition.isLong
+        );
+        uint _positionSize = _getPositionSizeInUsd(_puppetPositionKey);
+        if (_positionSize == 0) revert Error.Mirror__NoPosition();
+        if (_positionSize != lastTargetSizeMap[_puppetPositionKey]) revert Error.Mirror__RequestPending();
+
         uint _puppetCount = _puppetList.length;
-        uint[] memory _nextBalanceList = _account.getBalanceList(_callParams.collateralToken, _puppetList);
-        uint _remainingFee = _callParams.sequencerFee;
+        uint[] memory _nextBalanceList = _account.getBalanceList(_callPosition.collateralToken, _puppetList);
+        uint _remainingFee = _callPosition.sequencerFee;
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
             if (_nextBalanceList[_i] == 0) continue;
@@ -348,22 +356,25 @@ contract Mirror is CoreContract {
         }
 
         if (_remainingFee != 0) {
-            revert Error.Mirror__SequencerFeeNotFullyCovered(_callParams.sequencerFee - _remainingFee, _callParams.sequencerFee);
+            revert Error.Mirror__SequencerFeeNotFullyCovered(_callPosition.sequencerFee - _remainingFee, _callPosition.sequencerFee);
         }
 
-        _account.setBalanceList(_callParams.collateralToken, _puppetList, _nextBalanceList);
-        _account.transferOut(_callParams.collateralToken, _callParams.sequencerFeeReceiver, _callParams.sequencerFee);
+        _account.setBalanceList(_callPosition.collateralToken, _puppetList, _nextBalanceList);
+        _account.transferOut(_callPosition.collateralToken, _feeReceiver, _callPosition.sequencerFee);
+
+        uint _acceptablePrice = _callPosition.isLong ? 0 : type(uint).max;
 
         _requestKey = _submitOrder(
             _account,
             _allocationAddress,
-            _callParams.collateralToken,
-            _callParams.market,
-            _callParams.isLong,
-            _callParams.executionFee,
+            _callPosition.collateralToken,
+            _callPosition.market,
+            _callPosition.isLong,
+            _callPosition.executionFee,
             Order.OrderType.MarketDecrease,
             _positionSize,
-            0
+            0,
+            _acceptablePrice
         );
 
         lastTargetSizeMap[_puppetPositionKey] = 0;
@@ -373,9 +384,9 @@ contract Mirror is CoreContract {
             abi.encode(
                 _allocationAddress,
                 _requestKey,
-                _callParams.sequencerFeeReceiver,
-                _callParams.executionFee,
-                _callParams.sequencerFee,
+                _feeReceiver,
+                _callPosition.executionFee,
+                _callPosition.sequencerFee,
                 _positionSize,
                 _reason,
                 _nextBalanceList
@@ -392,13 +403,12 @@ contract Mirror is CoreContract {
         uint _executionFee,
         Order.OrderType _orderType,
         uint _sizeDeltaUsd,
-        uint _initialCollateralDeltaAmount
+        uint _initialCollateralDeltaAmount,
+        uint _acceptablePrice
     ) internal returns (bytes32 requestKey) {
         if (msg.value < _executionFee) {
             revert Error.Mirror__InsufficientGmxExecutionFee(msg.value, _executionFee);
         }
-
-        uint _acceptablePrice = _isLong ? type(uint).max : 0;
 
         bytes memory gmxCallData = abi.encodeWithSelector(
             config.gmxExchangeRouter.createOrder.selector,
@@ -466,5 +476,17 @@ contract Mirror is CoreContract {
 
     function _getPositionCollateral(bytes32 _positionKey) internal view returns (uint) {
         return config.gmxDataStore.getUint(keccak256(abi.encode(_positionKey, PositionStoreUtils.COLLATERAL_AMOUNT)));
+    }
+
+    function _getPositionIncreasedAtTime(bytes32 _positionKey) internal view returns (uint) {
+        return config.gmxDataStore.getUint(keccak256(abi.encode(_positionKey, PositionStoreUtils.INCREASED_AT_TIME)));
+    }
+
+    function _getPositionDecreasedAtTime(bytes32 _positionKey) internal view returns (uint) {
+        return config.gmxDataStore.getUint(keccak256(abi.encode(_positionKey, PositionStoreUtils.DECREASED_AT_TIME)));
+    }
+
+    function _getPositionSizeInTokens(bytes32 _positionKey) internal view returns (uint) {
+        return config.gmxDataStore.getUint(keccak256(abi.encode(_positionKey, PositionStoreUtils.SIZE_IN_TOKENS)));
     }
 }

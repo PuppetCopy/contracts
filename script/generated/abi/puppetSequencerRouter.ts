@@ -36,6 +36,11 @@ export default [
         internalType: 'struct SequencerRouter.Config',
         components: [
           {
+            name: 'feeReceiver',
+            type: 'address',
+            internalType: 'address'
+          },
+          {
             name: 'matchBaseGasLimit',
             type: 'uint256',
             internalType: 'uint256'
@@ -138,9 +143,9 @@ export default [
     name: 'adjust',
     inputs: [
       {
-        name: '_callParams',
+        name: '_callPosition',
         type: 'tuple',
-        internalType: 'struct Mirror.CallParams',
+        internalType: 'struct Mirror.CallPosition',
         components: [
           {
             name: 'collateralToken',
@@ -154,11 +159,6 @@ export default [
           },
           {
             name: 'market',
-            type: 'address',
-            internalType: 'address'
-          },
-          {
-            name: 'sequencerFeeReceiver',
             type: 'address',
             internalType: 'address'
           },
@@ -241,9 +241,9 @@ export default [
     name: 'close',
     inputs: [
       {
-        name: '_callParams',
+        name: '_callPosition',
         type: 'tuple',
-        internalType: 'struct Mirror.CallParams',
+        internalType: 'struct Mirror.CallPosition',
         components: [
           {
             name: 'collateralToken',
@@ -257,11 +257,6 @@ export default [
           },
           {
             name: 'market',
-            type: 'address',
-            internalType: 'address'
-          },
-          {
-            name: 'sequencerFeeReceiver',
             type: 'address',
             internalType: 'address'
           },
@@ -352,6 +347,11 @@ export default [
         internalType: 'struct SequencerRouter.Config',
         components: [
           {
+            name: 'feeReceiver',
+            type: 'address',
+            internalType: 'address'
+          },
+          {
             name: 'matchBaseGasLimit',
             type: 'uint256',
             internalType: 'uint256'
@@ -441,9 +441,9 @@ export default [
     name: 'matchmake',
     inputs: [
       {
-        name: '_callParams',
+        name: '_callMatch',
         type: 'tuple',
-        internalType: 'struct Mirror.CallParams',
+        internalType: 'struct Mirror.CallPosition',
         components: [
           {
             name: 'collateralToken',
@@ -457,11 +457,6 @@ export default [
           },
           {
             name: 'market',
-            type: 'address',
-            internalType: 'address'
-          },
-          {
-            name: 'sequencerFeeReceiver',
             type: 'address',
             internalType: 'address'
           },

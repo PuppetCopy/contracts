@@ -17,6 +17,7 @@ import {IAuthority} from "./utils/interfaces/IAuthority.sol";
  */
 contract SequencerRouter is CoreContract {
     struct Config {
+        address feeReceiver;
         uint matchBaseGasLimit;
         uint matchPerPuppetGasLimit;
         uint adjustBaseGasLimit;
@@ -69,25 +70,25 @@ contract SequencerRouter is CoreContract {
     }
 
     function matchmake(
-        Mirror.CallParams calldata _callParams,
+        Mirror.CallPosition calldata _callMatch,
         address[] calldata _puppetList
     ) external payable auth returns (address _allocationAddress, bytes32 _requestKey) {
-        return mirror.matchmake{value: msg.value}(account, subscribe, _callParams, _puppetList);
+        return mirror.matchmake{value: msg.value}(account, subscribe, _callMatch, _puppetList, config.feeReceiver);
     }
 
     function adjust(
-        Mirror.CallParams calldata _callParams,
+        Mirror.CallPosition calldata _callPosition,
         address[] calldata _puppetList
     ) external payable auth returns (bytes32 _requestKey) {
-        return mirror.adjust{value: msg.value}(account, _callParams, _puppetList);
+        return mirror.adjust{value: msg.value}(account, _callPosition, _puppetList, config.feeReceiver);
     }
 
     function close(
-        Mirror.CallParams calldata _callParams,
+        Mirror.CallPosition calldata _callPosition,
         address[] calldata _puppetList,
         uint8 _reason
     ) external payable auth returns (bytes32 _requestKey) {
-        return mirror.close{value: msg.value}(account, _callParams, _puppetList, _reason);
+        return mirror.close{value: msg.value}(account, _callPosition, _puppetList, _reason, config.feeReceiver);
     }
 
     /**
@@ -126,6 +127,7 @@ contract SequencerRouter is CoreContract {
     function _setConfig(bytes memory _data) internal override {
         Config memory _config = abi.decode(_data, (Config));
 
+        if (_config.feeReceiver == address(0)) revert("Invalid fee receiver");
         if (_config.matchBaseGasLimit == 0) revert("Invalid match base gas limit");
         if (_config.matchPerPuppetGasLimit == 0) revert("Invalid match per-puppet gas limit");
         if (_config.adjustBaseGasLimit == 0) revert("Invalid adjust base gas limit");

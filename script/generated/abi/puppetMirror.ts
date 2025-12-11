@@ -80,9 +80,9 @@ export default [
         internalType: 'contract Account'
       },
       {
-        name: '_callParams',
+        name: '_callPosition',
         type: 'tuple',
-        internalType: 'struct Mirror.CallParams',
+        internalType: 'struct Mirror.CallPosition',
         components: [
           {
             name: 'collateralToken',
@@ -96,11 +96,6 @@ export default [
           },
           {
             name: 'market',
-            type: 'address',
-            internalType: 'address'
-          },
-          {
-            name: 'sequencerFeeReceiver',
             type: 'address',
             internalType: 'address'
           },
@@ -130,6 +125,11 @@ export default [
         name: '_puppetList',
         type: 'address[]',
         internalType: 'address[]'
+      },
+      {
+        name: '_feeReceiver',
+        type: 'address',
+        internalType: 'address'
       }
     ],
     outputs: [
@@ -231,9 +231,9 @@ export default [
         internalType: 'contract Account'
       },
       {
-        name: '_callParams',
+        name: '_callPosition',
         type: 'tuple',
-        internalType: 'struct Mirror.CallParams',
+        internalType: 'struct Mirror.CallPosition',
         components: [
           {
             name: 'collateralToken',
@@ -247,11 +247,6 @@ export default [
           },
           {
             name: 'market',
-            type: 'address',
-            internalType: 'address'
-          },
-          {
-            name: 'sequencerFeeReceiver',
             type: 'address',
             internalType: 'address'
           },
@@ -286,6 +281,11 @@ export default [
         name: '_reason',
         type: 'uint8',
         internalType: 'uint8'
+      },
+      {
+        name: '_feeReceiver',
+        type: 'address',
+        internalType: 'address'
       }
     ],
     outputs: [
@@ -592,9 +592,9 @@ export default [
         internalType: 'contract Subscribe'
       },
       {
-        name: '_callParams',
+        name: '_callMatch',
         type: 'tuple',
-        internalType: 'struct Mirror.CallParams',
+        internalType: 'struct Mirror.CallPosition',
         components: [
           {
             name: 'collateralToken',
@@ -608,11 +608,6 @@ export default [
           },
           {
             name: 'market',
-            type: 'address',
-            internalType: 'address'
-          },
-          {
-            name: 'sequencerFeeReceiver',
             type: 'address',
             internalType: 'address'
           },
@@ -642,6 +637,11 @@ export default [
         name: '_puppetList',
         type: 'address[]',
         internalType: 'address[]'
+      },
+      {
+        name: '_feeReceiver',
+        type: 'address',
+        internalType: 'address'
       }
     ],
     outputs: [
@@ -854,6 +854,11 @@ export default [
         internalType: 'uint256'
       }
     ]
+  },
+  {
+    type: 'error',
+    name: 'Mirror__TraderPositionTooOld',
+    inputs: []
   },
   {
     type: 'error',

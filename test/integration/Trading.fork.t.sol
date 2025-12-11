@@ -117,6 +117,7 @@ contract TradingForkTest is Test {
             mirror,
             settle,
             SequencerRouter.Config({
+                feeReceiver: sequencer,
                 matchBaseGasLimit: 1_300_853,
                 matchPerPuppetGasLimit: 30_000,
                 adjustBaseGasLimit: 910_663,
@@ -151,11 +152,10 @@ contract TradingForkTest is Test {
         uint executionFee = 0.02 ether;
         uint sequencerFee = 1e6; // 1 USDC
 
-        Mirror.CallParams memory params = Mirror.CallParams({
+        Mirror.CallPosition memory params = Mirror.CallPosition({
             collateralToken: USDC,
             trader: trader,
             market: GMX_ETH_USD_MARKET,
-            sequencerFeeReceiver: sequencer,
             isLong: true,
             executionFee: executionFee,
             allocationId: 1,
@@ -273,8 +273,10 @@ contract TradingForkTest is Test {
         bytes32 positionKey = Position.getPositionKey(_trader, _market, address(_collateralToken), _isLong);
         bytes32 sizeKey = keccak256(abi.encode(positionKey, PositionStoreUtils.SIZE_IN_USD));
         bytes32 collateralKey = keccak256(abi.encode(positionKey, PositionStoreUtils.COLLATERAL_AMOUNT));
+        bytes32 increasedAtKey = keccak256(abi.encode(positionKey, PositionStoreUtils.INCREASED_AT_TIME));
 
         vm.mockCall(GMX_DATASTORE, abi.encodeWithSelector(IGmxReadDataStore.getUint.selector, sizeKey), abi.encode(_sizeUsd));
         vm.mockCall(GMX_DATASTORE, abi.encodeWithSelector(IGmxReadDataStore.getUint.selector, collateralKey), abi.encode(_collateralAmount));
+        vm.mockCall(GMX_DATASTORE, abi.encodeWithSelector(IGmxReadDataStore.getUint.selector, increasedAtKey), abi.encode(block.timestamp));
     }
 }

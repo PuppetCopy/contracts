@@ -194,6 +194,7 @@ contract DeployPosition is BaseScript {
             mirror,
             settle,
             SequencerRouter.Config({
+                feeReceiver: vm.addr(DEPLOYER_PRIVATE_KEY),
                 matchBaseGasLimit: 1_283_731,
                 matchPerPuppetGasLimit: 30_000,
                 adjustBaseGasLimit: 910_663,

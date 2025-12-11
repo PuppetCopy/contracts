@@ -80,7 +80,7 @@ export const CONTRACT_EVENT_MAP = {
       args: [
         { type: 'address', name: 'allocationAddress' },
         { type: 'bytes32', name: 'requestKey' },
-        { type: 'address', name: 'sequencerFeeReceiver' },
+        { type: 'address', name: 'feeReceiver' },
         { type: 'uint256', name: 'executionFee' },
         { type: 'uint256', name: 'sequencerFee' },
         { type: 'bool', name: 'isIncrease' },
@@ -95,7 +95,7 @@ export const CONTRACT_EVENT_MAP = {
       args: [
         { type: 'address', name: 'allocationAddress' },
         { type: 'bytes32', name: 'requestKey' },
-        { type: 'address', name: 'sequencerFeeReceiver' },
+        { type: 'address', name: 'feeReceiver' },
         { type: 'uint256', name: 'executionFee' },
         { type: 'uint256', name: 'sequencerFee' },
         { type: 'uint256', name: 'positionSize' },
@@ -109,7 +109,7 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'address', name: 'collateralToken' },
         { type: 'address', name: 'trader' },
         { type: 'address', name: 'market' },
-        { type: 'address', name: 'sequencerFeeReceiver' },
+        { type: 'address', name: 'feeReceiver' },
         { type: 'bool', name: 'isLong' },
         { type: 'uint256', name: 'executionFee' },
         { type: 'uint256', name: 'allocationId' },

@@ -56,6 +56,7 @@ library Error {
     error Mirror__NoPosition();
     error Mirror__PositionAlreadyOpen();
     error Mirror__DecreaseTooLarge(uint requested, uint available);
+    error Mirror__TraderPositionTooOld();
 
     error Settle__InvalidAllocation(address allocationAddress);
     error Settle__PuppetListMismatch(uint provided, uint expected);
@@ -74,6 +75,10 @@ library Error {
     error Account__TokenNotAllowed();
     error Account__DepositExceedsLimit(uint depositCap);
     error Account__InsufficientBalance(uint actualBalance, uint requiredAmount);
+    error Account__ArrayLengthMismatch();
+    error Account__InvalidDepositCap();
+    error Account__InvalidTokenAddress();
+    error Account__AmountExceedsUnaccounted();
 
     error AllocationAccount__UnauthorizedOperator();
     error AllocationAccount__InsufficientBalance();

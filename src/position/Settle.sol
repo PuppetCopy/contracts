@@ -70,8 +70,7 @@ contract Settle is CoreContract {
 
         uint _sequencerFee = _callParams.sequencerExecutionFee;
         if (_sequencerFee == 0) revert Error.Settle__InvalidSequencerExecutionFeeAmount();
-        address _sequencerFeeReceiver = _callParams.sequencerFeeReceiver;
-        if (_sequencerFeeReceiver == address(0)) revert Error.Settle__InvalidSequencerExecutionFeeReceiver();
+        if (_callParams.sequencerFeeReceiver == address(0)) revert Error.Settle__InvalidSequencerExecutionFeeReceiver();
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
         address _allocationAddress = _account.getAllocationAddress(
@@ -97,9 +96,7 @@ contract Settle is CoreContract {
 
         _distributedAmount = _callParams.amount - _callParams.sequencerExecutionFee;
 
-        _account.transferOut(
-            _callParams.distributionToken, _callParams.sequencerFeeReceiver, _callParams.sequencerExecutionFee
-        );
+        _account.transferOut(_callParams.distributionToken, _callParams.sequencerFeeReceiver, _callParams.sequencerExecutionFee);
 
         if (config.platformSettleFeeFactor > 0) {
             _platformFeeAmount = Precision.applyFactor(config.platformSettleFeeFactor, _distributedAmount);

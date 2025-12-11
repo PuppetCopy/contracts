@@ -29,7 +29,7 @@ contract Account is CoreContract {
 
     // Deposit configuration
     IERC20[] public depositTokenList;
-    mapping(IERC20 token => uint) depositCapMap;
+    mapping(IERC20 token => uint) public depositCapMap;
     mapping(IERC20 token => uint) public unaccountedTokenBalance;
 
     constructor(
@@ -85,6 +85,8 @@ contract Account is CoreContract {
         uint[] calldata _balanceList
     ) external auth {
         uint _accountListLength = _accountList.length;
+        if (_accountListLength != _balanceList.length) revert Error.Account__ArrayLengthMismatch();
+
         for (uint i = 0; i < _accountListLength; i++) {
             userBalanceMap[_token][_accountList[i]] = _balanceList[i];
         }
@@ -132,7 +134,7 @@ contract Account is CoreContract {
      * @notice Configure deposit caps for allowed tokens
      */
     function setDepositCapList(IERC20[] calldata _depositTokenList, uint[] calldata _depositCapList) external auth {
-        if (_depositTokenList.length != _depositCapList.length) revert("Invalid deposit token list");
+        if (_depositTokenList.length != _depositCapList.length) revert Error.Account__ArrayLengthMismatch();
 
         for (uint i = 0; i < depositTokenList.length; i++) {
             delete depositCapMap[depositTokenList[i]];
@@ -142,8 +144,8 @@ contract Account is CoreContract {
             IERC20 _token = _depositTokenList[i];
             uint _cap = _depositCapList[i];
 
-            if (_cap == 0) revert("Invalid deposit cap");
-            if (address(_token) == address(0)) revert("Invalid token address");
+            if (_cap == 0) revert Error.Account__InvalidDepositCap();
+            if (address(_token) == address(0)) revert Error.Account__InvalidTokenAddress();
 
             depositCapMap[_token] = _cap;
         }
@@ -222,7 +224,7 @@ contract Account is CoreContract {
      * @param _amount The amount to recover
      */
     function recoverUnaccountedTokens(IERC20 _token, address _receiver, uint _amount) external auth {
-        if (_amount > unaccountedTokenBalance[_token]) revert("Amount exceeds unaccounted balance");
+        if (_amount > unaccountedTokenBalance[_token]) revert Error.Account__AmountExceedsUnaccounted();
         unaccountedTokenBalance[_token] -= _amount;
         accountStore.transferOut(config.transferOutGasLimit, _token, _receiver, _amount);
         _logEvent("RecoverUnaccountedTokens", abi.encode(_token, _receiver, _amount, unaccountedTokenBalance[_token]));
