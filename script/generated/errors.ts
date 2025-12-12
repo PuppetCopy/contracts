@@ -582,6 +582,26 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
+    name: 'Account__ArrayLengthMismatch',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Account__InvalidDepositCap',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Account__InvalidTokenAddress',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Account__AmountExceedsUnaccounted',
+    inputs: []
+  },
+  {
+    type: 'error',
     name: 'AllocationAccount__UnauthorizedOperator',
     inputs: []
   },

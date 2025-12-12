@@ -142,6 +142,25 @@ export default [
   },
   {
     type: 'function',
+    name: 'depositCapMap',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'contract IERC20'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
     name: 'depositTokenList',
     inputs: [
       {
@@ -533,6 +552,16 @@ export default [
   },
   {
     type: 'error',
+    name: 'Account__AmountExceedsUnaccounted',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Account__ArrayLengthMismatch',
+    inputs: []
+  },
+  {
+    type: 'error',
     name: 'Account__DepositExceedsLimit',
     inputs: [
       {
@@ -565,6 +594,11 @@ export default [
   },
   {
     type: 'error',
+    name: 'Account__InvalidDepositCap',
+    inputs: []
+  },
+  {
+    type: 'error',
     name: 'Account__InvalidSettledAmount',
     inputs: [
       {
@@ -583,6 +617,11 @@ export default [
         internalType: 'uint256'
       }
     ]
+  },
+  {
+    type: 'error',
+    name: 'Account__InvalidTokenAddress',
+    inputs: []
   },
   {
     type: 'error',
