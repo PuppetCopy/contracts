@@ -31,7 +31,17 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'distributionTimeframe',
+            name: 'unlockTimeframe',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'askDecayTimeframe',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'askStart',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -50,7 +60,7 @@ export default [
         internalType: 'contract IERC20'
       },
       {
-        name: '_depositor',
+        name: '_buyer',
         type: 'address',
         internalType: 'address'
       },
@@ -60,7 +70,7 @@ export default [
         internalType: 'address'
       },
       {
-        name: '_purchaseAmount',
+        name: '_amount',
         type: 'uint256',
         internalType: 'uint256'
       }
@@ -71,25 +81,6 @@ export default [
   {
     type: 'function',
     name: 'accountedBalance',
-    inputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'contract IERC20'
-      }
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'askAmount',
     inputs: [
       {
         name: '',
@@ -145,6 +136,34 @@ export default [
   },
   {
     type: 'function',
+    name: 'config',
+    inputs: [],
+    outputs: [
+      {
+        name: 'transferOutGasLimit',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'unlockTimeframe',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'askDecayTimeframe',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'askStart',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
     name: 'deposit',
     inputs: [
       {
@@ -168,6 +187,25 @@ export default [
   },
   {
     type: 'function',
+    name: 'getAskPrice',
+    inputs: [
+      {
+        name: '_feeToken',
+        type: 'address',
+        internalType: 'contract IERC20'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
     name: 'getConfig',
     inputs: [],
     outputs: [
@@ -182,7 +220,17 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'distributionTimeframe',
+            name: 'unlockTimeframe',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'askDecayTimeframe',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'askStart',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -203,7 +251,7 @@ export default [
     ],
     outputs: [
       {
-        name: '_pending',
+        name: '',
         type: 'uint256',
         internalType: 'uint256'
       }
@@ -212,7 +260,7 @@ export default [
   },
   {
     type: 'function',
-    name: 'getTotalUnlocked',
+    name: 'getUnlockedBalance',
     inputs: [
       {
         name: '_feeToken',
@@ -231,7 +279,26 @@ export default [
   },
   {
     type: 'function',
-    name: 'lastDistributionTimestamp',
+    name: 'lastAskResetTimestamp',
+    inputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'contract IERC20'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'lastUnlockTimestamp',
     inputs: [
       {
         name: '',
@@ -263,17 +330,12 @@ export default [
   },
   {
     type: 'function',
-    name: 'setAskPrice',
+    name: 'recordTransferIn',
     inputs: [
       {
         name: '_feeToken',
         type: 'address',
         internalType: 'contract IERC20'
-      },
-      {
-        name: '_amount',
-        type: 'uint256',
-        internalType: 'uint256'
       }
     ],
     outputs: [],
@@ -349,20 +411,7 @@ export default [
   },
   {
     type: 'function',
-    name: 'syncBalance',
-    inputs: [
-      {
-        name: '_feeToken',
-        type: 'address',
-        internalType: 'contract IERC20'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'unclockedFees',
+    name: 'unlockedFees',
     inputs: [
       {
         name: '',
@@ -384,7 +433,7 @@ export default [
     name: 'FeeMarketplace__InsufficientUnlockedBalance',
     inputs: [
       {
-        name: 'accruedReward',
+        name: 'unlockedBalance',
         type: 'uint256',
         internalType: 'uint256'
       }
@@ -392,12 +441,7 @@ export default [
   },
   {
     type: 'error',
-    name: 'FeeMarketplace__InvalidAmount',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'FeeMarketplace__NotAuctionableToken',
+    name: 'FeeMarketplace__InvalidConfig',
     inputs: []
   },
   {

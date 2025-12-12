@@ -48,9 +48,7 @@
     },
     "./deployments": "./deployments.json"
   },
-  "dependencies": {
-    "viem": "catalog:"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@gmx": "github:gmx-io/gmx-synthetics",
     "@openzeppelin/contracts": "5.4.0",
@@ -58,6 +56,7 @@
     "@uniswap/v3-core": "1.0.1",
     "dotenv": "catalog:",
     "forge-std": "github:foundry-rs/forge-std#v1.12.0",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "viem": "^2.41.2"
   }
 }

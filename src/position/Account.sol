@@ -171,7 +171,7 @@ contract Account is CoreContract {
     /**
      * @notice Transfers allocation balance to AccountStore, tracking any unaccounted funds
      * @dev Records unaccounted balances before transferring allocation funds
-     * @param _amount The expected amount to transfer (passed by sequencer for validation)
+     * @param _amount The expected amount to transfer (passed by matchmaker for validation)
      */
     function transferInAllocation(
         address _allocationAddress,

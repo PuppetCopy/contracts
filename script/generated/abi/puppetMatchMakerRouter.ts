@@ -1,4 +1,4 @@
-// This file is auto-generated from forge-artifacts/SequencerRouter.sol/SequencerRouter.json
+// This file is auto-generated from forge-artifacts/MatchMakerRouter.sol/MatchMakerRouter.json
 // Do not edit manually.
 
 export default [
@@ -33,7 +33,7 @@ export default [
       {
         name: '_config',
         type: 'tuple',
-        internalType: 'struct SequencerRouter.Config',
+        internalType: 'struct MatchMakerRouter.Config',
         components: [
           {
             name: 'feeReceiver',
@@ -178,7 +178,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'sequencerFee',
+            name: 'matchMakerFee',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -276,7 +276,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'sequencerFee',
+            name: 'matchMakerFee',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -344,7 +344,7 @@ export default [
       {
         name: '',
         type: 'tuple',
-        internalType: 'struct SequencerRouter.Config',
+        internalType: 'struct MatchMakerRouter.Config',
         components: [
           {
             name: 'feeReceiver',
@@ -476,7 +476,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'sequencerFee',
+            name: 'matchMakerFee',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -607,7 +607,7 @@ export default [
             internalType: 'contract IERC20'
           },
           {
-            name: 'sequencerFeeReceiver',
+            name: 'matchMakerFeeReceiver',
             type: 'address',
             internalType: 'address'
           },
@@ -622,7 +622,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'sequencerExecutionFee',
+            name: 'matchMakerExecutionFee',
             type: 'uint256',
             internalType: 'uint256'
           },

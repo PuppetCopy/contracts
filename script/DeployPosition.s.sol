@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/src/console.sol";
 
-import {SequencerRouter} from "src/SequencerRouter.sol";
+import {MatchMakerRouter} from "src/MatchMakerRouter.sol";
 import {UserRouter} from "src/UserRouter.sol";
 import {Account as AccountContract} from "src/position/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
@@ -21,13 +21,7 @@ import {RouterProxy} from "src/utils/RouterProxy.sol";
 import {BaseScript} from "./BaseScript.s.sol";
 import {Const} from "./Const.sol";
 
-/**
- * @title DeployPosition
- * @notice Deployment script for the core position trading system
- * @dev Deploys all core position contracts with proper permissions
- */
 contract DeployPosition is BaseScript {
-    // State variables to hold deployed contracts
     Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
     TokenRouter tokenRouter = TokenRouter(getDeployedAddress("TokenRouter"));
 
@@ -40,13 +34,11 @@ contract DeployPosition is BaseScript {
         Subscribe subscribe = deploySubscribe();
         Mirror mirror = deployMirror(account);
         Settle settle = deploySettle(account);
-        SequencerRouter sequencerRouter = deploySequencerRouter(mirror, subscribe, settle, account);
+        MatchMakerRouter matchMakerRouter = deployMatchMakerRouter(mirror, subscribe, settle, account);
 
-        // Set up cross-contract permissions
         setupCrossContractPermissions(mirror, subscribe);
 
-        // Setup upkeeping configuration
-        setupUpkeepingConfig(account, settle, sequencerRouter);
+        setupUpkeepingConfig(account, settle, matchMakerRouter);
 
         vm.stopBroadcast();
     }
@@ -98,8 +90,8 @@ contract DeployPosition is BaseScript {
             dictator,
             Settle.Config({
                 transferOutGasLimit: 200_000,
-                platformSettleFeeFactor: 0.01e30, // 1%
-                maxSequencerFeeToSettleRatio: 0.1e30, // 10%
+                platformSettleFeeFactor: 0.01e30,
+                maxMatchMakerFeeToSettleRatio: 0.1e30,
                 maxPuppetList: 50,
                 allocationAccountTransferGasLimit: 100_000
             })
@@ -156,9 +148,9 @@ contract DeployPosition is BaseScript {
                 gmxOrderVault: Const.gmxOrderVault,
                 referralCode: Const.referralCode,
                 maxPuppetList: 50,
-                maxSequencerFeeToAllocationRatio: 0.1e30,
-                maxSequencerFeeToAdjustmentRatio: 0.1e30,
-                maxSequencerFeeToCloseRatio: 0.1e30,
+                maxMatchMakerFeeToAllocationRatio: 0.1e30,
+                maxMatchMakerFeeToAdjustmentRatio: 0.1e30,
+                maxMatchMakerFeeToCloseRatio: 0.1e30,
                 maxMatchOpenDuration: 30 seconds,
                 maxMatchAdjustDuration: 60 seconds
             })
@@ -178,22 +170,21 @@ contract DeployPosition is BaseScript {
         return mirror;
     }
 
-    function deploySequencerRouter(
+    function deployMatchMakerRouter(
         Mirror mirror,
         Subscribe subscribe,
         Settle settle,
         AccountContract account
-    ) internal returns (SequencerRouter) {
-        console.log("\n--- Deploying SequencerRouter ---");
+    ) internal returns (MatchMakerRouter) {
+        console.log("\n--- Deploying MatchMakerRouter ---");
 
-        // Deploy contract with empirical gas configuration
-        SequencerRouter sequencerRouter = new SequencerRouter(
+        MatchMakerRouter matchMakerRouter = new MatchMakerRouter(
             dictator,
             account,
             subscribe,
             mirror,
             settle,
-            SequencerRouter.Config({
+            MatchMakerRouter.Config({
                 feeReceiver: vm.addr(DEPLOYER_PRIVATE_KEY),
                 matchBaseGasLimit: 1_283_731,
                 matchPerPuppetGasLimit: 30_000,
@@ -201,7 +192,7 @@ contract DeployPosition is BaseScript {
                 adjustPerPuppetGasLimit: 3_412,
                 settleBaseGasLimit: 90_847,
                 settlePerPuppetGasLimit: 15_000,
-                gasPriceBufferBasisPoints: 12000, // 120% (20% buffer)
+                gasPriceBufferBasisPoints: 12000,
                 maxEthPriceAge: 300,
                 maxIndexPriceAge: 3000,
                 maxFiatPriceAge: 60_000,
@@ -213,33 +204,21 @@ contract DeployPosition is BaseScript {
                 minAdjustUsd: 10e30
             })
         );
-        console.log("SequencerRouter deployed at:", address(sequencerRouter));
+        console.log("MatchMakerRouter deployed at:", address(matchMakerRouter));
 
-        // Set up permissions for SequencerRouter to call other contracts
-        console.log("Setting up SequencerRouter permissions...");
+        console.log("Setting up MatchMakerRouter permissions...");
 
-        // Settle permissions
-        dictator.setPermission(settle, settle.settle.selector, address(sequencerRouter));
-        dictator.setPermission(settle, settle.collectAllocationAccountDust.selector, address(sequencerRouter));
+        dictator.setPermission(settle, settle.settle.selector, address(matchMakerRouter));
+        dictator.setPermission(settle, settle.collectAllocationAccountDust.selector, address(matchMakerRouter));
 
-        // Mirror permissions
-        dictator.setPermission(mirror, mirror.matchmake.selector, address(sequencerRouter));
-        dictator.setPermission(mirror, mirror.adjust.selector, address(sequencerRouter));
-        dictator.setPermission(mirror, mirror.close.selector, address(sequencerRouter));
+        dictator.setPermission(mirror, mirror.matchmake.selector, address(matchMakerRouter));
+        dictator.setPermission(mirror, mirror.adjust.selector, address(matchMakerRouter));
+        dictator.setPermission(mirror, mirror.close.selector, address(matchMakerRouter));
 
-        // External sequencer permissions
-        console.log("Setting up external sequencer permissions...");
-        dictator.setPermission(sequencerRouter, sequencerRouter.matchmake.selector, Const.sequencer);
-        dictator.setPermission(sequencerRouter, sequencerRouter.adjust.selector, Const.sequencer);
-        dictator.setPermission(sequencerRouter, sequencerRouter.close.selector, Const.sequencer);
-        dictator.setPermission(sequencerRouter, sequencerRouter.settleAllocation.selector, Const.sequencer);
-        dictator.setPermission(sequencerRouter, sequencerRouter.collectAllocationAccountDust.selector, Const.sequencer);
+        dictator.registerContract(matchMakerRouter);
+        console.log("MatchMakerRouter initialized and permissions configured");
 
-        // Initialize contract
-        dictator.registerContract(sequencerRouter);
-        console.log("SequencerRouter initialized and permissions configured");
-
-        return sequencerRouter;
+        return matchMakerRouter;
     }
 
     function setupCrossContractPermissions(Mirror mirror, Subscribe subscribe) internal {
@@ -251,13 +230,12 @@ contract DeployPosition is BaseScript {
         console.log("Cross-contract permissions configured");
     }
 
-    function setupUpkeepingConfig(AccountContract account, Settle settle, SequencerRouter sequencerRouter) internal {
+    function setupUpkeepingConfig(AccountContract account, Settle settle, MatchMakerRouter matchMakerRouter) internal {
         console.log("\n--- Setting up upkeeping configuration ---");
 
-        // Set up DAO permissions for configuration
         dictator.setPermission(account, account.setDepositCapList.selector, Const.dao);
         dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, Const.dao);
-        dictator.setPermission(sequencerRouter, sequencerRouter.recoverUnaccountedTokens.selector, Const.dao);
+        dictator.setPermission(matchMakerRouter, matchMakerRouter.recoverUnaccountedTokens.selector, Const.dao);
 
         // Configure USDC as allowed token
         IERC20[] memory allowedTokens = new IERC20[](1);
@@ -282,14 +260,14 @@ contract DeployPosition is BaseScript {
         Settle settle = Settle(getDeployedAddress("Settle"));
 
         Mirror mirror = deployMirror(account);
-        SequencerRouter sequencerRouter = deploySequencerRouter(mirror, subscribe, settle, account);
+        MatchMakerRouter matchMakerRouter = deployMatchMakerRouter(mirror, subscribe, settle, account);
         setupCrossContractPermissions(mirror, subscribe);
         deployUserRouter(account, subscribe, mirror);
 
         console.log("\n=== Mirror Upgrade Complete ===");
         console.log("New Mirror address:", address(mirror));
-        console.log("New SequencerRouter address:", address(sequencerRouter));
-        console.log("\nIMPORTANT: Update sequencer services to use the new SequencerRouter address");
+        console.log("New MatchMakerRouter address:", address(matchMakerRouter));
+        console.log("\nIMPORTANT: Update matchmaker services to use the new MatchMakerRouter address");
     }
 
     function upgradeSubscribe() public {
@@ -300,14 +278,14 @@ contract DeployPosition is BaseScript {
         Settle settle = Settle(getDeployedAddress("Settle"));
 
         Subscribe subscribe = deploySubscribe();
-        SequencerRouter sequencerRouter = deploySequencerRouter(mirror, subscribe, settle, account);
+        MatchMakerRouter matchMakerRouter = deployMatchMakerRouter(mirror, subscribe, settle, account);
         setupCrossContractPermissions(mirror, subscribe);
         deployUserRouter(account, subscribe, mirror);
 
         console.log("\n=== Subscribe Upgrade Complete ===");
         console.log("New Subscribe address:", address(subscribe));
-        console.log("New SequencerRouter address:", address(sequencerRouter));
-        console.log("\nIMPORTANT: Update sequencer services to use the new SequencerRouter address");
+        console.log("New MatchMakerRouter address:", address(matchMakerRouter));
+        console.log("\nIMPORTANT: Update matchmaker services to use the new MatchMakerRouter address");
     }
 
     function deployUserRouter(AccountContract account, Subscribe subscribe, Mirror mirror) internal {

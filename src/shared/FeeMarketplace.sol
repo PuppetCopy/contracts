@@ -10,26 +10,27 @@ import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {FeeMarketplaceStore} from "./FeeMarketplaceStore.sol";
 
-/**
- * @notice Marketplace for trading accumulated protocol fees with protocol tokens at fixed prices
- * @dev Fee tokens unlock gradually over `distributionTimeframe`. New deposits dilute the unlock rate
- *      of existing locked tokens, limiting arbitrage opportunities during high deposit activity.
- */
+/// @title FeeMarketplace
+/// @notice Dutch auction for protocol fees - fees unlock over time, ask price decays until redeemed
+/// @dev Two curves: (1) fees unlock linearly, (2) ask price decays linearly
+///      Price discovery via time-decay auction
 contract FeeMarketplace is CoreContract {
     struct Config {
         uint transferOutGasLimit;
-        uint distributionTimeframe;
+        uint unlockTimeframe;
+        uint askDecayTimeframe;
+        uint askStart;
     }
 
     PuppetToken public immutable protocolToken;
     FeeMarketplaceStore public immutable store;
 
-    mapping(IERC20 => uint) public askAmount;
-    mapping(IERC20 => uint) public unclockedFees;
-    mapping(IERC20 => uint) public lastDistributionTimestamp;
     mapping(IERC20 => uint) public accountedBalance;
+    mapping(IERC20 => uint) public unlockedFees;
+    mapping(IERC20 => uint) public lastUnlockTimestamp;
+    mapping(IERC20 => uint) public lastAskResetTimestamp;
 
-    Config config;
+    Config public config;
 
     constructor(
         IAuthority _authority,
@@ -41,50 +42,46 @@ contract FeeMarketplace is CoreContract {
         store = _store;
     }
 
-    /**
-     * @notice Get current configuration parameters
-     */
     function getConfig() external view returns (Config memory) {
         return config;
     }
 
-    /**
-     * @notice Calculate pending unlocked amount for a fee token based on elapsed time
-     */
-    function getPendingUnlock(
-        IERC20 _feeToken
-    ) public view returns (uint _pending) {
-        uint _accountedBalance = accountedBalance[_feeToken];
-        uint _unlockedAmount = unclockedFees[_feeToken];
+    function getPendingUnlock(IERC20 _feeToken) public view returns (uint) {
+        uint _accounted = accountedBalance[_feeToken];
+        uint _unlocked = unlockedFees[_feeToken];
+        if (_accounted <= _unlocked) return 0;
 
-        if (_accountedBalance <= _unlockedAmount) return 0;
+        uint _locked = _accounted - _unlocked;
+        uint _lastTimestamp = lastUnlockTimestamp[_feeToken];
+        if (_lastTimestamp == 0) return 0;
 
-        uint _lockedAmount = _accountedBalance - _unlockedAmount;
-        uint _timeElapsed = block.timestamp - lastDistributionTimestamp[_feeToken];
-
-        _pending = Math.min((_lockedAmount * _timeElapsed) / config.distributionTimeframe, _lockedAmount);
+        uint _elapsed = block.timestamp - _lastTimestamp;
+        return Math.min((_locked * _elapsed) / config.unlockTimeframe, _locked);
     }
 
-    /**
-     * @notice Get total unlocked balance available for redemption
-     */
-    function getTotalUnlocked(
-        IERC20 _feeToken
-    ) public view returns (uint) {
-        return unclockedFees[_feeToken] + getPendingUnlock(_feeToken);
+    function getUnlockedBalance(IERC20 _feeToken) external view returns (uint) {
+        return unlockedFees[_feeToken] + getPendingUnlock(_feeToken);
     }
 
-    /**
-     * @notice Deposit fee tokens into the marketplace
-     */
-    function deposit(
-        IERC20 _feeToken,
-        address _depositor,
-        uint _amount
-    ) external auth {
+    function getAskPrice(IERC20 _feeToken) public view returns (uint) {
+        uint _lastReset = lastAskResetTimestamp[_feeToken];
+        if (_lastReset == 0) return config.askStart;
+
+        uint _elapsed = block.timestamp - _lastReset;
+        if (_elapsed >= config.askDecayTimeframe) return 0;
+
+        return config.askStart - (config.askStart * _elapsed) / config.askDecayTimeframe;
+    }
+
+    function deposit(IERC20 _feeToken, address _depositor, uint _amount) external auth {
         if (_amount == 0) revert Error.FeeMarketplace__ZeroDeposit();
 
-        _updateUnlockedBalance(_feeToken);
+        if (accountedBalance[_feeToken] > 0) {
+            _syncUnlock(_feeToken);
+        } else {
+            lastUnlockTimestamp[_feeToken] = block.timestamp;
+            lastAskResetTimestamp[_feeToken] = block.timestamp;
+        }
 
         store.transferIn(_feeToken, _depositor, _amount);
         accountedBalance[_feeToken] += _amount;
@@ -92,84 +89,63 @@ contract FeeMarketplace is CoreContract {
         _logEvent("Deposit", abi.encode(_feeToken, _depositor, _amount));
     }
 
-    /**
-     * @notice Sync unaccounted tokens that were transferred directly to store
-     */
-    function syncBalance(
-        IERC20 _feeToken
-    ) external auth {
-        _updateUnlockedBalance(_feeToken);
+    function recordTransferIn(IERC20 _feeToken) external auth {
+        uint _unaccounted = store.recordTransferIn(_feeToken);
+        if (_unaccounted == 0) revert Error.FeeMarketplace__ZeroDeposit();
 
-        uint _unaccountedAmount = store.recordTransferIn(_feeToken);
-        if (_unaccountedAmount == 0) revert Error.FeeMarketplace__ZeroDeposit();
-
-        accountedBalance[_feeToken] += _unaccountedAmount;
-
-        _logEvent("Deposit", abi.encode(_feeToken, address(0), _unaccountedAmount));
-    }
-
-    /**
-     * @notice Execute fee redemption at fixed ask price
-     * @dev Burns protocol tokens received
-     */
-    function acceptOffer(
-        IERC20 _feeToken,
-        address _depositor,
-        address _receiver,
-        uint _purchaseAmount
-    ) external auth {
-        if (_purchaseAmount == 0) revert Error.FeeMarketplace__InvalidAmount();
-
-        uint _currentAskAmount = askAmount[_feeToken];
-
-        if (_currentAskAmount == 0) revert Error.FeeMarketplace__NotAuctionableToken();
-
-        // Update the fee token's unlocked balance before redemption.
-        _updateUnlockedBalance(_feeToken);
-
-        uint _accruedFees = unclockedFees[_feeToken];
-        if (_accruedFees < _purchaseAmount) {
-            revert Error.FeeMarketplace__InsufficientUnlockedBalance(_accruedFees);
+        if (accountedBalance[_feeToken] > 0) {
+            _syncUnlock(_feeToken);
+        } else {
+            lastUnlockTimestamp[_feeToken] = block.timestamp;
+            lastAskResetTimestamp[_feeToken] = block.timestamp;
         }
 
-        store.transferIn(protocolToken, _depositor, _currentAskAmount);
-        store.burn(_currentAskAmount);
+        accountedBalance[_feeToken] += _unaccounted;
 
-        unclockedFees[_feeToken] -= _purchaseAmount;
-        accountedBalance[_feeToken] -= _purchaseAmount;
-        store.transferOut(config.transferOutGasLimit, _feeToken, _receiver, _purchaseAmount);
-
-        _logEvent("AcceptOffer", abi.encode(_feeToken, _receiver, _purchaseAmount, _currentAskAmount));
+        _logEvent("Deposit", abi.encode(_feeToken, address(0), _unaccounted));
     }
 
-    /**
-     * @notice Set fixed redemption price for a fee token
-     */
-    function setAskPrice(
-        IERC20 _feeToken,
-        uint _amount
-    ) external auth {
-        askAmount[_feeToken] = _amount;
-        _logEvent("SetAskAmount", abi.encode(_feeToken, _amount));
-    }
+    function acceptOffer(IERC20 _feeToken, address _buyer, address _receiver, uint _amount) external auth {
+        if (_amount == 0) revert Error.FeeMarketplace__InsufficientUnlockedBalance(0);
 
-    function _updateUnlockedBalance(
-        IERC20 _feeToken
-    ) internal {
-        uint _pendingUnlock = getPendingUnlock(_feeToken);
-        if (_pendingUnlock > 0) {
-            unclockedFees[_feeToken] += _pendingUnlock;
+        _syncUnlock(_feeToken);
+
+        uint _unlocked = unlockedFees[_feeToken];
+        if (_unlocked < _amount) revert Error.FeeMarketplace__InsufficientUnlockedBalance(_unlocked);
+
+        uint _cost = getAskPrice(_feeToken);
+
+        if (_cost > 0) {
+            store.transferIn(protocolToken, _buyer, _cost);
+            store.burn(_cost);
         }
-        lastDistributionTimestamp[_feeToken] = block.timestamp;
+
+        unlockedFees[_feeToken] = _unlocked - _amount;
+        accountedBalance[_feeToken] -= _amount;
+
+        store.transferOut(config.transferOutGasLimit, _feeToken, _receiver, _amount);
+
+        lastAskResetTimestamp[_feeToken] = block.timestamp;
+
+        _logEvent("AcceptOffer", abi.encode(_feeToken, _buyer, _receiver, _amount, _cost));
     }
 
-    function _setConfig(
-        bytes memory _data
-    ) internal override {
+    function _syncUnlock(IERC20 _feeToken) internal {
+        uint _pending = getPendingUnlock(_feeToken);
+        if (_pending > 0) {
+            unlockedFees[_feeToken] += _pending;
+        }
+        lastUnlockTimestamp[_feeToken] = block.timestamp;
+    }
+
+    function _setConfig(bytes memory _data) internal override {
         Config memory _config = abi.decode(_data, (Config));
 
-        if (_config.transferOutGasLimit == 0) revert("Invalid transfer out gas limit");
-        if (_config.distributionTimeframe == 0) revert("Invalid distribution timeframe");
+        if (_config.transferOutGasLimit == 0) revert Error.FeeMarketplace__InvalidConfig();
+        if (_config.unlockTimeframe == 0) revert Error.FeeMarketplace__InvalidConfig();
+        if (_config.askDecayTimeframe == 0) revert Error.FeeMarketplace__InvalidConfig();
+        if (_config.askDecayTimeframe < _config.unlockTimeframe) revert Error.FeeMarketplace__InvalidConfig();
+        if (_config.askStart == 0) revert Error.FeeMarketplace__InvalidConfig();
 
         config = _config;
     }

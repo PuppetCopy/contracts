@@ -10,12 +10,7 @@ import {Settle} from "./position/Settle.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
-/**
- * @title SequencerRouter
- * @notice Routes sequencer operations to the appropriate contracts
- * @dev Simplified design without callbacks - sequencer is source of truth for position state
- */
-contract SequencerRouter is CoreContract {
+contract MatchMakerRouter is CoreContract {
     struct Config {
         address feeReceiver;
         uint matchBaseGasLimit;
@@ -72,14 +67,14 @@ contract SequencerRouter is CoreContract {
     function matchmake(
         Mirror.CallPosition calldata _callMatch,
         address[] calldata _puppetList
-    ) external payable auth returns (address _allocationAddress, bytes32 _requestKey) {
+    ) external payable returns (address _allocationAddress, bytes32 _requestKey) {
         return mirror.matchmake{value: msg.value}(account, subscribe, _callMatch, _puppetList, config.feeReceiver);
     }
 
     function adjust(
         Mirror.CallPosition calldata _callPosition,
         address[] calldata _puppetList
-    ) external payable auth returns (bytes32 _requestKey) {
+    ) external payable returns (bytes32 _requestKey) {
         return mirror.adjust{value: msg.value}(account, _callPosition, _puppetList, config.feeReceiver);
     }
 
@@ -87,23 +82,17 @@ contract SequencerRouter is CoreContract {
         Mirror.CallPosition calldata _callPosition,
         address[] calldata _puppetList,
         uint8 _reason
-    ) external payable auth returns (bytes32 _requestKey) {
+    ) external payable returns (bytes32 _requestKey) {
         return mirror.close{value: msg.value}(account, _callPosition, _puppetList, _reason, config.feeReceiver);
     }
 
-    /**
-     * @notice Settles an allocation by distributing funds back to puppets
-     */
     function settleAllocation(
         Settle.CallSettle calldata _settleParams,
         address[] calldata _puppetList
-    ) external auth returns (uint distributionAmount, uint platformFeeAmount) {
+    ) external returns (uint distributionAmount, uint platformFeeAmount) {
         return settle.settle(account, mirror, _settleParams, _puppetList);
     }
 
-    /**
-     * @notice Collects dust tokens from an allocation account
-     */
     function collectAllocationAccountDust(
         address _allocationAccount,
         IERC20 _dustToken,
@@ -113,9 +102,6 @@ contract SequencerRouter is CoreContract {
         return settle.collectAllocationAccountDust(account, _allocationAccount, _dustToken, _receiver, _amount);
     }
 
-    /**
-     * @notice Recovers unaccounted tokens sent to AccountStore outside normal flows
-     */
     function recoverUnaccountedTokens(
         IERC20 _token,
         address _receiver,

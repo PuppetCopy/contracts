@@ -41,17 +41,17 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'maxSequencerFeeToAllocationRatio',
+            name: 'maxMatchMakerFeeToAllocationRatio',
             type: 'uint256',
             internalType: 'uint256'
           },
           {
-            name: 'maxSequencerFeeToAdjustmentRatio',
+            name: 'maxMatchMakerFeeToAdjustmentRatio',
             type: 'uint256',
             internalType: 'uint256'
           },
           {
-            name: 'maxSequencerFeeToCloseRatio',
+            name: 'maxMatchMakerFeeToCloseRatio',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -115,7 +115,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'sequencerFee',
+            name: 'matchMakerFee',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -266,7 +266,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'sequencerFee',
+            name: 'matchMakerFee',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -328,17 +328,17 @@ export default [
         internalType: 'uint256'
       },
       {
-        name: 'maxSequencerFeeToAllocationRatio',
+        name: 'maxMatchMakerFeeToAllocationRatio',
         type: 'uint256',
         internalType: 'uint256'
       },
       {
-        name: 'maxSequencerFeeToAdjustmentRatio',
+        name: 'maxMatchMakerFeeToAdjustmentRatio',
         type: 'uint256',
         internalType: 'uint256'
       },
       {
-        name: 'maxSequencerFeeToCloseRatio',
+        name: 'maxMatchMakerFeeToCloseRatio',
         type: 'uint256',
         internalType: 'uint256'
       },
@@ -429,17 +429,17 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'maxSequencerFeeToAllocationRatio',
+            name: 'maxMatchMakerFeeToAllocationRatio',
             type: 'uint256',
             internalType: 'uint256'
           },
           {
-            name: 'maxSequencerFeeToAdjustmentRatio',
+            name: 'maxMatchMakerFeeToAdjustmentRatio',
             type: 'uint256',
             internalType: 'uint256'
           },
           {
-            name: 'maxSequencerFeeToCloseRatio',
+            name: 'maxMatchMakerFeeToCloseRatio',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -627,7 +627,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'sequencerFee',
+            name: 'matchMakerFee',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -742,13 +742,77 @@ export default [
   },
   {
     type: 'error',
-    name: 'Mirror__InvalidSequencerExecutionFeeAmount',
+    name: 'Mirror__InvalidMatchMakerExecutionFeeAmount',
     inputs: []
   },
   {
     type: 'error',
     name: 'Mirror__InvalidSizeDelta',
     inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Mirror__MatchMakerFeeExceedsAdjustmentRatio',
+    inputs: [
+      {
+        name: 'matchMakerFee',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'allocationAmount',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Mirror__MatchMakerFeeExceedsCloseRatio',
+    inputs: [
+      {
+        name: 'matchMakerFee',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'allocationAmount',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Mirror__MatchMakerFeeExceedsCostFactor',
+    inputs: [
+      {
+        name: 'matchMakerFee',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'allocationAmount',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Mirror__MatchMakerFeeNotFullyCovered',
+    inputs: [
+      {
+        name: 'totalPaid',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'requiredFee',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ]
   },
   {
     type: 'error',
@@ -790,70 +854,6 @@ export default [
     type: 'error',
     name: 'Mirror__RequestPending',
     inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Mirror__SequencerFeeExceedsAdjustmentRatio',
-    inputs: [
-      {
-        name: 'sequencerFee',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'allocationAmount',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Mirror__SequencerFeeExceedsCloseRatio',
-    inputs: [
-      {
-        name: 'sequencerFee',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'allocationAmount',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Mirror__SequencerFeeExceedsCostFactor',
-    inputs: [
-      {
-        name: 'sequencerFee',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'allocationAmount',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Mirror__SequencerFeeNotFullyCovered',
-    inputs: [
-      {
-        name: 'totalPaid',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'requiredFee',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ]
   },
   {
     type: 'error',

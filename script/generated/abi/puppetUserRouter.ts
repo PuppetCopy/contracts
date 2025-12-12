@@ -43,7 +43,7 @@ export default [
         internalType: 'address'
       },
       {
-        name: 'purchaseAmount',
+        name: 'amount',
         type: 'uint256',
         internalType: 'uint256'
       }

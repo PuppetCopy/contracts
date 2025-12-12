@@ -1,7 +1,7 @@
 // Main entrypoint for Puppet contracts
 // This file is NOT auto-generated - it provides combined ABIs for router patterns
 
-import { erc20Abi } from 'viem'
+import { erc20Abi } from './abi/erc20.js'
 import referralStorageAbi from './abi/externalReferralStorage.js'
 import { PUPPET_CONTRACT_MAP } from './contracts.js'
 import { puppetErrorAbi } from './errors.js'
@@ -14,10 +14,10 @@ export const CONTRACT = {
     abi: [...PUPPET_CONTRACT_MAP.UserRouter.abi, ...PUPPET_CONTRACT_MAP.RouterProxy.abi, ...puppetErrorAbi] as const,
     chainId: PUPPET_CONTRACT_MAP.UserRouter.chainId
   },
-  SequencerRouter: {
-    address: PUPPET_CONTRACT_MAP.SequencerRouter.address,
-    abi: [...PUPPET_CONTRACT_MAP.SequencerRouter.abi, ...puppetErrorAbi, ...gmxErrorAbi] as const,
-    chainId: PUPPET_CONTRACT_MAP.SequencerRouter.chainId
+  MatchMakerRouter: {
+    address: PUPPET_CONTRACT_MAP.MatchMakerRouter.address,
+    abi: [...PUPPET_CONTRACT_MAP.MatchMakerRouter.abi, ...puppetErrorAbi, ...gmxErrorAbi] as const,
+    chainId: PUPPET_CONTRACT_MAP.MatchMakerRouter.chainId
   },
   CustomError: {
     abi: puppetErrorAbi

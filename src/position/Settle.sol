@@ -12,16 +12,11 @@ import {Account} from "./Account.sol";
 import {Mirror} from "./Mirror.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
-/**
- * @title Settle
- * @notice Handles settlement and distribution of funds for puppet's positions
- * @dev Manages the settlement process when positions are closed or partially closed
- */
 contract Settle is CoreContract {
     struct Config {
         uint transferOutGasLimit;
         uint platformSettleFeeFactor;
-        uint maxSequencerFeeToSettleRatio;
+        uint maxMatchMakerFeeToSettleRatio;
         uint maxPuppetList;
         uint allocationAccountTransferGasLimit;
     }
@@ -29,11 +24,11 @@ contract Settle is CoreContract {
     struct CallSettle {
         IERC20 collateralToken;
         IERC20 distributionToken;
-        address sequencerFeeReceiver;
+        address matchMakerFeeReceiver;
         address trader;
         uint allocationId;
-        uint sequencerExecutionFee;
-        uint amount; // Amount to be settled (passed by sequencer)
+        uint matchMakerExecutionFee;
+        uint amount;
     }
 
     Config config;
@@ -45,17 +40,10 @@ contract Settle is CoreContract {
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
-    /**
-     * @notice Get current configuration parameters
-     */
     function getConfig() external view returns (Config memory) {
         return config;
     }
 
-    /**
-     * @notice Settles and distributes funds from closed positions to puppets
-     * @dev Transfers funds from allocation account, deducts fees, distributes to puppets based on allocation ratios
-     */
     function settle(
         Account _account,
         Mirror _mirror,
@@ -68,9 +56,9 @@ contract Settle is CoreContract {
             revert Error.Settle__PuppetListExceedsMaximum(_puppetCount, config.maxPuppetList);
         }
 
-        uint _sequencerFee = _callParams.sequencerExecutionFee;
-        if (_sequencerFee == 0) revert Error.Settle__InvalidSequencerExecutionFeeAmount();
-        if (_callParams.sequencerFeeReceiver == address(0)) revert Error.Settle__InvalidSequencerExecutionFeeReceiver();
+        uint _matchMakerFee = _callParams.matchMakerExecutionFee;
+        if (_matchMakerFee == 0) revert Error.Settle__InvalidMatchMakerExecutionFeeAmount();
+        if (_callParams.matchMakerFeeReceiver == address(0)) revert Error.Settle__InvalidMatchMakerExecutionFeeReceiver();
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
         address _allocationAddress = _account.getAllocationAddress(
@@ -80,8 +68,6 @@ contract Settle is CoreContract {
         uint _allocation = _mirror.allocationMap(_allocationAddress);
         if (_allocation == 0) revert Error.Settle__InvalidAllocation(_allocationAddress);
 
-        // Transfer the specified amount from allocation account
-        // transferInAllocation already verifies the amount matches
         _account.transferInAllocation(
             _allocationAddress,
             _callParams.distributionToken,
@@ -90,13 +76,13 @@ contract Settle is CoreContract {
         );
 
         if (
-            _callParams.sequencerExecutionFee
-                >= Precision.applyFactor(config.maxSequencerFeeToSettleRatio, _callParams.amount)
-        ) revert Error.Settle__SequencerFeeExceedsSettledAmount(_callParams.sequencerExecutionFee, _callParams.amount);
+            _callParams.matchMakerExecutionFee
+                >= Precision.applyFactor(config.maxMatchMakerFeeToSettleRatio, _callParams.amount)
+        ) revert Error.Settle__MatchMakerFeeExceedsSettledAmount(_callParams.matchMakerExecutionFee, _callParams.amount);
 
-        _distributedAmount = _callParams.amount - _callParams.sequencerExecutionFee;
+        _distributedAmount = _callParams.amount - _callParams.matchMakerExecutionFee;
 
-        _account.transferOut(_callParams.distributionToken, _callParams.sequencerFeeReceiver, _callParams.sequencerExecutionFee);
+        _account.transferOut(_callParams.distributionToken, _callParams.matchMakerFeeReceiver, _callParams.matchMakerExecutionFee);
 
         if (config.platformSettleFeeFactor > 0) {
             _platformFeeAmount = Precision.applyFactor(config.platformSettleFeeFactor, _distributedAmount);
@@ -128,10 +114,10 @@ contract Settle is CoreContract {
             abi.encode(
                 _callParams.collateralToken,
                 _callParams.distributionToken,
-                _callParams.sequencerFeeReceiver,
+                _callParams.matchMakerFeeReceiver,
                 _callParams.trader,
                 _callParams.allocationId,
-                _callParams.sequencerExecutionFee,
+                _callParams.matchMakerExecutionFee,
                 _allocationAddress,
                 _traderMatchingKey,
                 _distributedAmount,
@@ -141,10 +127,6 @@ contract Settle is CoreContract {
         );
     }
 
-    /**
-     * @notice Collects dust tokens from an allocation account
-     * @dev Transfers small amounts of tokens that are below the dust threshold
-     */
     function collectAllocationAccountDust(
         Account _account,
         address _allocationAccount,
@@ -158,8 +140,6 @@ contract Settle is CoreContract {
         if (_dustThreshold == 0) revert Error.Settle__DustThresholdNotSet(address(_dustToken));
         if (_amount > _dustThreshold) revert Error.Settle__AmountExceedsDustThreshold(_amount, _dustThreshold);
 
-        // Transfer the specified dust amount from allocation account
-        // transferInAllocation already verifies the amount and balance
         _account.transferInAllocation(_allocationAccount, _dustToken, _amount, config.allocationAccountTransferGasLimit);
 
         _account.transferOut(_dustToken, _receiver, _amount);
@@ -172,10 +152,6 @@ contract Settle is CoreContract {
         return _amount;
     }
 
-    /**
-     * @notice Collects accumulated platform fees from AllocationStore
-     * @dev Validates amount doesn't exceed accumulated fees before transfer
-     */
     function collectPlatformFees(Account _account, IERC20 _token, address _receiver, uint _amount) external auth {
         if (_receiver == address(0)) revert("Invalid receiver");
         if (_amount == 0) revert("Invalid amount");
@@ -187,9 +163,6 @@ contract Settle is CoreContract {
         _logEvent("CollectPlatformFees", abi.encode(_token, _receiver, _amount));
     }
 
-    /**
-     * @notice Configure dust collection thresholds for tokens
-     */
     function setTokenDustThresholdList(
         IERC20[] calldata _tokenDustThresholdList,
         uint[] calldata _tokenDustThresholdCapList
@@ -198,12 +171,10 @@ contract Settle is CoreContract {
             revert("Invalid token dust threshold list");
         }
 
-        // Clear existing thresholds
         for (uint i = 0; i < tokenDustThresholdList.length; i++) {
             delete tokenDustThresholdAmountMap[tokenDustThresholdList[i]];
         }
 
-        // Set new thresholds
         for (uint i = 0; i < _tokenDustThresholdList.length; i++) {
             IERC20 _token = _tokenDustThresholdList[i];
             uint _cap = _tokenDustThresholdCapList[i];
@@ -216,21 +187,16 @@ contract Settle is CoreContract {
 
         tokenDustThresholdList = _tokenDustThresholdList;
 
-        // Log dust threshold configuration
         _logEvent("SetTokenDustThreshold", abi.encode(_tokenDustThresholdList, _tokenDustThresholdCapList));
     }
 
-    /**
-     * @notice Internal function to set configuration
-     * @dev Required by CoreContract
-     */
     function _setConfig(
         bytes memory _data
     ) internal override {
         Config memory _config = abi.decode(_data, (Config));
 
         if (_config.platformSettleFeeFactor == 0) revert("Invalid Platform Settle Fee Factor");
-        if (_config.maxSequencerFeeToSettleRatio == 0) revert("Invalid Max Sequencer Fee To Settle Ratio");
+        if (_config.maxMatchMakerFeeToSettleRatio == 0) revert("Invalid Max MatchMaker Fee To Settle Ratio");
         if (_config.maxPuppetList == 0) revert("Invalid Max Puppet List");
         if (_config.allocationAccountTransferGasLimit == 0) revert("Invalid Token Transfer Gas Limit");
 

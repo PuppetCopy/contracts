@@ -12,7 +12,7 @@ import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
 /**
  * @title UserRouter
  * @notice Handles user-facing operations for the copy trading system
- * @dev Contains deposit, withdraw, rule setting, and offer acceptance functionality
+ * @dev Contains deposit, withdraw, rule setting, and fee marketplace interactions
  */
 contract UserRouter is ReentrancyGuardTransient {
     Account public immutable account;
@@ -61,12 +61,12 @@ contract UserRouter is ReentrancyGuardTransient {
     }
 
     /**
-     * @notice Executes a fee redemption offer.
-     * @param feeToken The fee token to be redeemed.
+     * @notice Accepts the current fee offer by burning PUPPET at ask price.
+     * @param feeToken The fee token to purchase.
      * @param receiver The address receiving the fee tokens.
-     * @param purchaseAmount The amount of fee tokens to redeem.
+     * @param amount The amount of fee tokens to purchase.
      */
-    function acceptOffer(IERC20 feeToken, address receiver, uint purchaseAmount) external nonReentrant {
-        feeMarketplace.acceptOffer(feeToken, msg.sender, receiver, purchaseAmount);
+    function acceptOffer(IERC20 feeToken, address receiver, uint amount) external nonReentrant {
+        feeMarketplace.acceptOffer(feeToken, msg.sender, receiver, amount);
     }
 }

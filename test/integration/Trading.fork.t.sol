@@ -4,7 +4,7 @@ pragma solidity ^0.8.31;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test} from "forge-std/src/Test.sol";
 
-import {SequencerRouter} from "src/SequencerRouter.sol";
+import {MatchMakerRouter} from "src/MatchMakerRouter.sol";
 import {Account as AccountContract} from "src/position/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
 import {Subscribe} from "src/position/Subscribe.sol";
@@ -35,7 +35,7 @@ contract TradingForkTest is Test {
 
     // Test actors
     address private admin = address(0xA11CE);
-    address private sequencer = address(0xBEE);
+    address private matchMaker = address(0xBEE);
     address private trader = address(0xCAFE);
     address private puppet1 = address(0x1);
     address private puppet2 = address(0x2);
@@ -48,7 +48,7 @@ contract TradingForkTest is Test {
     Subscribe private subscribe;
     Mirror private mirror;
     Settle private settle;
-    SequencerRouter private sequencerRouter;
+    MatchMakerRouter private matchMakerRouter;
 
     function setUp() public {
         // Prefer RPC_42161_1 (in .env); fall back to ARBITRUM_RPC_URL for compatibility
@@ -63,7 +63,7 @@ contract TradingForkTest is Test {
 
         vm.createSelectFork(rpc);
         vm.deal(admin, 100 ether);
-        vm.deal(sequencer, 10 ether);
+        vm.deal(matchMaker, 10 ether);
 
         authority = new Dictatorship(admin);
         tokenRouter = new TokenRouter(authority, TokenRouter.Config({transferGasLimit: 200_000}));
@@ -91,9 +91,9 @@ contract TradingForkTest is Test {
                 // forge-lint: disable-next-line(unsafe-typecast)
                 referralCode: bytes32("PUPPET"),
                 maxPuppetList: 50,
-                maxSequencerFeeToAllocationRatio: 0.1e30,
-                maxSequencerFeeToAdjustmentRatio: 0.1e30,
-                maxSequencerFeeToCloseRatio: 0.1e30,
+                maxMatchMakerFeeToAllocationRatio: 0.1e30,
+                maxMatchMakerFeeToAdjustmentRatio: 0.1e30,
+                maxMatchMakerFeeToCloseRatio: 0.1e30,
                 maxMatchOpenDuration: 30 seconds,
                 maxMatchAdjustDuration: 60 seconds
             })
@@ -104,20 +104,20 @@ contract TradingForkTest is Test {
             Settle.Config({
                 transferOutGasLimit: 200_000,
                 platformSettleFeeFactor: 0.05e30, // 5%
-                maxSequencerFeeToSettleRatio: 0.1e30, // 10%
+                maxMatchMakerFeeToSettleRatio: 0.1e30, // 10%
                 maxPuppetList: 50,
                 allocationAccountTransferGasLimit: 100_000
             })
         );
 
-        sequencerRouter = new SequencerRouter(
+        matchMakerRouter = new MatchMakerRouter(
             authority,
             account,
             subscribe,
             mirror,
             settle,
-            SequencerRouter.Config({
-                feeReceiver: sequencer,
+            MatchMakerRouter.Config({
+                feeReceiver: matchMaker,
                 matchBaseGasLimit: 1_300_853,
                 matchPerPuppetGasLimit: 30_000,
                 adjustBaseGasLimit: 910_663,
@@ -150,7 +150,7 @@ contract TradingForkTest is Test {
         _mockTraderPosition(trader, GMX_ETH_USD_MARKET, USDC, true, 10_000e30, 2_000e6);
 
         uint executionFee = 0.02 ether;
-        uint sequencerFee = 1e6; // 1 USDC
+        uint fee = 1e6; // 1 USDC
 
         Mirror.CallPosition memory params = Mirror.CallPosition({
             collateralToken: USDC,
@@ -159,12 +159,12 @@ contract TradingForkTest is Test {
             isLong: true,
             executionFee: executionFee,
             allocationId: 1,
-            sequencerFee: sequencerFee
+            matchMakerFee: fee
         });
 
-        vm.startPrank(sequencer);
-        vm.deal(sequencer, executionFee + 1 ether); // ensure ETH for execution fee
-        (address allocationAddr, bytes32 orderKey) = sequencerRouter.matchmake{value: executionFee}(params, puppetList);
+        vm.startPrank(matchMaker);
+        vm.deal(matchMaker, executionFee + 1 ether); // ensure ETH for execution fee
+        (address allocationAddr, bytes32 orderKey) = matchMakerRouter.matchmake{value: executionFee}(params, puppetList);
         vm.stopPrank();
 
         assertTrue(orderKey != bytes32(0), "GMX order key should be non-zero");
@@ -185,7 +185,7 @@ contract TradingForkTest is Test {
         authority.registerContract(settle);
         authority.registerContract(subscribe);
         authority.registerContract(mirror);
-        authority.registerContract(sequencerRouter);
+        authority.registerContract(matchMakerRouter);
 
         // TokenRouter permissions
         authority.setPermission(tokenRouter, tokenRouter.transfer.selector, address(accountStore));
@@ -206,18 +206,18 @@ contract TradingForkTest is Test {
 
         // Mirror permissions
         authority.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(subscribe));
-        authority.setPermission(mirror, mirror.matchmake.selector, address(sequencerRouter));
-        authority.setPermission(mirror, mirror.adjust.selector, address(sequencerRouter));
-        authority.setPermission(mirror, mirror.close.selector, address(sequencerRouter));
+        authority.setPermission(mirror, mirror.matchmake.selector, address(matchMakerRouter));
+        authority.setPermission(mirror, mirror.adjust.selector, address(matchMakerRouter));
+        authority.setPermission(mirror, mirror.close.selector, address(matchMakerRouter));
 
         // Settle permissions
-        authority.setPermission(settle, settle.settle.selector, address(sequencerRouter));
-        authority.setPermission(settle, settle.collectAllocationAccountDust.selector, address(sequencerRouter));
+        authority.setPermission(settle, settle.settle.selector, address(matchMakerRouter));
+        authority.setPermission(settle, settle.collectAllocationAccountDust.selector, address(matchMakerRouter));
 
-        // Sequencer entrypoints (use sequencer as the caller for this test)
-        authority.setPermission(sequencerRouter, sequencerRouter.matchmake.selector, sequencer);
-        authority.setPermission(sequencerRouter, sequencerRouter.adjust.selector, sequencer);
-        authority.setPermission(sequencerRouter, sequencerRouter.close.selector, sequencer);
+        // MatchMaker entrypoints (use matchMaker as the caller for this test)
+        authority.setPermission(matchMakerRouter, matchMakerRouter.matchmake.selector, matchMaker);
+        authority.setPermission(matchMakerRouter, matchMakerRouter.adjust.selector, matchMaker);
+        authority.setPermission(matchMakerRouter, matchMakerRouter.close.selector, matchMaker);
 
         // Administrative helpers
         authority.setPermission(account, account.setDepositCapList.selector, admin);

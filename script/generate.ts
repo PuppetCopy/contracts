@@ -253,9 +253,21 @@ async function main(): Promise<void> {
   await generateErrorAbi()
   await generateEvents()
   await generateIndex()
-  await generateGmx()
-  await generateGmxIndex()
-  await formatGeneratedFiles()
+
+  const skipGmx =
+    Bun.env.SKIP_GMX === '1' ||
+    Bun.env.SKIP_GMX === 'true' ||
+    Bun.env.SKIP_NETWORK === '1' ||
+    Bun.env.SKIP_NETWORK === 'true'
+  if (!skipGmx) {
+    await generateGmx()
+    await generateGmxIndex()
+  }
+
+  const skipFormat = Bun.env.SKIP_FORMAT === '1' || Bun.env.SKIP_FORMAT === 'true'
+  if (!skipFormat) {
+    await formatGeneratedFiles()
+  }
 
   console.log('\n=== Generation complete ===')
   console.log(`Output: ${OUTPUT_DIR}/`)

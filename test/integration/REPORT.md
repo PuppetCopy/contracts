@@ -1,7 +1,7 @@
 # Fork Test Gas Analysis
 
 **Network:** Arbitrum One (Chain ID: 42161)  
-**Purpose:** Empirical gas measurement for sequencer operations
+**Purpose:** Empirical gas measurement for matchmaker operations
 
 ## Latest Results (2025-01-25)
 

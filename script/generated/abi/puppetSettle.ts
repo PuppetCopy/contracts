@@ -26,7 +26,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'maxSequencerFeeToSettleRatio',
+            name: 'maxMatchMakerFeeToSettleRatio',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -170,7 +170,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'maxSequencerFeeToSettleRatio',
+            name: 'maxMatchMakerFeeToSettleRatio',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -292,7 +292,7 @@ export default [
             internalType: 'contract IERC20'
           },
           {
-            name: 'sequencerFeeReceiver',
+            name: 'matchMakerFeeReceiver',
             type: 'address',
             internalType: 'address'
           },
@@ -307,7 +307,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'sequencerExecutionFee',
+            name: 'matchMakerExecutionFee',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -455,18 +455,34 @@ export default [
   },
   {
     type: 'error',
+    name: 'Settle__InvalidMatchMakerExecutionFeeAmount',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Settle__InvalidMatchMakerExecutionFeeReceiver',
+    inputs: []
+  },
+  {
+    type: 'error',
     name: 'Settle__InvalidReceiver',
     inputs: []
   },
   {
     type: 'error',
-    name: 'Settle__InvalidSequencerExecutionFeeAmount',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Settle__InvalidSequencerExecutionFeeReceiver',
-    inputs: []
+    name: 'Settle__MatchMakerFeeExceedsSettledAmount',
+    inputs: [
+      {
+        name: 'matchMakerFee',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'settledAmount',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ]
   },
   {
     type: 'error',
@@ -495,22 +511,6 @@ export default [
       },
       {
         name: 'expected',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Settle__SequencerFeeExceedsSettledAmount',
-    inputs: [
-      {
-        name: 'sequencerFee',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'settledAmount',
         type: 'uint256',
         internalType: 'uint256'
       }

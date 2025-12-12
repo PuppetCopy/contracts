@@ -239,7 +239,7 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Mirror__InvalidSequencerExecutionFeeAmount',
+    name: 'Mirror__InvalidMatchMakerExecutionFeeAmount',
     inputs: []
   },
   {
@@ -286,10 +286,10 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Mirror__SequencerFeeExceedsCostFactor',
+    name: 'Mirror__MatchMakerFeeExceedsCostFactor',
     inputs: [
       {
-        name: 'sequencerFee',
+        name: 'matchMakerFee',
         internalType: 'uint256',
         type: 'uint256'
       },
@@ -307,10 +307,10 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Mirror__SequencerFeeExceedsAdjustmentRatio',
+    name: 'Mirror__MatchMakerFeeExceedsAdjustmentRatio',
     inputs: [
       {
-        name: 'sequencerFee',
+        name: 'matchMakerFee',
         internalType: 'uint256',
         type: 'uint256'
       },
@@ -323,10 +323,10 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Mirror__SequencerFeeExceedsCloseRatio',
+    name: 'Mirror__MatchMakerFeeExceedsCloseRatio',
     inputs: [
       {
-        name: 'sequencerFee',
+        name: 'matchMakerFee',
         internalType: 'uint256',
         type: 'uint256'
       },
@@ -339,7 +339,7 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Mirror__SequencerFeeNotFullyCovered',
+    name: 'Mirror__MatchMakerFeeNotFullyCovered',
     inputs: [
       {
         name: 'totalPaid',
@@ -418,20 +418,20 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Settle__InvalidSequencerExecutionFeeAmount',
+    name: 'Settle__InvalidMatchMakerExecutionFeeAmount',
     inputs: []
   },
   {
     type: 'error',
-    name: 'Settle__InvalidSequencerExecutionFeeReceiver',
+    name: 'Settle__InvalidMatchMakerExecutionFeeReceiver',
     inputs: []
   },
   {
     type: 'error',
-    name: 'Settle__SequencerFeeExceedsSettledAmount',
+    name: 'Settle__MatchMakerFeeExceedsSettledAmount',
     inputs: [
       {
-        name: 'sequencerFee',
+        name: 'matchMakerFee',
         internalType: 'uint256',
         type: 'uint256'
       },
@@ -612,12 +612,7 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'SequencerRouter__FailedRefundExecutionFee',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'FeeMarketplace__NotAuctionableToken',
+    name: 'MatchMakerRouter__FailedRefundExecutionFee',
     inputs: []
   },
   {
@@ -625,7 +620,7 @@ export const puppetErrorAbi = [
     name: 'FeeMarketplace__InsufficientUnlockedBalance',
     inputs: [
       {
-        name: 'accruedReward',
+        name: 'unlockedBalance',
         internalType: 'uint256',
         type: 'uint256'
       }
@@ -638,7 +633,7 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'FeeMarketplace__InvalidAmount',
+    name: 'FeeMarketplace__InvalidConfig',
     inputs: []
   }
 ] as const

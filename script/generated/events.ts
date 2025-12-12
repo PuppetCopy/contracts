@@ -53,9 +53,10 @@ export const CONTRACT_EVENT_MAP = {
       hash: '0x7d778e14025c4611dae90acde3cdf239063797ccb4dc030ab8c78b43e4558e02',
       args: [
         { type: 'address', name: 'feeToken' },
+        { type: 'address', name: 'buyer' },
         { type: 'address', name: 'receiver' },
-        { type: 'uint256', name: 'purchaseAmount' },
-        { type: 'uint256', name: 'currentAskAmount' }
+        { type: 'uint256', name: 'amount' },
+        { type: 'uint256', name: 'cost' }
       ]
     },
     Deposit: {
@@ -63,13 +64,6 @@ export const CONTRACT_EVENT_MAP = {
       args: [
         { type: 'address', name: 'feeToken' },
         { type: 'address', name: 'depositor' },
-        { type: 'uint256', name: 'amount' }
-      ]
-    },
-    SetAskAmount: {
-      hash: '0xcfe46361f1decd9f0703eed4590829d6e4caf041b08e3ef5c92ff03d27bf8851',
-      args: [
-        { type: 'address', name: 'feeToken' },
         { type: 'uint256', name: 'amount' }
       ]
     }
@@ -82,7 +76,7 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'bytes32', name: 'requestKey' },
         { type: 'address', name: 'feeReceiver' },
         { type: 'uint256', name: 'executionFee' },
-        { type: 'uint256', name: 'sequencerFee' },
+        { type: 'uint256', name: 'matchMakerFee' },
         { type: 'bool', name: 'isIncrease' },
         { type: 'uint256', name: 'sizeDelta' },
         { type: 'uint256', name: 'puppetCurrentSize' },
@@ -97,7 +91,7 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'bytes32', name: 'requestKey' },
         { type: 'address', name: 'feeReceiver' },
         { type: 'uint256', name: 'executionFee' },
-        { type: 'uint256', name: 'sequencerFee' },
+        { type: 'uint256', name: 'matchMakerFee' },
         { type: 'uint256', name: 'positionSize' },
         { type: 'uint8', name: 'reason' },
         { type: 'uint256[]', name: 'nextBalanceList' }
@@ -113,7 +107,7 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'bool', name: 'isLong' },
         { type: 'uint256', name: 'executionFee' },
         { type: 'uint256', name: 'allocationId' },
-        { type: 'uint256', name: 'sequencerFee' },
+        { type: 'uint256', name: 'matchMakerFee' },
         { type: 'address', name: 'allocationAddress' },
         { type: 'bytes32', name: 'traderMatchingKey' },
         { type: 'bytes32', name: 'traderPositionKey' },
@@ -151,10 +145,10 @@ export const CONTRACT_EVENT_MAP = {
       args: [
         { type: 'address', name: 'collateralToken' },
         { type: 'address', name: 'distributionToken' },
-        { type: 'address', name: 'sequencerFeeReceiver' },
+        { type: 'address', name: 'matchMakerFeeReceiver' },
         { type: 'address', name: 'trader' },
         { type: 'uint256', name: 'allocationId' },
-        { type: 'uint256', name: 'sequencerExecutionFee' },
+        { type: 'uint256', name: 'matchMakerExecutionFee' },
         { type: 'address', name: 'allocationAddress' },
         { type: 'bytes32', name: 'traderMatchingKey' },
         { type: 'uint256', name: 'distributedAmount' },
