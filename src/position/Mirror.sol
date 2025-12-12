@@ -26,9 +26,9 @@ contract Mirror is CoreContract {
         address gmxOrderVault;
         bytes32 referralCode;
         uint maxPuppetList;
-        uint maxMatchMakerFeeToAllocationRatio;
-        uint maxMatchMakerFeeToAdjustmentRatio;
-        uint maxMatchMakerFeeToCloseRatio;
+        uint maxMatchmakerFeeToAllocationRatio;
+        uint maxMatchmakerFeeToAdjustmentRatio;
+        uint maxMatchmakerFeeToCloseRatio;
         uint maxMatchOpenDuration;
         uint maxMatchAdjustDuration;
     }
@@ -40,7 +40,7 @@ contract Mirror is CoreContract {
         bool isLong;
         uint executionFee;
         uint allocationId;
-        uint matchMakerFee;
+        uint matchmakerFee;
     }
 
     Config public config;
@@ -89,7 +89,7 @@ contract Mirror is CoreContract {
         address[] calldata _puppetList,
         address _feeReceiver
     ) external payable auth returns (address _allocationAddress, bytes32 _requestKey) {
-        if (_callMatch.matchMakerFee == 0) revert Error.Mirror__InvalidMatchMakerExecutionFeeAmount();
+        if (_callMatch.matchmakerFee == 0) revert Error.Mirror__InvalidMatchmakerExecutionFeeAmount();
         uint _puppetCount = _puppetList.length;
         if (_puppetCount == 0) revert Error.Mirror__PuppetListEmpty();
         if (_puppetCount > config.maxPuppetList) revert Error.Mirror__PuppetListTooLarge(_puppetCount, config.maxPuppetList);
@@ -121,7 +121,7 @@ contract Mirror is CoreContract {
         uint[] memory _nextBalanceList = _account.getBalanceList(_callMatch.collateralToken, _puppetList);
 
         uint _allocated = 0;
-        uint _remainingFee = _callMatch.matchMakerFee;
+        uint _remainingFee = _callMatch.matchmakerFee;
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
             address _puppet = _puppetList[_i];
@@ -145,10 +145,10 @@ contract Mirror is CoreContract {
         }
 
         if (_remainingFee != 0) {
-            revert Error.Mirror__MatchMakerFeeNotFullyCovered(_callMatch.matchMakerFee - _remainingFee, _callMatch.matchMakerFee);
+            revert Error.Mirror__MatchmakerFeeNotFullyCovered(_callMatch.matchmakerFee - _remainingFee, _callMatch.matchmakerFee);
         }
-        if (_callMatch.matchMakerFee >= Precision.applyFactor(config.maxMatchMakerFeeToAllocationRatio, _allocated + _callMatch.matchMakerFee)) {
-            revert Error.Mirror__MatchMakerFeeExceedsCostFactor(_callMatch.matchMakerFee, _allocated + _callMatch.matchMakerFee);
+        if (_callMatch.matchmakerFee >= Precision.applyFactor(config.maxMatchmakerFeeToAllocationRatio, _allocated + _callMatch.matchmakerFee)) {
+            revert Error.Mirror__MatchmakerFeeExceedsCostFactor(_callMatch.matchmakerFee, _allocated + _callMatch.matchmakerFee);
         }
 
         _allocationAddress = _account.createAllocationAccount(_allocationKey);
@@ -156,7 +156,7 @@ contract Mirror is CoreContract {
         allocationPuppetList[_allocationAddress] = _allocatedList;
 
         _account.setBalanceList(_callMatch.collateralToken, _puppetList, _nextBalanceList);
-        _account.transferOut(_callMatch.collateralToken, _feeReceiver, _callMatch.matchMakerFee);
+        _account.transferOut(_callMatch.collateralToken, _feeReceiver, _callMatch.matchmakerFee);
         _account.transferOut(_callMatch.collateralToken, config.gmxOrderVault, _allocated);
 
         uint _sizeDelta = Math.mulDiv(_traderSizeInUsd, _allocated, _traderCollateral);
@@ -187,7 +187,7 @@ contract Mirror is CoreContract {
                 _callMatch.isLong,
                 _callMatch.executionFee,
                 _callMatch.allocationId,
-                _callMatch.matchMakerFee,
+                _callMatch.matchmakerFee,
                 _allocationAddress,
                 _traderMatchingKey,
                 _traderPositionKey,
@@ -208,7 +208,7 @@ contract Mirror is CoreContract {
         address[] calldata _puppetList,
         address _feeReceiver
     ) external payable auth returns (bytes32 _requestKey) {
-        if (_callPosition.matchMakerFee == 0) revert Error.Mirror__InvalidMatchMakerExecutionFeeAmount();
+        if (_callPosition.matchmakerFee == 0) revert Error.Mirror__InvalidMatchmakerExecutionFeeAmount();
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callPosition.collateralToken, _callPosition.trader);
         address _allocationAddress = _account.getAllocationAddress(
@@ -217,8 +217,8 @@ contract Mirror is CoreContract {
         uint _allocated = allocationMap[_allocationAddress];
         if (_allocated == 0) revert Error.Mirror__InvalidAllocation(_allocationAddress);
 
-        if (_callPosition.matchMakerFee >= Precision.applyFactor(config.maxMatchMakerFeeToAdjustmentRatio, _allocated)) {
-            revert Error.Mirror__MatchMakerFeeExceedsAdjustmentRatio(_callPosition.matchMakerFee, _allocated);
+        if (_callPosition.matchmakerFee >= Precision.applyFactor(config.maxMatchmakerFeeToAdjustmentRatio, _allocated)) {
+            revert Error.Mirror__MatchmakerFeeExceedsAdjustmentRatio(_callPosition.matchmakerFee, _allocated);
         }
 
         bytes32 _puppetPositionKey = Position.getPositionKey(
@@ -251,7 +251,7 @@ contract Mirror is CoreContract {
 
         uint _puppetCount = _puppetList.length;
         uint[] memory _nextBalanceList = _account.getBalanceList(_callPosition.collateralToken, _puppetList);
-        uint _remainingFee = _callPosition.matchMakerFee;
+        uint _remainingFee = _callPosition.matchmakerFee;
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
             if (_nextBalanceList[_i] == 0) continue;
@@ -269,11 +269,11 @@ contract Mirror is CoreContract {
         }
 
         if (_remainingFee != 0) {
-            revert Error.Mirror__MatchMakerFeeNotFullyCovered(_callPosition.matchMakerFee - _remainingFee, _callPosition.matchMakerFee);
+            revert Error.Mirror__MatchmakerFeeNotFullyCovered(_callPosition.matchmakerFee - _remainingFee, _callPosition.matchmakerFee);
         }
 
         _account.setBalanceList(_callPosition.collateralToken, _puppetList, _nextBalanceList);
-        _account.transferOut(_callPosition.collateralToken, _feeReceiver, _callPosition.matchMakerFee);
+        _account.transferOut(_callPosition.collateralToken, _feeReceiver, _callPosition.matchmakerFee);
 
         uint _acceptablePrice = _traderSizeInUsd / _traderSizeInTokens;
 
@@ -299,7 +299,7 @@ contract Mirror is CoreContract {
                 _requestKey,
                 _feeReceiver,
                 _callPosition.executionFee,
-                _callPosition.matchMakerFee,
+                _callPosition.matchmakerFee,
                 _isIncrease,
                 _sizeDelta,
                 _puppetCurrentSize,
@@ -316,7 +316,7 @@ contract Mirror is CoreContract {
         uint8 _reason,
         address _feeReceiver
     ) external payable auth returns (bytes32 _requestKey) {
-        if (_callPosition.matchMakerFee == 0) revert Error.Mirror__InvalidMatchMakerExecutionFeeAmount();
+        if (_callPosition.matchmakerFee == 0) revert Error.Mirror__InvalidMatchmakerExecutionFeeAmount();
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callPosition.collateralToken, _callPosition.trader);
         address _allocationAddress = _account.getAllocationAddress(
@@ -325,8 +325,8 @@ contract Mirror is CoreContract {
         uint _allocated = allocationMap[_allocationAddress];
         if (_allocated == 0) revert Error.Mirror__InvalidAllocation(_allocationAddress);
 
-        if (_callPosition.matchMakerFee >= Precision.applyFactor(config.maxMatchMakerFeeToCloseRatio, _allocated)) {
-            revert Error.Mirror__MatchMakerFeeExceedsCloseRatio(_callPosition.matchMakerFee, _allocated);
+        if (_callPosition.matchmakerFee >= Precision.applyFactor(config.maxMatchmakerFeeToCloseRatio, _allocated)) {
+            revert Error.Mirror__MatchmakerFeeExceedsCloseRatio(_callPosition.matchmakerFee, _allocated);
         }
 
         bytes32 _puppetPositionKey = Position.getPositionKey(
@@ -338,7 +338,7 @@ contract Mirror is CoreContract {
 
         uint _puppetCount = _puppetList.length;
         uint[] memory _nextBalanceList = _account.getBalanceList(_callPosition.collateralToken, _puppetList);
-        uint _remainingFee = _callPosition.matchMakerFee;
+        uint _remainingFee = _callPosition.matchmakerFee;
 
         for (uint _i = 0; _i < _puppetCount; _i++) {
             if (_nextBalanceList[_i] == 0) continue;
@@ -356,11 +356,11 @@ contract Mirror is CoreContract {
         }
 
         if (_remainingFee != 0) {
-            revert Error.Mirror__MatchMakerFeeNotFullyCovered(_callPosition.matchMakerFee - _remainingFee, _callPosition.matchMakerFee);
+            revert Error.Mirror__MatchmakerFeeNotFullyCovered(_callPosition.matchmakerFee - _remainingFee, _callPosition.matchmakerFee);
         }
 
         _account.setBalanceList(_callPosition.collateralToken, _puppetList, _nextBalanceList);
-        _account.transferOut(_callPosition.collateralToken, _feeReceiver, _callPosition.matchMakerFee);
+        _account.transferOut(_callPosition.collateralToken, _feeReceiver, _callPosition.matchmakerFee);
 
         uint _acceptablePrice = _callPosition.isLong ? 0 : type(uint).max;
 
@@ -386,7 +386,7 @@ contract Mirror is CoreContract {
                 _requestKey,
                 _feeReceiver,
                 _callPosition.executionFee,
-                _callPosition.matchMakerFee,
+                _callPosition.matchmakerFee,
                 _positionSize,
                 _reason,
                 _nextBalanceList
@@ -463,9 +463,9 @@ contract Mirror is CoreContract {
         if (_config.gmxOrderVault == address(0)) revert("Invalid GMX Order Vault address");
         if (_config.referralCode == bytes32(0)) revert("Invalid Referral Code");
         if (_config.maxPuppetList == 0) revert("Invalid max puppet list");
-        if (_config.maxMatchMakerFeeToAllocationRatio == 0) revert("Invalid max matchmaker fee to allocation ratio");
-        if (_config.maxMatchMakerFeeToAdjustmentRatio == 0) revert("Invalid max matchmaker fee to adjustment ratio");
-        if (_config.maxMatchMakerFeeToCloseRatio == 0) revert("Invalid max matchmaker fee to close ratio");
+        if (_config.maxMatchmakerFeeToAllocationRatio == 0) revert("Invalid max matchmaker fee to allocation ratio");
+        if (_config.maxMatchmakerFeeToAdjustmentRatio == 0) revert("Invalid max matchmaker fee to adjustment ratio");
+        if (_config.maxMatchmakerFeeToCloseRatio == 0) revert("Invalid max matchmaker fee to close ratio");
 
         config = _config;
     }

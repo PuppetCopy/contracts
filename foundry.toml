@@ -19,7 +19,7 @@
   build_info = true
   optimizer = true
   optimizer_runs = 200
-  gas_reports = ["Mirror", "Account", "Settle", "Subscribe", "MatchMakerRouter"]
+  gas_reports = ["Mirror", "Account", "Settle", "Subscribe", "Router"]
 
 [profile.default.optimizer_details]
   yul = true

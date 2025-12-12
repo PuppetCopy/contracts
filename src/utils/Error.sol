@@ -42,16 +42,19 @@ library Error {
 
     error Mirror__InvalidAllocation(address allocationAddress);
     error Mirror__InvalidCollateralDelta();
-    error Mirror__InvalidMatchMakerExecutionFeeAmount();
+    error Mirror__InvalidMatchmakerExecutionFeeAmount();
+    error Mirror__InvalidExecutionFeeAmount();
     error Mirror__InvalidSizeDelta();
     error Mirror__PuppetListEmpty();
     error Mirror__PuppetListTooLarge(uint provided, uint maximum);
     error Mirror__InsufficientGmxExecutionFee(uint provided, uint required);
-    error Mirror__MatchMakerFeeExceedsCostFactor(uint matchMakerFee, uint allocationAmount);
+    error Mirror__MatchmakerFeeExceedsCostFactor(uint matchmakerFee, uint allocationAmount);
     error Mirror__OrderCreationFailed();
-    error Mirror__MatchMakerFeeExceedsAdjustmentRatio(uint matchMakerFee, uint allocationAmount);
-    error Mirror__MatchMakerFeeExceedsCloseRatio(uint matchMakerFee, uint allocationAmount);
-    error Mirror__MatchMakerFeeNotFullyCovered(uint totalPaid, uint requiredFee);
+    error Mirror__MatchmakerFeeExceedsAdjustmentRatio(uint matchmakerFee, uint allocationAmount);
+    error Mirror__MatchmakerFeeExceedsCloseRatio(uint matchmakerFee, uint allocationAmount);
+    error Mirror__FeeExceedsCloseRatio(uint fee, uint allocationAmount);
+    error Mirror__MatchmakerFeeNotFullyCovered(uint totalPaid, uint requiredFee);
+    error Mirror__FeeNotFullyCovered(uint totalPaid, uint requiredFee);
     error Mirror__RequestPending();
     error Mirror__NoPosition();
     error Mirror__PositionAlreadyOpen();
@@ -60,9 +63,9 @@ library Error {
 
     error Settle__InvalidAllocation(address allocationAddress);
     error Settle__PuppetListMismatch(uint provided, uint expected);
-    error Settle__InvalidMatchMakerExecutionFeeAmount();
-    error Settle__InvalidMatchMakerExecutionFeeReceiver();
-    error Settle__MatchMakerFeeExceedsSettledAmount(uint matchMakerFee, uint settledAmount);
+    error Settle__InvalidMatchmakerExecutionFeeAmount();
+    error Settle__InvalidMatchmakerExecutionFeeReceiver();
+    error Settle__MatchmakerFeeExceedsSettledAmount(uint matchmakerFee, uint settledAmount);
     error Settle__PuppetListExceedsMaximum(uint provided, uint maximum);
     error Settle__InvalidReceiver();
     error Settle__DustThresholdNotSet(address token);
@@ -83,7 +86,7 @@ library Error {
     error AllocationAccount__UnauthorizedOperator();
     error AllocationAccount__InsufficientBalance();
 
-    error MatchMakerRouter__FailedRefundExecutionFee();
+    error MatchmakerRouter__FailedRefundExecutionFee();
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();

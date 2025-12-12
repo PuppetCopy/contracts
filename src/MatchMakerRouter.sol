@@ -10,7 +10,7 @@ import {Settle} from "./position/Settle.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
-contract MatchMakerRouter is CoreContract {
+contract MatchmakerRouter is CoreContract {
     struct Config {
         address feeReceiver;
         uint matchBaseGasLimit;

@@ -6,7 +6,6 @@ import accountstoreAbi from './abi/puppetAccountStore.js'
 import dictatorshipAbi from './abi/puppetDictatorship.js'
 import feemarketplaceAbi from './abi/puppetFeeMarketplace.js'
 import feemarketplacestoreAbi from './abi/puppetFeeMarketplaceStore.js'
-import matchmakerrouterAbi from './abi/puppetMatchMakerRouter.js'
 import mirrorAbi from './abi/puppetMirror.js'
 import puppettokenAbi from './abi/puppetPuppetToken.js'
 import routerproxyAbi from './abi/puppetRouterProxy.js'
@@ -61,10 +60,9 @@ export const PUPPET_CONTRACT_MAP = {
     chainId: 42161,
     abi: settleAbi
   },
-  MatchMakerRouter: {
+  Router: {
     address: '0xaF02B24e394d73b62efaB84f4c231D7cE1acCB85',
-    chainId: 42161,
-    abi: matchmakerrouterAbi
+    chainId: 42161
   },
   UserRouter: {
     address: '0xD65A4bD84Ae0B2434cF539ef5589b2C63a848BCf',

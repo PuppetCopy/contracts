@@ -4,7 +4,7 @@ pragma solidity ^0.8.31;
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {MatchMakerRouter} from "src/MatchMakerRouter.sol";
+import {MatchmakerRouter} from "src/MatchmakerRouter.sol";
 import {Account as AccountContract} from "src/position/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
 import {Subscribe} from "src/position/Subscribe.sol";
@@ -23,7 +23,7 @@ import {MockGmxDataStore} from "test/mock/MockGmxDataStore.t.sol";
 /**
  * @title TradingTest
  * @notice Test suite for position mirroring and trading operations
- * @dev Tests integration between Mirror, Settle, MatchMakerRouter, Subscribe, and Deposit
+ * @dev Tests integration between Mirror, Settle, MatchmakerRouter, Subscribe, and Deposit
  * Updated to work with the decoupled Subscribe/Deposit architecture.
  */
 contract TradingTest is BasicSetup {
@@ -32,7 +32,7 @@ contract TradingTest is BasicSetup {
     Settle settle;
     Subscribe subscribe;
     Mirror mirror;
-    MatchMakerRouter matchMakerRouter;
+    MatchmakerRouter matchmakerRouter;
     MockGmxExchangeRouter mockGmxExchangeRouter;
     MockGmxDataStore mockGmxDataStore;
 
@@ -74,9 +74,9 @@ contract TradingTest is BasicSetup {
                 gmxOrderVault: address(0x1234),
                 referralCode: 0x5055505045540000000000000000000000000000000000000000000000000000,
                 maxPuppetList: 50,
-                maxMatchMakerFeeToAllocationRatio: 0.1e30,
-                maxMatchMakerFeeToAdjustmentRatio: 0.1e30,
-                maxMatchMakerFeeToCloseRatio: 0.1e30,
+                maxMatchmakerFeeToAllocationRatio: 0.1e30,
+                maxMatchmakerFeeToAdjustmentRatio: 0.1e30,
+                maxMatchmakerFeeToCloseRatio: 0.1e30,
                 maxMatchOpenDuration: 30 seconds,
                 maxMatchAdjustDuration: 60 seconds
             })
@@ -87,19 +87,19 @@ contract TradingTest is BasicSetup {
             Settle.Config({
                 transferOutGasLimit: 200_000,
                 platformSettleFeeFactor: 0.05e30, // 5%
-                maxMatchMakerFeeToSettleRatio: 0.1e30, // 10%
+                maxMatchmakerFeeToSettleRatio: 0.1e30, // 10%
                 maxPuppetList: 50,
                 allocationAccountTransferGasLimit: 100_000
             })
         );
 
-        matchMakerRouter = new MatchMakerRouter(
+        matchmakerRouter = new MatchmakerRouter(
             dictator,
             account,
             subscribe,
             mirror,
             settle,
-            MatchMakerRouter.Config({
+            MatchmakerRouter.Config({
                 feeReceiver: users.owner,
                 matchBaseGasLimit: 1_300_853,
                 matchPerPuppetGasLimit: 30_000,
@@ -140,20 +140,20 @@ contract TradingTest is BasicSetup {
 
         // Mirror Contract Permissions
         dictator.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(subscribe));
-        dictator.setPermission(mirror, mirror.matchmake.selector, address(matchMakerRouter));
-        dictator.setPermission(mirror, mirror.adjust.selector, address(matchMakerRouter));
-        dictator.setPermission(mirror, mirror.close.selector, address(matchMakerRouter));
+        dictator.setPermission(mirror, mirror.matchmake.selector, address(matchmakerRouter));
+        dictator.setPermission(mirror, mirror.adjust.selector, address(matchmakerRouter));
+        dictator.setPermission(mirror, mirror.close.selector, address(matchmakerRouter));
 
         // Settle Contract Permissions
-        dictator.setPermission(settle, settle.settle.selector, address(matchMakerRouter));
-        dictator.setPermission(settle, settle.collectAllocationAccountDust.selector, address(matchMakerRouter));
+        dictator.setPermission(settle, settle.settle.selector, address(matchmakerRouter));
+        dictator.setPermission(settle, settle.collectAllocationAccountDust.selector, address(matchmakerRouter));
 
         // Initialize contracts
         dictator.registerContract(account);
         dictator.registerContract(settle);
         dictator.registerContract(subscribe);
         dictator.registerContract(mirror);
-        dictator.registerContract(matchMakerRouter);
+        dictator.registerContract(matchmakerRouter);
 
         // Mock GMX DataStore calls to simulate trader positions
         _setupGmxDataStoreMocks();
@@ -169,11 +169,11 @@ contract TradingTest is BasicSetup {
         dictator.setPermission(account, account.deposit.selector, users.owner);
         dictator.setPermission(subscribe, subscribe.rule.selector, users.owner);
         dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, users.owner);
-        dictator.setPermission(matchMakerRouter, matchMakerRouter.matchmake.selector, users.owner);
-        dictator.setPermission(matchMakerRouter, matchMakerRouter.adjust.selector, users.owner);
-        dictator.setPermission(matchMakerRouter, matchMakerRouter.close.selector, users.owner);
-        dictator.setPermission(matchMakerRouter, matchMakerRouter.settleAllocation.selector, users.owner);
-        dictator.setPermission(matchMakerRouter, matchMakerRouter.collectAllocationAccountDust.selector, users.owner);
+        dictator.setPermission(matchmakerRouter, matchmakerRouter.matchmake.selector, users.owner);
+        dictator.setPermission(matchmakerRouter, matchmakerRouter.adjust.selector, users.owner);
+        dictator.setPermission(matchmakerRouter, matchmakerRouter.close.selector, users.owner);
+        dictator.setPermission(matchmakerRouter, matchmakerRouter.settleAllocation.selector, users.owner);
+        dictator.setPermission(matchmakerRouter, matchmakerRouter.collectAllocationAccountDust.selector, users.owner);
 
         account.setDepositCapList(allowedTokens, allowanceCaps);
 
@@ -225,14 +225,14 @@ contract TradingTest is BasicSetup {
             isLong: true,
             executionFee: 0.001 ether,
             allocationId: nextAllocationId++,
-            matchMakerFee: fee
+            matchmakerFee: fee
         });
 
         uint feeReceiverBalanceBefore = usdc.balanceOf(users.owner);
 
         vm.deal(users.owner, 1 ether);
         (address allocationAddress, bytes32 requestKey) =
-            matchMakerRouter.matchmake{value: 0.001 ether}(callMatch, puppetList);
+            matchmakerRouter.matchmake{value: 0.001 ether}(callMatch, puppetList);
 
         // Verify allocation was created
         assertGt(mirror.allocationMap(allocationAddress), 0, "Allocation should be created");
@@ -240,7 +240,7 @@ contract TradingTest is BasicSetup {
         // Verify request was submitted to GMX
         assertNotEq(requestKey, bytes32(0), "Request key should be generated");
 
-        // Verify matchmaker fee was paid to feeReceiver (users.owner configured in MatchMakerRouter)
+        // Verify matchmaker fee was paid to feeReceiver (users.owner configured in Router)
         assertEq(usdc.balanceOf(users.owner) - feeReceiverBalanceBefore, fee, "Fee receiver should receive fee");
     }
 
@@ -258,12 +258,12 @@ contract TradingTest is BasicSetup {
             isLong: true,
             executionFee: 0.001 ether,
             allocationId: nextAllocationId++,
-            matchMakerFee: fee
+            matchmakerFee: fee
         });
 
         vm.deal(users.owner, 1 ether);
         vm.expectRevert();
-        matchMakerRouter.matchmake{value: 0.001 ether}(callMatch, puppetList);
+        matchmakerRouter.matchmake{value: 0.001 ether}(callMatch, puppetList);
     }
 
     function testRequestAdjustSuccess() public {
@@ -282,11 +282,11 @@ contract TradingTest is BasicSetup {
             isLong: true,
             executionFee: 0.001 ether,
             allocationId: allocationId,
-            matchMakerFee: fee
+            matchmakerFee: fee
         });
 
         vm.deal(users.owner, 1 ether);
-        (address allocationAddress, bytes32 requestKey) = matchMakerRouter.matchmake{value: 0.001 ether}(initialCallPosition, puppetList);
+        (address allocationAddress, bytes32 requestKey) = matchmakerRouter.matchmake{value: 0.001 ether}(initialCallPosition, puppetList);
 
         // Simulate GMX execution - mock the puppet position as existing with lastTargetSize
         uint lastTargetSize = mirror.lastTargetSizeMap(
@@ -307,11 +307,11 @@ contract TradingTest is BasicSetup {
             isLong: true,
             executionFee: 0.001 ether,
             allocationId: allocationId,
-            matchMakerFee: adjustFee
+            matchmakerFee: adjustFee
         });
 
         vm.deal(users.owner, 1 ether);
-        bytes32 adjustRequestKey = matchMakerRouter.adjust{value: 0.001 ether}(adjustCallPosition, puppetList);
+        bytes32 adjustRequestKey = matchmakerRouter.adjust{value: 0.001 ether}(adjustCallPosition, puppetList);
 
         // Verify request was submitted
         assertNotEq(adjustRequestKey, bytes32(0), "Adjust request should be generated");
@@ -334,10 +334,10 @@ contract TradingTest is BasicSetup {
         Settle.CallSettle memory settleParams = Settle.CallSettle({
             collateralToken: usdc,
             distributionToken: usdc,
-            matchMakerFeeReceiver: users.owner,
+            matchmakerFeeReceiver: users.owner,
             trader: trader,
             allocationId: allocationId,
-            matchMakerExecutionFee: 0.1e6,
+            matchmakerExecutionFee: 0.1e6,
             amount: 500e6
         });
 
@@ -345,7 +345,7 @@ contract TradingTest is BasicSetup {
         uint puppet2BalanceBefore = account.userBalanceMap(usdc, puppet2);
         uint ownerFeeBalanceBefore = usdc.balanceOf(users.owner);
 
-        (uint distributionAmount, uint platformFeeAmount) = matchMakerRouter.settleAllocation(settleParams, puppetList);
+        (uint distributionAmount, uint platformFeeAmount) = matchmakerRouter.settleAllocation(settleParams, puppetList);
 
         // Verify settlement occurred
         assertEq(settleParams.amount, 500e6, "Should have correct settlement amount");
@@ -360,7 +360,7 @@ contract TradingTest is BasicSetup {
 
         // Verify keeper fee paid out and total distribution matches available less fees
         uint ownerFeeBalanceAfter = usdc.balanceOf(users.owner);
-        assertEq(ownerFeeBalanceAfter - ownerFeeBalanceBefore, settleParams.matchMakerExecutionFee, "Keeper fee payout mismatch");
+        assertEq(ownerFeeBalanceAfter - ownerFeeBalanceBefore, settleParams.matchmakerExecutionFee, "Keeper fee payout mismatch");
 
         // Allocation sum should match stored allocation map and Puppet shares
         uint[] memory puppetAllocations = mirror.getAllocationPuppetList(allocationAddress);
@@ -371,7 +371,7 @@ contract TradingTest is BasicSetup {
         uint puppet1Delta = account.userBalanceMap(usdc, puppet1) - puppet1BalanceBefore;
         uint puppet2Delta = account.userBalanceMap(usdc, puppet2) - puppet2BalanceBefore;
         uint distributedTotal = puppet1Delta + puppet2Delta;
-        uint accounted = distributedTotal + platformFeeAmount + settleParams.matchMakerExecutionFee;
+        uint accounted = distributedTotal + platformFeeAmount + settleParams.matchmakerExecutionFee;
         // Allow for minor rounding dust from mulDiv
         assertTrue(accounted <= settleParams.amount, "Settlement over-accounted");
         assertLe(settleParams.amount - accounted, puppetList.length, "Settlement accounting mismatch");
@@ -400,21 +400,21 @@ contract TradingTest is BasicSetup {
         Settle.CallSettle memory settleParams = Settle.CallSettle({
             collateralToken: usdc,
             distributionToken: usdc,
-            matchMakerFeeReceiver: users.owner,
+            matchmakerFeeReceiver: users.owner,
             trader: trader,
             allocationId: allocationId,
-            matchMakerExecutionFee: 0.1e6,
+            matchmakerExecutionFee: 0.1e6,
             amount: 500e6
         });
 
         uint puppet1Before = account.userBalanceMap(usdc, puppet1);
         uint puppet2Before = account.userBalanceMap(usdc, puppet2);
 
-        (uint distributed, uint platformFee) = matchMakerRouter.settleAllocation(settleParams, puppetList);
+        (uint distributed, uint platformFee) = matchmakerRouter.settleAllocation(settleParams, puppetList);
 
         uint delta1 = account.userBalanceMap(usdc, puppet1) - puppet1Before;
         uint delta2 = account.userBalanceMap(usdc, puppet2) - puppet2Before;
-        uint accounted = delta1 + delta2 + platformFee + settleParams.matchMakerExecutionFee;
+        uint accounted = delta1 + delta2 + platformFee + settleParams.matchmakerExecutionFee;
         assertTrue(accounted <= settleParams.amount, "Post-settle over-account");
         assertLe(settleParams.amount - accounted, puppetList.length, "Post-settle dust exceeds tolerance");
     }
@@ -459,7 +459,7 @@ contract TradingTest is BasicSetup {
 
         uint ownerBalanceBefore = usdc.balanceOf(users.owner);
 
-        uint dustCollected = matchMakerRouter.collectAllocationAccountDust(allocationAddress, usdc, users.owner, 5e6);
+        uint dustCollected = matchmakerRouter.collectAllocationAccountDust(allocationAddress, usdc, users.owner, 5e6);
 
         assertEq(dustCollected, 5e6, "Should collect all dust");
         assertEq(usdc.balanceOf(users.owner), ownerBalanceBefore + 5e6, "Owner should receive dust");
@@ -478,12 +478,12 @@ contract TradingTest is BasicSetup {
             isLong: true,
             executionFee: 0.001 ether,
             allocationId: nextAllocationId++,
-            matchMakerFee: 1e6
+            matchmakerFee: 1e6
         });
 
         vm.deal(users.owner, 1 ether);
         vm.expectRevert(Error.Mirror__PuppetListEmpty.selector);
-        matchMakerRouter.matchmake{value: 0.001 ether}(callMatch, emptyPuppetList);
+        matchmakerRouter.matchmake{value: 0.001 ether}(callMatch, emptyPuppetList);
     }
 
     function testExpiredRule() public {
@@ -503,13 +503,13 @@ contract TradingTest is BasicSetup {
             isLong: true,
             executionFee: 0.001 ether,
             allocationId: nextAllocationId++,
-            matchMakerFee: fee
+            matchmakerFee: fee
         });
 
         vm.deal(users.owner, 1 ether);
         // Should revert because no valid puppets means no allocation, and matchmaker fee check fails
         vm.expectRevert();
-        matchMakerRouter.matchmake{value: 0.001 ether}(callMatch, puppetList);
+        matchmakerRouter.matchmake{value: 0.001 ether}(callMatch, puppetList);
     }
 
     function testThrottleActivity() public {
@@ -522,7 +522,7 @@ contract TradingTest is BasicSetup {
         // Refresh trader position timestamp (simulates trader opening a new position)
         _mockTraderPosition(trader);
 
-        // MatchMaker should only include active (non-throttled) puppets
+        //  should only include active (non-throttled) puppets
         // puppet2 is still throttled (2 hour throttle), so only puppet1 is included
         address[] memory puppetList = new address[](1);
         puppetList[0] = puppet1;
@@ -536,12 +536,12 @@ contract TradingTest is BasicSetup {
             isLong: true,
             executionFee: 0.001 ether,
             allocationId: nextAllocationId++,
-            matchMakerFee: fee
+            matchmakerFee: fee
         });
 
         vm.deal(users.owner, 1 ether);
 
-        (address allocationAddress, bytes32 requestKey) = matchMakerRouter.matchmake{value: 0.001 ether}(callMatch, puppetList);
+        (address allocationAddress, bytes32 requestKey) = matchmakerRouter.matchmake{value: 0.001 ether}(callMatch, puppetList);
 
         // Should get allocation only from puppet1
         uint allocatedAmount = mirror.allocationMap(allocationAddress);
@@ -575,7 +575,7 @@ contract TradingTest is BasicSetup {
 
         // Should revert when trying to collect
         vm.expectRevert();
-        matchMakerRouter.collectAllocationAccountDust(allocationAddress, usdc, users.owner, 15e6);
+        matchmakerRouter.collectAllocationAccountDust(allocationAddress, usdc, users.owner, 15e6);
     }
 
     function testDecreasePosition() public {
@@ -594,11 +594,11 @@ contract TradingTest is BasicSetup {
             isLong: true,
             executionFee: 0.001 ether,
             allocationId: allocationId,
-            matchMakerFee: fee
+            matchmakerFee: fee
         });
 
         vm.deal(users.owner, 2 ether);
-        (address allocationAddress, bytes32 requestKey) = matchMakerRouter.matchmake{value: 0.001 ether}(openMatch, puppetList);
+        (address allocationAddress, bytes32 requestKey) = matchmakerRouter.matchmake{value: 0.001 ether}(openMatch, puppetList);
 
         // Simulate GMX execution - mock the puppet position as existing with lastTargetSize
         uint lastTargetSize = mirror.lastTargetSizeMap(
@@ -616,10 +616,10 @@ contract TradingTest is BasicSetup {
             isLong: true,
             executionFee: 0.001 ether,
             allocationId: allocationId,
-            matchMakerFee: 0.5e6
+            matchmakerFee: 0.5e6
         });
 
-        bytes32 decreaseRequestKey = matchMakerRouter.adjust{value: 0.001 ether}(decreasePosition, puppetList);
+        bytes32 decreaseRequestKey = matchmakerRouter.adjust{value: 0.001 ether}(decreasePosition, puppetList);
         assertNotEq(decreaseRequestKey, bytes32(0), "Decrease request should be generated");
     }
 
@@ -667,7 +667,7 @@ contract TradingTest is BasicSetup {
             isLong: true,
             executionFee: 0.001 ether,
             allocationId: allocationId1,
-            matchMakerFee: 0.5e6
+            matchmakerFee: 0.5e6
         });
 
         Mirror.CallPosition memory callMatch2 = Mirror.CallPosition({
@@ -677,16 +677,16 @@ contract TradingTest is BasicSetup {
             isLong: true,
             executionFee: 0.001 ether,
             allocationId: allocationId2,
-            matchMakerFee: 0.5e6
+            matchmakerFee: 0.5e6
         });
 
         vm.deal(users.owner, 2 ether);
 
         // Create position for trader1
-        (address allocation1, bytes32 requestKey1) = matchMakerRouter.matchmake{value: 0.001 ether}(callMatch1, puppetList1);
+        (address allocation1, bytes32 requestKey1) = matchmakerRouter.matchmake{value: 0.001 ether}(callMatch1, puppetList1);
 
         // Create position for trader2
-        (address allocation2, bytes32 requestKey2) = matchMakerRouter.matchmake{value: 0.001 ether}(callMatch2, puppetList2);
+        (address allocation2, bytes32 requestKey2) = matchmakerRouter.matchmake{value: 0.001 ether}(callMatch2, puppetList2);
 
         // Verify both allocations were created
         assertGt(mirror.allocationMap(allocation1), 0, "Trader1 allocation should exist");
@@ -704,26 +704,26 @@ contract TradingTest is BasicSetup {
         Settle.CallSettle memory settleParams1 = Settle.CallSettle({
             collateralToken: usdc,
             distributionToken: usdc,
-            matchMakerFeeReceiver: users.owner,
+            matchmakerFeeReceiver: users.owner,
             trader: trader,
             allocationId: allocationId1,
-            matchMakerExecutionFee: 0.1e6,
+            matchmakerExecutionFee: 0.1e6,
             amount: 100e6
         });
 
-        (uint distributed1, uint platformFee1) = matchMakerRouter.settleAllocation(settleParams1, puppetList1);
+        (uint distributed1, uint platformFee1) = matchmakerRouter.settleAllocation(settleParams1, puppetList1);
 
         Settle.CallSettle memory settleParams2 = Settle.CallSettle({
             collateralToken: usdc,
             distributionToken: usdc,
-            matchMakerFeeReceiver: users.owner,
+            matchmakerFeeReceiver: users.owner,
             trader: trader2,
             allocationId: allocationId2,
-            matchMakerExecutionFee: 0.1e6,
+            matchmakerExecutionFee: 0.1e6,
             amount: 80e6
         });
 
-        (uint distributed2, uint platformFee2) = matchMakerRouter.settleAllocation(settleParams2, puppetList2);
+        (uint distributed2, uint platformFee2) = matchmakerRouter.settleAllocation(settleParams2, puppetList2);
 
         // Verify settlements occurred
         assertEq(settleParams1.amount, 100e6, "Should settle full trader1 profit");

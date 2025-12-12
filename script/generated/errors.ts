@@ -239,7 +239,12 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Mirror__InvalidMatchMakerExecutionFeeAmount',
+    name: 'Mirror__InvalidMatchmakerExecutionFeeAmount',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Mirror__InvalidExecutionFeeAmount',
     inputs: []
   },
   {
@@ -286,10 +291,10 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Mirror__MatchMakerFeeExceedsCostFactor',
+    name: 'Mirror__MatchmakerFeeExceedsCostFactor',
     inputs: [
       {
-        name: 'matchMakerFee',
+        name: 'matchmakerFee',
         internalType: 'uint256',
         type: 'uint256'
       },
@@ -307,10 +312,10 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Mirror__MatchMakerFeeExceedsAdjustmentRatio',
+    name: 'Mirror__MatchmakerFeeExceedsAdjustmentRatio',
     inputs: [
       {
-        name: 'matchMakerFee',
+        name: 'matchmakerFee',
         internalType: 'uint256',
         type: 'uint256'
       },
@@ -323,10 +328,10 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Mirror__MatchMakerFeeExceedsCloseRatio',
+    name: 'Mirror__MatchmakerFeeExceedsCloseRatio',
     inputs: [
       {
-        name: 'matchMakerFee',
+        name: 'matchmakerFee',
         internalType: 'uint256',
         type: 'uint256'
       },
@@ -339,7 +344,39 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Mirror__MatchMakerFeeNotFullyCovered',
+    name: 'Mirror__FeeExceedsCloseRatio',
+    inputs: [
+      {
+        name: 'fee',
+        internalType: 'uint256',
+        type: 'uint256'
+      },
+      {
+        name: 'allocationAmount',
+        internalType: 'uint256',
+        type: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Mirror__MatchmakerFeeNotFullyCovered',
+    inputs: [
+      {
+        name: 'totalPaid',
+        internalType: 'uint256',
+        type: 'uint256'
+      },
+      {
+        name: 'requiredFee',
+        internalType: 'uint256',
+        type: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Mirror__FeeNotFullyCovered',
     inputs: [
       {
         name: 'totalPaid',
@@ -418,20 +455,20 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Settle__InvalidMatchMakerExecutionFeeAmount',
+    name: 'Settle__InvalidMatchmakerExecutionFeeAmount',
     inputs: []
   },
   {
     type: 'error',
-    name: 'Settle__InvalidMatchMakerExecutionFeeReceiver',
+    name: 'Settle__InvalidMatchmakerExecutionFeeReceiver',
     inputs: []
   },
   {
     type: 'error',
-    name: 'Settle__MatchMakerFeeExceedsSettledAmount',
+    name: 'Settle__MatchmakerFeeExceedsSettledAmount',
     inputs: [
       {
-        name: 'matchMakerFee',
+        name: 'matchmakerFee',
         internalType: 'uint256',
         type: 'uint256'
       },
@@ -612,7 +649,7 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'MatchMakerRouter__FailedRefundExecutionFee',
+    name: 'MatchmakerRouter__FailedRefundExecutionFee',
     inputs: []
   },
   {

@@ -16,7 +16,7 @@ contract Settle is CoreContract {
     struct Config {
         uint transferOutGasLimit;
         uint platformSettleFeeFactor;
-        uint maxMatchMakerFeeToSettleRatio;
+        uint maxMatchmakerFeeToSettleRatio;
         uint maxPuppetList;
         uint allocationAccountTransferGasLimit;
     }
@@ -24,10 +24,10 @@ contract Settle is CoreContract {
     struct CallSettle {
         IERC20 collateralToken;
         IERC20 distributionToken;
-        address matchMakerFeeReceiver;
+        address matchmakerFeeReceiver;
         address trader;
         uint allocationId;
-        uint matchMakerExecutionFee;
+        uint matchmakerExecutionFee;
         uint amount;
     }
 
@@ -56,9 +56,9 @@ contract Settle is CoreContract {
             revert Error.Settle__PuppetListExceedsMaximum(_puppetCount, config.maxPuppetList);
         }
 
-        uint _matchMakerFee = _callParams.matchMakerExecutionFee;
-        if (_matchMakerFee == 0) revert Error.Settle__InvalidMatchMakerExecutionFeeAmount();
-        if (_callParams.matchMakerFeeReceiver == address(0)) revert Error.Settle__InvalidMatchMakerExecutionFeeReceiver();
+        uint _matchmakerFee = _callParams.matchmakerExecutionFee;
+        if (_matchmakerFee == 0) revert Error.Settle__InvalidMatchmakerExecutionFeeAmount();
+        if (_callParams.matchmakerFeeReceiver == address(0)) revert Error.Settle__InvalidMatchmakerExecutionFeeReceiver();
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_callParams.collateralToken, _callParams.trader);
         address _allocationAddress = _account.getAllocationAddress(
@@ -76,13 +76,13 @@ contract Settle is CoreContract {
         );
 
         if (
-            _callParams.matchMakerExecutionFee
-                >= Precision.applyFactor(config.maxMatchMakerFeeToSettleRatio, _callParams.amount)
-        ) revert Error.Settle__MatchMakerFeeExceedsSettledAmount(_callParams.matchMakerExecutionFee, _callParams.amount);
+            _callParams.matchmakerExecutionFee
+                >= Precision.applyFactor(config.maxMatchmakerFeeToSettleRatio, _callParams.amount)
+        ) revert Error.Settle__MatchmakerFeeExceedsSettledAmount(_callParams.matchmakerExecutionFee, _callParams.amount);
 
-        _distributedAmount = _callParams.amount - _callParams.matchMakerExecutionFee;
+        _distributedAmount = _callParams.amount - _callParams.matchmakerExecutionFee;
 
-        _account.transferOut(_callParams.distributionToken, _callParams.matchMakerFeeReceiver, _callParams.matchMakerExecutionFee);
+        _account.transferOut(_callParams.distributionToken, _callParams.matchmakerFeeReceiver, _callParams.matchmakerExecutionFee);
 
         if (config.platformSettleFeeFactor > 0) {
             _platformFeeAmount = Precision.applyFactor(config.platformSettleFeeFactor, _distributedAmount);
@@ -114,10 +114,10 @@ contract Settle is CoreContract {
             abi.encode(
                 _callParams.collateralToken,
                 _callParams.distributionToken,
-                _callParams.matchMakerFeeReceiver,
+                _callParams.matchmakerFeeReceiver,
                 _callParams.trader,
                 _callParams.allocationId,
-                _callParams.matchMakerExecutionFee,
+                _callParams.matchmakerExecutionFee,
                 _allocationAddress,
                 _traderMatchingKey,
                 _distributedAmount,
@@ -196,7 +196,7 @@ contract Settle is CoreContract {
         Config memory _config = abi.decode(_data, (Config));
 
         if (_config.platformSettleFeeFactor == 0) revert("Invalid Platform Settle Fee Factor");
-        if (_config.maxMatchMakerFeeToSettleRatio == 0) revert("Invalid Max MatchMaker Fee To Settle Ratio");
+        if (_config.maxMatchmakerFeeToSettleRatio == 0) revert("Invalid Max Matchmaker Fee To Settle Ratio");
         if (_config.maxPuppetList == 0) revert("Invalid Max Puppet List");
         if (_config.allocationAccountTransferGasLimit == 0) revert("Invalid Token Transfer Gas Limit");
 

@@ -4,7 +4,7 @@ pragma solidity ^0.8.31;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test} from "forge-std/src/Test.sol";
 
-import {MatchMakerRouter} from "src/MatchMakerRouter.sol";
+import {MatchmakerRouter} from "src/MatchmakerRouter.sol";
 import {Account as AccountContract} from "src/position/Account.sol";
 import {Mirror} from "src/position/Mirror.sol";
 import {Subscribe} from "src/position/Subscribe.sol";
@@ -35,7 +35,7 @@ contract TradingForkTest is Test {
 
     // Test actors
     address private admin = address(0xA11CE);
-    address private matchMaker = address(0xBEE);
+    address private matchmaker = address(0xBEE);
     address private trader = address(0xCAFE);
     address private puppet1 = address(0x1);
     address private puppet2 = address(0x2);
@@ -48,7 +48,7 @@ contract TradingForkTest is Test {
     Subscribe private subscribe;
     Mirror private mirror;
     Settle private settle;
-    MatchMakerRouter private matchMakerRouter;
+    MatchmakerRouter private matchmakerRouter;
 
     function setUp() public {
         // Prefer RPC_42161_1 (in .env); fall back to ARBITRUM_RPC_URL for compatibility
@@ -63,7 +63,7 @@ contract TradingForkTest is Test {
 
         vm.createSelectFork(rpc);
         vm.deal(admin, 100 ether);
-        vm.deal(matchMaker, 10 ether);
+        vm.deal(matchmaker, 10 ether);
 
         authority = new Dictatorship(admin);
         tokenRouter = new TokenRouter(authority, TokenRouter.Config({transferGasLimit: 200_000}));
@@ -91,9 +91,9 @@ contract TradingForkTest is Test {
                 // forge-lint: disable-next-line(unsafe-typecast)
                 referralCode: bytes32("PUPPET"),
                 maxPuppetList: 50,
-                maxMatchMakerFeeToAllocationRatio: 0.1e30,
-                maxMatchMakerFeeToAdjustmentRatio: 0.1e30,
-                maxMatchMakerFeeToCloseRatio: 0.1e30,
+                maxMatchmakerFeeToAllocationRatio: 0.1e30,
+                maxMatchmakerFeeToAdjustmentRatio: 0.1e30,
+                maxMatchmakerFeeToCloseRatio: 0.1e30,
                 maxMatchOpenDuration: 30 seconds,
                 maxMatchAdjustDuration: 60 seconds
             })
@@ -104,20 +104,20 @@ contract TradingForkTest is Test {
             Settle.Config({
                 transferOutGasLimit: 200_000,
                 platformSettleFeeFactor: 0.05e30, // 5%
-                maxMatchMakerFeeToSettleRatio: 0.1e30, // 10%
+                maxMatchmakerFeeToSettleRatio: 0.1e30, // 10%
                 maxPuppetList: 50,
                 allocationAccountTransferGasLimit: 100_000
             })
         );
 
-        matchMakerRouter = new MatchMakerRouter(
+        matchmakerRouter = new MatchmakerRouter(
             authority,
             account,
             subscribe,
             mirror,
             settle,
-            MatchMakerRouter.Config({
-                feeReceiver: matchMaker,
+            MatchmakerRouter.Config({
+                feeReceiver: matchmaker,
                 matchBaseGasLimit: 1_300_853,
                 matchPerPuppetGasLimit: 30_000,
                 adjustBaseGasLimit: 910_663,
@@ -159,12 +159,12 @@ contract TradingForkTest is Test {
             isLong: true,
             executionFee: executionFee,
             allocationId: 1,
-            matchMakerFee: fee
+            matchmakerFee: fee
         });
 
-        vm.startPrank(matchMaker);
-        vm.deal(matchMaker, executionFee + 1 ether); // ensure ETH for execution fee
-        (address allocationAddr, bytes32 orderKey) = matchMakerRouter.matchmake{value: executionFee}(params, puppetList);
+        vm.startPrank(matchmaker);
+        vm.deal(matchmaker, executionFee + 1 ether); // ensure ETH for execution fee
+        (address allocationAddr, bytes32 orderKey) = matchmakerRouter.matchmake{value: executionFee}(params, puppetList);
         vm.stopPrank();
 
         assertTrue(orderKey != bytes32(0), "GMX order key should be non-zero");
@@ -185,7 +185,7 @@ contract TradingForkTest is Test {
         authority.registerContract(settle);
         authority.registerContract(subscribe);
         authority.registerContract(mirror);
-        authority.registerContract(matchMakerRouter);
+        authority.registerContract(matchmakerRouter);
 
         // TokenRouter permissions
         authority.setPermission(tokenRouter, tokenRouter.transfer.selector, address(accountStore));
@@ -206,18 +206,18 @@ contract TradingForkTest is Test {
 
         // Mirror permissions
         authority.setPermission(mirror, mirror.initializeTraderActivityThrottle.selector, address(subscribe));
-        authority.setPermission(mirror, mirror.matchmake.selector, address(matchMakerRouter));
-        authority.setPermission(mirror, mirror.adjust.selector, address(matchMakerRouter));
-        authority.setPermission(mirror, mirror.close.selector, address(matchMakerRouter));
+        authority.setPermission(mirror, mirror.matchmake.selector, address(matchmakerRouter));
+        authority.setPermission(mirror, mirror.adjust.selector, address(matchmakerRouter));
+        authority.setPermission(mirror, mirror.close.selector, address(matchmakerRouter));
 
         // Settle permissions
-        authority.setPermission(settle, settle.settle.selector, address(matchMakerRouter));
-        authority.setPermission(settle, settle.collectAllocationAccountDust.selector, address(matchMakerRouter));
+        authority.setPermission(settle, settle.settle.selector, address(matchmakerRouter));
+        authority.setPermission(settle, settle.collectAllocationAccountDust.selector, address(matchmakerRouter));
 
-        // MatchMaker entrypoints (use matchMaker as the caller for this test)
-        authority.setPermission(matchMakerRouter, matchMakerRouter.matchmake.selector, matchMaker);
-        authority.setPermission(matchMakerRouter, matchMakerRouter.adjust.selector, matchMaker);
-        authority.setPermission(matchMakerRouter, matchMakerRouter.close.selector, matchMaker);
+        //  entrypoints (use matchmaker as the caller for this test)
+        authority.setPermission(matchmakerRouter, matchmakerRouter.matchmake.selector, matchmaker);
+        authority.setPermission(matchmakerRouter, matchmakerRouter.adjust.selector, matchmaker);
+        authority.setPermission(matchmakerRouter, matchmakerRouter.close.selector, matchmaker);
 
         // Administrative helpers
         authority.setPermission(account, account.setDepositCapList.selector, admin);

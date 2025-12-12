@@ -14,10 +14,10 @@ export const CONTRACT = {
     abi: [...PUPPET_CONTRACT_MAP.UserRouter.abi, ...PUPPET_CONTRACT_MAP.RouterProxy.abi, ...puppetErrorAbi] as const,
     chainId: PUPPET_CONTRACT_MAP.UserRouter.chainId
   },
-  MatchMakerRouter: {
-    address: PUPPET_CONTRACT_MAP.MatchMakerRouter.address,
-    abi: [...PUPPET_CONTRACT_MAP.MatchMakerRouter.abi, ...puppetErrorAbi, ...gmxErrorAbi] as const,
-    chainId: PUPPET_CONTRACT_MAP.MatchMakerRouter.chainId
+  MatchmakerRouter: {
+    address: PUPPET_CONTRACT_MAP.MatchmakerRouter.address,
+    abi: [...PUPPET_CONTRACT_MAP.MatchmakerRouter.abi, ...puppetErrorAbi, ...gmxErrorAbi] as const,
+    chainId: PUPPET_CONTRACT_MAP.MatchmakerRouter.chainId
   },
   CustomError: {
     abi: puppetErrorAbi

@@ -26,7 +26,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'maxMatchMakerFeeToSettleRatio',
+            name: 'maxMatchmakerFeeToSettleRatio',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -170,7 +170,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'maxMatchMakerFeeToSettleRatio',
+            name: 'maxMatchmakerFeeToSettleRatio',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -292,7 +292,7 @@ export default [
             internalType: 'contract IERC20'
           },
           {
-            name: 'matchMakerFeeReceiver',
+            name: 'matchmakerFeeReceiver',
             type: 'address',
             internalType: 'address'
           },
@@ -307,7 +307,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'matchMakerExecutionFee',
+            name: 'matchmakerExecutionFee',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -455,12 +455,12 @@ export default [
   },
   {
     type: 'error',
-    name: 'Settle__InvalidMatchMakerExecutionFeeAmount',
+    name: 'Settle__InvalidMatchmakerExecutionFeeAmount',
     inputs: []
   },
   {
     type: 'error',
-    name: 'Settle__InvalidMatchMakerExecutionFeeReceiver',
+    name: 'Settle__InvalidMatchmakerExecutionFeeReceiver',
     inputs: []
   },
   {
@@ -470,10 +470,10 @@ export default [
   },
   {
     type: 'error',
-    name: 'Settle__MatchMakerFeeExceedsSettledAmount',
+    name: 'Settle__MatchmakerFeeExceedsSettledAmount',
     inputs: [
       {
-        name: 'matchMakerFee',
+        name: 'matchmakerFee',
         type: 'uint256',
         internalType: 'uint256'
       },

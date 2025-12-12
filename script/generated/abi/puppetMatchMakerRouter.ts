@@ -1,4 +1,4 @@
-// This file is auto-generated from forge-artifacts/MatchMakerRouter.sol/MatchMakerRouter.json
+// This file is auto-generated from forge-artifacts/MatchmakerRouter.sol/MatchmakerRouter.json
 // Do not edit manually.
 
 export default [

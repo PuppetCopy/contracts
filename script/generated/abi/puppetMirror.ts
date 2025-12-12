@@ -41,17 +41,17 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'maxMatchMakerFeeToAllocationRatio',
+            name: 'maxMatchmakerFeeToAllocationRatio',
             type: 'uint256',
             internalType: 'uint256'
           },
           {
-            name: 'maxMatchMakerFeeToAdjustmentRatio',
+            name: 'maxMatchmakerFeeToAdjustmentRatio',
             type: 'uint256',
             internalType: 'uint256'
           },
           {
-            name: 'maxMatchMakerFeeToCloseRatio',
+            name: 'maxMatchmakerFeeToCloseRatio',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -115,7 +115,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'matchMakerFee',
+            name: 'matchmakerFee',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -266,7 +266,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'matchMakerFee',
+            name: 'matchmakerFee',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -328,17 +328,17 @@ export default [
         internalType: 'uint256'
       },
       {
-        name: 'maxMatchMakerFeeToAllocationRatio',
+        name: 'maxMatchmakerFeeToAllocationRatio',
         type: 'uint256',
         internalType: 'uint256'
       },
       {
-        name: 'maxMatchMakerFeeToAdjustmentRatio',
+        name: 'maxMatchmakerFeeToAdjustmentRatio',
         type: 'uint256',
         internalType: 'uint256'
       },
       {
-        name: 'maxMatchMakerFeeToCloseRatio',
+        name: 'maxMatchmakerFeeToCloseRatio',
         type: 'uint256',
         internalType: 'uint256'
       },
@@ -429,17 +429,17 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'maxMatchMakerFeeToAllocationRatio',
+            name: 'maxMatchmakerFeeToAllocationRatio',
             type: 'uint256',
             internalType: 'uint256'
           },
           {
-            name: 'maxMatchMakerFeeToAdjustmentRatio',
+            name: 'maxMatchmakerFeeToAdjustmentRatio',
             type: 'uint256',
             internalType: 'uint256'
           },
           {
-            name: 'maxMatchMakerFeeToCloseRatio',
+            name: 'maxMatchmakerFeeToCloseRatio',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -627,7 +627,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'matchMakerFee',
+            name: 'matchmakerFee',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -742,7 +742,7 @@ export default [
   },
   {
     type: 'error',
-    name: 'Mirror__InvalidMatchMakerExecutionFeeAmount',
+    name: 'Mirror__InvalidMatchmakerExecutionFeeAmount',
     inputs: []
   },
   {
@@ -752,10 +752,10 @@ export default [
   },
   {
     type: 'error',
-    name: 'Mirror__MatchMakerFeeExceedsAdjustmentRatio',
+    name: 'Mirror__MatchmakerFeeExceedsAdjustmentRatio',
     inputs: [
       {
-        name: 'matchMakerFee',
+        name: 'matchmakerFee',
         type: 'uint256',
         internalType: 'uint256'
       },
@@ -768,10 +768,10 @@ export default [
   },
   {
     type: 'error',
-    name: 'Mirror__MatchMakerFeeExceedsCloseRatio',
+    name: 'Mirror__MatchmakerFeeExceedsCloseRatio',
     inputs: [
       {
-        name: 'matchMakerFee',
+        name: 'matchmakerFee',
         type: 'uint256',
         internalType: 'uint256'
       },
@@ -784,10 +784,10 @@ export default [
   },
   {
     type: 'error',
-    name: 'Mirror__MatchMakerFeeExceedsCostFactor',
+    name: 'Mirror__MatchmakerFeeExceedsCostFactor',
     inputs: [
       {
-        name: 'matchMakerFee',
+        name: 'matchmakerFee',
         type: 'uint256',
         internalType: 'uint256'
       },
@@ -800,7 +800,7 @@ export default [
   },
   {
     type: 'error',
-    name: 'Mirror__MatchMakerFeeNotFullyCovered',
+    name: 'Mirror__MatchmakerFeeNotFullyCovered',
     inputs: [
       {
         name: 'totalPaid',
