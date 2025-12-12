@@ -33,7 +33,7 @@ export default [
       {
         name: '_config',
         type: 'tuple',
-        internalType: 'struct MatchMakerRouter.Config',
+        internalType: 'struct MatchmakerRouter.Config',
         components: [
           {
             name: 'feeReceiver',
@@ -178,7 +178,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'matchMakerFee',
+            name: 'matchmakerFee',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -276,7 +276,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'matchMakerFee',
+            name: 'matchmakerFee',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -344,7 +344,7 @@ export default [
       {
         name: '',
         type: 'tuple',
-        internalType: 'struct MatchMakerRouter.Config',
+        internalType: 'struct MatchmakerRouter.Config',
         components: [
           {
             name: 'feeReceiver',
@@ -476,7 +476,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'matchMakerFee',
+            name: 'matchmakerFee',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -607,7 +607,7 @@ export default [
             internalType: 'contract IERC20'
           },
           {
-            name: 'matchMakerFeeReceiver',
+            name: 'matchmakerFeeReceiver',
             type: 'address',
             internalType: 'address'
           },
@@ -622,7 +622,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'matchMakerExecutionFee',
+            name: 'matchmakerExecutionFee',
             type: 'uint256',
             internalType: 'uint256'
           },
