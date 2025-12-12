@@ -56,7 +56,8 @@ contract FeeMarketplace is CoreContract {
         if (_lastTimestamp == 0) return 0;
 
         uint _elapsed = block.timestamp - _lastTimestamp;
-        return Math.min((_locked * _elapsed) / config.unlockTimeframe, _locked);
+        uint _unlockedAmount = Math.mulDiv(_locked, _elapsed, config.unlockTimeframe);
+        return Math.min(_unlockedAmount, _locked);
     }
 
     function getUnlockedBalance(IERC20 _feeToken) external view returns (uint) {
@@ -70,16 +71,16 @@ contract FeeMarketplace is CoreContract {
         uint _elapsed = block.timestamp - _lastReset;
         if (_elapsed >= config.askDecayTimeframe) return 0;
 
-        return config.askStart - (config.askStart * _elapsed) / config.askDecayTimeframe;
+        uint _decay = Math.mulDiv(config.askStart, _elapsed, config.askDecayTimeframe);
+        return config.askStart - _decay;
     }
 
     function deposit(IERC20 _feeToken, address _depositor, uint _amount) external auth {
         if (_amount == 0) revert Error.FeeMarketplace__ZeroDeposit();
 
-        if (accountedBalance[_feeToken] > 0) {
-            _syncUnlock(_feeToken);
-        } else {
-            lastUnlockTimestamp[_feeToken] = block.timestamp;
+        _syncUnlock(_feeToken);
+
+        if (accountedBalance[_feeToken] == 0 && unlockedFees[_feeToken] == 0) {
             lastAskResetTimestamp[_feeToken] = block.timestamp;
         }
 
@@ -93,10 +94,9 @@ contract FeeMarketplace is CoreContract {
         uint _unaccounted = store.recordTransferIn(_feeToken);
         if (_unaccounted == 0) revert Error.FeeMarketplace__ZeroDeposit();
 
-        if (accountedBalance[_feeToken] > 0) {
-            _syncUnlock(_feeToken);
-        } else {
-            lastUnlockTimestamp[_feeToken] = block.timestamp;
+        _syncUnlock(_feeToken);
+
+        if (accountedBalance[_feeToken] == 0 && unlockedFees[_feeToken] == 0) {
             lastAskResetTimestamp[_feeToken] = block.timestamp;
         }
 
@@ -105,13 +105,12 @@ contract FeeMarketplace is CoreContract {
         _logEvent("Deposit", abi.encode(_feeToken, address(0), _unaccounted));
     }
 
-    function acceptOffer(IERC20 _feeToken, address _buyer, address _receiver, uint _amount) external auth {
-        if (_amount == 0) revert Error.FeeMarketplace__InsufficientUnlockedBalance(0);
-
+    function acceptOffer(IERC20 _feeToken, address _buyer, address _receiver, uint _minOut) external auth {
         _syncUnlock(_feeToken);
 
-        uint _unlocked = unlockedFees[_feeToken];
-        if (_unlocked < _amount) revert Error.FeeMarketplace__InsufficientUnlockedBalance(_unlocked);
+        uint _payout = unlockedFees[_feeToken];
+        if (_payout == 0) revert Error.FeeMarketplace__InsufficientUnlockedBalance(0);
+        if (_payout < _minOut) revert Error.FeeMarketplace__InsufficientUnlockedBalance(_payout);
 
         uint _cost = getAskPrice(_feeToken);
 
@@ -120,14 +119,14 @@ contract FeeMarketplace is CoreContract {
             store.burn(_cost);
         }
 
-        unlockedFees[_feeToken] = _unlocked - _amount;
-        accountedBalance[_feeToken] -= _amount;
+        unlockedFees[_feeToken] = 0;
+        accountedBalance[_feeToken] -= _payout;
 
-        store.transferOut(config.transferOutGasLimit, _feeToken, _receiver, _amount);
+        store.transferOut(config.transferOutGasLimit, _feeToken, _receiver, _payout);
 
         lastAskResetTimestamp[_feeToken] = block.timestamp;
 
-        _logEvent("AcceptOffer", abi.encode(_feeToken, _buyer, _receiver, _amount, _cost));
+        _logEvent("AcceptOffer", abi.encode(_feeToken, _buyer, _receiver, _payout, _cost));
     }
 
     function _syncUnlock(IERC20 _feeToken) internal {

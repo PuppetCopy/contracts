@@ -70,7 +70,7 @@ export default [
         internalType: 'address'
       },
       {
-        name: '_amount',
+        name: '_minOut',
         type: 'uint256',
         internalType: 'uint256'
       }

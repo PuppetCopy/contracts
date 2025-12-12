@@ -55,7 +55,7 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'address', name: 'feeToken' },
         { type: 'address', name: 'buyer' },
         { type: 'address', name: 'receiver' },
-        { type: 'uint256', name: 'amount' },
+        { type: 'uint256', name: 'payout' },
         { type: 'uint256', name: 'cost' }
       ]
     },

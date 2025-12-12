@@ -64,9 +64,9 @@ contract UserRouter is ReentrancyGuardTransient {
      * @notice Accepts the current fee offer by burning PUPPET at ask price.
      * @param feeToken The fee token to purchase.
      * @param receiver The address receiving the fee tokens.
-     * @param amount The amount of fee tokens to purchase.
+     * @param minOut Minimum fee tokens out.
      */
-    function acceptOffer(IERC20 feeToken, address receiver, uint amount) external nonReentrant {
-        feeMarketplace.acceptOffer(feeToken, msg.sender, receiver, amount);
+    function acceptOffer(IERC20 feeToken, address receiver, uint minOut) external nonReentrant {
+        feeMarketplace.acceptOffer(feeToken, msg.sender, receiver, minOut);
     }
 }
