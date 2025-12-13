@@ -3,6 +3,7 @@ pragma solidity ^0.8.31;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test} from "forge-std/src/Test.sol";
+import {console} from "forge-std/src/console.sol";
 
 import {MatchmakerRouter} from "src/MatchmakerRouter.sol";
 import {Account as AccountContract} from "src/position/Account.sol";
@@ -303,5 +304,194 @@ contract TradingForkTest is Test {
         );
         vm.mockCall(GMX_DATASTORE, abi.encodeWithSelector(IGmxReadDataStore.getUint.selector, collateralKey), abi.encode(_collateralAmount));
         vm.mockCall(GMX_DATASTORE, abi.encodeWithSelector(IGmxReadDataStore.getUint.selector, increasedAtKey), abi.encode(block.timestamp));
+    }
+
+    // -------------------------------------------------------------------------
+    // Gas Benchmarking (run with -vvv to see output)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @notice Read GMX's gas limit configuration from DataStore
+     * @dev Run: forge test --match-test testFork_ReadGmxGasLimits -vvv
+     */
+    function testFork_ReadGmxGasLimits() public view {
+        console.log("\n=== GMX DATASTORE GAS LIMITS ===\n");
+
+        // Keys from GMX's Keys.sol
+        bytes32 INCREASE_ORDER_GAS_LIMIT = keccak256(abi.encode("INCREASE_ORDER_GAS_LIMIT"));
+        bytes32 DECREASE_ORDER_GAS_LIMIT = keccak256(abi.encode("DECREASE_ORDER_GAS_LIMIT"));
+        bytes32 SINGLE_SWAP_GAS_LIMIT = keccak256(abi.encode("SINGLE_SWAP_GAS_LIMIT"));
+
+        uint256 increaseGas = IGmxReadDataStore(GMX_DATASTORE).getUint(INCREASE_ORDER_GAS_LIMIT);
+        uint256 decreaseGas = IGmxReadDataStore(GMX_DATASTORE).getUint(DECREASE_ORDER_GAS_LIMIT);
+        uint256 swapGas = IGmxReadDataStore(GMX_DATASTORE).getUint(SINGLE_SWAP_GAS_LIMIT);
+
+        console.log("INCREASE_ORDER_GAS_LIMIT:", increaseGas);
+        console.log("DECREASE_ORDER_GAS_LIMIT:", decreaseGas);
+        console.log("SINGLE_SWAP_GAS_LIMIT:   ", swapGas);
+
+        console.log("\n=== ESTIMATED ADJUST LIMITS ===");
+        console.log("(adjust uses same GMX calls as matchmake)");
+        console.log("(delta is our contract logic: no allocation creation, has throttle checks)");
+    }
+
+    /**
+     * @notice Gas benchmark for matchmake with varying puppet counts
+     * @dev Run: forge test --match-test testFork_GasBenchmark_Matchmake -vvv
+     */
+    function testFork_GasBenchmark_Matchmake() public {
+        console.log("\n=== MATCHMAKE GAS BENCHMARK ===\n");
+
+        uint[] memory puppetCounts = new uint[](5);
+        puppetCounts[0] = 1;
+        puppetCounts[1] = 5;
+        puppetCounts[2] = 10;
+        puppetCounts[3] = 25;
+        puppetCounts[4] = 50;
+
+        uint[] memory gasResults = new uint[](5);
+
+        for (uint i = 0; i < puppetCounts.length; i++) {
+            uint count = puppetCounts[i];
+            address[] memory puppets = _setupPuppets(count, i * 100);
+
+            _mockTraderPosition(trader, GMX_ETH_USD_MARKET, USDC, true, 10_000e30, 2_000e6, 5);
+
+            Mirror.CallPosition memory params = Mirror.CallPosition({
+                collateralToken: USDC,
+                trader: trader,
+                market: GMX_ETH_USD_MARKET,
+                isLong: true,
+                executionFee: 0.02 ether,
+                allocationId: i + 100,
+                matchmakerFee: 0.01e6 // Small fee to avoid hitting ratio limits
+            });
+
+            vm.startPrank(matchmaker);
+            vm.deal(matchmaker, 1 ether);
+
+            uint gasBefore = gasleft();
+            matchmakerRouter.matchmake{value: 0.02 ether}(params, puppets);
+            gasResults[i] = gasBefore - gasleft();
+
+            vm.stopPrank();
+
+            console.log("Puppets:", count, "| Gas:", gasResults[i]);
+        }
+
+        // Calculate per-puppet gas
+        if (gasResults[4] > gasResults[0]) {
+            uint perPuppetGas = (gasResults[4] - gasResults[0]) / 49;
+            uint baseGas = gasResults[0] - perPuppetGas;
+            console.log("\n--- RECOMMENDED matchmake CONFIG ---");
+            console.log("matchBaseGasLimit:     ", baseGas);
+            console.log("matchPerPuppetGasLimit:", perPuppetGas);
+        }
+    }
+
+    /**
+     * @notice Gas benchmark for settle with varying puppet counts
+     * @dev Run: forge test --match-test testFork_GasBenchmark_Settle -vvv
+     */
+    function testFork_GasBenchmark_Settle() public {
+        console.log("\n=== SETTLE GAS BENCHMARK ===\n");
+
+        uint[] memory puppetCounts = new uint[](5);
+        puppetCounts[0] = 1;
+        puppetCounts[1] = 5;
+        puppetCounts[2] = 10;
+        puppetCounts[3] = 25;
+        puppetCounts[4] = 50;
+
+        uint[] memory gasResults = new uint[](5);
+
+        // Grant settle permission to matchmaker
+        vm.prank(admin);
+        authority.setPermission(matchmakerRouter, matchmakerRouter.settleAllocation.selector, matchmaker);
+
+        for (uint i = 0; i < puppetCounts.length; i++) {
+            uint count = puppetCounts[i];
+            uint allocationId = i + 200;
+
+            // Setup puppets and create allocation via matchmake first
+            address[] memory puppets = _setupPuppets(count, 1000 + i * 100);
+
+            _mockTraderPosition(trader, GMX_ETH_USD_MARKET, USDC, true, 10_000e30, 2_000e6, 5);
+
+            Mirror.CallPosition memory matchParams = Mirror.CallPosition({
+                collateralToken: USDC,
+                trader: trader,
+                market: GMX_ETH_USD_MARKET,
+                isLong: true,
+                executionFee: 0.02 ether,
+                allocationId: allocationId,
+                matchmakerFee: 0.01e6 // Small fee to avoid hitting ratio limits
+            });
+
+            vm.startPrank(matchmaker);
+            vm.deal(matchmaker, 1 ether);
+            (address allocationAddr,) = matchmakerRouter.matchmake{value: 0.02 ether}(matchParams, puppets);
+            vm.stopPrank();
+
+            // Fund allocation with profit
+            deal(address(USDC), allocationAddr, 100e6, true);
+
+            // Benchmark settle
+            Settle.CallSettle memory settleParams = Settle.CallSettle({
+                collateralToken: USDC,
+                distributionToken: USDC,
+                matchmakerFeeReceiver: matchmaker,
+                trader: trader,
+                allocationId: allocationId,
+                matchmakerExecutionFee: 0.01e6,
+                amount: 100e6
+            });
+
+            vm.startPrank(matchmaker);
+
+            uint gasBefore = gasleft();
+            matchmakerRouter.settleAllocation(settleParams, puppets);
+            gasResults[i] = gasBefore - gasleft();
+
+            vm.stopPrank();
+
+            console.log("Puppets:", count, "| Gas:", gasResults[i]);
+        }
+
+        // Calculate per-puppet gas
+        if (gasResults[4] > gasResults[0]) {
+            uint perPuppetGas = (gasResults[4] - gasResults[0]) / 49;
+            uint baseGas = gasResults[0] - perPuppetGas;
+            console.log("\n--- RECOMMENDED settle CONFIG ---");
+            console.log("settleBaseGasLimit:     ", baseGas);
+            console.log("settlePerPuppetGasLimit:", perPuppetGas);
+        }
+    }
+
+    function _setupPuppets(uint count, uint offset) internal returns (address[] memory) {
+        address[] memory puppets = new address[](count);
+
+        vm.startPrank(admin);
+        for (uint i = 0; i < count; i++) {
+            address puppet = address(uint160(0x2000 + offset + i));
+            puppets[i] = puppet;
+
+            account.deposit(USDC, admin, puppet, 100e6);
+
+            subscribe.rule(
+                mirror,
+                USDC,
+                puppet,
+                trader,
+                Subscribe.RuleParams({
+                    allowanceRate: 1000,
+                    throttleActivity: 1,
+                    expiry: block.timestamp + 30 days
+                })
+            );
+        }
+        vm.stopPrank();
+
+        return puppets;
     }
 }

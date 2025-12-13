@@ -10,13 +10,22 @@ import { gmxErrorAbi } from './gmx/abi/gmxErrors.js'
 // Combined ABIs for router proxy pattern and error handling
 export const CONTRACT = {
   UserRouter: {
-    address: PUPPET_CONTRACT_MAP.RouterProxy.address,
-    abi: [...PUPPET_CONTRACT_MAP.UserRouter.abi, ...PUPPET_CONTRACT_MAP.RouterProxy.abi, ...puppetErrorAbi] as const,
+    address: PUPPET_CONTRACT_MAP.UserRouterProxy.address,
+    abi: [
+      ...PUPPET_CONTRACT_MAP.UserRouter.abi,
+      ...PUPPET_CONTRACT_MAP.UserRouterProxy.abi,
+      ...puppetErrorAbi
+    ] as const,
     chainId: PUPPET_CONTRACT_MAP.UserRouter.chainId
   },
   MatchmakerRouter: {
-    address: PUPPET_CONTRACT_MAP.MatchmakerRouter.address,
-    abi: [...PUPPET_CONTRACT_MAP.MatchmakerRouter.abi, ...puppetErrorAbi, ...gmxErrorAbi] as const,
+    address: PUPPET_CONTRACT_MAP.MatchmakerRouterProxy.address,
+    abi: [
+      ...PUPPET_CONTRACT_MAP.MatchmakerRouter.abi,
+      ...PUPPET_CONTRACT_MAP.MatchmakerRouterProxy.abi,
+      ...puppetErrorAbi,
+      ...gmxErrorAbi
+    ] as const,
     chainId: PUPPET_CONTRACT_MAP.MatchmakerRouter.chainId
   },
   CustomError: {

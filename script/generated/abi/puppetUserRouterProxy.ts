@@ -1,4 +1,4 @@
-// This file is auto-generated from forge-artifacts/RouterProxy.sol/RouterProxy.json
+// This file is auto-generated from forge-artifacts/UserRouterProxy.sol/UserRouterProxy.json
 // Do not edit manually.
 
 export default [
@@ -52,25 +52,6 @@ export default [
       }
     ],
     stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'multicall',
-    inputs: [
-      {
-        name: 'data',
-        type: 'bytes[]',
-        internalType: 'bytes[]'
-      }
-    ],
-    outputs: [
-      {
-        name: 'results',
-        type: 'bytes[]',
-        internalType: 'bytes[]'
-      }
-    ],
-    stateMutability: 'nonpayable'
   },
   {
     type: 'function',

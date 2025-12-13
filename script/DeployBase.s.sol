@@ -7,7 +7,8 @@ import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
-import {RouterProxy} from "src/utils/RouterProxy.sol";
+import {MatchmakerRouterProxy} from "src/utils/MatchmakerRouterProxy.sol";
+import {UserRouterProxy} from "src/utils/UserRouterProxy.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
 import {Const} from "./Const.sol";
@@ -29,18 +30,18 @@ contract DeployBase is BaseScript {
             puppetToken,
             feeMarketplaceStore,
             FeeMarketplace.Config({
-                transferOutGasLimit: 200_000,
-                unlockTimeframe: 4 days,
-                askDecayTimeframe: 7 days,
-                askStart: 100e18
+                transferOutGasLimit: 200_000, unlockTimeframe: 4 days, askDecayTimeframe: 7 days, askStart: 100e18
             })
         );
         dictatorship.setAccess(feeMarketplaceStore, address(feeMarketplace));
         dictatorship.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
         dictatorship.registerContract(feeMarketplace);
 
-        RouterProxy routerProxy = new RouterProxy(dictatorship);
-        dictatorship.setAccess(routerProxy, Const.dao);
+        UserRouterProxy userRouterProxy = new UserRouterProxy(dictatorship);
+        dictatorship.setAccess(userRouterProxy, Const.dao);
+
+        MatchmakerRouterProxy matchmakerRouterProxy = new MatchmakerRouterProxy(dictatorship);
+        dictatorship.setAccess(matchmakerRouterProxy, Const.dao);
 
         vm.stopBroadcast();
     }

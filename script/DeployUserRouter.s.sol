@@ -11,7 +11,7 @@ import {Mirror} from "src/position/Mirror.sol";
 import {Subscribe} from "src/position/Subscribe.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
-import {RouterProxy} from "src/utils/RouterProxy.sol";
+import {UserRouterProxy} from "src/utils/UserRouterProxy.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
 import {Const} from "./Const.sol";
@@ -26,21 +26,25 @@ contract DeployUserRouter is BaseScript {
     Dictatorship dictator = Dictatorship(getDeployedAddress("Dictatorship"));
 
     function deployUserRouter() internal {
-        RouterProxy routerProxy = RouterProxy(payable(getDeployedAddress("RouterProxy")));
+        UserRouterProxy userRouterProxy = UserRouterProxy(payable(getDeployedAddress("UserRouterProxy")));
         AccountContract account = AccountContract(getDeployedAddress("Account"));
         Subscribe subscribe = Subscribe(getDeployedAddress("Subscribe"));
         FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
         Mirror mirror = Mirror(getDeployedAddress("Mirror"));
 
-        dictator.setPermission(subscribe, subscribe.rule.selector, address(routerProxy));
-        dictator.setPermission(account, account.deposit.selector, address(routerProxy));
-        dictator.setPermission(account, account.withdraw.selector, address(routerProxy));
-        dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, address(routerProxy));
+        // Set permissions on the PROXY address (stable address for users)
+        dictator.setPermission(subscribe, subscribe.rule.selector, address(userRouterProxy));
+        dictator.setPermission(account, account.deposit.selector, address(userRouterProxy));
+        dictator.setPermission(account, account.withdraw.selector, address(userRouterProxy));
+        dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, address(userRouterProxy));
 
-        UserRouter newRouter = new UserRouter(account, subscribe, feeMarketplace, mirror);
-        routerProxy.update(address(newRouter));
+        UserRouter userRouterImpl = new UserRouter(account, subscribe, feeMarketplace, mirror);
+        userRouterProxy.update(address(userRouterImpl));
 
-        UserRouter(address(routerProxy)).setRule(
+        console.log("UserRouter implementation deployed at:", address(userRouterImpl));
+        console.log("UserRouterProxy updated to implementation:", address(userRouterImpl));
+
+        UserRouter(address(userRouterProxy)).setRule(
             IERC20(Const.usdc),
             DEPLOYER_ADDRESS,
             Subscribe.RuleParams({allowanceRate: 1000, throttleActivity: 1 hours, expiry: block.timestamp + 830 days})

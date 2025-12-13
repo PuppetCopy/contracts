@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.29;
+pragma solidity ^0.8.31;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/src/console.sol";
@@ -16,7 +16,8 @@ import {AccountStore} from "src/shared/AccountStore.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
-import {RouterProxy} from "src/utils/RouterProxy.sol";
+import {MatchmakerRouterProxy} from "src/utils/MatchmakerRouterProxy.sol";
+import {UserRouterProxy} from "src/utils/UserRouterProxy.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
 import {Const} from "./Const.sol";
@@ -35,10 +36,9 @@ contract DeployPosition is BaseScript {
         Mirror mirror = deployMirror(account);
         Settle settle = deploySettle(account);
         FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
-        MatchmakerRouter matchmakerRouter = deployMatchmakerRouter(mirror, subscribe, settle, account, feeMarketplace);
-
+        deployMatchmakerRouter(mirror, subscribe, settle, account, feeMarketplace);
+        deployUserRouter(account, subscribe, mirror);
         setupCrossContractPermissions(mirror, subscribe);
-
         setupUpkeepingConfig(account, settle);
 
         vm.stopBroadcast();
@@ -107,7 +107,7 @@ contract DeployPosition is BaseScript {
 
         // Initialize contract
         dictator.registerContract(settle);
-        console.log("Settle initialized and permissions configured");
+        console.log("Settle initialized and permissions configfured");
 
         return settle;
     }
@@ -178,10 +178,13 @@ contract DeployPosition is BaseScript {
         Settle settle,
         AccountContract account,
         FeeMarketplace feeMarketplace
-    ) internal returns (MatchmakerRouter) {
-        console.log("\n--- Deploying Router ---");
+    ) internal returns (MatchmakerRouterProxy) {
+        console.log("\n--- Deploying MatchmakerRouter ---");
 
-        MatchmakerRouter matchmakerRouter = new MatchmakerRouter(
+        MatchmakerRouterProxy matchmakerRouterProxy =
+            MatchmakerRouterProxy(payable(getDeployedAddress("MatchmakerRouterProxy")));
+
+        MatchmakerRouter matchmakerRouterImpl = new MatchmakerRouter(
             dictator,
             account,
             subscribe,
@@ -189,43 +192,50 @@ contract DeployPosition is BaseScript {
             settle,
             feeMarketplace,
             MatchmakerRouter.Config({
-                feeReceiver: vm.addr(DEPLOYER_PRIVATE_KEY),
-                matchBaseGasLimit: 1_283_731,
-                matchPerPuppetGasLimit: 30_000,
-                adjustBaseGasLimit: 910_663,
-                adjustPerPuppetGasLimit: 3_412,
-                settleBaseGasLimit: 90_847,
-                settlePerPuppetGasLimit: 15_000,
+                feeReceiver: address(feeMarketplace.store()),
+                // Gas limits from fork benchmark (testFork_GasBenchmark) + 20% buffer
+                matchBaseGasLimit: 1_450_000, // measured: 1,201,011
+                matchPerPuppetGasLimit: 31_000, // measured: 25,301
+                adjustBaseGasLimit: 1_350_000, // estimated: matchBase - ~45k (no CREATE2)
+                adjustPerPuppetGasLimit: 31_000, // same as match (similar per-puppet logic)
+                settleBaseGasLimit: 115_000, // measured: 94,147
+                settlePerPuppetGasLimit: 3_000, // measured: 2,469
                 gasPriceBufferBasisPoints: 12000,
+                // Time values in seconds (matchmaker multiplies by 1000 for ms)
                 maxEthPriceAge: 300,
-                maxIndexPriceAge: 3000,
-                maxFiatPriceAge: 60_000,
-                maxGasAge: 2000,
-                stalledCheckInterval: 30_000,
-                stalledPositionThreshold: 5 * 60 * 1000,
+                maxIndexPriceAge: 3,
+                maxFiatPriceAge: 60,
+                maxGasAge: 2,
+                stalledCheckInterval: 30,
+                stalledPositionThreshold: 5 * 60,
                 minMatchTraderCollateral: 25e30,
                 minAllocationUsd: 20e30,
                 minAdjustUsd: 10e30
             })
         );
-        console.log("MatchmakerRouter deployed at:", address(matchmakerRouter));
+        console.log("MatchmakerRouter implementation deployed at:", address(matchmakerRouterImpl));
 
-        console.log("Setting up Router permissions...");
+        // Register implementation contract
+        dictator.registerContract(matchmakerRouterImpl);
 
-        dictator.setPermission(settle, settle.settle.selector, address(matchmakerRouter));
-        dictator.setPermission(settle, settle.collectAllocationAccountDust.selector, address(matchmakerRouter));
-        dictator.setPermission(settle, settle.collectPlatformFees.selector, address(matchmakerRouter));
+        // Set permissions on the PROXY address (stable address for matchmaker bots)
+        console.log("Setting up Router permissions on proxy...");
 
-        dictator.setPermission(mirror, mirror.matchmake.selector, address(matchmakerRouter));
-        dictator.setPermission(mirror, mirror.adjust.selector, address(matchmakerRouter));
-        dictator.setPermission(mirror, mirror.close.selector, address(matchmakerRouter));
+        dictator.setPermission(settle, settle.settle.selector, address(matchmakerRouterProxy));
+        dictator.setPermission(settle, settle.collectAllocationAccountDust.selector, address(matchmakerRouterProxy));
+        dictator.setPermission(settle, settle.collectPlatformFees.selector, address(matchmakerRouterProxy));
 
-        dictator.setPermission(feeMarketplace, feeMarketplace.recordTransferIn.selector, address(matchmakerRouter));
+        dictator.setPermission(mirror, mirror.matchmake.selector, address(matchmakerRouterProxy));
+        dictator.setPermission(mirror, mirror.adjust.selector, address(matchmakerRouterProxy));
+        dictator.setPermission(mirror, mirror.close.selector, address(matchmakerRouterProxy));
 
-        dictator.registerContract(matchmakerRouter);
-        console.log("MatchmakerRouter initialized and permissions configured");
+        dictator.setPermission(feeMarketplace, feeMarketplace.recordTransferIn.selector, address(matchmakerRouterProxy));
 
-        return matchmakerRouter;
+        // Update proxy to point to new implementation
+        matchmakerRouterProxy.update(address(matchmakerRouterImpl));
+        console.log("MatchmakerRouterProxy updated to implementation:", address(matchmakerRouterImpl));
+
+        return matchmakerRouterProxy;
     }
 
     function setupCrossContractPermissions(Mirror mirror, Subscribe subscribe) internal {
@@ -268,14 +278,14 @@ contract DeployPosition is BaseScript {
         FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
 
         Mirror mirror = deployMirror(account);
-        MatchmakerRouter matchmakerRouter = deployMatchmakerRouter(mirror, subscribe, settle, account, feeMarketplace);
+        MatchmakerRouterProxy matchmakerRouterProxy =
+            deployMatchmakerRouter(mirror, subscribe, settle, account, feeMarketplace);
         setupCrossContractPermissions(mirror, subscribe);
         deployUserRouter(account, subscribe, mirror);
 
         console.log("\n=== Mirror Upgrade Complete ===");
         console.log("New Mirror address:", address(mirror));
-        console.log("New Router address:", address(matchmakerRouter));
-        console.log("\nIMPORTANT: Update matchmaker services to use the new Router address");
+        console.log("MatchmakerRouterProxy (stable):", address(matchmakerRouterProxy));
     }
 
     function upgradeSubscribe() public {
@@ -287,32 +297,35 @@ contract DeployPosition is BaseScript {
         FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
 
         Subscribe subscribe = deploySubscribe();
-        MatchmakerRouter matchmakerRouter = deployMatchmakerRouter(mirror, subscribe, settle, account, feeMarketplace);
+        MatchmakerRouterProxy matchmakerRouterProxy =
+            deployMatchmakerRouter(mirror, subscribe, settle, account, feeMarketplace);
         setupCrossContractPermissions(mirror, subscribe);
         deployUserRouter(account, subscribe, mirror);
 
         console.log("\n=== Subscribe Upgrade Complete ===");
         console.log("New Subscribe address:", address(subscribe));
-        console.log("New Router address:", address(matchmakerRouter));
-        console.log("\nIMPORTANT: Update matchmaker services to use the new Router address");
+        console.log("MatchmakerRouterProxy (stable):", address(matchmakerRouterProxy));
     }
 
     function deployUserRouter(AccountContract account, Subscribe subscribe, Mirror mirror) internal {
         console.log("\n--- Deploying UserRouter ---");
 
-        RouterProxy routerProxy = RouterProxy(payable(getDeployedAddress("MatchmakerRouterProxy")));
+        UserRouterProxy userRouterProxy = UserRouterProxy(payable(getDeployedAddress("UserRouterProxy")));
         FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
 
-        dictator.setPermission(subscribe, subscribe.rule.selector, address(routerProxy));
-        dictator.setPermission(account, account.deposit.selector, address(routerProxy));
-        dictator.setPermission(account, account.withdraw.selector, address(routerProxy));
-        dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, address(routerProxy));
+        // Set permissions on the PROXY address (stable address for users)
+        dictator.setPermission(subscribe, subscribe.rule.selector, address(userRouterProxy));
+        dictator.setPermission(account, account.deposit.selector, address(userRouterProxy));
+        dictator.setPermission(account, account.withdraw.selector, address(userRouterProxy));
+        dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, address(userRouterProxy));
 
-        UserRouter newRouter = new UserRouter(account, subscribe, feeMarketplace, mirror);
-        routerProxy.update(address(newRouter));
+        UserRouter userRouterImpl = new UserRouter(account, subscribe, feeMarketplace, mirror);
 
-        console.log("UserRouter deployed at:", address(newRouter));
-        console.log("MatchmakerRouterProxy updated to new UserRouter");
+        // Note: UserRouter doesn't extend CoreContract, so no registerContract needed
+        userRouterProxy.update(address(userRouterImpl));
+
+        console.log("UserRouter implementation deployed at:", address(userRouterImpl));
+        console.log("UserRouterProxy updated to implementation:", address(userRouterImpl));
     }
 }
  

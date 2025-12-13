@@ -14,7 +14,7 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
  *         contract (the implementation). This uses OpenZeppelin's ERC1967Upgrade
  *         to manage the implementation address.
  */
-contract RouterProxy is Proxy, Access, Multicall {
+contract RouterProxy is Proxy, Access {
     constructor(
         IAuthority _authority
     ) Access(_authority) {}
