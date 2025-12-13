@@ -78,7 +78,8 @@ contract TradingTest is BasicSetup {
                 maxMatchmakerFeeToAdjustmentRatio: 0.1e30,
                 maxMatchmakerFeeToCloseRatio: 0.1e30,
                 maxMatchOpenDuration: 30 seconds,
-                maxMatchAdjustDuration: 60 seconds
+                maxMatchAdjustDuration: 60 seconds,
+                collateralReserveBps: 500
             })
         );
 
@@ -315,6 +316,270 @@ contract TradingTest is BasicSetup {
 
         // Verify request was submitted
         assertNotEq(adjustRequestKey, bytes32(0), "Adjust request should be generated");
+    }
+
+    function testAdjustRedistributesAllocationFromInsolventPuppet() public {
+        address[] memory puppetList = new address[](2);
+        puppetList[0] = puppet1;
+        puppetList[1] = puppet2;
+
+        uint openFee = 1;
+        uint allocationId = nextAllocationId++;
+
+        Mirror.CallPosition memory openCallPosition = Mirror.CallPosition({
+            collateralToken: usdc,
+            trader: trader,
+            market: address(wnt),
+            isLong: true,
+            executionFee: 0.001 ether,
+            allocationId: allocationId,
+            matchmakerFee: openFee
+        });
+
+        vm.deal(users.owner, 2 ether);
+        (address allocationAddress,) = matchmakerRouter.matchmake{value: 0.001 ether}(openCallPosition, puppetList);
+
+        uint[] memory beforeList = mirror.getAllocationPuppetList(allocationAddress);
+        uint totalBefore = beforeList[0] + beforeList[1];
+
+        uint lastTargetSize = mirror.lastTargetSizeMap(
+            Position.getPositionKey(allocationAddress, address(wnt), address(usdc), true)
+        );
+        _mockPuppetPosition(allocationAddress, lastTargetSize);
+        _updateTraderPosition(trader, 7500e30, 1000e6);
+
+        uint puppet2Balance = account.userBalanceMap(usdc, puppet2);
+        uint[] memory nextBalanceList = new uint[](2);
+        nextBalanceList[0] = 0;
+        nextBalanceList[1] = puppet2Balance;
+        vm.startPrank(address(mirror));
+        account.setBalanceList(usdc, puppetList, nextBalanceList);
+        vm.stopPrank();
+
+        uint adjustFee = 30e6;
+        uint feeReceiverBalanceBefore = usdc.balanceOf(users.owner);
+
+        Mirror.CallPosition memory adjustCallPosition = Mirror.CallPosition({
+            collateralToken: usdc,
+            trader: trader,
+            market: address(wnt),
+            isLong: true,
+            executionFee: 0.001 ether,
+            allocationId: allocationId,
+            matchmakerFee: adjustFee
+        });
+
+        vm.deal(users.owner, 2 ether);
+        matchmakerRouter.adjust{value: 0.001 ether}(adjustCallPosition, puppetList);
+
+        uint[] memory afterList = mirror.getAllocationPuppetList(allocationAddress);
+        uint totalAfter = afterList[0] + afterList[1];
+
+        assertEq(totalAfter, totalBefore, "Total allocation should remain constant");
+        assertEq(afterList[0], beforeList[0] - 15e6, "Insolvent puppet should lose allocation");
+        assertEq(afterList[1], beforeList[1] + 15e6, "Solvent puppet should gain allocation");
+        assertEq(account.userBalanceMap(usdc, puppet1), 0, "Insolvent puppet balance should be zero");
+        assertEq(account.userBalanceMap(usdc, puppet2), puppet2Balance - adjustFee, "Solvent puppet should pay fee");
+        assertEq(usdc.balanceOf(users.owner) - feeReceiverBalanceBefore, adjustFee, "Fee receiver should receive fee");
+    }
+
+    function testAdjustRedistributesAllocationWhenPartiallySolvent() public {
+        address[] memory puppetList = new address[](2);
+        puppetList[0] = puppet1;
+        puppetList[1] = puppet2;
+
+        uint openFee = 1;
+        uint allocationId = nextAllocationId++;
+
+        Mirror.CallPosition memory openCallPosition = Mirror.CallPosition({
+            collateralToken: usdc,
+            trader: trader,
+            market: address(wnt),
+            isLong: true,
+            executionFee: 0.001 ether,
+            allocationId: allocationId,
+            matchmakerFee: openFee
+        });
+
+        vm.deal(users.owner, 2 ether);
+        (address allocationAddress,) = matchmakerRouter.matchmake{value: 0.001 ether}(openCallPosition, puppetList);
+
+        uint[] memory beforeList = mirror.getAllocationPuppetList(allocationAddress);
+        uint totalBefore = beforeList[0] + beforeList[1];
+
+        uint lastTargetSize = mirror.lastTargetSizeMap(
+            Position.getPositionKey(allocationAddress, address(wnt), address(usdc), true)
+        );
+        _mockPuppetPosition(allocationAddress, lastTargetSize);
+        _updateTraderPosition(trader, 7500e30, 1000e6);
+
+        uint puppet2Balance = account.userBalanceMap(usdc, puppet2);
+        uint[] memory nextBalanceList = new uint[](2);
+        nextBalanceList[0] = 5e6;
+        nextBalanceList[1] = puppet2Balance;
+        vm.startPrank(address(mirror));
+        account.setBalanceList(usdc, puppetList, nextBalanceList);
+        vm.stopPrank();
+
+        uint adjustFee = 30e6;
+
+        Mirror.CallPosition memory adjustCallPosition = Mirror.CallPosition({
+            collateralToken: usdc,
+            trader: trader,
+            market: address(wnt),
+            isLong: true,
+            executionFee: 0.001 ether,
+            allocationId: allocationId,
+            matchmakerFee: adjustFee
+        });
+
+        vm.deal(users.owner, 2 ether);
+        matchmakerRouter.adjust{value: 0.001 ether}(adjustCallPosition, puppetList);
+
+        uint[] memory afterList = mirror.getAllocationPuppetList(allocationAddress);
+        uint totalAfter = afterList[0] + afterList[1];
+
+        assertEq(totalAfter, totalBefore, "Total allocation should remain constant");
+        assertEq(afterList[0], beforeList[0] - 10e6, "Partial insolvency should reduce allocation");
+        assertEq(afterList[1], beforeList[1] + 10e6, "Solvent puppet should receive redistribution");
+        assertEq(account.userBalanceMap(usdc, puppet1), 0, "Puppet1 balance should be drained");
+        assertEq(account.userBalanceMap(usdc, puppet2), puppet2Balance - 25e6, "Puppet2 should pay remaining fee");
+    }
+
+    function testAdjustRedistributionCapsAtAllocation() public {
+        address[] memory puppetList = new address[](2);
+        puppetList[0] = puppet1;
+        puppetList[1] = puppet2;
+
+        usdc.mint(users.owner, 9000e6);
+        account.deposit(usdc, users.owner, puppet2, 9000e6);
+
+        subscribe.rule(
+            mirror,
+            usdc,
+            puppet1,
+            trader,
+            Subscribe.RuleParams({
+                allowanceRate: 100,
+                throttleActivity: 1 hours,
+                expiry: block.timestamp + 30 days
+            })
+        );
+
+        uint openFee = 1;
+        uint allocationId = nextAllocationId++;
+
+        Mirror.CallPosition memory openCallPosition = Mirror.CallPosition({
+            collateralToken: usdc,
+            trader: trader,
+            market: address(wnt),
+            isLong: true,
+            executionFee: 0.001 ether,
+            allocationId: allocationId,
+            matchmakerFee: openFee
+        });
+
+        vm.deal(users.owner, 2 ether);
+        (address allocationAddress,) = matchmakerRouter.matchmake{value: 0.001 ether}(openCallPosition, puppetList);
+
+        uint[] memory beforeList = mirror.getAllocationPuppetList(allocationAddress);
+        uint totalBefore = beforeList[0] + beforeList[1];
+
+        uint lastTargetSize = mirror.lastTargetSizeMap(
+            Position.getPositionKey(allocationAddress, address(wnt), address(usdc), true)
+        );
+        _mockPuppetPosition(allocationAddress, lastTargetSize);
+        _updateTraderPosition(trader, 7500e30, 1000e6);
+
+        uint puppet2Balance = account.userBalanceMap(usdc, puppet2);
+        uint[] memory nextBalanceList = new uint[](2);
+        nextBalanceList[0] = 0;
+        nextBalanceList[1] = puppet2Balance;
+        vm.startPrank(address(mirror));
+        account.setBalanceList(usdc, puppetList, nextBalanceList);
+        vm.stopPrank();
+
+        uint adjustFee = 50e6;
+
+        Mirror.CallPosition memory adjustCallPosition = Mirror.CallPosition({
+            collateralToken: usdc,
+            trader: trader,
+            market: address(wnt),
+            isLong: true,
+            executionFee: 0.001 ether,
+            allocationId: allocationId,
+            matchmakerFee: adjustFee
+        });
+
+        vm.deal(users.owner, 2 ether);
+        matchmakerRouter.adjust{value: 0.001 ether}(adjustCallPosition, puppetList);
+
+        uint[] memory afterList = mirror.getAllocationPuppetList(allocationAddress);
+        uint totalAfter = afterList[0] + afterList[1];
+
+        assertEq(totalAfter, totalBefore, "Total allocation should remain constant");
+        assertEq(afterList[0], 0, "Insolvent puppet should lose all allocation");
+        assertEq(afterList[1], totalBefore, "Other puppet should receive remaining allocation");
+    }
+
+    function testCloseRedistributesAllocationFromInsolventPuppet() public {
+        address[] memory puppetList = new address[](2);
+        puppetList[0] = puppet1;
+        puppetList[1] = puppet2;
+
+        uint openFee = 1;
+        uint allocationId = nextAllocationId++;
+
+        Mirror.CallPosition memory openCallPosition = Mirror.CallPosition({
+            collateralToken: usdc,
+            trader: trader,
+            market: address(wnt),
+            isLong: true,
+            executionFee: 0.001 ether,
+            allocationId: allocationId,
+            matchmakerFee: openFee
+        });
+
+        vm.deal(users.owner, 2 ether);
+        (address allocationAddress,) = matchmakerRouter.matchmake{value: 0.001 ether}(openCallPosition, puppetList);
+
+        uint[] memory beforeList = mirror.getAllocationPuppetList(allocationAddress);
+        uint totalBefore = beforeList[0] + beforeList[1];
+
+        uint lastTargetSize = mirror.lastTargetSizeMap(
+            Position.getPositionKey(allocationAddress, address(wnt), address(usdc), true)
+        );
+        _mockPuppetPosition(allocationAddress, lastTargetSize);
+
+        uint puppet2Balance = account.userBalanceMap(usdc, puppet2);
+        uint[] memory nextBalanceList = new uint[](2);
+        nextBalanceList[0] = 0;
+        nextBalanceList[1] = puppet2Balance;
+        vm.startPrank(address(mirror));
+        account.setBalanceList(usdc, puppetList, nextBalanceList);
+        vm.stopPrank();
+
+        uint closeFee = 30e6;
+
+        Mirror.CallPosition memory closeCallPosition = Mirror.CallPosition({
+            collateralToken: usdc,
+            trader: trader,
+            market: address(wnt),
+            isLong: true,
+            executionFee: 0.001 ether,
+            allocationId: allocationId,
+            matchmakerFee: closeFee
+        });
+
+        vm.deal(users.owner, 2 ether);
+        matchmakerRouter.close{value: 0.001 ether}(closeCallPosition, puppetList, 0);
+
+        uint[] memory afterList = mirror.getAllocationPuppetList(allocationAddress);
+        uint totalAfter = afterList[0] + afterList[1];
+
+        assertEq(totalAfter, totalBefore, "Total allocation should remain constant");
+        assertEq(afterList[0], beforeList[0] - 15e6, "Insolvent puppet should lose allocation");
+        assertEq(afterList[1], beforeList[1] + 15e6, "Solvent puppet should gain allocation");
     }
 
     function testSettleSuccess() public {
@@ -814,10 +1079,23 @@ contract TradingTest is BasicSetup {
      * @param _sizeInUsd The position size in USD
      */
     function _mockPuppetPosition(address _allocationAddress, uint _sizeInUsd) internal {
-        bytes32 puppetPositionKey = Position.getPositionKey(_allocationAddress, address(wnt), address(usdc), true);
+        bytes32 positionKey = Position.getPositionKey(_allocationAddress, address(wnt), address(usdc), true);
 
-        bytes32 sizeInUsdKey = keccak256(abi.encode(puppetPositionKey, PositionStoreUtils.SIZE_IN_USD));
+        bytes32 sizeInUsdKey = keccak256(abi.encode(positionKey, PositionStoreUtils.SIZE_IN_USD));
         mockGmxDataStore.setUint(sizeInUsdKey, _sizeInUsd);
+
+        bytes32 traderPositionKey = Position.getPositionKey(trader, address(wnt), address(usdc), true);
+        bytes32 traderSizeInUsdKey = keccak256(abi.encode(traderPositionKey, PositionStoreUtils.SIZE_IN_USD));
+        bytes32 traderSizeInTokensKey = keccak256(abi.encode(traderPositionKey, PositionStoreUtils.SIZE_IN_TOKENS));
+        uint traderSizeInUsd = mockGmxDataStore.getUint(traderSizeInUsdKey);
+        uint traderSizeInTokens = mockGmxDataStore.getUint(traderSizeInTokensKey);
+
+        bytes32 sizeInTokensKey = keccak256(abi.encode(positionKey, PositionStoreUtils.SIZE_IN_TOKENS));
+        uint sizeInTokens = traderSizeInUsd == 0 ? 1 : (_sizeInUsd * traderSizeInTokens) / traderSizeInUsd;
+        mockGmxDataStore.setUint(sizeInTokensKey, sizeInTokens);
+
+        bytes32 collateralKey = keccak256(abi.encode(positionKey, PositionStoreUtils.COLLATERAL_AMOUNT));
+        mockGmxDataStore.setUint(collateralKey, mirror.allocationMap(_allocationAddress));
     }
 
     /**

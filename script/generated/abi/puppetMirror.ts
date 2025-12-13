@@ -64,6 +64,11 @@ export default [
             name: 'maxMatchAdjustDuration',
             type: 'uint256',
             internalType: 'uint256'
+          },
+          {
+            name: 'collateralReserveBps',
+            type: 'uint256',
+            internalType: 'uint256'
           }
         ]
       }
@@ -351,6 +356,11 @@ export default [
         name: 'maxMatchAdjustDuration',
         type: 'uint256',
         internalType: 'uint256'
+      },
+      {
+        name: 'collateralReserveBps',
+        type: 'uint256',
+        internalType: 'uint256'
       }
     ],
     stateMutability: 'view'
@@ -450,6 +460,11 @@ export default [
           },
           {
             name: 'maxMatchAdjustDuration',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'collateralReserveBps',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -592,7 +607,7 @@ export default [
         internalType: 'contract Subscribe'
       },
       {
-        name: '_callMatch',
+        name: '_callPosition',
         type: 'tuple',
         internalType: 'struct Mirror.CallPosition',
         components: [
@@ -660,6 +675,25 @@ export default [
   },
   {
     type: 'function',
+    name: 'reservedCollateralMap',
+    inputs: [
+      {
+        name: 'allocationAddress',
+        type: 'address',
+        internalType: 'address'
+      }
+    ],
+    outputs: [
+      {
+        name: 'reservedCollateralAmount',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
     name: 'setConfig',
     inputs: [
       {
@@ -712,6 +746,17 @@ export default [
       }
     ],
     stateMutability: 'pure'
+  },
+  {
+    type: 'error',
+    name: 'Mirror__AllocationNotFullyRedistributed',
+    inputs: [
+      {
+        name: 'remainingAllocation',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ]
   },
   {
     type: 'error',
@@ -833,6 +878,22 @@ export default [
     type: 'error',
     name: 'Mirror__PuppetListEmpty',
     inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Mirror__PuppetListMismatch',
+    inputs: [
+      {
+        name: 'provided',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'expected',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ]
   },
   {
     type: 'error',

@@ -152,7 +152,8 @@ contract DeployPosition is BaseScript {
                 maxMatchmakerFeeToAdjustmentRatio: 0.1e30,
                 maxMatchmakerFeeToCloseRatio: 0.1e30,
                 maxMatchOpenDuration: 30 seconds,
-                maxMatchAdjustDuration: 60 seconds
+                maxMatchAdjustDuration: 60 seconds,
+                collateralReserveBps: 500
             })
         );
         console.log("Mirror deployed at:", address(mirror));

@@ -55,6 +55,8 @@ library Error {
     error Mirror__FeeExceedsCloseRatio(uint fee, uint allocationAmount);
     error Mirror__MatchmakerFeeNotFullyCovered(uint totalPaid, uint requiredFee);
     error Mirror__FeeNotFullyCovered(uint totalPaid, uint requiredFee);
+    error Mirror__PuppetListMismatch(uint provided, uint expected);
+    error Mirror__AllocationNotFullyRedistributed(uint remainingAllocation);
     error Mirror__RequestPending();
     error Mirror__NoPosition();
     error Mirror__PositionAlreadyOpen();

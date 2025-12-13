@@ -392,6 +392,33 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
+    name: 'Mirror__PuppetListMismatch',
+    inputs: [
+      {
+        name: 'provided',
+        internalType: 'uint256',
+        type: 'uint256'
+      },
+      {
+        name: 'expected',
+        internalType: 'uint256',
+        type: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Mirror__AllocationNotFullyRedistributed',
+    inputs: [
+      {
+        name: 'remainingAllocation',
+        internalType: 'uint256',
+        type: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
     name: 'Mirror__RequestPending',
     inputs: []
   },

@@ -79,8 +79,8 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'uint256', name: 'matchmakerFee' },
         { type: 'bool', name: 'isIncrease' },
         { type: 'uint256', name: 'sizeDelta' },
-        { type: 'uint256', name: 'puppetCurrentSize' },
-        { type: 'uint256', name: 'puppetTargetSize' },
+        { type: 'uint256', name: 'currentSize' },
+        { type: 'uint256', name: 'targetSize' },
         { type: 'uint256[]', name: 'nextBalanceList' }
       ]
     },
@@ -92,7 +92,7 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'address', name: 'feeReceiver' },
         { type: 'uint256', name: 'executionFee' },
         { type: 'uint256', name: 'matchmakerFee' },
-        { type: 'uint256', name: 'positionSize' },
+        { type: 'uint256', name: 'currentSize' },
         { type: 'uint8', name: 'reason' },
         { type: 'uint256[]', name: 'nextBalanceList' }
       ]
@@ -111,7 +111,7 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'address', name: 'allocationAddress' },
         { type: 'bytes32', name: 'traderMatchingKey' },
         { type: 'bytes32', name: 'traderPositionKey' },
-        { type: 'bytes32', name: 'puppetPositionKey' },
+        { type: 'bytes32', name: 'positionKey' },
         { type: 'bytes32', name: 'requestKey' },
         { type: 'uint256', name: 'sizeDelta' },
         { type: 'uint256', name: 'allocated' },

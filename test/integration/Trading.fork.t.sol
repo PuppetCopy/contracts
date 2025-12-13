@@ -26,7 +26,7 @@ contract TradingForkTest is Test {
     address private constant GMX_EXCHANGE_ROUTER = Const.gmxExchangeRouter;
     address private constant GMX_DATASTORE = Const.gmxDataStore;
     address private constant GMX_ORDER_VAULT = Const.gmxOrderVault;
-    address private constant GMX_ETH_USD_MARKET = Const.gmxEthUsdcMarket;
+    address private constant GMX_ETH_USD_MARKET = 0x70d95587d40A2caf56bd97485aB3Eec10Bee6336;
 
     // Collateral: native USDC on Arbitrum
     IERC20 private constant USDC = IERC20(Const.usdc);
@@ -51,11 +51,9 @@ contract TradingForkTest is Test {
     MatchmakerRouter private matchmakerRouter;
 
     function setUp() public {
-        // Prefer RPC_42161_1 (in .env); fall back to ARBITRUM_RPC_URL for compatibility
-        string memory rpc = vm.envOr(ARB_RPC_ENV, string(""));
-        if (bytes(rpc).length == 0) {
-            rpc = vm.envOr("ARBITRUM_RPC_URL", string(""));
-        }
+        string memory rpc = vm.envOr("RPC_URL", string(""));
+        if (bytes(rpc).length == 0) rpc = vm.envOr(ARB_RPC_ENV, string(""));
+        if (bytes(rpc).length == 0) rpc = vm.envOr("ARBITRUM_RPC_URL", string(""));
         if (bytes(rpc).length == 0) {
             vm.skip(true);
             return;
@@ -95,7 +93,8 @@ contract TradingForkTest is Test {
                 maxMatchmakerFeeToAdjustmentRatio: 0.1e30,
                 maxMatchmakerFeeToCloseRatio: 0.1e30,
                 maxMatchOpenDuration: 30 seconds,
-                maxMatchAdjustDuration: 60 seconds
+                maxMatchAdjustDuration: 60 seconds,
+                collateralReserveBps: 500
             })
         );
 
@@ -147,7 +146,7 @@ contract TradingForkTest is Test {
         puppetList[1] = puppet2;
 
         // Mock trader state in DataStore so Mirror pre-checks pass
-        _mockTraderPosition(trader, GMX_ETH_USD_MARKET, USDC, true, 10_000e30, 2_000e6);
+        _mockTraderPosition(trader, GMX_ETH_USD_MARKET, USDC, true, 10_000e30, 2_000e6, 5);
 
         uint executionFee = 0.02 ether;
         uint fee = 1e6; // 1 USDC
@@ -268,14 +267,19 @@ contract TradingForkTest is Test {
         IERC20 _collateralToken,
         bool _isLong,
         uint _sizeUsd,
-        uint _collateralAmount
+        uint _collateralAmount,
+        uint _sizeInTokens
     ) internal {
         bytes32 positionKey = Position.getPositionKey(_trader, _market, address(_collateralToken), _isLong);
         bytes32 sizeKey = keccak256(abi.encode(positionKey, PositionStoreUtils.SIZE_IN_USD));
+        bytes32 sizeTokensKey = keccak256(abi.encode(positionKey, PositionStoreUtils.SIZE_IN_TOKENS));
         bytes32 collateralKey = keccak256(abi.encode(positionKey, PositionStoreUtils.COLLATERAL_AMOUNT));
         bytes32 increasedAtKey = keccak256(abi.encode(positionKey, PositionStoreUtils.INCREASED_AT_TIME));
 
         vm.mockCall(GMX_DATASTORE, abi.encodeWithSelector(IGmxReadDataStore.getUint.selector, sizeKey), abi.encode(_sizeUsd));
+        vm.mockCall(
+            GMX_DATASTORE, abi.encodeWithSelector(IGmxReadDataStore.getUint.selector, sizeTokensKey), abi.encode(_sizeInTokens)
+        );
         vm.mockCall(GMX_DATASTORE, abi.encodeWithSelector(IGmxReadDataStore.getUint.selector, collateralKey), abi.encode(_collateralAmount));
         vm.mockCall(GMX_DATASTORE, abi.encodeWithSelector(IGmxReadDataStore.getUint.selector, increasedAtKey), abi.encode(block.timestamp));
     }

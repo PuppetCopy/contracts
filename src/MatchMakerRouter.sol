@@ -19,16 +19,13 @@ contract MatchmakerRouter is CoreContract {
         uint adjustPerPuppetGasLimit;
         uint settleBaseGasLimit;
         uint settlePerPuppetGasLimit;
-        uint gasPriceBufferBasisPoints; // e.g. 12000 = 120% (20% buffer)
-        // Price staleness thresholds (in milliseconds)
+        uint gasPriceBufferBasisPoints;
         uint maxEthPriceAge;
         uint maxIndexPriceAge;
         uint maxFiatPriceAge;
         uint maxGasAge;
-        // Position monitoring
-        uint stalledCheckInterval; // How often to check for stalled positions (ms)
-        uint stalledPositionThreshold; // Position is stalled after this duration (ms)
-        // Minimum thresholds (in USD with 30 decimals)
+        uint stalledCheckInterval;
+        uint stalledPositionThreshold;
         uint minMatchTraderCollateral;
         uint minAllocationUsd;
         uint minAdjustUsd;
