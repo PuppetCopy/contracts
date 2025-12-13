@@ -5,8 +5,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Account} from "./position/Account.sol";
 import {Mirror} from "./position/Mirror.sol";
-import {Subscribe} from "./position/Subscribe.sol";
 import {Settle} from "./position/Settle.sol";
+import {Subscribe} from "./position/Subscribe.sol";
+import {FeeMarketplace} from "./shared/FeeMarketplace.sol";
+import {FeeMarketplaceStore} from "./shared/FeeMarketplaceStore.sol";
 import {CoreContract} from "./utils/CoreContract.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 
@@ -35,6 +37,8 @@ contract MatchmakerRouter is CoreContract {
     Mirror public immutable mirror;
     Settle public immutable settle;
     Account public immutable account;
+    FeeMarketplace public immutable feeMarketplace;
+    FeeMarketplaceStore public immutable feeMarketplaceStore;
 
     Config config;
 
@@ -44,17 +48,21 @@ contract MatchmakerRouter is CoreContract {
         Subscribe _subscribe,
         Mirror _mirror,
         Settle _settle,
+        FeeMarketplace _feeMarketplace,
         Config memory _config
     ) CoreContract(_authority, abi.encode(_config)) {
         if (address(_account) == address(0)) revert("Account not set correctly");
         if (address(_subscribe) == address(0)) revert("Subscribe contract not set correctly");
         if (address(_mirror) == address(0)) revert("Mirror not set correctly");
         if (address(_settle) == address(0)) revert("Settle not set correctly");
+        if (address(_feeMarketplace) == address(0)) revert("FeeMarketplace not set correctly");
 
         mirror = _mirror;
         subscribe = _subscribe;
         settle = _settle;
         account = _account;
+        feeMarketplace = _feeMarketplace;
+        feeMarketplaceStore = _feeMarketplace.store();
     }
 
     function getConfig() external view returns (Config memory) {
@@ -99,15 +107,14 @@ contract MatchmakerRouter is CoreContract {
         return settle.collectAllocationAccountDust(account, _allocationAccount, _dustToken, _receiver, _amount);
     }
 
-    function recoverUnaccountedTokens(
-        IERC20 _token,
-        address _receiver,
-        uint _amount
-    ) external auth {
-        account.recoverUnaccountedTokens(_token, _receiver, _amount);
+    function collectAndDepositPlatformFees(IERC20 _token, uint _amount) external {
+        settle.collectPlatformFees(account, _token, address(feeMarketplaceStore), _amount);
+        feeMarketplace.recordTransferIn(_token);
     }
 
-    function _setConfig(bytes memory _data) internal override {
+    function _setConfig(
+        bytes memory _data
+    ) internal override {
         Config memory _config = abi.decode(_data, (Config));
 
         if (_config.feeReceiver == address(0)) revert("Invalid fee receiver");

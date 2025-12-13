@@ -1,28 +1,25 @@
 import { $, file, write } from 'bun'
 import { createPublicClient, getAddress, http } from 'viem'
 
-console.log('Running deployment script...')
-
 const rpcUrl = process.env.RPC_URL
+const scriptName = process.env.SCRIPT_NAME
 
 if (!rpcUrl) {
   throw new Error('Missing environment variable: RPC_URL')
 }
 
-// Create a Viem client
+if (!scriptName) {
+  throw new Error('Missing environment variable: SCRIPT_NAME')
+}
+
 const client = createPublicClient({
   transport: http(rpcUrl)
 })
 
 const chainId = await client.getChainId()
-const scriptName = 'DeployUserRouter'
 const scriptFile = `${scriptName}.s.sol`
 
-console.log(`Config: ${JSON.stringify({ chainId, scriptName })}`)
-
-if (!chainId || !scriptName) {
-  throw new Error(`Missing required environment variables: ${JSON.stringify({ chainId, scriptName })}`)
-}
+console.log(`Deploying ${scriptName} on chain ${chainId}...`)
 
 type IDeploymentArtifact = {
   transactions: {
@@ -30,58 +27,44 @@ type IDeploymentArtifact = {
     transactionType: string
     contractName: string
     contractAddress: string
-    function: null
-    arguments: string[]
-    transaction: {
-      from: string
-      gas: string
-      value: string
-      input: string
-      nonce: string
-      chainId: string
-      to?: undefined
-    }
-    additionalContracts: never[]
-    isFixedGasLimit: boolean
   }[]
   chain: number
-  commit: string
-  timestamp: number
 }
 
-console.log(`Deploying ${chainId}:${scriptName} with RPC_URL ${rpcUrl}`)
-
-await $`forge script \
+const result = await $`forge script \
   script/${scriptFile}:${scriptName} \
   --broadcast \
   --verify \
   -vvvv \
-  --rpc-url ${rpcUrl}`
+  --rpc-url ${rpcUrl}`.nothrow()
+
+if (result.exitCode !== 0) {
+  console.error('Forge script failed')
+  process.exit(1)
+}
 
 const deploymentsFilePath = './deployments.json'
 const deploymentsFile = file(deploymentsFilePath)
-const deployments = (await deploymentsFile.exists())
+const deployments: Record<string, Record<string, string>> = (await deploymentsFile.exists())
   ? await deploymentsFile.json()
-  : ({} as {
-      [chainId: string]: {
-        [contractName: string]: string
-      }
-    })
+  : {}
 
 const broadcastFile = file(`./broadcast/${scriptFile}/${chainId}/run-latest.json`)
 const latestRun = (await broadcastFile.json()) as IDeploymentArtifact
 
-latestRun.transactions.reduce((acc, tx) => {
-  if (!tx.contractName) {
-    return acc
+const chainKey = String(latestRun.chain)
+deployments[chainKey] ??= {}
+
+for (const tx of latestRun.transactions) {
+  if (tx.contractName) {
+    deployments[chainKey][tx.contractName] = getAddress(tx.contractAddress)
   }
+}
 
-  acc[String(latestRun.chain)] ??= {}
-  acc[String(latestRun.chain)][tx.contractName] = getAddress(tx.contractAddress)
+await write(deploymentsFilePath, JSON.stringify(deployments, null, 2))
+console.log(`Updated deployments.json for chain ${chainKey}`)
 
-  return acc
-}, deployments)
-
-const jsonString = JSON.stringify(deployments, null, 2)
-await write(deploymentsFilePath, jsonString, { createPath: true })
-console.log(jsonString)
+// Regenerate TypeScript
+console.log('Regenerating TypeScript...')
+await $`bun run generate && bun run build:ts`
+console.log('Done!')

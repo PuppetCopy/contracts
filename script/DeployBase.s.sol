@@ -2,6 +2,8 @@
 pragma solidity ^0.8.31;
 
 import {Dictatorship} from "src/shared/Dictatorship.sol";
+import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
+import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
@@ -13,23 +15,33 @@ import {Const} from "./Const.sol";
 contract DeployBase is BaseScript {
     function run() public {
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
-        deployContracts();
-        vm.stopBroadcast();
-    }
 
-    function deployContracts() internal {
         Dictatorship dictatorship = new Dictatorship(Const.dao);
-
-        // Deploy PUPPET token on Arbitrum (home chain - single source of truth)
         PuppetToken puppetToken = new PuppetToken(Const.dao);
-
-        // Deploy governance token
         PuppetVoteToken puppetVoteToken = new PuppetVoteToken(dictatorship);
 
         TokenRouter tokenRouter = new TokenRouter(dictatorship, TokenRouter.Config(200_000));
         dictatorship.registerContract(tokenRouter);
-        RouterProxy routerProxy = new RouterProxy(dictatorship);
 
+        FeeMarketplaceStore feeMarketplaceStore = new FeeMarketplaceStore(dictatorship, tokenRouter, puppetToken);
+        FeeMarketplace feeMarketplace = new FeeMarketplace(
+            dictatorship,
+            puppetToken,
+            feeMarketplaceStore,
+            FeeMarketplace.Config({
+                transferOutGasLimit: 200_000,
+                unlockTimeframe: 4 days,
+                askDecayTimeframe: 7 days,
+                askStart: 100e18
+            })
+        );
+        dictatorship.setAccess(feeMarketplaceStore, address(feeMarketplace));
+        dictatorship.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
+        dictatorship.registerContract(feeMarketplace);
+
+        RouterProxy routerProxy = new RouterProxy(dictatorship);
         dictatorship.setAccess(routerProxy, Const.dao);
+
+        vm.stopBroadcast();
     }
 }

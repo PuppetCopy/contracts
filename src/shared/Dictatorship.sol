@@ -2,102 +2,57 @@
 pragma solidity ^0.8.31;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import {Error} from "../utils/Error.sol";
-import {CoreContract} from "./../utils/CoreContract.sol";
-import {Access} from "./../utils/auth/Access.sol";
-import {Permission} from "./../utils/auth/Permission.sol";
-import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
+import {CoreContract} from "../utils/CoreContract.sol";
+import {Access} from "../utils/auth/Access.sol";
+import {Permission} from "../utils/auth/Permission.sol";
+import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 
-/**
- * @notice Central authority for managing CoreContract permissions, configuration, and event logging
- * @dev Ownership should be held by a secure Governance contract
- */
 contract Dictatorship is Ownable, IAuthority {
-    /**
-     * @notice Central log for events emitted by registered CoreContracts
-     */
     event PuppetEventLog(address indexed coreContract, string indexed method, bytes data);
 
     mapping(address => bool) public registeredContract;
 
-    uint public targetCallGasLimit = 500_000;
-
-    /**
-     * @notice Update gas limit for external calls
-     */
-    function setTargetCallGasLimit(
-        uint _gasLimit
-    ) external onlyOwner {
-        if (_gasLimit == 0) revert Error.Dictatorship__InvalidTargetAddress(); // Reuse existing error
-        targetCallGasLimit = _gasLimit;
-        emit PuppetEventLog(address(this), "SettargetCallGasLimit", abi.encode(_gasLimit));
+    constructor(
+        address _initialOwner
+    ) Ownable(_initialOwner) {
+        registeredContract[address(this)] = true;
     }
 
-    /**
-     * @notice Check if user has general access via target Access contract
-     */
     function hasAccess(Access _target, address _user) external view returns (bool) {
         return _target.canCall(_user);
     }
 
-    /**
-     * @notice Check if user has specific function permission
-     */
-    function hasPermission(Permission _target, bytes4 _functionSig, address user) external view returns (bool) {
-        return _target.canCall(_functionSig, user);
+    function hasPermission(Permission _target, bytes4 _functionSig, address _user) external view returns (bool) {
+        return _target.canCall(_functionSig, _user);
     }
 
-    constructor(
-        address _initialOwner
-    ) Ownable(_initialOwner) {
-        registeredContract[address(this)] = true; // Register self to allow event logging
-    }
-
-    /**
-     * @notice Log events from registered CoreContracts
-     */
-    function logEvent(string memory _method, bytes memory _data) external {
+    function logEvent(string calldata _method, bytes calldata _data) external {
         if (!registeredContract[msg.sender]) revert Error.Dictatorship__ContractNotRegistered();
         emit PuppetEventLog(msg.sender, _method, _data);
     }
 
-    /**
-     * @notice Grant general access to user on target Access contract
-     */
     function setAccess(Access _target, address _user) external onlyOwner {
-        _target.setAccess{gas: targetCallGasLimit}(_user, true);
+        _target.setAccess(_user, true);
         emit PuppetEventLog(address(this), "UpdateAccess", abi.encode(_target, _user, true));
     }
 
-    /**
-     * @notice Revoke general access from user on target Access contract
-     */
     function removeAccess(Access _target, address _user) external onlyOwner {
-        _target.setAccess{gas: targetCallGasLimit}(_user, false);
+        _target.setAccess(_user, false);
         emit PuppetEventLog(address(this), "UpdateAccess", abi.encode(_target, _user, false));
     }
 
-    /**
-     * @notice Grant function-specific permission to user
-     */
     function setPermission(Permission _target, bytes4 _functionSig, address _user) external onlyOwner {
-        _target.setPermission{gas: targetCallGasLimit}(_functionSig, _user, true);
+        _target.setPermission(_functionSig, _user, true);
         emit PuppetEventLog(address(this), "UpdatePermission", abi.encode(address(_target), _user, _functionSig, true));
     }
 
-    /**
-     * @notice Revoke function-specific permission from user
-     */
     function removePermission(Permission _target, bytes4 _functionSig, address _user) external onlyOwner {
-        _target.setPermission{gas: targetCallGasLimit}(_functionSig, _user, false);
+        _target.setPermission(_functionSig, _user, false);
         emit PuppetEventLog(address(this), "UpdatePermission", abi.encode(address(_target), _user, _functionSig, false));
     }
 
-    /**
-     * @notice Register a CoreContract for event logging
-     */
     function registerContract(
         CoreContract _contract
     ) external onlyOwner {
@@ -108,40 +63,30 @@ contract Dictatorship is Ownable, IAuthority {
         if (registeredContract[targetAddress]) revert Error.Dictatorship__ContractAlreadyInitialized();
 
         registeredContract[targetAddress] = true;
-        emit PuppetEventLog(targetAddress, "RegisterContract", abi.encode(targetAddress));
+        emit PuppetEventLog(targetAddress, "RegisterContract", "");
     }
 
-    /**
-     * @notice Push configuration update to registered CoreContract
-     */
     function setConfig(CoreContract _contract, bytes calldata _config) external onlyOwner {
-        if (!_contract.supportsInterface(type(CoreContract).interfaceId)) {
-            revert Error.Dictatorship__InvalidCoreContract();
-        }
         if (!registeredContract[address(_contract)]) revert Error.Dictatorship__ContractNotRegistered();
-        
-        try _contract.setConfig{gas: targetCallGasLimit}(_config) {}
-        catch {
-            revert Error.Dictatorship__ConfigurationUpdateFailed();
+
+        try _contract.setConfig(_config) {}
+        catch (bytes memory reason) {
+            if (reason.length == 0) revert Error.Dictatorship__ConfigurationUpdateFailed();
+            assembly {
+                revert(add(32, reason), mload(reason))
+            }
         }
 
         emit PuppetEventLog(address(_contract), "SetConfig", _config);
     }
 
-    /**
-     * @notice De-register a CoreContract from event logging
-     */
     function removeContract(
         CoreContract _contract
     ) external onlyOwner {
-        if (!_contract.supportsInterface(type(CoreContract).interfaceId)) {
-            revert Error.Dictatorship__InvalidCoreContract();
-        }
-
         address targetAddress = address(_contract);
         if (!registeredContract[targetAddress]) revert Error.Dictatorship__ContractNotRegistered();
 
         registeredContract[targetAddress] = false;
-        emit PuppetEventLog(targetAddress, "RemoveContractAccess", abi.encode(targetAddress));
+        emit PuppetEventLog(targetAddress, "RemoveContract", "");
     }
 }

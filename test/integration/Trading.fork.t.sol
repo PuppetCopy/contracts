@@ -16,7 +16,10 @@ import {PositionStoreUtils} from "@gmx/contracts/position/PositionStoreUtils.sol
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {AccountStore} from "src/shared/AccountStore.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
+import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
+import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
+import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {Const} from "script/Const.sol";
 
 /// @notice Fork test that hits the real GMX V2 exchange router on Arbitrum to ensure open requests work end-to-end.
@@ -49,6 +52,9 @@ contract TradingForkTest is Test {
     Mirror private mirror;
     Settle private settle;
     MatchmakerRouter private matchmakerRouter;
+    PuppetToken private puppetToken;
+    FeeMarketplaceStore private feeMarketplaceStore;
+    FeeMarketplace private feeMarketplace;
 
     function setUp() public {
         string memory rpc = vm.envOr("RPC_URL", string(""));
@@ -109,12 +115,27 @@ contract TradingForkTest is Test {
             })
         );
 
+        puppetToken = new PuppetToken(admin);
+        feeMarketplaceStore = new FeeMarketplaceStore(authority, tokenRouter, puppetToken);
+        feeMarketplace = new FeeMarketplace(
+            authority,
+            puppetToken,
+            feeMarketplaceStore,
+            FeeMarketplace.Config({
+                transferOutGasLimit: 200_000,
+                unlockTimeframe: 1 days,
+                askDecayTimeframe: 1 days,
+                askStart: 100e18
+            })
+        );
+
         matchmakerRouter = new MatchmakerRouter(
             authority,
             account,
             subscribe,
             mirror,
             settle,
+            feeMarketplace,
             MatchmakerRouter.Config({
                 feeReceiver: matchmaker,
                 matchBaseGasLimit: 1_300_853,

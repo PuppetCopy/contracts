@@ -34,11 +34,12 @@ contract DeployPosition is BaseScript {
         Subscribe subscribe = deploySubscribe();
         Mirror mirror = deployMirror(account);
         Settle settle = deploySettle(account);
-        MatchmakerRouter matchmakerRouter = deployMatchmakerRouter(mirror, subscribe, settle, account);
+        FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
+        MatchmakerRouter matchmakerRouter = deployMatchmakerRouter(mirror, subscribe, settle, account, feeMarketplace);
 
         setupCrossContractPermissions(mirror, subscribe);
 
-        setupUpkeepingConfig(account, settle, matchmakerRouter);
+        setupUpkeepingConfig(account, settle);
 
         vm.stopBroadcast();
     }
@@ -147,7 +148,7 @@ contract DeployPosition is BaseScript {
                 gmxDataStore: IGmxReadDataStore(Const.gmxDataStore),
                 gmxOrderVault: Const.gmxOrderVault,
                 referralCode: Const.referralCode,
-                maxPuppetList: 50,
+                maxPuppetList: 200,
                 maxMatchmakerFeeToAllocationRatio: 0.1e30,
                 maxMatchmakerFeeToAdjustmentRatio: 0.1e30,
                 maxMatchmakerFeeToCloseRatio: 0.1e30,
@@ -175,7 +176,8 @@ contract DeployPosition is BaseScript {
         Mirror mirror,
         Subscribe subscribe,
         Settle settle,
-        AccountContract account
+        AccountContract account,
+        FeeMarketplace feeMarketplace
     ) internal returns (MatchmakerRouter) {
         console.log("\n--- Deploying Router ---");
 
@@ -185,6 +187,7 @@ contract DeployPosition is BaseScript {
             subscribe,
             mirror,
             settle,
+            feeMarketplace,
             MatchmakerRouter.Config({
                 feeReceiver: vm.addr(DEPLOYER_PRIVATE_KEY),
                 matchBaseGasLimit: 1_283_731,
@@ -211,10 +214,13 @@ contract DeployPosition is BaseScript {
 
         dictator.setPermission(settle, settle.settle.selector, address(matchmakerRouter));
         dictator.setPermission(settle, settle.collectAllocationAccountDust.selector, address(matchmakerRouter));
+        dictator.setPermission(settle, settle.collectPlatformFees.selector, address(matchmakerRouter));
 
         dictator.setPermission(mirror, mirror.matchmake.selector, address(matchmakerRouter));
         dictator.setPermission(mirror, mirror.adjust.selector, address(matchmakerRouter));
         dictator.setPermission(mirror, mirror.close.selector, address(matchmakerRouter));
+
+        dictator.setPermission(feeMarketplace, feeMarketplace.recordTransferIn.selector, address(matchmakerRouter));
 
         dictator.registerContract(matchmakerRouter);
         console.log("MatchmakerRouter initialized and permissions configured");
@@ -231,12 +237,12 @@ contract DeployPosition is BaseScript {
         console.log("Cross-contract permissions configured");
     }
 
-    function setupUpkeepingConfig(AccountContract account, Settle settle, MatchmakerRouter matchmakerRouter) internal {
+    function setupUpkeepingConfig(AccountContract account, Settle settle) internal {
         console.log("\n--- Setting up upkeeping configuration ---");
 
         dictator.setPermission(account, account.setDepositCapList.selector, Const.dao);
         dictator.setPermission(settle, settle.setTokenDustThresholdList.selector, Const.dao);
-        dictator.setPermission(matchmakerRouter, matchmakerRouter.recoverUnaccountedTokens.selector, Const.dao);
+        dictator.setPermission(account, account.recoverUnaccountedTokens.selector, Const.dao);
 
         // Configure USDC as allowed token
         IERC20[] memory allowedTokens = new IERC20[](1);
@@ -259,9 +265,10 @@ contract DeployPosition is BaseScript {
         AccountContract account = AccountContract(getDeployedAddress("Account"));
         Subscribe subscribe = Subscribe(getDeployedAddress("Subscribe"));
         Settle settle = Settle(getDeployedAddress("Settle"));
+        FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
 
         Mirror mirror = deployMirror(account);
-        MatchmakerRouter matchmakerRouter = deployMatchmakerRouter(mirror, subscribe, settle, account);
+        MatchmakerRouter matchmakerRouter = deployMatchmakerRouter(mirror, subscribe, settle, account, feeMarketplace);
         setupCrossContractPermissions(mirror, subscribe);
         deployUserRouter(account, subscribe, mirror);
 
@@ -277,9 +284,10 @@ contract DeployPosition is BaseScript {
         AccountContract account = AccountContract(getDeployedAddress("Account"));
         Mirror mirror = Mirror(getDeployedAddress("Mirror"));
         Settle settle = Settle(getDeployedAddress("Settle"));
+        FeeMarketplace feeMarketplace = FeeMarketplace(getDeployedAddress("FeeMarketplace"));
 
         Subscribe subscribe = deploySubscribe();
-        MatchmakerRouter matchmakerRouter = deployMatchmakerRouter(mirror, subscribe, settle, account);
+        MatchmakerRouter matchmakerRouter = deployMatchmakerRouter(mirror, subscribe, settle, account, feeMarketplace);
         setupCrossContractPermissions(mirror, subscribe);
         deployUserRouter(account, subscribe, mirror);
 
@@ -298,6 +306,7 @@ contract DeployPosition is BaseScript {
         dictator.setPermission(subscribe, subscribe.rule.selector, address(routerProxy));
         dictator.setPermission(account, account.deposit.selector, address(routerProxy));
         dictator.setPermission(account, account.withdraw.selector, address(routerProxy));
+        dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, address(routerProxy));
 
         UserRouter newRouter = new UserRouter(account, subscribe, feeMarketplace, mirror);
         routerProxy.update(address(newRouter));

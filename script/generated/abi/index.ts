@@ -8,6 +8,7 @@ export { default as feemarketplacestoreAbi } from './puppetFeeMarketplaceStore.j
 export { default as matchmakerrouterAbi } from './puppetMatchmakerRouter.js'
 export { default as mirrorAbi } from './puppetMirror.js'
 export { default as puppettokenAbi } from './puppetPuppetToken.js'
+export { default as puppetvotetokenAbi } from './puppetPuppetVoteToken.js'
 export { default as routerproxyAbi } from './puppetRouterProxy.js'
 export { default as settleAbi } from './puppetSettle.js'
 export { default as subscribeAbi } from './puppetSubscribe.js'

@@ -52,7 +52,7 @@ export default [
         internalType: 'bytes4'
       },
       {
-        name: 'user',
+        name: '_user',
         type: 'address',
         internalType: 'address'
       }
@@ -251,32 +251,6 @@ export default [
   },
   {
     type: 'function',
-    name: 'setTargetCallGasLimit',
-    inputs: [
-      {
-        name: '_gasLimit',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'targetCallGasLimit',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
     name: 'transferOwnership',
     inputs: [
       {
@@ -350,11 +324,6 @@ export default [
   {
     type: 'error',
     name: 'Dictatorship__InvalidCoreContract',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Dictatorship__InvalidTargetAddress',
     inputs: []
   },
   {

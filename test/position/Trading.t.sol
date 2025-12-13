@@ -15,6 +15,8 @@ import {Position} from "@gmx/contracts/position/Position.sol";
 import {PositionStoreUtils} from "@gmx/contracts/position/PositionStoreUtils.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {AccountStore} from "src/shared/AccountStore.sol";
+import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
+import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
 import {Error} from "src/utils/Error.sol";
 import {BasicSetup} from "test/base/BasicSetup.t.sol";
 import {MockGmxExchangeRouter} from "test/mock/MockGmxExchangeRouter.t.sol";
@@ -35,6 +37,8 @@ contract TradingTest is BasicSetup {
     MatchmakerRouter matchmakerRouter;
     MockGmxExchangeRouter mockGmxExchangeRouter;
     MockGmxDataStore mockGmxDataStore;
+    FeeMarketplaceStore feeMarketplaceStore;
+    FeeMarketplace feeMarketplace;
 
     // Test actors
     address trader = makeAddr("trader");
@@ -94,12 +98,26 @@ contract TradingTest is BasicSetup {
             })
         );
 
+        feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
+        feeMarketplace = new FeeMarketplace(
+            dictator,
+            puppetToken,
+            feeMarketplaceStore,
+            FeeMarketplace.Config({
+                transferOutGasLimit: 200_000,
+                unlockTimeframe: 1 days,
+                askDecayTimeframe: 1 days,
+                askStart: 100e18
+            })
+        );
+
         matchmakerRouter = new MatchmakerRouter(
             dictator,
             account,
             subscribe,
             mirror,
             settle,
+            feeMarketplace,
             MatchmakerRouter.Config({
                 feeReceiver: users.owner,
                 matchBaseGasLimit: 1_300_853,
@@ -148,6 +166,13 @@ contract TradingTest is BasicSetup {
         // Settle Contract Permissions
         dictator.setPermission(settle, settle.settle.selector, address(matchmakerRouter));
         dictator.setPermission(settle, settle.collectAllocationAccountDust.selector, address(matchmakerRouter));
+        dictator.setPermission(settle, settle.collectPlatformFees.selector, address(matchmakerRouter));
+
+        // FeeMarketplace Permissions
+        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
+        dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
+        dictator.setPermission(feeMarketplace, feeMarketplace.recordTransferIn.selector, address(matchmakerRouter));
+        dictator.registerContract(feeMarketplace);
 
         // Initialize contracts
         dictator.registerContract(account);
@@ -640,6 +665,74 @@ contract TradingTest is BasicSetup {
         // Allow for minor rounding dust from mulDiv
         assertTrue(accounted <= settleParams.amount, "Settlement over-accounted");
         assertLe(settleParams.amount - accounted, puppetList.length, "Settlement accounting mismatch");
+    }
+
+    /**
+     * @notice Full E2E test: Match → Settle → Collect Platform Fees → FeeMarketplace
+     * @dev Tests the complete fee flow from settlement to FeeMarketplace deposit
+     */
+    function testE2E_SettleAndCollectPlatformFees() public {
+        // Step 1: Create allocation and position
+        testRequestMatchSuccess();
+
+        address[] memory puppetList = new address[](2);
+        puppetList[0] = puppet1;
+        puppetList[1] = puppet2;
+
+        uint allocationId = 1;
+
+        // Step 2: Simulate profit by sending tokens to allocation account
+        address allocationAddress = getAllocationAddress(usdc, trader, puppetList, allocationId);
+        usdc.mint(allocationAddress, 500e6);
+
+        // Step 3: Settle allocation (this generates platform fees)
+        Settle.CallSettle memory settleParams = Settle.CallSettle({
+            collateralToken: usdc,
+            distributionToken: usdc,
+            matchmakerFeeReceiver: users.owner,
+            trader: trader,
+            allocationId: allocationId,
+            matchmakerExecutionFee: 0.1e6,
+            amount: 500e6
+        });
+
+        (, uint platformFeeAmount) = matchmakerRouter.settleAllocation(settleParams, puppetList);
+
+        // Step 4: Verify platform fees accumulated in Settle contract
+        uint accumulatedFees = settle.platformFeeMap(usdc);
+        assertEq(accumulatedFees, platformFeeAmount, "Platform fees should be tracked in Settle");
+        assertGt(accumulatedFees, 0, "Should have accumulated platform fees");
+
+        // Step 5: Verify FeeMarketplace is empty before collection
+        uint marketplaceBalanceBefore = feeMarketplace.accountedBalance(usdc);
+        assertEq(marketplaceBalanceBefore, 0, "FeeMarketplace should be empty initially");
+
+        // Step 6: Collect and deposit platform fees to FeeMarketplace (public function - anyone can call)
+        vm.stopPrank();
+        vm.prank(address(0xDEAD)); // Random address to prove it's permissionless
+        matchmakerRouter.collectAndDepositPlatformFees(usdc, accumulatedFees);
+
+        // Step 7: Verify platform fees moved to FeeMarketplace
+        uint settleFeesAfter = settle.platformFeeMap(usdc);
+        assertEq(settleFeesAfter, 0, "Settle should have no fees after collection");
+
+        uint marketplaceBalanceAfter = feeMarketplace.accountedBalance(usdc);
+        assertEq(marketplaceBalanceAfter, platformFeeAmount, "FeeMarketplace should have received fees");
+
+        // Step 8: Verify fees are locked initially (need to wait for unlock)
+        uint unlockedBalance = feeMarketplace.getUnlockedBalance(usdc);
+        assertEq(unlockedBalance, 0, "Fees should be locked initially");
+
+        // Step 9: Fast forward time to unlock some fees
+        skip(1 days);
+        uint unlockedAfterTime = feeMarketplace.getUnlockedBalance(usdc);
+        assertEq(unlockedAfterTime, platformFeeAmount, "All fees should be unlocked after unlock timeframe");
+
+        // Step 10: Verify ask price decays
+        uint askPrice = feeMarketplace.getAskPrice(usdc);
+        assertEq(askPrice, 0, "Ask price should be 0 after decay timeframe");
+
+        vm.startPrank(users.owner);
     }
 
     function testSettleInvariantSumAllocations() public {

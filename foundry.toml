@@ -32,9 +32,12 @@
 
 [profile.prod]
   out = "forge-artifacts-prod"
-  cache_path  = 'forge-cache-prod'
-  fs_permissions = [{ access = "read-write", path = "./deployments.json" }]
+  cache_path = "forge-cache-prod"
   optimizer_runs = 100_000
+  fs_permissions = [
+    { access = "read-write", path = "./deployments.json" },
+    { access = "read-write", path = "./broadcast" }
+  ]
 
 [profile.ci.fuzz]
   runs = 1000

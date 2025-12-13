@@ -31,6 +31,11 @@ export default [
         internalType: 'contract Settle'
       },
       {
+        name: '_feeMarketplace',
+        type: 'address',
+        internalType: 'contract FeeMarketplace'
+      },
+      {
         name: '_config',
         type: 'tuple',
         internalType: 'struct MatchmakerRouter.Config',
@@ -338,6 +343,50 @@ export default [
   },
   {
     type: 'function',
+    name: 'collectAndDepositPlatformFees',
+    inputs: [
+      {
+        name: '_token',
+        type: 'address',
+        internalType: 'contract IERC20'
+      },
+      {
+        name: '_amount',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable'
+  },
+  {
+    type: 'function',
+    name: 'feeMarketplace',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'contract FeeMarketplace'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'feeMarketplaceStore',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'contract FeeMarketplaceStore'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
     name: 'getConfig',
     inputs: [],
     outputs: [
@@ -514,29 +563,6 @@ export default [
       }
     ],
     stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'recoverUnaccountedTokens',
-    inputs: [
-      {
-        name: '_token',
-        type: 'address',
-        internalType: 'contract IERC20'
-      },
-      {
-        name: '_receiver',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: '_amount',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
   },
   {
     type: 'function',

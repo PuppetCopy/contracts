@@ -9,6 +9,7 @@ import feemarketplacestoreAbi from './abi/puppetFeeMarketplaceStore.js'
 import matchmakerrouterAbi from './abi/puppetMatchmakerRouter.js'
 import mirrorAbi from './abi/puppetMirror.js'
 import puppettokenAbi from './abi/puppetPuppetToken.js'
+import puppetvotetokenAbi from './abi/puppetPuppetVoteToken.js'
 import routerproxyAbi from './abi/puppetRouterProxy.js'
 import settleAbi from './abi/puppetSettle.js'
 import subscribeAbi from './abi/puppetSubscribe.js'
@@ -17,22 +18,22 @@ import userrouterAbi from './abi/puppetUserRouter.js'
 
 export const PUPPET_CONTRACT_MAP = {
   Dictatorship: {
-    address: '0x5a5648423e6110e9b4AE94e88bd66F963a5253C2',
+    address: '0x686B8A9701659F623c28e0A7c5053D9a499EFfE8',
     chainId: 42161,
     abi: dictatorshipAbi
   },
   PuppetToken: {
-    address: '0x10f7F9e33FaF343F9CfE1c69b177ed86Bc760B4e',
+    address: '0x3b1A496303b8272C6558b1E9159074F13176adc8',
     chainId: 42161,
     abi: puppettokenAbi
   },
   TokenRouter: {
-    address: '0x3Ccfe071124Cb0f6715038485Eb26096C35FE5EE',
+    address: '0x50403a2A8bfFedFE685c9729670614401d5ADcC3',
     chainId: 42161,
     abi: tokenrouterAbi
   },
   RouterProxy: {
-    address: '0xB43f1E80164bA23884076b9e816AC28895D76A34',
+    address: '0xa7E7a4F384885BF9b169FceD9e96F1220e5c1293',
     chainId: 42161,
     abi: routerproxyAbi
   },
@@ -42,12 +43,12 @@ export const PUPPET_CONTRACT_MAP = {
     abi: accountstoreAbi
   },
   FeeMarketplaceStore: {
-    address: '0xAf97414983197b30485828ddb3De60134871dBe2',
+    address: '0xaF5798725AFA764748f9Dc85E8418510B459F722',
     chainId: 42161,
     abi: feemarketplacestoreAbi
   },
   FeeMarketplace: {
-    address: '0x1290fE1CC845D9D564183d3d8C65122DCf908ED5',
+    address: '0x4d80C64A10e44c724203485A4349727e01A0BaDF',
     chainId: 42161,
     abi: feemarketplaceAbi
   },
@@ -80,5 +81,10 @@ export const PUPPET_CONTRACT_MAP = {
     address: '0xb7C104b156A2933161a4Cb92B4981858258de649',
     chainId: 42161,
     abi: subscribeAbi
+  },
+  PuppetVoteToken: {
+    address: '0x95718B4EEC9316E3a61ef75A2BBD3951cF465Bff',
+    chainId: 42161,
+    abi: puppetvotetokenAbi
   }
 } as const

@@ -35,7 +35,7 @@ contract DeployUserRouter is BaseScript {
         dictator.setPermission(subscribe, subscribe.rule.selector, address(routerProxy));
         dictator.setPermission(account, account.deposit.selector, address(routerProxy));
         dictator.setPermission(account, account.withdraw.selector, address(routerProxy));
-        // dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, address(routerProxy));
+        dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, address(routerProxy));
 
         UserRouter newRouter = new UserRouter(account, subscribe, feeMarketplace, mirror);
         routerProxy.update(address(newRouter));
