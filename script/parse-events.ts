@@ -409,15 +409,15 @@ function extractParamName(arg: string): string {
   }
   // Array index: "foo[0]" -> "foo"
   else if (arg.match(/^(\w+)\[\d+\]$/)) {
-    name = arg.match(/^(\w+)\[\d+\]$/)![1]!
+    name = arg.match(/^(\w+)\[\d+\]$/)[1]!
   }
   // Mapping access: "foo[key]" -> "foo"
   else if (arg.match(/^(\w+)\[.+\]$/)) {
-    name = arg.match(/^(\w+)\[.+\]$/)![1]!
+    name = arg.match(/^(\w+)\[.+\]$/)[1]!
   }
   // Simple variable, strip leading underscore: "_foo" -> "foo"
   else if (arg.match(/^_?(\w+)$/)) {
-    name = arg.match(/^_?(\w+)$/)![1]!
+    name = arg.match(/^_?(\w+)$/)[1]!
   }
   // Special vars
   else if (arg === 'msg.sender') {

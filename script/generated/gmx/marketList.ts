@@ -701,5 +701,110 @@ export const ARBITRUM_MARKET_LIST = [
     longToken: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
     shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
     marketType: 'PERP'
+  },
+  {
+    marketToken: '0xfaEaE570B07618D3F10360608E43c241181c4614',
+    indexToken: '0xEcc5eb985Ddbb8335b175b0A2A1144E4c978F1f6',
+    longToken: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
+  },
+  {
+    marketToken: '0xb3588455858a49D3244237CEe00880CcB84b91Dd',
+    indexToken: '0xC5799ab6E2818fD8d0788dB8D156B0c5db1Bf97b',
+    longToken: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
+  },
+  {
+    marketToken: '0x2347EbB8645Cc2EA0Ba92D1EC59704031F2fCCf4',
+    indexToken: '0x465A31E5bA29b8EAcC860d499D714a6f07e56E85',
+    longToken: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
+  },
+  {
+    marketToken: '0x947C521E44f727219542B0f91a85182193c1D2ad',
+    indexToken: '0xB79Eb5BA64A167676694bB41bc1640F95d309a2F',
+    longToken: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
+  },
+  {
+    marketToken: '0x4De268aC68477f794C3eAC5A419Cbcffc2cD5e02',
+    indexToken: '0xF67b2a901D674B443Fa9f6DB2A689B37c07fD4fE',
+    longToken: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
+  },
+  {
+    marketToken: '0xF913B4748031EF569898ED91e5BA0d602bB93298',
+    indexToken: '0xf97f4df75117a78c1A5a0DBb814Af92458539FB4',
+    longToken: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
+  },
+  {
+    marketToken: '0xac484106d935f0f20F1485b631fA6F65AeEff550',
+    indexToken: '0xc5ff0eB026dB972F95DF3dfF04e697d8b660092a',
+    longToken: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
+  },
+  {
+    marketToken: '0x970b730b5dD18de53A230eE8F4af088dBC3a6F8d',
+    indexToken: '0x96Ee343E36E8642627FAEa235D57a9FEC8a6e34f',
+    longToken: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
+  },
+  {
+    marketToken: '0x4b67aa8F754b17b1029Ad2DB4fb6a276CCe350c4',
+    indexToken: '0x2e73bDBee83D91623736D514b0BB41f2afd9C7Fd',
+    longToken: '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
+  },
+  {
+    marketToken: '0xcf083d35AD306A042d4Fb312fCdd8228b52b82f8',
+    indexToken: '0x2bcC6D6CdBbDC0a4071e48bb3B969b06B3330c07',
+    longToken: '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
+  },
+  {
+    marketToken: '0x065577D05c3D4C11505ed7bc97BBF85d462A6A6f',
+    indexToken: '0xa9004A5421372E1D83fB1f85b0fc986c912f91f3',
+    longToken: '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
+  },
+  {
+    marketToken: '0x6d9430A116ed4d4FC6FE1996A5493662d555b07E',
+    indexToken: '0xc4017CFe7D7eaBDE63d3252caBF26A286fE2B1E0',
+    longToken: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
+  },
+  {
+    marketToken: '0xCEff9D261A96Cb78Df35f9333ba9F2F4CFcb8a68',
+    indexToken: '0xdB58EB7f408EbA2176eCb44A4696292605cCEB39',
+    longToken: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
+  },
+  {
+    marketToken: '0xe024188850A822409F362209C1EF2cFdc7c4DE4C',
+    indexToken: '0x95c317066CF214b2E6588B2685D949384504F51e',
+    longToken: '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
+  },
+  {
+    marketToken: '0x0164B6c847c65e07C9F6226149ADBFA7C1dE40Cf',
+    indexToken: '0x2aAB60E62f05d17e58dEc982870bfAdc7F4e7ADF',
+    longToken: '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
   }
 ] as const

@@ -1,4 +1,4 @@
-import { type Address, createPublicClient, http } from 'viem'
+import { type Address, createPublicClient, getAddress, http } from 'viem'
 import { arbitrum } from 'viem/chains'
 import { GMX_V2_CONTRACT_MAP } from './generated/gmx/gmxContracts.js'
 
@@ -51,18 +51,18 @@ try {
     address: READER_ADDRESS,
     abi: readerAbi,
     functionName: 'getMarkets',
-    args: [DATASTORE_ADDRESS, 0n, 100n]
+    args: [DATASTORE_ADDRESS, 0n, 200n]
   })) as Market[]
 
-  // Build the market list
+  // Build the market list with checksummed addresses
   const marketList = markets.map(market => {
     const isSpotMarket = market.indexToken === '0x0000000000000000000000000000000000000000'
 
     return {
-      marketToken: market.marketToken,
-      indexToken: market.indexToken,
-      longToken: market.longToken,
-      shortToken: market.shortToken,
+      marketToken: getAddress(market.marketToken),
+      indexToken: getAddress(market.indexToken),
+      longToken: getAddress(market.longToken),
+      shortToken: getAddress(market.shortToken),
       marketType: isSpotMarket ? ('SWAP' as const) : ('PERP' as const)
     }
   })

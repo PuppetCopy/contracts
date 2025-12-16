@@ -1,8 +1,7 @@
+import { getAddress } from 'viem'
+
 const INTERFACE_TOKENS_URL = 'https://raw.githubusercontent.com/gmx-io/gmx-interface/master/sdk/src/configs/tokens.ts'
 const SYNTHETICS_TOKENS_URL = 'https://raw.githubusercontent.com/gmx-io/gmx-synthetics/main/config/tokens.ts'
-
-// Make this file a module to allow top-level await
-export {}
 
 type TokenData = {
   symbol: string
@@ -134,7 +133,7 @@ try {
       }
     }
 
-    const address = addressMatch[1]
+    const address = getAddress(addressMatch[1])
     const decimals = Number.parseInt(decimalsMatch[1], 10)
     const name = nameMatch ? nameMatch[1] : symbol
 
@@ -158,7 +157,7 @@ try {
       ...(syntheticsData.dataStreamFeedDecimals !== undefined && {
         dataStreamFeedDecimals: syntheticsData.dataStreamFeedDecimals
       }),
-      ...(syntheticsData.priceFeed?.address && { priceFeedAddress: syntheticsData.priceFeed.address })
+      ...(syntheticsData.priceFeed?.address && { priceFeedAddress: getAddress(syntheticsData.priceFeed.address) })
     })
   }
 
