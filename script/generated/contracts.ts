@@ -59,37 +59,37 @@ export const PUPPET_CONTRACT_MAP = {
     abi: matchmakerrouterproxyAbi
   },
   AccountStore: {
-    address: '0x9C10ec021E503f8E1795a75604f8c0c4A2A8BcfC',
+    address: '0x9c10EC021E503F8E1795a75604f8c0c4a2A8BcFC',
     chainId: 42161,
     abi: accountstoreAbi
   },
   Account: {
-    address: '0xCA67b43CB9c53d186CA943a803e93a0a0B487a03',
+    address: '0xcA67b43Cb9C53d186Ca943A803e93A0A0b487A03',
     chainId: 42161,
     abi: accountAbi
   },
   Subscribe: {
-    address: '0x58c1183775CaebAf64c0f930A68a9801dC74AE26',
+    address: '0x58c1183775cAebAF64C0f930a68A9801Dc74AE26',
     chainId: 42161,
     abi: subscribeAbi
   },
   Mirror: {
-    address: '0x3716923FFd18b729794B0bc9370f68acA19E7e1b',
+    address: '0x3716923fFD18b729794B0bc9370F68ACA19E7E1b',
     chainId: 42161,
     abi: mirrorAbi
   },
   Settle: {
-    address: '0x522acC1d41AAFc4097b7daC066aD6A146F04cB0F',
+    address: '0x522ACc1d41AAfc4097b7DAC066ad6a146f04cB0F',
     chainId: 42161,
     abi: settleAbi
   },
   MatchmakerRouter: {
-    address: '0xF44c71fAbedDD30d0A606DCEE6498D4ec4f69E6e',
+    address: '0xF44C71FaBEdDD30d0a606dceE6498D4eC4F69e6e',
     chainId: 42161,
     abi: matchmakerrouterAbi
   },
   UserRouter: {
-    address: '0xCEdEa6c652Bd757b2937eC36b9c8aCbf70cf2841',
+    address: '0xcEdEA6C652bd757B2937eC36B9c8aCbf70CF2841',
     chainId: 42161,
     abi: userrouterAbi
   }
