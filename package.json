@@ -52,10 +52,8 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@gmx": "github:gmx-io/gmx-synthetics",
     "@openzeppelin/contracts": "5.4.0",
     "@types/bun": "catalog:",
-    "@uniswap/v3-core": "1.0.1",
     "dotenv": "catalog:",
     "forge-std": "github:foundry-rs/forge-std#v1.12.0",
     "typescript": "catalog:",

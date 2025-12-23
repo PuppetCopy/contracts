@@ -2,102 +2,78 @@
 pragma solidity ^0.8.31;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 
-import {Account} from "./position/Account.sol";
 import {Allocation} from "./position/Allocation.sol";
-import {Subscribe} from "./position/Subscribe.sol";
+import {IPuppetModule} from "./position/PuppetModule.sol";
+import {IERC7579Account} from "./utils/interfaces/IERC7579Account.sol";
 
 /**
  * @title UserRouter
- * @notice Aggregates user-facing operations for Account, Subscribe, and Allocation
- * @dev Deployed as implementation behind UserRouterProxy
+ * @notice Aggregates user-facing operations for puppet subaccounts
+ *
+ * Puppets interact via their ERC-7579 subaccounts:
+ * 1. Install PuppetModule on subaccount
+ * 2. Call setPolicy() to follow traders
+ * 3. Approve Allocation contract to pull funds
+ * 4. Trader's client matches and calls allocate()
  */
-contract UserRouter is Multicall {
-    Account public immutable account;
-    Subscribe public immutable subscribe;
+contract UserRouter {
     Allocation public immutable allocation;
+    IPuppetModule public immutable puppetModule;
 
-    constructor(
-        Account _account,
-        Subscribe _subscribe,
-        Allocation _allocation
-    ) {
-        account = _account;
-        subscribe = _subscribe;
+    constructor(Allocation _allocation, IPuppetModule _puppetModule) {
         allocation = _allocation;
+        puppetModule = _puppetModule;
     }
 
-    // ============ Account Operations ============
+    // ============ Policy Management (Puppet Operations) ============
 
     /**
-     * @notice Deposit collateral tokens into user's account
-     * @param _collateralToken The token to deposit
-     * @param _amount Amount to deposit
-     */
-    function deposit(IERC20 _collateralToken, uint _amount) external {
-        account.deposit(_collateralToken, msg.sender, msg.sender, _amount);
-    }
-
-    /**
-     * @notice Deposit collateral tokens on behalf of another user
-     * @param _collateralToken The token to deposit
-     * @param _user The user to credit
-     * @param _amount Amount to deposit
-     */
-    function depositFor(IERC20 _collateralToken, address _user, uint _amount) external {
-        account.deposit(_collateralToken, msg.sender, _user, _amount);
-    }
-
-    /**
-     * @notice Withdraw collateral tokens from user's account
-     * @param _collateralToken The token to withdraw
-     * @param _receiver Address to receive tokens
-     * @param _amount Amount to withdraw
-     */
-    function withdraw(IERC20 _collateralToken, address _receiver, uint _amount) external {
-        account.withdraw(_collateralToken, msg.sender, _receiver, _amount);
-    }
-
-    // ============ Subscribe Operations ============
-
-    /**
-     * @notice Set subscription rule to follow a trader
-     * @param _collateralToken The collateral token for matching
+     * @notice Set policy to follow a trader
+     * @dev Called by puppet's subaccount: puppetSubaccount.execute(userRouter, setPolicy(...))
      * @param _trader The trader to follow
-     * @param _ruleParams Subscription parameters (allowanceRate, throttleActivity, expiry)
+     * @param _collateralToken The collateral token for matching
+     * @param _data Encoded policy parameters (format defined by module)
      */
-    function rule(
-        IERC20 _collateralToken,
-        address _trader,
-        Subscribe.RuleParams calldata _ruleParams
-    ) external {
-        subscribe.rule(allocation, _collateralToken, msg.sender, _trader, _ruleParams);
+    function setPolicy(address _trader, IERC20 _collateralToken, bytes calldata _data) external {
+        puppetModule.setPolicy(_trader, _collateralToken, _data);
+    }
+
+    /**
+     * @notice Remove policy for a trader
+     * @param _trader The trader to unfollow
+     * @param _collateralToken The collateral token
+     */
+    function removePolicy(address _trader, IERC20 _collateralToken) external {
+        puppetModule.removePolicy(_trader, _collateralToken);
     }
 
     // ============ Allocation Operations (Trader) ============
 
     /**
-     * @notice Allocate capital with puppets for trading
+     * @notice Allocate capital from puppet subaccounts to trader's position
+     * @dev Called by trader or authorized matchmaker
      * @param _collateralToken The collateral token
-     * @param _subaccount The trader's smart account (subaccount)
-     * @param _traderAllocation Amount the trader is allocating
-     * @param _puppetList List of puppets to include
+     * @param _traderSubaccount The trader's smart account (subaccount)
+     * @param _traderAllocation Amount the trader is allocating from their own funds
+     * @param _puppetSubaccountList List of puppet subaccount addresses
+     * @param _puppetAllocationList Requested allocation amounts per puppet
      */
     function allocate(
         IERC20 _collateralToken,
-        address _subaccount,
+        IERC7579Account _traderSubaccount,
         uint _traderAllocation,
-        address[] calldata _puppetList
+        address[] calldata _puppetSubaccountList,
+        uint[] calldata _puppetAllocationList
     ) external {
         allocation.allocate(
-            account,
-            subscribe,
             _collateralToken,
             msg.sender,
-            _subaccount,
+            _traderSubaccount,
             _traderAllocation,
-            _puppetList
+            _puppetSubaccountList,
+            _puppetAllocationList,
+            address(puppetModule)
         );
     }
 
@@ -112,7 +88,7 @@ contract UserRouter is Multicall {
     }
 
     /**
-     * @notice Realize pending settlements for user
+     * @notice Realize pending settlements for caller's subaccount
      * @param _collateralToken The collateral token
      * @param _trader The trader address
      */
@@ -122,14 +98,14 @@ contract UserRouter is Multicall {
     }
 
     /**
-     * @notice Withdraw from allocation back to account balance
+     * @notice Withdraw allocation back to puppet's subaccount
      * @param _collateralToken The collateral token
      * @param _trader The trader address
      * @param _amount Amount to withdraw from allocation
      */
     function withdrawAllocation(IERC20 _collateralToken, address _trader, uint _amount) external {
         bytes32 _traderMatchingKey = _getTraderMatchingKey(_collateralToken, _trader);
-        allocation.withdraw(account, _collateralToken, _traderMatchingKey, msg.sender, _amount);
+        allocation.withdraw(_collateralToken, _traderMatchingKey, msg.sender, _amount);
     }
 
     // ============ Internal ============

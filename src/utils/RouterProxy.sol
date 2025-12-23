@@ -3,7 +3,6 @@ pragma solidity ^0.8.31;
 
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {Proxy} from "@openzeppelin/contracts/proxy/Proxy.sol";
-import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 
 import {Access} from "../utils/auth/Access.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";

@@ -2,9 +2,8 @@
 pragma solidity ^0.8.31;
 
 import {Dictatorship} from "src/shared/Dictatorship.sol";
-import {Account as PuppetAccount} from "src/position/Account.sol";
-import {Subscribe} from "src/position/Subscribe.sol";
 import {Allocation} from "src/position/Allocation.sol";
+import {PuppetModule} from "src/position/PuppetModule.sol";
 import {UserRouter} from "src/UserRouter.sol";
 import {UserRouterProxy} from "src/utils/UserRouterProxy.sol";
 
@@ -21,30 +20,18 @@ contract DeployUserRouter is BaseScript {
 
         // Load existing contracts
         Dictatorship dictatorship = Dictatorship(getDeployedAddress("Dictatorship"));
-        PuppetAccount account = PuppetAccount(getDeployedAddress("Account"));
-        Subscribe subscribe = Subscribe(getDeployedAddress("Subscribe"));
         Allocation allocation = Allocation(getDeployedAddress("Allocation"));
+        PuppetModule puppetModule = PuppetModule(getDeployedAddress("PuppetModule"));
         UserRouterProxy userRouterProxy = UserRouterProxy(payable(getDeployedAddress("UserRouterProxy")));
 
         // Deploy UserRouter implementation
-        UserRouter userRouter = new UserRouter(
-            account,
-            subscribe,
-            allocation
-        );
+        UserRouter userRouter = new UserRouter(allocation, puppetModule);
 
         // Set implementation on proxy
         userRouterProxy.update(address(userRouter));
 
         // Permissions are set on the PROXY address since delegatecall preserves msg.sender
         address proxyAddr = address(userRouterProxy);
-
-        // Account permissions
-        dictatorship.setPermission(account, account.deposit.selector, proxyAddr);
-        dictatorship.setPermission(account, account.withdraw.selector, proxyAddr);
-
-        // Subscribe permissions
-        dictatorship.setPermission(subscribe, subscribe.rule.selector, proxyAddr);
 
         // Allocation permissions
         dictatorship.setPermission(allocation, allocation.allocate.selector, proxyAddr);

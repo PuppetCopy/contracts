@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.31;
 
-import {IBaseOrderUtils} from "@gmx/contracts/order/IBaseOrderUtils.sol";
+import {IBaseOrderUtils} from "./IGmxTypes.sol";
 
 interface IGmxExchangeRouter {
     /// @dev Executes multiple calls in a single transaction, and returns the results of each call.

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.31;
 
 import {Allocation} from "./Allocation.sol";
+import {IERC7579Account} from "../utils/interfaces/IERC7579Account.sol";
 
 /**
  * @title SubaccountModule
@@ -20,7 +21,7 @@ contract SubaccountModule {
     // ============ ERC-7579 Module Interface ============
 
     function onInstall(bytes calldata) external {
-        allocation.registerSubaccount(msg.sender, address(this));
+        allocation.registerSubaccount(IERC7579Account(msg.sender), address(this));
     }
 
     function onUninstall(bytes calldata) external pure {}
@@ -36,11 +37,11 @@ contract SubaccountModule {
     // ============ ERC-7579 Hook Interface ============
 
     function preCheck(address, uint256, bytes calldata callData) external returns (bytes memory) {
-        allocation.syncSettlement(msg.sender);
+        allocation.syncSettlement(IERC7579Account(msg.sender));
         return callData; // Pass GMX calldata through to postCheck
     }
 
     function postCheck(bytes calldata hookData) external {
-        allocation.syncUtilization(msg.sender, hookData); // Pass calldata for indexing
+        allocation.syncUtilization(IERC7579Account(msg.sender), hookData); // Pass calldata for indexing
     }
 }

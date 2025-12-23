@@ -2,7 +2,7 @@
 pragma solidity ^0.8.31;
 
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
-import {IBaseOrderUtils} from "@gmx/contracts/order/IBaseOrderUtils.sol";
+import {IBaseOrderUtils} from "src/position/interface/IGmxTypes.sol";
 
 contract MockGmxExchangeRouter is IGmxExchangeRouter {
     // This mapping can be used to track created orders for testing purposes

@@ -4,11 +4,12 @@
   src = 'src'
   out = 'forge-artifacts'
   cache_path = 'forge-cache'
-  libs = ['node_modules']
+  libs = ["node_modules"]
   ignored_error_codes = [2424, 4591]  # Suppress deprecated natspec memory-safe-assembly and "more than 256 warnings" warnings
   remappings = [
     "forge-std/src/=node_modules/forge-std/src/",
-    "forge-std/=node_modules/forge-std/src/"
+    "forge-std/=node_modules/forge-std/src/",
+    "@openzeppelin/=node_modules/@openzeppelin/"
   ]
   evm_version = 'cancun'
   solc_version = '0.8.31'
