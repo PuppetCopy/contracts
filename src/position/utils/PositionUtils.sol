@@ -7,12 +7,4 @@ library PositionUtils {
     function getTraderMatchingKey(IERC20 collateralToken, address trader) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(collateralToken, trader));
     }
-
-    function getAllocationKey(
-        address[] calldata _puppetList,
-        bytes32 _traderMatchingKey,
-        uint allocationId
-    ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(_puppetList, _traderMatchingKey, allocationId));
-    }
 }

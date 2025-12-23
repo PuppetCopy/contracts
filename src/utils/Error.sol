@@ -85,6 +85,14 @@ library Error {
     error Account__InvalidTokenAddress();
     error Account__AmountExceedsUnaccounted();
 
+    error Allocation__InsufficientTraderBalance(uint available, uint required);
+    error Allocation__InsufficientAllocation(uint available, uint required);
+    error Allocation__PuppetListTooLarge(uint provided, uint maximum);
+    error Allocation__ZeroAllocation();
+    error Allocation__NoUtilization();
+    error Allocation__UtilizationNotSettled(uint utilization);
+    error Allocation__UnregisteredSubaccount();
+
     error AllocationAccount__UnauthorizedOperator();
     error AllocationAccount__InsufficientBalance();
 

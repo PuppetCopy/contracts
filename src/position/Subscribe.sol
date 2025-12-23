@@ -7,7 +7,7 @@ import {PositionUtils} from "../position/utils/PositionUtils.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {Mirror} from "./Mirror.sol";
+import {Allocation} from "./Allocation.sol";
 
 contract Subscribe is CoreContract {
     struct RuleParams {
@@ -58,7 +58,7 @@ contract Subscribe is CoreContract {
      * @dev Validates rule parameters against config limits and initializes activity throttle
      */
     function rule(
-        Mirror mirror,
+        Allocation _allocation,
         IERC20 _collateralToken,
         address _user,
         address _trader,
@@ -79,7 +79,7 @@ contract Subscribe is CoreContract {
 
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_collateralToken, _trader);
         matchingRuleMap[_traderMatchingKey][_user] = _ruleParams;
-        mirror.initializeTraderActivityThrottle(_traderMatchingKey, _user);
+        _allocation.initializeTraderActivityThrottle(_traderMatchingKey, _user);
 
         _logEvent(
             "Rule",

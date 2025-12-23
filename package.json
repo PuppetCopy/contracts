@@ -6,7 +6,7 @@
   "sideEffects": false,
   "scripts": {
     "test": "forge test --match-contract TradingTest -vvv",
-    "test:target": "bun run test --match-test testCollectDust",
+    "test:target": "bun run test --match-test AllocationTest",
     "test:fork": "forge test --match-contract TradingForkTest -vvvv --fork-url=arbitrum",
     "build": "forge build",
     "build:sizes": "forge build --sizes || true",
