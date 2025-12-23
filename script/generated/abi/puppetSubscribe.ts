@@ -202,9 +202,9 @@ export default [
     name: 'rule',
     inputs: [
       {
-        name: 'mirror',
+        name: '_allocation',
         type: 'address',
-        internalType: 'contract Mirror'
+        internalType: 'contract Allocation'
       },
       {
         name: '_collateralToken',

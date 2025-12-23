@@ -2,8 +2,7 @@
 pragma solidity ^0.8.31;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-import {TokenRouter} from "../shared/TokenRouter.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {Error} from "./../utils/Error.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
@@ -13,15 +12,14 @@ import {Access} from "./auth/Access.sol";
 /**
  * @title BankStore
  * @notice Token storage with internal balance tracking and controlled transfers
+ * @dev Users must approve this contract directly. Smart account batch-calls handle approve+deposit atomically.
  */
 abstract contract BankStore is Access {
+    using SafeERC20 for IERC20;
+
     mapping(IERC20 => uint) public tokenBalanceMap;
 
-    TokenRouter immutable router;
-
-    constructor(IAuthority _authority, TokenRouter _router) Access(_authority) {
-        router = _router;
-    }
+    constructor(IAuthority _authority) Access(_authority) {}
 
     /**
      * @notice Get tracked balance for a token
@@ -61,10 +59,11 @@ abstract contract BankStore is Access {
     }
 
     /**
-     * @notice Pull tokens from user via router
+     * @notice Pull tokens from depositor using transferFrom
+     * @dev Depositor must have approved this contract
      */
     function transferIn(IERC20 _token, address _depositor, uint _value) public auth {
-        router.transfer(_token, _depositor, address(this), _value);
+        _token.safeTransferFrom(_depositor, address(this), _value);
         tokenBalanceMap[_token] += _value;
     }
 

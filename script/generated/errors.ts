@@ -666,6 +666,80 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
+    name: 'Allocation__InsufficientTraderBalance',
+    inputs: [
+      {
+        name: 'available',
+        internalType: 'uint256',
+        type: 'uint256'
+      },
+      {
+        name: 'required',
+        internalType: 'uint256',
+        type: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Allocation__InsufficientAllocation',
+    inputs: [
+      {
+        name: 'available',
+        internalType: 'uint256',
+        type: 'uint256'
+      },
+      {
+        name: 'required',
+        internalType: 'uint256',
+        type: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Allocation__PuppetListTooLarge',
+    inputs: [
+      {
+        name: 'provided',
+        internalType: 'uint256',
+        type: 'uint256'
+      },
+      {
+        name: 'maximum',
+        internalType: 'uint256',
+        type: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Allocation__ZeroAllocation',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__NoUtilization',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__UtilizationNotSettled',
+    inputs: [
+      {
+        name: 'utilization',
+        internalType: 'uint256',
+        type: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Allocation__UnregisteredSubaccount',
+    inputs: []
+  },
+  {
+    type: 'error',
     name: 'AllocationAccount__UnauthorizedOperator',
     inputs: []
   },

@@ -4,10 +4,8 @@ pragma solidity ^0.8.31;
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
-import {TokenRouter} from "src/shared/TokenRouter.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
-import {MatchmakerRouterProxy} from "src/utils/MatchmakerRouterProxy.sol";
 import {UserRouterProxy} from "src/utils/UserRouterProxy.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
@@ -21,10 +19,7 @@ contract DeployBase is BaseScript {
         PuppetToken puppetToken = new PuppetToken(Const.dao);
         PuppetVoteToken puppetVoteToken = new PuppetVoteToken(dictatorship);
 
-        TokenRouter tokenRouter = new TokenRouter(dictatorship, TokenRouter.Config(200_000));
-        dictatorship.registerContract(tokenRouter);
-
-        FeeMarketplaceStore feeMarketplaceStore = new FeeMarketplaceStore(dictatorship, tokenRouter, puppetToken);
+        FeeMarketplaceStore feeMarketplaceStore = new FeeMarketplaceStore(dictatorship, puppetToken);
         FeeMarketplace feeMarketplace = new FeeMarketplace(
             dictatorship,
             puppetToken,
@@ -34,14 +29,10 @@ contract DeployBase is BaseScript {
             })
         );
         dictatorship.setAccess(feeMarketplaceStore, address(feeMarketplace));
-        dictatorship.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
         dictatorship.registerContract(feeMarketplace);
 
         UserRouterProxy userRouterProxy = new UserRouterProxy(dictatorship);
         dictatorship.setAccess(userRouterProxy, Const.dao);
-
-        MatchmakerRouterProxy matchmakerRouterProxy = new MatchmakerRouterProxy(dictatorship);
-        dictatorship.setAccess(matchmakerRouterProxy, Const.dao);
 
         vm.stopBroadcast();
     }

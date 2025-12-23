@@ -17,14 +17,10 @@ library Error {
     error Dictatorship__InvalidTargetAddress();
     error Dictatorship__InvalidCoreContract();
 
-    error TokenRouter__EmptyTokenTranferGasLimit();
-
     error BankStore__InsufficientBalance();
 
     error PuppetVoteToken__Unsupported();
 
-    error RewardDistributor__InvalidAmount();
-    error RewardDistributor__InsufficientRewards(uint accured);
 
     error VotingEscrow__ZeroAmount();
     error VotingEscrow__ExceedMaxTime();
@@ -92,11 +88,6 @@ library Error {
     error Allocation__NoUtilization();
     error Allocation__UtilizationNotSettled(uint utilization);
     error Allocation__UnregisteredSubaccount();
-
-    error AllocationAccount__UnauthorizedOperator();
-    error AllocationAccount__InsufficientBalance();
-
-    error MatchmakerRouter__FailedRefundExecutionFee();
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();

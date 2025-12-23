@@ -217,8 +217,8 @@ contract Allocation is CoreContract {
         );
     }
 
-    function utilize(bytes32 _traderMatchingKey, uint _utilization) external auth {
-        _utilize(_traderMatchingKey, _utilization);
+    function utilize(bytes32 _traderMatchingKey, uint _utilization, bytes calldata _executionCalldata) external auth {
+        _utilize(_traderMatchingKey, _utilization, _executionCalldata);
     }
 
     function syncSettlement(address _subaccount) external auth {
@@ -240,7 +240,7 @@ contract Allocation is CoreContract {
         }
     }
 
-    function syncUtilization(address _subaccount) external auth {
+    function syncUtilization(address _subaccount, bytes calldata _executionCalldata) external auth {
         address _trader = subaccountTraderMap[_subaccount];
         IERC20[] memory _tokens = _subaccountTokenList[_subaccount];
         uint _length = _tokens.length;
@@ -256,11 +256,11 @@ contract Allocation is CoreContract {
             if (_actualBalance >= _recordedBalance) continue;
 
             uint _outflow = _recordedBalance - _actualBalance;
-            _utilize(_traderMatchingKey, _outflow);
+            _utilize(_traderMatchingKey, _outflow, _executionCalldata);
         }
     }
 
-    function _utilize(bytes32 _traderMatchingKey, uint _utilization) internal {
+    function _utilize(bytes32 _traderMatchingKey, uint _utilization, bytes calldata _executionCalldata) internal {
         uint _totalAlloc = totalAllocation[_traderMatchingKey];
         if (_totalAlloc == 0) revert Error.Allocation__ZeroAllocation();
 
@@ -277,7 +277,7 @@ contract Allocation is CoreContract {
 
         _logEvent(
             "Utilize",
-            abi.encode(_traderMatchingKey, _epoch, _utilization, _newRemaining, _newTotalUtilization, _newTotalAllocation)
+            abi.encode(_traderMatchingKey, _epoch, _utilization, _newRemaining, _newTotalUtilization, _newTotalAllocation, _executionCalldata)
         );
     }
 

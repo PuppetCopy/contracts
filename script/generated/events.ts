@@ -48,6 +48,72 @@ export const CONTRACT_EVENT_MAP = {
       ]
     }
   },
+  Allocation: {
+    Allocate: {
+      hash: '0x2d453a8b2eb4888bfee5a5b17781ba95747a5f795cd81b44fe943773178f8d8e',
+      args: [
+        { type: 'bytes32', name: 'traderMatchingKey' },
+        { type: 'address', name: 'collateralToken' },
+        { type: 'address', name: 'trader' },
+        { type: 'address', name: 'subaccount' },
+        { type: 'uint256', name: 'traderAllocation' },
+        { type: 'uint256', name: 'newTraderAllocation' },
+        { type: 'uint256', name: 'traderUtilization' },
+        { type: 'uint256', name: 'puppetTotalAllocation' },
+        { type: 'uint256', name: 'totalAllocation' },
+        { type: 'address[]', name: 'puppetList' },
+        { type: 'uint256[]', name: 'puppetAllocationList' },
+        { type: 'uint256[]', name: 'puppetUtilizationList' }
+      ]
+    },
+    Realize: {
+      hash: '0x70f1ccda0ef798c992cd2e281e4adc7782b4b682993676eb7a7c436eba78909c',
+      args: [
+        { type: 'bytes32', name: 'traderMatchingKey' },
+        { type: 'address', name: 'user' },
+        { type: 'uint256', name: 'epoch' },
+        { type: 'uint256', name: 'param0' },
+        { type: 'uint256', name: 'param02' },
+        { type: 'uint256', name: 'allocation' }
+      ]
+    },
+    Settle: {
+      hash: '0xea8fbe0762c74a52b889978a4aff8df9447ec89ed00dff7346b7014a2d0754d2',
+      args: [
+        { type: 'bytes32', name: 'traderMatchingKey' },
+        { type: 'address', name: 'collateralToken' },
+        { type: 'address', name: 'subaccount' },
+        { type: 'uint256', name: 'settledAllocation' },
+        { type: 'uint256', name: 'totalUtil' },
+        { type: 'uint256', name: 'deltaPerUtilization' },
+        { type: 'uint256', name: 'newCumulative' }
+      ]
+    },
+    Utilize: {
+      hash: '0xc9821f8cab0a52239845f39d6c776b6ea544a5115eb59f262f8bccce97b66cf7',
+      args: [
+        { type: 'bytes32', name: 'traderMatchingKey' },
+        { type: 'uint256', name: 'epoch' },
+        { type: 'uint256', name: 'utilization' },
+        { type: 'uint256', name: 'newRemaining' },
+        { type: 'uint256', name: 'newTotalUtilization' },
+        { type: 'uint256', name: 'newTotalAllocation' },
+        { type: 'bytes', name: 'executionCalldata' }
+      ]
+    },
+    Withdraw: {
+      hash: '0x8d7f87ab38a7f75a63dc465e10aadacecfca64c44ca774040b039bfb004e3367',
+      args: [
+        { type: 'bytes32', name: 'traderMatchingKey' },
+        { type: 'address', name: 'collateralToken' },
+        { type: 'address', name: 'user' },
+        { type: 'uint256', name: 'amount' },
+        { type: 'uint256', name: 'realized' },
+        { type: 'uint256', name: 'utilization' },
+        { type: 'uint256', name: 'newAllocation' }
+      ]
+    }
+  },
   FeeMarketplace: {
     AcceptOffer: {
       hash: '0x7d778e14025c4611dae90acde3cdf239063797ccb4dc030ab8c78b43e4558e02',
@@ -68,99 +134,27 @@ export const CONTRACT_EVENT_MAP = {
       ]
     }
   },
-  Mirror: {
-    Adjust: {
-      hash: '0x5b8ed69a4f24653f05791cdb161ade14eb6f876b7b4e96f8d9846c02cf407a7d',
+  RewardDistributor: {
+    Claim: {
+      hash: '0x5c2db6855baf6c374b9d0065771a33d4c31a8627d7b9d40f3fc6aa5dbd7b8a48',
       args: [
-        { type: 'address', name: 'allocationAddress' },
-        { type: 'bytes32', name: 'requestKey' },
-        { type: 'address', name: 'feeReceiver' },
-        { type: 'uint256', name: 'executionFee' },
-        { type: 'uint256', name: 'matchmakerFee' },
-        { type: 'bool', name: 'isIncrease' },
-        { type: 'uint256', name: 'sizeDelta' },
-        { type: 'uint256', name: 'currentSize' },
-        { type: 'uint256', name: 'targetSize' },
-        { type: 'uint256[]', name: 'nextBalanceList' }
-      ]
-    },
-    Close: {
-      hash: '0x2e8d9b385fe8ba591af7cdee7ebea35f1b676c032b3c41146d411996bc476835',
-      args: [
-        { type: 'address', name: 'allocationAddress' },
-        { type: 'bytes32', name: 'requestKey' },
-        { type: 'address', name: 'feeReceiver' },
-        { type: 'uint256', name: 'executionFee' },
-        { type: 'uint256', name: 'matchmakerFee' },
-        { type: 'uint256', name: 'currentSize' },
-        { type: 'uint8', name: 'reason' },
-        { type: 'uint256[]', name: 'nextBalanceList' }
-      ]
-    },
-    Match: {
-      hash: '0x6e00d71ae900f49e5c2cc50dac9a932b70f04bf1c9199e0057b8f67f68a9d147',
-      args: [
-        { type: 'address', name: 'collateralToken' },
-        { type: 'address', name: 'trader' },
-        { type: 'address', name: 'market' },
-        { type: 'address', name: 'feeReceiver' },
-        { type: 'bool', name: 'isLong' },
-        { type: 'uint256', name: 'executionFee' },
-        { type: 'uint256', name: 'allocationId' },
-        { type: 'uint256', name: 'matchmakerFee' },
-        { type: 'address', name: 'allocationAddress' },
-        { type: 'bytes32', name: 'traderMatchingKey' },
-        { type: 'bytes32', name: 'traderPositionKey' },
-        { type: 'bytes32', name: 'positionKey' },
-        { type: 'bytes32', name: 'requestKey' },
-        { type: 'uint256', name: 'sizeDelta' },
-        { type: 'uint256', name: 'allocated' },
-        { type: 'uint256[]', name: 'allocatedList' },
-        { type: 'address[]', name: 'puppetList' },
-        { type: 'uint256[]', name: 'nextBalanceList' }
-      ]
-    }
-  },
-  Settle: {
-    CollectAllocationAccountDust: {
-      hash: '0xa37898b4f41de8a7f0d328410d8e26f69c589234ad4090832a36f9460799680b',
-      args: [
-        { type: 'address', name: 'dustToken' },
-        { type: 'address', name: 'allocationAccount' },
-        { type: 'address', name: 'receiver' },
-        { type: 'uint256', name: 'dustThreshold' },
-        { type: 'uint256', name: 'amount' }
-      ]
-    },
-    CollectPlatformFees: {
-      hash: '0x6d80a7bf061a9b8e3965f5352eda85740cd09e3be7253a9f2ed4dd0b2a285f4b',
-      args: [
-        { type: 'address', name: 'token' },
+        { type: 'address', name: 'user' },
         { type: 'address', name: 'receiver' },
         { type: 'uint256', name: 'amount' }
       ]
     },
-    Settle: {
-      hash: '0xea8fbe0762c74a52b889978a4aff8df9447ec89ed00dff7346b7014a2d0754d2',
+    Deposit: {
+      hash: '0xe09149d2123147c5f43d258257fef0b7b969db78269369ebcf5ebb9eef8592f2',
       args: [
-        { type: 'address', name: 'collateralToken' },
-        { type: 'address', name: 'distributionToken' },
-        { type: 'address', name: 'matchmakerFeeReceiver' },
-        { type: 'address', name: 'trader' },
-        { type: 'uint256', name: 'allocationId' },
-        { type: 'uint256', name: 'matchmakerExecutionFee' },
-        { type: 'address', name: 'allocationAddress' },
-        { type: 'bytes32', name: 'traderMatchingKey' },
-        { type: 'uint256', name: 'distributedAmount' },
-        { type: 'uint256', name: 'platformFeeAmount' },
-        { type: 'uint256[]', name: 'nextBalanceList' }
+        { type: 'address', name: 'depositor' },
+        { type: 'uint256', name: 'amount' }
       ]
     },
-    SetTokenDustThreshold: {
-      hash: '0xabc588bbe2d6384ff53b244f5b3ff19a550fffbc6e40ecd9baa9d7eb97077258',
+    Distribute: {
+      hash: '0x12f2bd7a927376d1d2ab7929ec1cd8c356284e6726ffd41484976754d29559f1',
       args: [
-        { type: 'address[]', name: 'tokenDustThresholdList' },
-        { type: 'uint256[]', name: 'tokenDustThresholdCapList' }
+        { type: 'uint256', name: 'cumulativeRewardPerToken' },
+        { type: 'uint256', name: 'emission' }
       ]
     }
   },

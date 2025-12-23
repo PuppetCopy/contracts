@@ -4,11 +4,11 @@ pragma solidity ^0.8.31;
 import {Allocation} from "./Allocation.sol";
 
 /**
- * @title TraderSubaccountHook
+ * @title SubaccountModule
  * @notice Stateless ERC-7579 hook module that syncs utilization on subaccount transactions
  * @dev Installed on Rhinestone smart accounts, calls Allocation.syncUtilization()
  */
-contract TraderSubaccountHook {
+contract SubaccountModule {
     uint256 constant MODULE_TYPE_HOOK = 4;
 
     Allocation public immutable allocation;
@@ -35,12 +35,12 @@ contract TraderSubaccountHook {
 
     // ============ ERC-7579 Hook Interface ============
 
-    function preCheck(address, uint256, bytes calldata) external returns (bytes memory) {
+    function preCheck(address, uint256, bytes calldata callData) external returns (bytes memory) {
         allocation.syncSettlement(msg.sender);
-        return "";
+        return callData; // Pass GMX calldata through to postCheck
     }
 
-    function postCheck(bytes calldata) external {
-        allocation.syncUtilization(msg.sender);
+    function postCheck(bytes calldata hookData) external {
+        allocation.syncUtilization(msg.sender, hookData); // Pass calldata for indexing
     }
 }

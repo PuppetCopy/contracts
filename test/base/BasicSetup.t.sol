@@ -2,7 +2,6 @@
 pragma solidity ^0.8.31;
 
 import {Dictatorship} from "src/shared/Dictatorship.sol";
-import {TokenRouter} from "src/shared/TokenRouter.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
 
@@ -24,7 +23,6 @@ contract BasicSetup is Test {
 
     Dictatorship dictator;
     PuppetToken puppetToken;
-    TokenRouter tokenRouter;
     PuppetVoteToken vPuppetToken;
 
     function setUp() public virtual {
@@ -39,17 +37,12 @@ contract BasicSetup is Test {
         vm.startPrank(users.owner);
 
         dictator = new Dictatorship(users.owner);
-        tokenRouter = new TokenRouter(dictator, TokenRouter.Config(200_000));
-        dictator.registerContract(tokenRouter);
         puppetToken = new PuppetToken(users.owner);
         vPuppetToken = new PuppetVoteToken(dictator);
 
         // Owner funding operations
-        puppetToken.approve(address(tokenRouter), type(uint).max);
         usdc.mint(users.owner, 2000e6);
         wnt.mint(users.owner, 2000e18);
-        wnt.approve(address(tokenRouter), type(uint).max);
-        usdc.approve(address(tokenRouter), type(uint).max);
 
         skip(1 hours);
     }

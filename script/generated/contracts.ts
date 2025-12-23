@@ -3,19 +3,15 @@
 
 import accountAbi from './abi/puppetAccount.js'
 import accountstoreAbi from './abi/puppetAccountStore.js'
+import allocationAbi from './abi/puppetAllocation.js'
 import dictatorshipAbi from './abi/puppetDictatorship.js'
 import feemarketplaceAbi from './abi/puppetFeeMarketplace.js'
 import feemarketplacestoreAbi from './abi/puppetFeeMarketplaceStore.js'
-import matchmakerrouterAbi from './abi/puppetMatchmakerRouter.js'
-import matchmakerrouterproxyAbi from './abi/puppetMatchmakerRouterProxy.js'
-import mirrorAbi from './abi/puppetMirror.js'
 import puppettokenAbi from './abi/puppetPuppetToken.js'
 import puppetvotetokenAbi from './abi/puppetPuppetVoteToken.js'
-import settleAbi from './abi/puppetSettle.js'
+import rewarddistributorAbi from './abi/puppetRewardDistributor.js'
 import subscribeAbi from './abi/puppetSubscribe.js'
 import tokenrouterAbi from './abi/puppetTokenRouter.js'
-import userrouterAbi from './abi/puppetUserRouter.js'
-import userrouterproxyAbi from './abi/puppetUserRouterProxy.js'
 
 export const PUPPET_CONTRACT_MAP = {
   Dictatorship: {
@@ -48,16 +44,6 @@ export const PUPPET_CONTRACT_MAP = {
     chainId: 42161,
     abi: puppetvotetokenAbi
   },
-  UserRouterProxy: {
-    address: '0xBf8F9dfBDcE977B2048D685E0d226b328e00400c',
-    chainId: 42161,
-    abi: userrouterproxyAbi
-  },
-  MatchmakerRouterProxy: {
-    address: '0xA65a035B2EaA68b6670f098Aae6fAf7506AFcF9E',
-    chainId: 42161,
-    abi: matchmakerrouterproxyAbi
-  },
   AccountStore: {
     address: '0x9c10EC021E503F8E1795a75604f8c0c4a2A8BcFC',
     chainId: 42161,
@@ -73,24 +59,14 @@ export const PUPPET_CONTRACT_MAP = {
     chainId: 42161,
     abi: subscribeAbi
   },
-  Mirror: {
-    address: '0x3716923fFD18b729794B0bc9370F68ACA19E7E1b',
+  Allocation: {
+    address: '0x0000000000000000000000000000000000000001',
     chainId: 42161,
-    abi: mirrorAbi
+    abi: allocationAbi
   },
-  Settle: {
-    address: '0x522ACc1d41AAfc4097b7DAC066ad6a146f04cB0F',
+  RewardDistributor: {
+    address: '0x0000000000000000000000000000000000000002',
     chainId: 42161,
-    abi: settleAbi
-  },
-  MatchmakerRouter: {
-    address: '0xF44C71FaBEdDD30d0a606dceE6498D4eC4F69e6e',
-    chainId: 42161,
-    abi: matchmakerrouterAbi
-  },
-  UserRouter: {
-    address: '0xcEdEA6C652bd757B2937eC36B9c8aCbf70CF2841',
-    chainId: 42161,
-    abi: userrouterAbi
+    abi: rewarddistributorAbi
   }
 } as const

@@ -20,7 +20,7 @@ contract FeeMarketplaceTest is BasicSetup {
     function setUp() public override {
         super.setUp();
 
-        feeMarketplaceStore = new FeeMarketplaceStore(dictator, tokenRouter, puppetToken);
+        feeMarketplaceStore = new FeeMarketplaceStore(dictator, puppetToken);
         feeMarketplace = new FeeMarketplace(
             dictator,
             puppetToken,
@@ -37,12 +37,16 @@ contract FeeMarketplaceTest is BasicSetup {
         dictator.setPermission(feeMarketplace, feeMarketplace.acceptOffer.selector, users.owner);
         dictator.setPermission(feeMarketplace, feeMarketplace.recordTransferIn.selector, users.owner);
 
-        dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(feeMarketplaceStore));
         dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
 
         dictator.registerContract(feeMarketplace);
 
         vm.startPrank(users.owner);
+
+        // Approve feeMarketplaceStore to pull tokens for deposits and acceptOffer
+        usdc.approve(address(feeMarketplaceStore), type(uint).max);
+        wnt.approve(address(feeMarketplaceStore), type(uint).max);
+        puppetToken.approve(address(feeMarketplaceStore), type(uint).max);
     }
 
     // Helper to accept offer for all unlocked fees
@@ -682,11 +686,11 @@ contract FeeMarketplaceTest is BasicSetup {
         // Owner deposits
         feeMarketplace.deposit(usdc, users.owner, 100e6);
 
-        // Alice deposits (via authorized call) - need to approve tokenRouter
+        // Alice deposits (via authorized call) - need to approve feeMarketplaceStore
         usdc.mint(users.alice, 50e6);
         vm.stopPrank();
         vm.prank(users.alice);
-        usdc.approve(address(tokenRouter), 50e6);
+        usdc.approve(address(feeMarketplaceStore), 50e6);
         vm.prank(users.owner);
         feeMarketplace.deposit(usdc, users.alice, 50e6);
 

@@ -491,6 +491,12 @@ export const ARBITRUM_TOKEN_LIST = [
     priceFeedAddress: '0x37DDEE84dE03d039e1Bf809b7a01EDd2c4665771'
   },
   {
+    symbol: 'MON',
+    decimals: 18,
+    address: '0xB96e60CA3a7677b29f1e10dd109E952B275038Be',
+    name: 'Monad'
+  },
+  {
     symbol: 'MOODENG',
     decimals: 6,
     address: '0xd3898c6570974AEca38a8ACf22fd60739e528A99',
@@ -661,6 +667,12 @@ export const ARBITRUM_TOKEN_LIST = [
     synthetic: true,
     dataStreamFeedId: '0x0003591ce9a9d662c43124ca14fd6f8603c9ab856ee45358189a2ce6904b5a3c',
     dataStreamFeedDecimals: 18
+  },
+  {
+    symbol: 'SKY',
+    decimals: 18,
+    address: '0xeeA41ceA2204D1156De1BDF2CF4ab6184d17f90B',
+    name: 'Sky'
   },
   {
     symbol: 'SPX6900',
@@ -932,6 +944,12 @@ export const ARBITRUM_TOKEN_LIST = [
     synthetic: true,
     dataStreamFeedId: '0x0003c16c6aed42294f5cb4741f6e59ba2d728f0eae2eb9e6d3f555808c59fc45',
     dataStreamFeedDecimals: 18
+  },
+  {
+    symbol: 'ZEC',
+    decimals: 8,
+    address: '0x6eAbbaA3278556Dc5b19c034dc26c0eaB60d65B5',
+    name: 'Zcash'
   },
   {
     symbol: 'ZORA',

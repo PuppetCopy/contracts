@@ -5,12 +5,11 @@ import {Test} from "forge-std/src/Test.sol";
 import {console} from "forge-std/src/console.sol";
 
 import {Dictatorship} from "src/shared/Dictatorship.sol";
-import {TokenRouter} from "src/shared/TokenRouter.sol";
 import {AccountStore} from "src/shared/AccountStore.sol";
 import {Account as PuppetAccount} from "src/position/Account.sol";
 import {Allocation} from "src/position/Allocation.sol";
 import {Subscribe} from "src/position/Subscribe.sol";
-import {TraderSubaccountHook} from "src/position/TraderSubaccountHook.sol";
+import {SubaccountModule} from "src/position/SubaccountModule.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {MockERC20} from "test/mock/MockERC20.t.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -35,12 +34,11 @@ contract MockSmartAccount {
 
 contract AllocationTest is Test {
     Dictatorship dictator;
-    TokenRouter tokenRouter;
     AccountStore accountStore;
     PuppetAccount account;
     Allocation allocation;
     Subscribe subscribe;
-    TraderSubaccountHook hook;
+    SubaccountModule hook;
     MockSmartAccount traderAccount;
     MockERC20 usdc;
 
@@ -64,12 +62,8 @@ contract AllocationTest is Test {
         usdc = new MockERC20("USDC", "USDC", 6);
         dictator = new Dictatorship(owner);
 
-        // Deploy TokenRouter
-        tokenRouter = new TokenRouter(dictator, TokenRouter.Config({transferGasLimit: 200_000}));
-        dictator.registerContract(tokenRouter);
-
         // Deploy AccountStore
-        accountStore = new AccountStore(dictator, tokenRouter);
+        accountStore = new AccountStore(dictator);
 
         // Deploy Account
         account = new PuppetAccount(dictator, accountStore, PuppetAccount.Config({transferOutGasLimit: 200_000}));
@@ -92,8 +86,8 @@ contract AllocationTest is Test {
         );
         dictator.registerContract(subscribe);
 
-        // Deploy TraderSubaccountHook
-        hook = new TraderSubaccountHook(allocation);
+        // Deploy SubaccountModule
+        hook = new SubaccountModule(allocation);
 
         // Deploy MockSmartAccount (simulates an ERC-7579 wallet)
         traderAccount = new MockSmartAccount();
@@ -103,9 +97,6 @@ contract AllocationTest is Test {
         dictator.setAccess(Access(address(accountStore)), address(account));
         dictator.setAccess(Access(address(accountStore)), owner);
         dictator.setAccess(Access(address(accountStore)), address(traderAccount));
-
-        // TokenRouter permission
-        dictator.setPermission(tokenRouter, TokenRouter.transfer.selector, address(accountStore));
 
         // Account functions that Allocation calls
         dictator.setPermission(account, PuppetAccount.setUserBalance.selector, address(allocation));
@@ -155,7 +146,7 @@ contract AllocationTest is Test {
     function _deposit(address _user, uint _amount) internal {
         usdc.mint(_user, _amount);
         vm.prank(_user);
-        usdc.approve(address(tokenRouter), _amount);
+        usdc.approve(address(accountStore), _amount);
         vm.prank(owner);
         account.deposit(usdc, _user, _user, _amount);
     }
@@ -184,7 +175,7 @@ contract AllocationTest is Test {
         vm.prank(address(traderAccount));
         usdc.transfer(address(0xdead), _amount);
         vm.prank(owner);
-        allocation.utilize(_traderKey, _amount);
+        allocation.utilize(_traderKey, _amount, "");
     }
 
     // Deposit settlement funds to address(traderAccount) (simulating funds returning from GMX position)
@@ -1545,7 +1536,7 @@ contract AllocationTest is Test {
         // Try to utilize more than total allocation (2000)
         vm.prank(owner);
         vm.expectRevert(); // Should underflow or revert
-        allocation.utilize(traderKey, 2001e6);
+        allocation.utilize(traderKey, 2001e6, "");
     }
 
     function test_withdrawExactAllocation() public {
@@ -1820,6 +1811,6 @@ contract AllocationTest is Test {
         // Now utilize should underflow: 500 - 1500
         vm.expectRevert();
         vm.prank(owner);
-        allocation.utilize(traderKey, 1500e6);
+        allocation.utilize(traderKey, 1500e6, "");
     }
 }

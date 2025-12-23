@@ -6,7 +6,7 @@ import {IAuthority} from "./interfaces/IAuthority.sol";
 
 /**
  * @title UserRouterProxy
- * @notice Upgradeable proxy for UserRouter - separate from MatchmakerRouter's proxy
+ * @notice Upgradeable proxy for UserRouter
  */
 contract UserRouterProxy is RouterProxy {
     constructor(IAuthority _authority) RouterProxy(_authority) {}

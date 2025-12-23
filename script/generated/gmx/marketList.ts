@@ -806,5 +806,26 @@ export const ARBITRUM_MARKET_LIST = [
     longToken: '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f',
     shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
     marketType: 'PERP'
+  },
+  {
+    marketToken: '0x66AB9D61A0124b61C8892A4ac687Ac48DbA8ff2c',
+    indexToken: '0xB96e60CA3a7677b29f1e10dd109E952B275038Be',
+    longToken: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
+  },
+  {
+    marketToken: '0x587759c237acCa739bCE3911647BacF56C876E60',
+    indexToken: '0x6eAbbaA3278556Dc5b19c034dc26c0eaB60d65B5',
+    longToken: '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
+  },
+  {
+    marketToken: '0x00310c6d8A9F821e3FE991f4835f2cA4d87034Cf',
+    indexToken: '0xeeA41ceA2204D1156De1BDF2CF4ab6184d17f90B',
+    longToken: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    shortToken: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    marketType: 'PERP'
   }
 ] as const
