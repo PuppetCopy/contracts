@@ -50,12 +50,9 @@
     },
     "./deployments": "./deployments.json"
   },
-  "dependencies": {},
   "devDependencies": {
-    "@openzeppelin/contracts": "5.4.0",
     "@types/bun": "catalog:",
     "dotenv": "catalog:",
-    "forge-std": "github:foundry-rs/forge-std#v1.12.0",
     "typescript": "catalog:",
     "viem": "catalog:"
   }

@@ -3,7 +3,6 @@ pragma solidity ^0.8.31;
 
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {Allocation} from "src/position/Allocation.sol";
-import {PuppetModule} from "src/position/PuppetModule.sol";
 import {UserRouter} from "src/UserRouter.sol";
 import {UserRouterProxy} from "src/utils/UserRouterProxy.sol";
 
@@ -21,11 +20,10 @@ contract DeployUserRouter is BaseScript {
         // Load existing contracts
         Dictatorship dictatorship = Dictatorship(getDeployedAddress("Dictatorship"));
         Allocation allocation = Allocation(getDeployedAddress("Allocation"));
-        PuppetModule puppetModule = PuppetModule(getDeployedAddress("PuppetModule"));
         UserRouterProxy userRouterProxy = UserRouterProxy(payable(getDeployedAddress("UserRouterProxy")));
 
         // Deploy UserRouter implementation
-        UserRouter userRouter = new UserRouter(allocation, puppetModule);
+        UserRouter userRouter = new UserRouter(allocation);
 
         // Set implementation on proxy
         userRouterProxy.update(address(userRouter));

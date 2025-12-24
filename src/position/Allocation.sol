@@ -6,25 +6,27 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {CoreContract} from "../utils/CoreContract.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {IERC7579Account} from "../utils/interfaces/IERC7579Account.sol";
+import {IERC7579Account} from "erc7579/interfaces/IERC7579Account.sol";
+import {IExecutor, IHook, MODULE_TYPE_EXECUTOR, MODULE_TYPE_HOOK} from "erc7579/interfaces/IERC7579Module.sol";
+import {ModeLib, ModeCode, CallType, ExecType, ModeSelector, ModePayload, CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT} from "erc7579/lib/ModeLib.sol";
+import {ExecutionLib} from "erc7579/lib/ExecutionLib.sol";
 import {Error} from "./../utils/Error.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
-interface IPuppetModule {
-    function validatePolicy(address _trader, IERC20 _collateralToken, uint _requestedAmount)
-        external
-        returns (uint);
-}
-
-interface IPuppetSubaccount {
-    function executeValidation(address _module, address _trader, IERC20 _collateralToken, uint _requestedAmount)
-        external
-        returns (uint);
-}
-
-/// @notice Coordinates allocations between puppet subaccounts and trader subaccounts
-/// @dev Puppets hold their own funds in ERC-7579 subaccounts
-contract Allocation is CoreContract {
+/**
+ * @title Allocation
+ * @notice Coordinates allocations between puppet and trader accounts
+ * @dev Acts as session owner on puppet accounts to execute transfers
+ *
+ * Flow:
+ * 1. Puppet installs Smart Sessions with Allocation as session owner
+ * 2. Puppet configures policies (AllowedRecipient, AllowanceRate, Throttle)
+ * 3. Trader (7579 account) calls allocate() to gather funds
+ * 4. Allocation executes transfers from puppets → trader via Smart Sessions
+ * 5. Smart Sessions validates each transfer against puppet's policies
+ * 6. Allocation records accounting for settlement distribution
+ */
+contract Allocation is CoreContract, IExecutor, IHook {
     using SafeERC20 for IERC20;
 
     struct Config {
@@ -51,7 +53,7 @@ contract Allocation is CoreContract {
     mapping(bytes32 traderMatchingKey => mapping(address user => uint)) public userSettlementCheckpoint;
 
     // Trader subaccount tracking
-    mapping(bytes32 traderMatchingKey => address) public subaccountMap;
+    mapping(bytes32 traderMatchingKey => IERC7579Account) public subaccountMap;
     mapping(bytes32 traderMatchingKey => uint) public subaccountRecordedBalance;
     mapping(IERC7579Account subaccount => address trader) public subaccountTraderMap;
     mapping(IERC7579Account subaccount => IERC20[]) internal _subaccountTokenList;
@@ -69,13 +71,84 @@ contract Allocation is CoreContract {
         return _subaccountTokenList[_subaccount];
     }
 
-    // ============ Registration ============
+    // ============ ERC-7579 Executor Module Interface ============
 
-    function registerSubaccount(IERC7579Account _subaccount, address _hook) external auth {
-        if (!_subaccount.isModuleInstalled(4, _hook, "")) {
-            revert Error.Allocation__UnregisteredSubaccount();
+    /**
+     * @notice Called when this module is installed on a smart account
+     * @dev Only registers when BOTH executor and hook are installed.
+     *      onInstall is called AFTER the module is marked as installed.
+     */
+    function onInstall(bytes calldata) external {
+        IERC7579Account _trader = IERC7579Account(msg.sender);
+
+        bool executorInstalled = _trader.isModuleInstalled(MODULE_TYPE_EXECUTOR, address(this), "");
+        bool hookInstalled = _trader.isModuleInstalled(MODULE_TYPE_HOOK, address(this), "");
+
+        // Only register when BOTH are installed (second install completes setup)
+        if (executorInstalled && hookInstalled) {
+            registeredSubaccount[_trader] = true;
         }
-        registeredSubaccount[_subaccount] = true;
+    }
+
+    /**
+     * @notice Called when this module is uninstalled from a smart account
+     * @dev Unregisters on first uninstall (when both still show as installed).
+     *      onUninstall is called BEFORE the module is marked as uninstalled.
+     *      Can only uninstall when all positions are settled (no active utilization).
+     */
+    function onUninstall(bytes calldata) external {
+        IERC7579Account _trader = IERC7579Account(msg.sender);
+
+        bool executorInstalled = _trader.isModuleInstalled(MODULE_TYPE_EXECUTOR, address(this), "");
+        bool hookInstalled = _trader.isModuleInstalled(MODULE_TYPE_HOOK, address(this), "");
+
+        // First uninstall - both still show installed (about to be cleared after this call)
+        if (executorInstalled && hookInstalled) {
+            // Check all token positions are fully settled
+            IERC20[] memory _tokens = _subaccountTokenList[_trader];
+            for (uint _i = 0; _i < _tokens.length; ++_i) {
+                bytes32 _traderMatchingKey =
+                    PositionUtils.getTraderMatchingKey(_tokens[_i], subaccountTraderMap[_trader]);
+                uint _utilization = totalUtilization[_traderMatchingKey];
+                if (_utilization > 0) {
+                    revert Error.Allocation__ActiveUtilization(_utilization);
+                }
+            }
+
+            delete registeredSubaccount[_trader];
+        }
+        // Second uninstall - already unregistered, no-op
+    }
+
+    function isModuleType(uint256 moduleTypeId) external pure returns (bool) {
+        return moduleTypeId == MODULE_TYPE_EXECUTOR || moduleTypeId == MODULE_TYPE_HOOK;
+    }
+
+    function isInitialized(address _smartAccount) external view returns (bool) {
+        return registeredSubaccount[IERC7579Account(_smartAccount)];
+    }
+
+    // ============ IHook ============
+
+    /**
+     * @notice Pre-execution hook - syncs any pending settlements before trade
+     * @dev Called by smart account before executing a transaction
+     */
+    function preCheck(address, uint256, bytes calldata callData) external returns (bytes memory) {
+        IERC7579Account _subaccount = IERC7579Account(msg.sender);
+        if (!registeredSubaccount[_subaccount]) revert Error.Allocation__UnregisteredSubaccount();
+        _syncSettlement(_subaccount);
+        return callData; // Pass execution calldata through to postCheck
+    }
+
+    /**
+     * @notice Post-execution hook - syncs utilization after trade
+     * @dev Called by smart account after executing a transaction
+     */
+    function postCheck(bytes calldata hookData) external {
+        IERC7579Account _subaccount = IERC7579Account(msg.sender);
+        if (!registeredSubaccount[_subaccount]) revert Error.Allocation__UnregisteredSubaccount();
+        _syncUtilization(_subaccount, hookData);
     }
 
     // ============ View Functions ============
@@ -127,29 +200,35 @@ contract Allocation is CoreContract {
     // ============ Allocation ============
 
     /**
-     * @notice Allocate funds from puppet subaccounts to a trader's position
-     * @dev Puppets must have approved this contract to pull funds from their subaccounts
+     * @notice Trader gathers allocations from puppets
+     * @dev Executes transfers from puppet accounts via Smart Sessions.
+     *      Allocation contract must be session owner on puppet accounts.
+     *      Puppet policies validate each transfer (recipient, amount, throttle).
+     * @param _collateralToken The collateral token
+     * @param _trader The trader's 7579 account (receives funds)
+     * @param _traderAllocation Trader's own allocation amount (already in trader account)
+     * @param _puppetList List of puppet accounts to pull from
+     * @param _allocationList Allocation amounts per puppet
      */
     function allocate(
         IERC20 _collateralToken,
-        address _trader,
-        IERC7579Account _traderSubaccount,
+        IERC7579Account _trader,
         uint _traderAllocation,
-        address[] calldata _puppetSubaccountList,
-        uint[] calldata _puppetAllocationList,
-        address _puppetModule
+        address[] calldata _puppetList,
+        uint[] calldata _allocationList
     ) external auth {
-        if (!registeredSubaccount[_traderSubaccount]) revert Error.Allocation__UnregisteredSubaccount();
+        if (!registeredSubaccount[_trader]) revert Error.Allocation__UnregisteredSubaccount();
 
-        uint _puppetCount = _puppetSubaccountList.length;
+        uint _puppetCount = _puppetList.length;
         if (_puppetCount > config.maxPuppetList) {
             revert Error.Allocation__PuppetListTooLarge(_puppetCount, config.maxPuppetList);
         }
-        if (_puppetCount != _puppetAllocationList.length) {
-            revert Error.Allocation__PuppetListTooLarge(_puppetCount, _puppetAllocationList.length);
+        if (_puppetCount != _allocationList.length) {
+            revert Error.Allocation__PuppetListTooLarge(_puppetCount, _allocationList.length);
         }
 
-        bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_collateralToken, _trader);
+        address _traderAddr = address(_trader);
+        bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_collateralToken, _traderAddr);
 
         // Initialize epoch if needed
         uint _epoch = currentEpoch[_traderMatchingKey];
@@ -166,47 +245,60 @@ contract Allocation is CoreContract {
             }
         }
 
-        // Register trader subaccount mapping if first allocation
-        if (subaccountMap[_traderMatchingKey] == address(0)) {
-            subaccountMap[_traderMatchingKey] = address(_traderSubaccount);
-            subaccountTraderMap[_traderSubaccount] = _trader;
-            _subaccountTokenList[_traderSubaccount].push(_collateralToken);
+        // Register trader mapping if first allocation
+        if (subaccountMap[_traderMatchingKey] == IERC7579Account(address(0))) {
+            subaccountMap[_traderMatchingKey] = _trader;
+            subaccountTraderMap[_trader] = _traderAddr;
+            _subaccountTokenList[_trader].push(_collateralToken);
         }
 
         uint _puppetTotalAllocation = 0;
         uint[] memory _puppetUtilizationList = new uint[](_puppetCount);
 
-        // Process each puppet allocation
+        // Execute transfers from each puppet via trader's account
+        // Trader executes on puppet accounts so policies see trader as actor
         for (uint _i = 0; _i < _puppetCount; ++_i) {
-            address _puppet = _puppetSubaccountList[_i];
-            uint _requestedAmount = _puppetAllocationList[_i];
+            address _puppet = _puppetList[_i];
+            uint _amount = _allocationList[_i];
 
-            if (_requestedAmount == 0) continue;
+            if (_amount == 0) continue;
 
-            // Validate against puppet's policy via puppet subaccount -> PuppetModule
-            uint _allowedAmount = IPuppetSubaccount(_puppet).executeValidation(
-                _puppetModule, _trader, _collateralToken, _requestedAmount
+            // Build the call: puppet.execute(transfer to trader)
+            bytes memory puppetExecution = abi.encodeWithSelector(
+                IERC7579Account.execute.selector,
+                ModeLib.encodeSimpleSingle(),
+                ExecutionLib.encodeSingle(
+                    address(_collateralToken),
+                    0,
+                    abi.encodeCall(IERC20.transfer, (_traderAddr, _amount))
+                )
             );
 
-            if (_allowedAmount == 0) continue;
+            // Execute via trader's account with EXECTYPE_TRY - doesn't revert on failure
+            // Puppet's policies may reject
+            bytes[] memory returnData = _trader.executeFromExecutor(
+                ModeLib.encode(CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT, ModePayload.wrap(0x00)),
+                ExecutionLib.encodeSingle(_puppet, 0, puppetExecution)
+            );
 
-            // Pull funds from puppet's subaccount
-            _collateralToken.safeTransferFrom(_puppet, address(_traderSubaccount), _allowedAmount);
+            // EXECTYPE_TRY returns raw result per ERC-7579 spec:
+            // - Success: empty bytes (execute() has no return value)
+            // - Failure: revert data (error selector + params)
+            if (returnData[0].length > 0) continue; // Failed - has revert data
 
-            // Update allocation tracking
-            uint _newPuppetAllocation = allocationBalance[_traderMatchingKey][_puppet] + _allowedAmount;
+            // Success - update allocation tracking
+            uint _newPuppetAllocation = allocationBalance[_traderMatchingKey][_puppet] + _amount;
             allocationBalance[_traderMatchingKey][_puppet] = _newPuppetAllocation;
             _puppetUtilizationList[_i] = _updateUserCheckpoints(_traderMatchingKey, _puppet, _newPuppetAllocation);
-
-            _puppetTotalAllocation += _allowedAmount;
+            _puppetTotalAllocation += _amount;
         }
 
-        // Handle trader's own allocation
+        // Handle trader's own allocation (already in trader account)
         uint _traderUtilization = 0;
         if (_traderAllocation > 0) {
-            uint _newTraderAllocation = allocationBalance[_traderMatchingKey][_trader] + _traderAllocation;
-            allocationBalance[_traderMatchingKey][_trader] = _newTraderAllocation;
-            _traderUtilization = _updateUserCheckpoints(_traderMatchingKey, _trader, _newTraderAllocation);
+            uint _newTraderAllocation = allocationBalance[_traderMatchingKey][_traderAddr] + _traderAllocation;
+            allocationBalance[_traderMatchingKey][_traderAddr] = _newTraderAllocation;
+            _traderUtilization = _updateUserCheckpoints(_traderMatchingKey, _traderAddr, _newTraderAllocation);
         }
 
         uint _totalAllocation = _traderAllocation + _puppetTotalAllocation;
@@ -223,13 +315,12 @@ contract Allocation is CoreContract {
                 _traderMatchingKey,
                 _collateralToken,
                 _trader,
-                _traderSubaccount,
                 _traderAllocation,
                 _traderUtilization,
                 _puppetTotalAllocation,
                 _totalAllocation,
-                _puppetSubaccountList,
-                _puppetAllocationList,
+                _puppetList,
+                _allocationList,
                 _puppetUtilizationList
             )
         );
@@ -241,7 +332,7 @@ contract Allocation is CoreContract {
         _utilize(_traderMatchingKey, _utilization, _executionCalldata);
     }
 
-    function syncSettlement(IERC7579Account _subaccount) external auth {
+    function _syncSettlement(IERC7579Account _subaccount) internal {
         address _trader = subaccountTraderMap[_subaccount];
         IERC20[] memory _tokens = _subaccountTokenList[_subaccount];
         uint _length = _tokens.length;
@@ -260,7 +351,7 @@ contract Allocation is CoreContract {
         }
     }
 
-    function syncUtilization(IERC7579Account _subaccount, bytes calldata _executionCalldata) external auth {
+    function _syncUtilization(IERC7579Account _subaccount, bytes calldata _executionCalldata) internal {
         address _trader = subaccountTraderMap[_subaccount];
         IERC20[] memory _tokens = _subaccountTokenList[_subaccount];
         uint _length = _tokens.length;
@@ -314,7 +405,7 @@ contract Allocation is CoreContract {
     function settle(bytes32 _traderMatchingKey, IERC20 _collateralToken) external auth {
         if (totalUtilization[_traderMatchingKey] == 0) revert Error.Allocation__NoUtilization();
 
-        address _subaccount = subaccountMap[_traderMatchingKey];
+        address _subaccount = address(subaccountMap[_traderMatchingKey]);
         uint _actualBalance = _collateralToken.balanceOf(_subaccount);
         uint _recordedBalance = subaccountRecordedBalance[_traderMatchingKey];
 
@@ -426,7 +517,7 @@ contract Allocation is CoreContract {
         _updateUserCheckpoints(_traderMatchingKey, _user, _newAllocation, 0);
 
         // Transfer from trader subaccount back to puppet's subaccount
-        address _traderSubaccount = subaccountMap[_traderMatchingKey];
+        address _traderSubaccount = address(subaccountMap[_traderMatchingKey]);
         _collateralToken.safeTransferFrom(_traderSubaccount, _user, _amount);
         subaccountRecordedBalance[_traderMatchingKey] -= _amount;
 

@@ -9,6 +9,7 @@ coverage.json
 broadcast
 cache/
 /CLAUDE.md
+lib/
 
 *.local.*
 

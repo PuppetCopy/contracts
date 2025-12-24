@@ -3,15 +3,16 @@ pragma solidity ^0.8.31;
 
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {Allocation} from "src/position/Allocation.sol";
-import {PuppetAccount} from "src/position/PuppetAccount.sol";
-import {PuppetModule} from "src/position/PuppetModule.sol";
-import {SubaccountModule} from "src/position/SubaccountModule.sol";
+import {AllowedRecipientPolicy} from "src/position/policies/AllowedRecipientPolicy.sol";
+import {AllowanceRatePolicy} from "src/position/policies/AllowanceRatePolicy.sol";
+import {ThrottlePolicy} from "src/position/policies/ThrottlePolicy.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
 
 /**
- * @notice Deploy position contracts: Allocation, PuppetAccount, PuppetModule, SubaccountModule
- * @dev Run DeployUserRouter.s.sol after this to deploy UserRouter and set permissions
+ * @notice Deploy position contracts: Allocation, Policies
+ * @dev Allocation is an ERC-7579 executor+hook module installed on trader accounts
+ *      Policies are Smart Sessions compatible - users install them via Rhinestone
  */
 contract DeployPosition is BaseScript {
     function run() public {
@@ -20,32 +21,17 @@ contract DeployPosition is BaseScript {
         // Load existing contracts
         Dictatorship dictatorship = Dictatorship(getDeployedAddress("Dictatorship"));
 
-        // Deploy Allocation first
+        // Deploy Allocation (executor + hook module for trader subaccounts)
         Allocation allocation = new Allocation(
             dictatorship,
             Allocation.Config({maxPuppetList: 100})
         );
         dictatorship.registerContract(allocation);
 
-        // Deploy PuppetAccount (stores puppet policy state)
-        PuppetAccount puppetAccount = new PuppetAccount(dictatorship);
-        dictatorship.registerContract(puppetAccount);
-
-        // Deploy PuppetModule (contains validation logic)
-        PuppetModule puppetModule = new PuppetModule(puppetAccount, address(allocation));
-
-        // Deploy SubaccountModule (for trader subaccounts)
-        SubaccountModule subaccountModule = new SubaccountModule(allocation);
-
-        // Set permissions for PuppetModule to call PuppetAccount
-        dictatorship.setPermission(puppetAccount, puppetAccount.registerPuppet.selector, address(puppetModule));
-        dictatorship.setPermission(puppetAccount, puppetAccount.setPolicy.selector, address(puppetModule));
-        dictatorship.setPermission(puppetAccount, puppetAccount.removePolicy.selector, address(puppetModule));
-
-        // Set permissions for SubaccountModule to call Allocation
-        dictatorship.setPermission(allocation, allocation.registerSubaccount.selector, address(subaccountModule));
-        dictatorship.setPermission(allocation, allocation.syncSettlement.selector, address(subaccountModule));
-        dictatorship.setPermission(allocation, allocation.syncUtilization.selector, address(subaccountModule));
+        // Deploy Smart Sessions policies (stateless, users install via Rhinestone)
+        new AllowedRecipientPolicy();
+        new AllowanceRatePolicy();
+        new ThrottlePolicy();
 
         vm.stopBroadcast();
     }

@@ -4,12 +4,18 @@
   src = 'src'
   out = 'forge-artifacts'
   cache_path = 'forge-cache'
-  libs = ["node_modules"]
+  libs = ["lib"]
   ignored_error_codes = [2424, 4591]  # Suppress deprecated natspec memory-safe-assembly and "more than 256 warnings" warnings
   remappings = [
-    "forge-std/src/=node_modules/forge-std/src/",
-    "forge-std/=node_modules/forge-std/src/",
-    "@openzeppelin/=node_modules/@openzeppelin/"
+    "forge-std/=lib/forge-std/",
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "erc7579/=lib/erc7579-implementation/src/",
+    "@rhinestone/sentinellist/=lib/sentinellist/",
+    "sentinellist/=lib/sentinellist/src/",
+    "account-abstraction/=lib/account-abstraction/contracts/",
+    "solady/=lib/solady/src/",
+    "src/=src/",
+    "test/=test/"
   ]
   evm_version = 'cancun'
   solc_version = '0.8.31'
@@ -65,7 +71,9 @@
   arbitrum = { key = "${ETHERSCAN_API_KEY}" }
 
 [lint]
-  # Disable all style/informational lints during build
+  # Exclude test folder from linting
+  exclude_paths = ["test/**"]
+  # Disable style/informational lints during build
   exclude_lints = [
     "screaming-snake-case-immutable",
     "screaming-snake-case-const",
@@ -73,5 +81,6 @@
     "mixed-case-function",
     "unused-import",
     "asm-keccak256",
-    "unsafe-cheatcode"
+    "unsafe-cheatcode",
+    "erc20-unchecked-transfer"
   ]

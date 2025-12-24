@@ -88,9 +88,10 @@ library Error {
     error Allocation__NoUtilization();
     error Allocation__UtilizationNotSettled(uint utilization);
     error Allocation__UnregisteredSubaccount();
-
-    error PuppetAccount__InvalidPolicy();
-    error PuppetAccount__UnregisteredPuppet();
+    error Allocation__ExecutorNotInstalled();
+    error Allocation__ActiveUtilization(uint totalUtilization);
+    error Allocation__AlreadyRegistered();
+    error Allocation__AlreadyUnregistered();
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();

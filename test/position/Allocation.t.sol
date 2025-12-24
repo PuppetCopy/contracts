@@ -6,55 +6,27 @@ import {console} from "forge-std/src/console.sol";
 
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {Allocation} from "src/position/Allocation.sol";
-import {PuppetAccount} from "src/position/PuppetAccount.sol";
-import {PuppetModule} from "src/position/PuppetModule.sol";
-import {SubaccountModule} from "src/position/SubaccountModule.sol";
 import {PositionUtils} from "src/position/utils/PositionUtils.sol";
 import {MockERC20} from "test/mock/MockERC20.t.sol";
+import {TestSmartAccount} from "test/mock/TestSmartAccount.t.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC7579Account} from "src/utils/interfaces/IERC7579Account.sol";
+import {IERC7579Account} from "erc7579/interfaces/IERC7579Account.sol";
 import {Access} from "src/utils/auth/Access.sol";
 import {Permission} from "src/utils/auth/Permission.sol";
+import {Error} from "src/utils/Error.sol";
 
-interface IPuppetModuleValidate {
-    function validatePolicy(address _trader, IERC20 _collateralToken, uint _requestedAmount) external returns (uint);
-}
-
-contract MockSmartAccount {
-    mapping(uint256 => address) public installedModules;
-
-    function setInstalledModule(uint256 _moduleType, address _module) external {
-        installedModules[_moduleType] = _module;
-    }
-
-    function isModuleInstalled(uint256 moduleTypeId, address module, bytes calldata) external view returns (bool) {
-        return installedModules[moduleTypeId] == module;
-    }
-
-    function transfer(IERC20 token, address to, uint amount) external {
-        token.transfer(to, amount);
-    }
-
-    // Execute validation through this account (msg.sender becomes this account)
-    function executeValidation(address _module, address _trader, IERC20 _collateralToken, uint _requestedAmount)
-        external
-        returns (uint)
-    {
-        return IPuppetModuleValidate(_module).validatePolicy(_trader, _collateralToken, _requestedAmount);
-    }
-}
-
+/**
+ * @title AllocationTest
+ * @notice Tests for Allocation contract as bundler
+ * @dev Simulates flow: Trader calls allocate(), Allocation executes transfers from puppets
+ */
 contract AllocationTest is Test {
     Dictatorship dictator;
-    PuppetAccount puppetAccount;
-    PuppetModule puppetModule;
     Allocation allocation;
-    SubaccountModule traderHook;
-    MockSmartAccount traderSubaccount;
+    TestSmartAccount traderAccount; // Trader's 7579 account
     MockERC20 usdc;
 
     address owner;
-    address trader;
     address puppet1;
     address puppet2;
     address puppet3;
@@ -63,7 +35,6 @@ contract AllocationTest is Test {
 
     function setUp() public {
         owner = makeAddr("owner");
-        trader = makeAddr("trader");
         puppet1 = makeAddr("puppet1");
         puppet2 = makeAddr("puppet2");
         puppet3 = makeAddr("puppet3");
@@ -73,135 +44,93 @@ contract AllocationTest is Test {
         usdc = new MockERC20("USDC", "USDC", 6);
         dictator = new Dictatorship(owner);
 
-        // Deploy Allocation first
+        // Deploy Allocation (executor + hook module)
         allocation = new Allocation(dictator, Allocation.Config({maxPuppetList: 100}));
         dictator.registerContract(allocation);
 
-        // Deploy PuppetAccount (stores puppet policy state)
-        puppetAccount = new PuppetAccount(dictator);
-        dictator.registerContract(puppetAccount);
+        // Deploy TestSmartAccount for trader
+        traderAccount = new TestSmartAccount();
+        // Install Allocation as hook (type 4) for settlement/utilization sync
+        traderAccount.installModule(4, address(allocation), "");
+        // Install Allocation as executor (type 2) - triggers onInstall() which registers the subaccount
+        traderAccount.installModule(2, address(allocation), "");
 
-        // Deploy PuppetModule (contains validation logic)
-        puppetModule = new PuppetModule(puppetAccount, address(allocation));
-
-        // Deploy SubaccountModule (for trader subaccounts)
-        traderHook = new SubaccountModule(allocation);
-
-        // Deploy MockSmartAccount (simulates an ERC-7579 wallet for trader)
-        traderSubaccount = new MockSmartAccount();
-        traderSubaccount.setInstalledModule(4, address(traderHook)); // Hook module type
-
-        // Set permissions for PuppetModule to call PuppetAccount
-        dictator.setPermission(puppetAccount, puppetAccount.registerPuppet.selector, address(puppetModule));
-        dictator.setPermission(puppetAccount, puppetAccount.setPolicy.selector, address(puppetModule));
-        dictator.setPermission(puppetAccount, puppetAccount.removePolicy.selector, address(puppetModule));
-
-        // Set permissions for SubaccountModule to call Allocation
-        dictator.setPermission(allocation, allocation.registerSubaccount.selector, address(traderHook));
-        dictator.setPermission(allocation, allocation.syncSettlement.selector, address(traderHook));
-        dictator.setPermission(allocation, allocation.syncUtilization.selector, address(traderHook));
-
-        // Owner permissions for testing
+        // Owner permissions for testing (owner simulates router)
         dictator.setPermission(allocation, allocation.allocate.selector, owner);
         dictator.setPermission(allocation, allocation.utilize.selector, owner);
         dictator.setPermission(allocation, allocation.settle.selector, owner);
         dictator.setPermission(allocation, allocation.realize.selector, owner);
         dictator.setPermission(allocation, allocation.withdraw.selector, owner);
-        dictator.setPermission(allocation, allocation.registerSubaccount.selector, owner);
 
         vm.stopPrank();
-
-        // Register trader subaccount by simulating hook installation
-        vm.prank(address(traderSubaccount));
-        traderHook.onInstall("");
     }
 
-    function _fundPuppet(address _puppet, uint _amount) internal {
-        usdc.mint(_puppet, _amount);
-        // Puppet approves Allocation to pull funds
-        vm.prank(_puppet);
-        usdc.approve(address(allocation), type(uint).max);
+    /**
+     * @notice Create puppet account with trader as allowed validator
+     * @dev Simulates: puppet subscribes to trader via Smart Sessions (validator module)
+     */
+    function _createPuppetAccount(address) internal returns (TestSmartAccount) {
+        TestSmartAccount puppetAccount = new TestSmartAccount();
+        // Install trader as validator (type 1) - simulates Smart Sessions subscription
+        puppetAccount.installModule(1, address(traderAccount), "");
+        return puppetAccount;
     }
 
-    function _createPuppetSubaccount(address _puppet) internal returns (MockSmartAccount) {
-        MockSmartAccount puppetSubaccount = new MockSmartAccount();
-        puppetSubaccount.setInstalledModule(1, address(puppetModule)); // Validator module type
-
-        // Register puppet by simulating module installation
-        vm.prank(address(puppetSubaccount));
-        puppetModule.onInstall("");
-
-        // Fund the subaccount and set approval
-        usdc.mint(address(puppetSubaccount), 0); // Will be funded separately
-        vm.prank(address(puppetSubaccount));
-        usdc.approve(address(allocation), type(uint).max);
-
-        return puppetSubaccount;
+    function _getTraderMatchingKey() internal view returns (bytes32) {
+        return PositionUtils.getTraderMatchingKey(usdc, address(traderAccount));
     }
 
-    function _setPolicy(address _puppetSubaccount, address _trader, uint _allowanceRate) internal {
-        vm.prank(_puppetSubaccount);
-        puppetModule.setPolicy(
-            _trader,
-            usdc,
-            abi.encode(PuppetModule.PolicyParams({allowanceRate: _allowanceRate, throttleActivity: 1 hours, expiry: block.timestamp + 30 days}))
-        );
-    }
-
-    function _getTraderMatchingKey(address _trader) internal view returns (bytes32) {
-        return PositionUtils.getTraderMatchingKey(usdc, _trader);
-    }
-
+    /**
+     * @notice Trader gathers allocations from puppets
+     * @dev Router calls allocate() with trader as parameter
+     */
     function _allocate(
-        address _trader,
         uint _traderAllocation,
         address[] memory _puppetList,
         uint[] memory _puppetAllocations
     ) internal {
+        // Owner (simulating router) calls allocate with trader as parameter
         vm.prank(owner);
         allocation.allocate(
             usdc,
-            _trader,
-            IERC7579Account(address(traderSubaccount)),
+            IERC7579Account(address(traderAccount)),
             _traderAllocation,
             _puppetList,
-            _puppetAllocations,
-            address(puppetModule)
+            _puppetAllocations
         );
     }
 
     function _utilize(bytes32 _traderKey, uint _amount) internal {
-        // Simulate funds leaving traderSubaccount to GMX
-        vm.prank(address(traderSubaccount));
+        // Simulate funds leaving trader account to GMX
+        vm.prank(address(traderAccount));
         usdc.transfer(address(0xdead), _amount);
         vm.prank(owner);
         allocation.utilize(_traderKey, _amount, "");
     }
 
     function _depositSettlement(uint _amount) internal {
-        // Mint to trader subaccount (simulating funds returning from GMX)
-        usdc.mint(address(traderSubaccount), _amount);
+        // Mint to trader account (simulating funds returning from GMX)
+        usdc.mint(address(traderAccount), _amount);
     }
 
     function test_singlePuppet_profit() public {
-        // Setup: create puppet subaccount with 1000 USDC, sets 100% allowance policy
-        MockSmartAccount puppetSubaccount = _createPuppetSubaccount(puppet1);
-        usdc.mint(address(puppetSubaccount), 1000e6);
-        _setPolicy(address(puppetSubaccount), trader, 10000); // 100%
+        // Setup: create puppet account with 1000 USDC
+        TestSmartAccount puppetAccount = _createPuppetAccount(puppet1);
+        usdc.mint(address(puppetAccount), 1000e6);
 
-        bytes32 traderKey = _getTraderMatchingKey(trader);
+        bytes32 traderKey = _getTraderMatchingKey();
 
-        // Allocate: puppet allocates 500 USDC (50% of 1000)
+        // Allocate: trader gathers 500 USDC from puppet
         address[] memory puppetList = new address[](1);
-        puppetList[0] = address(puppetSubaccount);
+        puppetList[0] = address(puppetAccount);
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(trader, 0, puppetList, allocations);
+        _allocate(0, puppetList, allocations);
 
-        assertEq(allocation.allocationBalance(traderKey, address(puppetSubaccount)), 500e6, "Puppet allocation should be 500");
+        assertEq(allocation.allocationBalance(traderKey, address(puppetAccount)), 500e6, "Puppet allocation should be 500");
         assertEq(allocation.totalAllocation(traderKey), 500e6, "Total allocation should be 500");
-        assertEq(usdc.balanceOf(address(traderSubaccount)), 500e6, "Trader subaccount should have 500 USDC");
+        assertEq(usdc.balanceOf(address(traderAccount)), 500e6, "Trader account should have 500 USDC");
 
         // Utilize: trader uses 500 USDC
         _utilize(traderKey, 500e6);
@@ -217,27 +146,26 @@ contract AllocationTest is Test {
 
         // Realize
         vm.prank(owner);
-        allocation.realize(traderKey, address(puppetSubaccount));
+        allocation.realize(traderKey, address(puppetAccount));
 
-        uint puppetAllocation = allocation.allocationBalance(traderKey, address(puppetSubaccount));
+        uint puppetAllocation = allocation.allocationBalance(traderKey, address(puppetAccount));
         assertEq(puppetAllocation, 600e6, "Puppet allocation should be 600 after profit");
     }
 
     function test_singlePuppet_loss() public {
-        // Setup: create puppet subaccount with 1000 USDC, sets 100% allowance policy
-        MockSmartAccount puppetSubaccount = _createPuppetSubaccount(puppet1);
-        usdc.mint(address(puppetSubaccount), 1000e6);
-        _setPolicy(address(puppetSubaccount), trader, 10000); // 100%
+        // Setup: create puppet account with 1000 USDC
+        TestSmartAccount puppetAccount = _createPuppetAccount(puppet1);
+        usdc.mint(address(puppetAccount), 1000e6);
 
-        bytes32 traderKey = _getTraderMatchingKey(trader);
+        bytes32 traderKey = _getTraderMatchingKey();
 
-        // Allocate: puppet allocates 500 USDC
+        // Allocate: trader gathers 500 USDC from puppet
         address[] memory puppetList = new address[](1);
-        puppetList[0] = address(puppetSubaccount);
+        puppetList[0] = address(puppetAccount);
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(trader, 0, puppetList, allocations);
+        _allocate(0, puppetList, allocations);
 
         // Utilize: trader uses 500 USDC
         _utilize(traderKey, 500e6);
@@ -250,32 +178,30 @@ contract AllocationTest is Test {
 
         // Realize
         vm.prank(owner);
-        allocation.realize(traderKey, address(puppetSubaccount));
+        allocation.realize(traderKey, address(puppetAccount));
 
-        uint puppetAllocation = allocation.allocationBalance(traderKey, address(puppetSubaccount));
+        uint puppetAllocation = allocation.allocationBalance(traderKey, address(puppetAccount));
         assertEq(puppetAllocation, 400e6, "Puppet allocation should be 400 after loss");
     }
 
     function test_multiplePuppets_profitDistribution() public {
-        // Setup: two puppet subaccounts with different allocations
-        MockSmartAccount puppetSubaccount1 = _createPuppetSubaccount(puppet1);
-        MockSmartAccount puppetSubaccount2 = _createPuppetSubaccount(puppet2);
-        usdc.mint(address(puppetSubaccount1), 1000e6);
-        usdc.mint(address(puppetSubaccount2), 2000e6);
-        _setPolicy(address(puppetSubaccount1), trader, 10000); // 100%
-        _setPolicy(address(puppetSubaccount2), trader, 10000); // 100%
+        // Setup: two puppet accounts with different allocations
+        TestSmartAccount puppetAccount1 = _createPuppetAccount(puppet1);
+        TestSmartAccount puppetAccount2 = _createPuppetAccount(puppet2);
+        usdc.mint(address(puppetAccount1), 1000e6);
+        usdc.mint(address(puppetAccount2), 2000e6);
 
-        bytes32 traderKey = _getTraderMatchingKey(trader);
+        bytes32 traderKey = _getTraderMatchingKey();
 
         // Allocate: puppet1 = 300, puppet2 = 600
         address[] memory puppetList = new address[](2);
-        puppetList[0] = address(puppetSubaccount1);
-        puppetList[1] = address(puppetSubaccount2);
+        puppetList[0] = address(puppetAccount1);
+        puppetList[1] = address(puppetAccount2);
         uint[] memory allocations = new uint[](2);
         allocations[0] = 300e6;
         allocations[1] = 600e6;
 
-        _allocate(trader, 0, puppetList, allocations);
+        _allocate(0, puppetList, allocations);
 
         assertEq(allocation.totalAllocation(traderKey), 900e6, "Total allocation should be 900");
 
@@ -290,129 +216,252 @@ contract AllocationTest is Test {
 
         // Realize both
         vm.prank(owner);
-        allocation.realize(traderKey, address(puppetSubaccount1));
+        allocation.realize(traderKey, address(puppetAccount1));
         vm.prank(owner);
-        allocation.realize(traderKey, address(puppetSubaccount2));
+        allocation.realize(traderKey, address(puppetAccount2));
 
         // puppet1: 300 * 1.5 = 450
         // puppet2: 600 * 1.5 = 900
-        assertEq(allocation.allocationBalance(traderKey, address(puppetSubaccount1)), 450e6, "Puppet1 should have 450");
-        assertEq(allocation.allocationBalance(traderKey, address(puppetSubaccount2)), 900e6, "Puppet2 should have 900");
-    }
-
-    function test_policyValidation_exceedsAllowance_skipped() public {
-        // Setup: create puppet subaccount with 1000 USDC, 50% allowance
-        MockSmartAccount puppetSubaccount = _createPuppetSubaccount(puppet1);
-        usdc.mint(address(puppetSubaccount), 1000e6);
-        _setPolicy(address(puppetSubaccount), trader, 5000); // 50% allowance
-
-        bytes32 traderKey = _getTraderMatchingKey(trader);
-
-        address[] memory puppetList = new address[](1);
-        puppetList[0] = address(puppetSubaccount);
-        uint[] memory allocations = new uint[](1);
-        allocations[0] = 600e6; // Trying to allocate 60% when only 50% allowed
-
-        // Should NOT revert, but skip the puppet (zero allocation reverts)
-        vm.expectRevert();
-        _allocate(trader, 0, puppetList, allocations);
-
-        // Verify no allocation happened
-        assertEq(allocation.allocationBalance(traderKey, address(puppetSubaccount)), 0, "Puppet should have 0 allocation");
-    }
-
-    function test_policyValidation_expired_skipped() public {
-        // Setup: create puppet subaccount with 1000 USDC
-        MockSmartAccount puppetSubaccount = _createPuppetSubaccount(puppet1);
-        usdc.mint(address(puppetSubaccount), 1000e6);
-
-        bytes32 traderKey = _getTraderMatchingKey(trader);
-
-        // Set policy that expires in 1 day
-        vm.prank(address(puppetSubaccount));
-        puppetModule.setPolicy(
-            trader,
-            usdc,
-            abi.encode(PuppetModule.PolicyParams({allowanceRate: 10000, throttleActivity: 1 hours, expiry: block.timestamp + 1 days}))
-        );
-
-        // Skip past expiry
-        skip(2 days);
-
-        address[] memory puppetList = new address[](1);
-        puppetList[0] = address(puppetSubaccount);
-        uint[] memory allocations = new uint[](1);
-        allocations[0] = 500e6;
-
-        // Should NOT revert, but skip the puppet (zero allocation reverts)
-        vm.expectRevert();
-        _allocate(trader, 0, puppetList, allocations);
-
-        // Verify no allocation happened
-        assertEq(allocation.allocationBalance(traderKey, address(puppetSubaccount)), 0, "Puppet should have 0 allocation");
-    }
-
-    function test_policyValidation_throttle_skipped() public {
-        // Setup: create puppet subaccount with 1000 USDC
-        MockSmartAccount puppetSubaccount = _createPuppetSubaccount(puppet1);
-        usdc.mint(address(puppetSubaccount), 1000e6);
-        _setPolicy(address(puppetSubaccount), trader, 10000); // 100%, 1 hour throttle
-
-        bytes32 traderKey = _getTraderMatchingKey(trader);
-
-        // First allocation
-        address[] memory puppetList = new address[](1);
-        puppetList[0] = address(puppetSubaccount);
-        uint[] memory allocations = new uint[](1);
-        allocations[0] = 100e6;
-
-        _allocate(trader, 0, puppetList, allocations);
-        assertEq(allocation.allocationBalance(traderKey, address(puppetSubaccount)), 100e6, "First allocation should succeed");
-
-        // Try to allocate again immediately - should be skipped due to throttle (zero allocation reverts)
-        allocations[0] = 100e6;
-        vm.expectRevert();
-        _allocate(trader, 0, puppetList, allocations);
-
-        // Skip 1 hour, should work now
-        skip(1 hours + 1);
-        _allocate(trader, 0, puppetList, allocations);
-        assertEq(allocation.allocationBalance(traderKey, address(puppetSubaccount)), 200e6, "Second allocation should succeed after throttle");
+        assertEq(allocation.allocationBalance(traderKey, address(puppetAccount1)), 450e6, "Puppet1 should have 450");
+        assertEq(allocation.allocationBalance(traderKey, address(puppetAccount2)), 900e6, "Puppet2 should have 900");
     }
 
     function test_withdraw() public {
-        // Setup: create puppet subaccount with 1000 USDC
-        MockSmartAccount puppetSubaccount = _createPuppetSubaccount(puppet1);
-        usdc.mint(address(puppetSubaccount), 1000e6);
-        _setPolicy(address(puppetSubaccount), trader, 10000);
+        // Setup: create puppet account with 1000 USDC
+        TestSmartAccount puppetAccount = _createPuppetAccount(puppet1);
+        usdc.mint(address(puppetAccount), 1000e6);
 
-        bytes32 traderKey = _getTraderMatchingKey(trader);
+        bytes32 traderKey = _getTraderMatchingKey();
 
         // Allocate
         address[] memory puppetList = new address[](1);
-        puppetList[0] = address(puppetSubaccount);
+        puppetList[0] = address(puppetAccount);
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(trader, 0, puppetList, allocations);
+        _allocate(0, puppetList, allocations);
 
-        // Trader subaccount needs to approve Allocation to pull funds back for withdraw
-        vm.prank(address(traderSubaccount));
+        // Trader account needs to approve Allocation to pull funds back for withdraw
+        vm.prank(address(traderAccount));
         usdc.approve(address(allocation), type(uint).max);
 
         // Withdraw (no utilization yet, so can withdraw)
         vm.prank(owner);
-        allocation.withdraw(usdc, traderKey, address(puppetSubaccount), 200e6);
+        allocation.withdraw(usdc, traderKey, address(puppetAccount), 200e6);
 
-        assertEq(allocation.allocationBalance(traderKey, address(puppetSubaccount)), 300e6, "Allocation should be 300 after withdraw");
-        assertEq(usdc.balanceOf(address(puppetSubaccount)), 700e6, "Puppet should have 700 USDC (500 remaining + 200 withdrawn)");
+        assertEq(allocation.allocationBalance(traderKey, address(puppetAccount)), 300e6, "Allocation should be 300 after withdraw");
+        assertEq(usdc.balanceOf(address(puppetAccount)), 700e6, "Puppet should have 700 USDC (500 remaining + 200 withdrawn)");
     }
 
     function test_noUtilization_settleReverts() public {
-        bytes32 traderKey = _getTraderMatchingKey(trader);
+        bytes32 traderKey = _getTraderMatchingKey();
 
         vm.expectRevert();
         vm.prank(owner);
         allocation.settle(traderKey, usdc);
+    }
+
+    function test_zeroAllocation_reverts() public {
+        TestSmartAccount puppetAccount = _createPuppetAccount(puppet1);
+
+        address[] memory puppetList = new address[](1);
+        puppetList[0] = address(puppetAccount);
+        uint[] memory allocations = new uint[](1);
+        allocations[0] = 0;
+
+        vm.expectRevert();
+        vm.prank(owner);
+        allocation.allocate(
+            usdc,
+            IERC7579Account(address(traderAccount)),
+            0,
+            puppetList,
+            allocations
+        );
+    }
+
+    function test_puppetRejectsTrader_skipped() public {
+        // Create two puppets - one allows trader, one doesn't
+        TestSmartAccount puppetAllowed = _createPuppetAccount(puppet1);
+        TestSmartAccount puppetRejected = new TestSmartAccount(); // No permission set
+
+        usdc.mint(address(puppetAllowed), 1000e6);
+        usdc.mint(address(puppetRejected), 1000e6);
+
+        bytes32 traderKey = _getTraderMatchingKey();
+
+        address[] memory puppetList = new address[](2);
+        puppetList[0] = address(puppetAllowed);
+        puppetList[1] = address(puppetRejected);
+        uint[] memory amounts = new uint[](2);
+        amounts[0] = 500e6;
+        amounts[1] = 500e6;
+
+        // Allocate - puppetRejected should be skipped, puppetAllowed should succeed
+        _allocate(0, puppetList, amounts);
+
+        // Only puppetAllowed's allocation should be recorded
+        assertEq(allocation.allocationBalance(traderKey, address(puppetAllowed)), 500e6);
+        assertEq(allocation.allocationBalance(traderKey, address(puppetRejected)), 0);
+        assertEq(allocation.totalAllocation(traderKey), 500e6);
+        assertEq(usdc.balanceOf(address(traderAccount)), 500e6);
+    }
+
+    function test_allPuppetsReject_reverts() public {
+        // Create puppet that doesn't allow trader
+        TestSmartAccount puppetRejected = new TestSmartAccount();
+        usdc.mint(address(puppetRejected), 1000e6);
+
+        address[] memory puppetList = new address[](1);
+        puppetList[0] = address(puppetRejected);
+        uint[] memory amounts = new uint[](1);
+        amounts[0] = 500e6;
+
+        // Should revert because 0 allocation after all puppets rejected
+        vm.expectRevert();
+        vm.prank(owner);
+        allocation.allocate(
+            usdc,
+            IERC7579Account(address(traderAccount)),
+            0,
+            puppetList,
+            amounts
+        );
+    }
+
+    function test_install_idempotent() public {
+        // Trader is already registered from setUp (installed as both hook and executor)
+        assertTrue(allocation.registeredSubaccount(traderAccount), "Should be registered");
+
+        // Installing executor again - both still installed, no state change
+        traderAccount.installModule(2, address(allocation), "");
+        assertTrue(allocation.registeredSubaccount(traderAccount), "Should still be registered");
+    }
+
+    // ============ Uninstall Tests ============
+
+    function test_uninstall_noActiveUtilization_succeeds() public {
+        // Setup: create puppet account with 1000 USDC
+        TestSmartAccount puppetAccount = _createPuppetAccount(puppet1);
+        usdc.mint(address(puppetAccount), 1000e6);
+
+        bytes32 traderKey = _getTraderMatchingKey();
+
+        // Allocate
+        address[] memory puppetList = new address[](1);
+        puppetList[0] = address(puppetAccount);
+        uint[] memory allocations = new uint[](1);
+        allocations[0] = 500e6;
+
+        _allocate(0, puppetList, allocations);
+
+        // No utilization - trader can uninstall
+        assertTrue(allocation.registeredSubaccount(traderAccount), "Should be registered before uninstall");
+
+        // Uninstall executor module - triggers Allocation.onUninstall()
+        traderAccount.uninstallModule(2, address(allocation), "");
+
+        assertFalse(allocation.registeredSubaccount(traderAccount), "Should be unregistered after uninstall");
+
+        // Allocations still exist - puppets can withdraw
+        assertEq(allocation.allocationBalance(traderKey, address(puppetAccount)), 500e6, "Allocation should remain");
+    }
+
+    function test_uninstall_activeUtilization_reverts() public {
+        // Setup: create puppet account with 1000 USDC
+        TestSmartAccount puppetAccount = _createPuppetAccount(puppet1);
+        usdc.mint(address(puppetAccount), 1000e6);
+
+        bytes32 traderKey = _getTraderMatchingKey();
+
+        // Allocate
+        address[] memory puppetList = new address[](1);
+        puppetList[0] = address(puppetAccount);
+        uint[] memory allocations = new uint[](1);
+        allocations[0] = 500e6;
+
+        _allocate(0, puppetList, allocations);
+
+        // Utilize funds (position opened)
+        _utilize(traderKey, 500e6);
+        assertEq(allocation.totalUtilization(traderKey), 500e6, "Utilization should be active");
+
+        // Attempt to uninstall - should fail due to active utilization
+        vm.expectRevert(abi.encodeWithSelector(Error.Allocation__ActiveUtilization.selector, 500e6));
+        traderAccount.uninstallModule(2, address(allocation), "");
+
+        // Still registered
+        assertTrue(allocation.registeredSubaccount(traderAccount), "Should still be registered");
+    }
+
+    function test_uninstall_afterSettlement_succeeds() public {
+        // Setup: create puppet account with 1000 USDC
+        TestSmartAccount puppetAccount = _createPuppetAccount(puppet1);
+        usdc.mint(address(puppetAccount), 1000e6);
+
+        bytes32 traderKey = _getTraderMatchingKey();
+
+        // Allocate
+        address[] memory puppetList = new address[](1);
+        puppetList[0] = address(puppetAccount);
+        uint[] memory allocations = new uint[](1);
+        allocations[0] = 500e6;
+
+        _allocate(0, puppetList, allocations);
+
+        // Utilize all
+        _utilize(traderKey, 500e6);
+
+        // Settlement returns funds
+        _depositSettlement(600e6);
+
+        vm.prank(owner);
+        allocation.settle(traderKey, usdc);
+
+        // Realize to clear utilization
+        vm.prank(owner);
+        allocation.realize(traderKey, address(puppetAccount));
+
+        assertEq(allocation.totalUtilization(traderKey), 0, "Utilization should be zero after realize");
+
+        // Now uninstall should succeed
+        traderAccount.uninstallModule(2, address(allocation), "");
+
+        assertFalse(allocation.registeredSubaccount(traderAccount), "Should be unregistered");
+    }
+
+    function test_allocate_afterUninstall_reverts() public {
+        // Setup puppet
+        TestSmartAccount puppetAccount = _createPuppetAccount(puppet1);
+        usdc.mint(address(puppetAccount), 1000e6);
+
+        // Uninstall trader executor module
+        traderAccount.uninstallModule(2, address(allocation), "");
+
+        // Attempt to allocate after uninstall
+        address[] memory puppetList = new address[](1);
+        puppetList[0] = address(puppetAccount);
+        uint[] memory allocations = new uint[](1);
+        allocations[0] = 500e6;
+
+        vm.expectRevert(Error.Allocation__UnregisteredSubaccount.selector);
+        vm.prank(owner);
+        allocation.allocate(
+            usdc,
+            IERC7579Account(address(traderAccount)),
+            0,
+            puppetList,
+            allocations
+        );
+    }
+
+    function test_uninstall_idempotent() public {
+        // Uninstall executor first - both still show installed → unregisters
+        traderAccount.uninstallModule(2, address(allocation), "");
+        assertFalse(allocation.registeredSubaccount(traderAccount), "Should be unregistered");
+
+        // Uninstall hook - only hook shows installed → no-op (already unregistered)
+        traderAccount.uninstallModule(4, address(allocation), "");
+        assertFalse(allocation.registeredSubaccount(traderAccount), "Should still be unregistered");
     }
 }
