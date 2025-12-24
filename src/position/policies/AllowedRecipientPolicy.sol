@@ -6,19 +6,18 @@ import {ERC7579ActionPolicy} from "modulekit/module-bases/ERC7579ActionPolicy.so
 import {ERC7579PolicyBase} from "modulekit/module-bases/ERC7579PolicyBase.sol";
 import {IPolicy, IActionPolicy, ConfigId} from "modulekit/module-bases/interfaces/IPolicy.sol";
 import {VALIDATION_SUCCESS, VALIDATION_FAILED} from "erc7579/interfaces/IERC7579Module.sol";
+import {IPuppetPolicy} from "./IPuppetPolicy.sol";
 
 /**
  * @title AllowedRecipientPolicy
  * @notice Smart Sessions policy that restricts transfers to whitelisted recipients
  */
-contract AllowedRecipientPolicy is ERC7579ActionPolicy {
+contract AllowedRecipientPolicy is ERC7579ActionPolicy, IPuppetPolicy {
     // ConfigId => multiplexer => account => initialized
     mapping(ConfigId => mapping(address => mapping(address => bool))) internal _initialized;
 
     // ConfigId => multiplexer => account => recipient => allowed
     mapping(ConfigId => mapping(address => mapping(address => mapping(address => bool)))) internal _allowedRecipients;
-
-    event PolicySet(ConfigId indexed id, address indexed multiplexer, address indexed account);
 
     // ============ ERC7579 Module ============
 

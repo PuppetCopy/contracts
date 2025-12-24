@@ -1,5 +1,6 @@
 {
   "recommendations": [
+    "NomicFoundation.hardhat-solidity",
     "NomicFoundation.hardhat-solidity"
   ]
 }

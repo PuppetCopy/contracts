@@ -15,7 +15,7 @@ import {IERC7579Account} from "erc7579/interfaces/IERC7579Account.sol";
  * 2. Puppet configures policies (AllowedRecipient, AllowanceRate, Throttle)
  * 3. Trader (7579 account) calls allocate() via this router
  * 4. Allocation executes transfers from puppets → trader
- * 5. Users can settle/realize/withdraw through this router
+ * 5. Users can sync/withdraw through this router
  */
 contract UserRouter {
     Allocation public immutable allocation;
@@ -43,7 +43,7 @@ contract UserRouter {
     ) external {
         allocation.allocate(
             _collateralToken,
-            IERC7579Account(msg.sender),
+            msg.sender,
             _traderAllocation,
             _puppetList,
             _allocationList
@@ -53,23 +53,13 @@ contract UserRouter {
     // ============ Settlement Operations ============
 
     /**
-     * @notice Trigger settlement for a trader matching key
+     * @notice Sync pending settlements for caller's subaccount (lazy claim)
      * @param _collateralToken The collateral token
      * @param _trader The trader address
      */
-    function settle(IERC20 _collateralToken, address _trader) external {
+    function syncAllocation(IERC20 _collateralToken, address _trader) external {
         bytes32 _traderMatchingKey = _getTraderMatchingKey(_collateralToken, _trader);
-        allocation.settle(_traderMatchingKey, _collateralToken);
-    }
-
-    /**
-     * @notice Realize pending settlements for caller's subaccount
-     * @param _collateralToken The collateral token
-     * @param _trader The trader address
-     */
-    function realize(IERC20 _collateralToken, address _trader) external {
-        bytes32 _traderMatchingKey = _getTraderMatchingKey(_collateralToken, _trader);
-        allocation.realize(_traderMatchingKey, msg.sender);
+        allocation.withdraw(_collateralToken, _traderMatchingKey, msg.sender, 0);
     }
 
     /**

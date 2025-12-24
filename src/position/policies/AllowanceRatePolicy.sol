@@ -6,16 +6,15 @@ import {ERC7579ActionPolicy} from "modulekit/module-bases/ERC7579ActionPolicy.so
 import {ERC7579PolicyBase} from "modulekit/module-bases/ERC7579PolicyBase.sol";
 import {IPolicy, IActionPolicy, ConfigId} from "modulekit/module-bases/interfaces/IPolicy.sol";
 import {VALIDATION_SUCCESS, VALIDATION_FAILED} from "erc7579/interfaces/IERC7579Module.sol";
+import {IPuppetPolicy} from "./IPuppetPolicy.sol";
 
 /**
  * @title AllowanceRatePolicy
  * @notice Smart Sessions policy that limits transfers to a percentage of balance
  */
-contract AllowanceRatePolicy is ERC7579ActionPolicy {
+contract AllowanceRatePolicy is ERC7579ActionPolicy, IPuppetPolicy {
     // ConfigId => multiplexer => account => allowance rate (basis points, 10000 = 100%)
     mapping(ConfigId => mapping(address => mapping(address => uint16))) internal _allowanceRate;
-
-    event PolicySet(ConfigId indexed id, address indexed multiplexer, address indexed account);
 
     // ============ ERC7579 Module ============
 

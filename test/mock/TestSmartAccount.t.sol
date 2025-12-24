@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {IERC7579Account, Execution} from "erc7579/interfaces/IERC7579Account.sol";
-import {IModule} from "erc7579/interfaces/IERC7579Module.sol";
+import {IModule, IHook} from "erc7579/interfaces/IERC7579Module.sol";
 import {ModeCode, ModeLib, CallType, ExecType, CALLTYPE_SINGLE, CALLTYPE_BATCH, EXECTYPE_DEFAULT, EXECTYPE_TRY} from "erc7579/lib/ModeLib.sol";
 import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
 import {MODULE_TYPE_VALIDATOR, MODULE_TYPE_EXECUTOR, MODULE_TYPE_FALLBACK, MODULE_TYPE_HOOK} from "modulekit/module-bases/utils/ERC7579Constants.sol";
@@ -18,6 +18,7 @@ contract TestSmartAccount is IERC7579Account {
 
     // Module storage
     mapping(uint256 => mapping(address => bool)) internal _modules;
+    address public installedHook;
 
     error UnsupportedCallType(CallType callType);
     error UnsupportedExecType(ExecType execType);
@@ -90,6 +91,9 @@ contract TestSmartAccount is IERC7579Account {
 
     function installModule(uint256 moduleTypeId, address module, bytes calldata initData) external payable {
         _modules[moduleTypeId][module] = true;
+        if (moduleTypeId == MODULE_TYPE_HOOK) {
+            installedHook = module;
+        }
         // Call onInstall if module implements IModule
         // Use low-level call to handle non-module contracts gracefully
         (bool success, bytes memory returnData) =
@@ -186,5 +190,30 @@ contract TestSmartAccount is IERC7579Account {
     function transfer(address token, address to, uint256 amount) external {
         (bool success,) = token.call(abi.encodeWithSignature("transfer(address,uint256)", to, amount));
         require(success, "Transfer failed");
+    }
+
+    /// @dev Execute with hook flow (preCheck -> execute -> postCheck)
+    function executeWithHooks(address target, uint256 value, bytes calldata data) external returns (bytes memory) {
+        bytes memory hookData;
+
+        // preCheck
+        if (installedHook != address(0)) {
+            hookData = IHook(installedHook).preCheck(msg.sender, value, data);
+        }
+
+        // Execute
+        (bool success, bytes memory result) = target.call{value: value}(data);
+        if (!success) {
+            assembly {
+                revert(add(result, 32), mload(result))
+            }
+        }
+
+        // postCheck
+        if (installedHook != address(0)) {
+            IHook(installedHook).postCheck(hookData);
+        }
+
+        return result;
     }
 }

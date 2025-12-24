@@ -33,8 +33,6 @@ contract DeployUserRouter is BaseScript {
 
         // Allocation permissions
         dictatorship.setPermission(allocation, allocation.allocate.selector, proxyAddr);
-        dictatorship.setPermission(allocation, allocation.settle.selector, proxyAddr);
-        dictatorship.setPermission(allocation, allocation.realize.selector, proxyAddr);
         dictatorship.setPermission(allocation, allocation.withdraw.selector, proxyAddr);
 
         vm.stopBroadcast();

@@ -11,6 +11,7 @@ import {IExecutor, IHook, MODULE_TYPE_EXECUTOR, MODULE_TYPE_HOOK} from "erc7579/
 import {ModeLib, ModeCode, CallType, ExecType, ModeSelector, ModePayload, CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT} from "erc7579/lib/ModeLib.sol";
 import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
 import {Error} from "./../utils/Error.sol";
+import {Precision} from "./../utils/Precision.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
 /**
@@ -59,7 +60,6 @@ contract Allocation is CoreContract, IExecutor, IHook {
     mapping(IERC7579Account subaccount => IERC20[]) internal _subaccountTokenList;
     mapping(IERC7579Account subaccount => bool) public registeredSubaccount;
 
-    uint constant PRECISION = 1e30;
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
@@ -72,6 +72,14 @@ contract Allocation is CoreContract, IExecutor, IHook {
     }
 
     // ============ ERC-7579 Executor Module Interface ============
+
+    function isModuleType(uint256 moduleTypeId) external pure returns (bool) {
+        return moduleTypeId == MODULE_TYPE_EXECUTOR || moduleTypeId == MODULE_TYPE_HOOK;
+    }
+
+    function isInitialized(address _smartAccount) external view returns (bool) {
+        return registeredSubaccount[IERC7579Account(_smartAccount)];
+    }
 
     /**
      * @notice Called when this module is installed on a smart account
@@ -120,14 +128,6 @@ contract Allocation is CoreContract, IExecutor, IHook {
         // Second uninstall - already unregistered, no-op
     }
 
-    function isModuleType(uint256 moduleTypeId) external pure returns (bool) {
-        return moduleTypeId == MODULE_TYPE_EXECUTOR || moduleTypeId == MODULE_TYPE_HOOK;
-    }
-
-    function isInitialized(address _smartAccount) external view returns (bool) {
-        return registeredSubaccount[IERC7579Account(_smartAccount)];
-    }
-
     // ============ IHook ============
 
     /**
@@ -136,9 +136,14 @@ contract Allocation is CoreContract, IExecutor, IHook {
      */
     function preCheck(address, uint256, bytes calldata callData) external returns (bytes memory) {
         IERC7579Account _subaccount = IERC7579Account(msg.sender);
-        if (!registeredSubaccount[_subaccount]) revert Error.Allocation__UnregisteredSubaccount();
-        _syncSettlement(_subaccount);
-        return callData; // Pass execution calldata through to postCheck
+        address _trader = subaccountTraderMap[_subaccount];
+        IERC20[] memory _tokens = _subaccountTokenList[_subaccount];
+
+        for (uint _i = 0; _i < _tokens.length; ++_i) {
+            _settle(PositionUtils.getTraderMatchingKey(_tokens[_i], _trader), _tokens[_i]);
+        }
+
+        return callData;
     }
 
     /**
@@ -147,8 +152,22 @@ contract Allocation is CoreContract, IExecutor, IHook {
      */
     function postCheck(bytes calldata hookData) external {
         IERC7579Account _subaccount = IERC7579Account(msg.sender);
-        if (!registeredSubaccount[_subaccount]) revert Error.Allocation__UnregisteredSubaccount();
-        _syncUtilization(_subaccount, hookData);
+        address _trader = subaccountTraderMap[_subaccount];
+        IERC20[] memory _tokens = _subaccountTokenList[_subaccount];
+
+        for (uint _i = 0; _i < _tokens.length; ++_i) {
+            IERC20 _token = _tokens[_i];
+            bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_token, _trader);
+
+            uint _recordedBalance = subaccountRecordedBalance[_traderMatchingKey];
+            if (_recordedBalance == 0) continue;
+
+            uint _actualBalance = _token.balanceOf(address(_subaccount));
+            if (_actualBalance >= _recordedBalance) continue;
+
+            uint _outflow = _recordedBalance - _actualBalance;
+            _utilize(_traderMatchingKey, _outflow, hookData);
+        }
     }
 
     // ============ View Functions ============
@@ -194,7 +213,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
 
         if (_cumulative <= _lastCheckpoint) return 0;
 
-        return (_utilization * (_cumulative - _lastCheckpoint)) / PRECISION;
+        return Precision.applyFactor(_cumulative - _lastCheckpoint, _utilization);
     }
 
     // ============ Allocation ============
@@ -205,18 +224,19 @@ contract Allocation is CoreContract, IExecutor, IHook {
      *      Allocation contract must be session owner on puppet accounts.
      *      Puppet policies validate each transfer (recipient, amount, throttle).
      * @param _collateralToken The collateral token
-     * @param _trader The trader's 7579 account (receives funds)
+     * @param _traderAddr The trader's 7579 account address (receives funds)
      * @param _traderAllocation Trader's own allocation amount (already in trader account)
      * @param _puppetList List of puppet accounts to pull from
      * @param _allocationList Allocation amounts per puppet
      */
     function allocate(
         IERC20 _collateralToken,
-        IERC7579Account _trader,
+        address _traderAddr,
         uint _traderAllocation,
         address[] calldata _puppetList,
         uint[] calldata _allocationList
     ) external auth {
+        IERC7579Account _trader = IERC7579Account(_traderAddr);
         if (!registeredSubaccount[_trader]) revert Error.Allocation__UnregisteredSubaccount();
 
         uint _puppetCount = _puppetList.length;
@@ -227,8 +247,9 @@ contract Allocation is CoreContract, IExecutor, IHook {
             revert Error.Allocation__PuppetListTooLarge(_puppetCount, _allocationList.length);
         }
 
-        address _traderAddr = address(_trader);
         bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_collateralToken, _traderAddr);
+
+        _settle(_traderMatchingKey, _collateralToken);
 
         // Initialize epoch if needed
         uint _epoch = currentEpoch[_traderMatchingKey];
@@ -237,11 +258,11 @@ contract Allocation is CoreContract, IExecutor, IHook {
                 && totalAllocation[_traderMatchingKey] == 0;
 
             if (_firstInit) {
-                epochRemaining[_traderMatchingKey][0] = PRECISION;
+                epochRemaining[_traderMatchingKey][0] = Precision.FLOAT_PRECISION;
             } else {
                 ++_epoch;
                 currentEpoch[_traderMatchingKey] = _epoch;
-                epochRemaining[_traderMatchingKey][_epoch] = PRECISION;
+                epochRemaining[_traderMatchingKey][_epoch] = Precision.FLOAT_PRECISION;
             }
         }
 
@@ -289,7 +310,11 @@ contract Allocation is CoreContract, IExecutor, IHook {
             // Success - update allocation tracking
             uint _newPuppetAllocation = allocationBalance[_traderMatchingKey][_puppet] + _amount;
             allocationBalance[_traderMatchingKey][_puppet] = _newPuppetAllocation;
-            _puppetUtilizationList[_i] = _updateUserCheckpoints(_traderMatchingKey, _puppet, _newPuppetAllocation);
+            uint _puppetUtilization = getUserUtilization(_traderMatchingKey, _puppet);
+            if (_puppetUtilization == 0) {
+                _updateUserCheckpoints(_traderMatchingKey, _puppet, _newPuppetAllocation);
+            }
+            _puppetUtilizationList[_i] = _puppetUtilization;
             _puppetTotalAllocation += _amount;
         }
 
@@ -298,7 +323,10 @@ contract Allocation is CoreContract, IExecutor, IHook {
         if (_traderAllocation > 0) {
             uint _newTraderAllocation = allocationBalance[_traderMatchingKey][_traderAddr] + _traderAllocation;
             allocationBalance[_traderMatchingKey][_traderAddr] = _newTraderAllocation;
-            _traderUtilization = _updateUserCheckpoints(_traderMatchingKey, _traderAddr, _newTraderAllocation);
+            _traderUtilization = getUserUtilization(_traderMatchingKey, _traderAddr);
+            if (_traderUtilization == 0) {
+                _updateUserCheckpoints(_traderMatchingKey, _traderAddr, _newTraderAllocation);
+            }
         }
 
         uint _totalAllocation = _traderAllocation + _puppetTotalAllocation;
@@ -332,45 +360,6 @@ contract Allocation is CoreContract, IExecutor, IHook {
         _utilize(_traderMatchingKey, _utilization, _executionCalldata);
     }
 
-    function _syncSettlement(IERC7579Account _subaccount) internal {
-        address _trader = subaccountTraderMap[_subaccount];
-        IERC20[] memory _tokens = _subaccountTokenList[_subaccount];
-        uint _length = _tokens.length;
-
-        for (uint _i = 0; _i < _length; ++_i) {
-            IERC20 _token = _tokens[_i];
-            bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_token, _trader);
-
-            if (totalUtilization[_traderMatchingKey] == 0) continue;
-
-            uint _actualBalance = _token.balanceOf(address(_subaccount));
-            uint _recordedBalance = subaccountRecordedBalance[_traderMatchingKey];
-            if (_actualBalance <= _recordedBalance) continue;
-
-            _settle(_traderMatchingKey, _token, address(_subaccount), _actualBalance, _recordedBalance);
-        }
-    }
-
-    function _syncUtilization(IERC7579Account _subaccount, bytes calldata _executionCalldata) internal {
-        address _trader = subaccountTraderMap[_subaccount];
-        IERC20[] memory _tokens = _subaccountTokenList[_subaccount];
-        uint _length = _tokens.length;
-
-        for (uint _i = 0; _i < _length; ++_i) {
-            IERC20 _token = _tokens[_i];
-            bytes32 _traderMatchingKey = PositionUtils.getTraderMatchingKey(_token, _trader);
-
-            uint _recordedBalance = subaccountRecordedBalance[_traderMatchingKey];
-            if (_recordedBalance == 0) continue;
-
-            uint _actualBalance = _token.balanceOf(address(_subaccount));
-            if (_actualBalance >= _recordedBalance) continue;
-
-            uint _outflow = _recordedBalance - _actualBalance;
-            _utilize(_traderMatchingKey, _outflow, _executionCalldata);
-        }
-    }
-
     function _utilize(bytes32 _traderMatchingKey, uint _utilization, bytes calldata _executionCalldata) internal {
         uint _totalAlloc = totalAllocation[_traderMatchingKey];
         if (_totalAlloc == 0) revert Error.Allocation__ZeroAllocation();
@@ -400,111 +389,33 @@ contract Allocation is CoreContract, IExecutor, IHook {
         );
     }
 
-    // ============ Settlement ============
-
-    function settle(bytes32 _traderMatchingKey, IERC20 _collateralToken) external auth {
-        if (totalUtilization[_traderMatchingKey] == 0) revert Error.Allocation__NoUtilization();
-
-        address _subaccount = address(subaccountMap[_traderMatchingKey]);
-        uint _actualBalance = _collateralToken.balanceOf(_subaccount);
-        uint _recordedBalance = subaccountRecordedBalance[_traderMatchingKey];
-
-        _settle(_traderMatchingKey, _collateralToken, _subaccount, _actualBalance, _recordedBalance);
-    }
-
-    function _settle(
-        bytes32 _traderMatchingKey,
-        IERC20 _collateralToken,
-        address _subaccount,
-        uint _actualBalance,
-        uint _recordedBalance
-    ) internal {
-        uint _totalUtil = totalUtilization[_traderMatchingKey];
-        uint _settledAllocation = _actualBalance - _recordedBalance;
-        subaccountRecordedBalance[_traderMatchingKey] = _actualBalance;
-
-        uint _deltaPerUtilization = (_settledAllocation * PRECISION) / _totalUtil;
-        uint _newCumulative = cumulativeSettlementPerUtilization[_traderMatchingKey] + _deltaPerUtilization;
-        cumulativeSettlementPerUtilization[_traderMatchingKey] = _newCumulative;
-
-        _logEvent(
-            "Settle",
-            abi.encode(
-                _traderMatchingKey,
-                _collateralToken,
-                _subaccount,
-                _settledAllocation,
-                _totalUtil,
-                _deltaPerUtilization,
-                _newCumulative
-            )
-        );
-    }
-
-    function realize(bytes32 _traderMatchingKey, address _user) external auth returns (uint _realized) {
-        uint _utilization = getUserUtilization(_traderMatchingKey, _user);
-        _realized = pendingSettlement(_traderMatchingKey, _user, _utilization);
-
-        if (_utilization == 0 && _realized == 0) return 0;
-
-        uint _epoch = currentEpoch[_traderMatchingKey];
-
-        if (_realized == 0 && userEpoch[_traderMatchingKey][_user] < _epoch) {
-            uint _allocation = allocationBalance[_traderMatchingKey][_user];
-            userEpoch[_traderMatchingKey][_user] = _epoch;
-            userRemainingCheckpoint[_traderMatchingKey][_user] = epochRemaining[_traderMatchingKey][_epoch];
-            userAllocationSnapshot[_traderMatchingKey][_user] = _allocation;
-            userSettlementCheckpoint[_traderMatchingKey][_user] =
-                cumulativeSettlementPerUtilization[_traderMatchingKey];
-
-            _logEvent("Realize", abi.encode(_traderMatchingKey, _user, _epoch, 0, 0, _allocation));
-            return 0;
-        }
-
-        if (_utilization > 0) {
-            totalUtilization[_traderMatchingKey] -= _utilization;
-        }
-
-        if (_realized > 0) {
-            totalAllocation[_traderMatchingKey] += _realized;
-        }
-
-        uint _newAllocation = allocationBalance[_traderMatchingKey][_user] + _realized - _utilization;
-        allocationBalance[_traderMatchingKey][_user] = _newAllocation;
-
-        userEpoch[_traderMatchingKey][_user] = _epoch;
-        userRemainingCheckpoint[_traderMatchingKey][_user] = epochRemaining[_traderMatchingKey][_epoch];
-        userAllocationSnapshot[_traderMatchingKey][_user] = _newAllocation;
-        userSettlementCheckpoint[_traderMatchingKey][_user] = cumulativeSettlementPerUtilization[_traderMatchingKey];
-
-        _logEvent("Realize", abi.encode(_traderMatchingKey, _user, _epoch, _realized, _utilization, _newAllocation));
-    }
-
     // ============ Withdraw ============
 
     function withdraw(IERC20 _collateralToken, bytes32 _traderMatchingKey, address _user, uint _amount) external auth {
+        uint _cumulative = _settle(_traderMatchingKey, _collateralToken);
         uint _utilization = getUserUtilization(_traderMatchingKey, _user);
+        uint _allocation = allocationBalance[_traderMatchingKey][_user];
         uint _realized = 0;
 
-        uint _allocation = allocationBalance[_traderMatchingKey][_user];
-
         if (_utilization > 0) {
-            _realized = pendingSettlement(_traderMatchingKey, _user, _utilization);
-            if (_realized == 0) {
+            uint _checkpoint = userSettlementCheckpoint[_traderMatchingKey][_user];
+            if (_cumulative <= _checkpoint) {
                 revert Error.Allocation__UtilizationNotSettled(_utilization);
             }
+            // Calculate realized amount (may be 0 for dust utilization)
+            _realized = Precision.applyFactor(_cumulative - _checkpoint, _utilization);
 
             totalUtilization[_traderMatchingKey] -= _utilization;
             totalAllocation[_traderMatchingKey] += _realized;
-            _allocation = _allocation + _realized - _utilization;
-            allocationBalance[_traderMatchingKey][_user] = _allocation;
 
-            uint _epoch = currentEpoch[_traderMatchingKey];
-            userEpoch[_traderMatchingKey][_user] = _epoch;
-            userRemainingCheckpoint[_traderMatchingKey][_user] = epochRemaining[_traderMatchingKey][_epoch];
-            userAllocationSnapshot[_traderMatchingKey][_user] = _allocation;
-            userSettlementCheckpoint[_traderMatchingKey][_user] =
-                cumulativeSettlementPerUtilization[_traderMatchingKey];
+            _allocation = _allocation + _realized - _utilization;
+        }
+
+        // amount=0 is a sync-only call (lazy claim)
+        if (_amount == 0) {
+            allocationBalance[_traderMatchingKey][_user] = _allocation;
+            _updateUserCheckpoints(_traderMatchingKey, _user, _allocation);
+            return;
         }
 
         if (_allocation < _amount) {
@@ -514,9 +425,8 @@ contract Allocation is CoreContract, IExecutor, IHook {
         uint _newAllocation = _allocation - _amount;
         allocationBalance[_traderMatchingKey][_user] = _newAllocation;
         totalAllocation[_traderMatchingKey] -= _amount;
-        _updateUserCheckpoints(_traderMatchingKey, _user, _newAllocation, 0);
+        _updateUserCheckpoints(_traderMatchingKey, _user, _newAllocation);
 
-        // Transfer from trader subaccount back to puppet's subaccount
         address _traderSubaccount = address(subaccountMap[_traderMatchingKey]);
         _collateralToken.safeTransferFrom(_traderSubaccount, _user, _amount);
         subaccountRecordedBalance[_traderMatchingKey] -= _amount;
@@ -527,30 +437,34 @@ contract Allocation is CoreContract, IExecutor, IHook {
         );
     }
 
-    // ============ Internal ============
+    function _settle(bytes32 _traderMatchingKey, IERC20 _token) internal returns (uint _cumulative) {
+        uint _totalUtil = totalUtilization[_traderMatchingKey];
+        _cumulative = cumulativeSettlementPerUtilization[_traderMatchingKey];
+        if (_totalUtil == 0) return _cumulative;
 
-    function _updateUserCheckpoints(bytes32 _traderMatchingKey, address _user, uint _allocation)
-        internal
-        returns (uint _utilization)
-    {
-        _utilization = getUserUtilization(_traderMatchingKey, _user);
-        _updateUserCheckpoints(_traderMatchingKey, _user, _allocation, _utilization);
+        address _subaccount = address(subaccountMap[_traderMatchingKey]);
+        uint _actualBalance = _token.balanceOf(_subaccount);
+        uint _recordedBalance = subaccountRecordedBalance[_traderMatchingKey];
+        if (_actualBalance <= _recordedBalance) return _cumulative;
+
+        uint _settled = _actualBalance - _recordedBalance;
+        subaccountRecordedBalance[_traderMatchingKey] = _actualBalance;
+
+        _cumulative += Precision.toFactor(_settled, _totalUtil);
+        cumulativeSettlementPerUtilization[_traderMatchingKey] = _cumulative;
+
+        _logEvent("Settle", abi.encode(_traderMatchingKey, _token, _subaccount, _settled, _totalUtil, _cumulative));
     }
 
-    function _updateUserCheckpoints(
-        bytes32 _traderMatchingKey,
-        address _user,
-        uint _allocation,
-        uint _utilization
-    ) internal {
-        if (_utilization == 0) {
-            uint _epoch = currentEpoch[_traderMatchingKey];
-            userEpoch[_traderMatchingKey][_user] = _epoch;
-            userRemainingCheckpoint[_traderMatchingKey][_user] = epochRemaining[_traderMatchingKey][_epoch];
-            userAllocationSnapshot[_traderMatchingKey][_user] = _allocation;
-            userSettlementCheckpoint[_traderMatchingKey][_user] =
-                cumulativeSettlementPerUtilization[_traderMatchingKey];
-        }
+    // ============ Internal ============
+
+    function _updateUserCheckpoints(bytes32 _traderMatchingKey, address _user, uint _allocation) internal {
+        uint _epoch = currentEpoch[_traderMatchingKey];
+        userEpoch[_traderMatchingKey][_user] = _epoch;
+        userRemainingCheckpoint[_traderMatchingKey][_user] = epochRemaining[_traderMatchingKey][_epoch];
+        userAllocationSnapshot[_traderMatchingKey][_user] = _allocation;
+        userSettlementCheckpoint[_traderMatchingKey][_user] =
+            cumulativeSettlementPerUtilization[_traderMatchingKey];
     }
 
     function _setConfig(bytes memory _data) internal override {
