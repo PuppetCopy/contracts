@@ -2,23 +2,22 @@
 pragma solidity ^0.8.31;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {CoreContract} from "../utils/CoreContract.sol";
-import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {IERC7579Account} from "erc7579/interfaces/IERC7579Account.sol";
 import {IExecutor, IHook, MODULE_TYPE_EXECUTOR, MODULE_TYPE_HOOK} from "erc7579/interfaces/IERC7579Module.sol";
 import {ModeLib, ModePayload, CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT} from "erc7579/lib/ModeLib.sol";
 import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
-import {Error} from "./../utils/Error.sol";
-import {Precision} from "./../utils/Precision.sol";
+
+import {CoreContract} from "../utils/CoreContract.sol";
+import {Error} from "../utils/Error.sol";
+import {IAuthority} from "../utils/interfaces/IAuthority.sol";
+import {Precision} from "../utils/Precision.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
 contract Allocation is CoreContract, IExecutor, IHook {
-    using SafeERC20 for IERC20;
-
     struct Config {
         uint maxPuppetList;
+        uint transferOutGasLimit;
     }
 
     Config public config;
@@ -75,8 +74,8 @@ contract Allocation is CoreContract, IExecutor, IHook {
 
     function getAvailableAllocation(bytes32 _key, address _user) external view returns (uint) {
         uint _allocation = allocationBalance[_key][_user];
-        uint _utilization = getUserUtilization(_key, _user);
-        return _utilization >= _allocation ? 0 : _allocation - _utilization;
+        uint _utilized = getUserUtilization(_key, _user);
+        return _utilized >= _allocation ? 0 : _allocation - _utilized;
     }
 
     function pendingSettlement(bytes32 _key, address _user) external view returns (uint) {
@@ -122,8 +121,8 @@ contract Allocation is CoreContract, IExecutor, IHook {
             IERC20[] memory _tokens = _subaccountTokenList[_trader];
             for (uint _i = 0; _i < _tokens.length; ++_i) {
                 bytes32 _key = PositionUtils.getTraderMatchingKey(_tokens[_i], subaccountTraderMap[_trader]);
-                uint _util = totalUtilization[_key];
-                if (_util > 0) revert Error.Allocation__ActiveUtilization(_util);
+                uint _utilized = totalUtilization[_key];
+                if (_utilized > 0) revert Error.Allocation__ActiveUtilization(_utilized);
             }
             delete registeredSubaccount[_trader];
         }
@@ -131,7 +130,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
 
     // ===================== Hooks =====================
 
-    function preCheck(address, uint256, bytes calldata callData) external returns (bytes memory) {
+    function preCheck(address, uint256, bytes calldata _callData) external returns (bytes memory) {
         IERC7579Account _subaccount = IERC7579Account(msg.sender);
         address _trader = subaccountTraderMap[_subaccount];
         IERC20[] memory _tokens = _subaccountTokenList[_subaccount];
@@ -139,10 +138,10 @@ contract Allocation is CoreContract, IExecutor, IHook {
         for (uint _i = 0; _i < _tokens.length; ++_i) {
             _settle(PositionUtils.getTraderMatchingKey(_tokens[_i], _trader), _tokens[_i]);
         }
-        return callData;
+        return _callData;
     }
 
-    function postCheck(bytes calldata hookData) external {
+    function postCheck(bytes calldata _hookData) external {
         IERC7579Account _subaccount = IERC7579Account(msg.sender);
         address _trader = subaccountTraderMap[_subaccount];
         IERC20[] memory _tokens = _subaccountTokenList[_subaccount];
@@ -157,11 +156,26 @@ contract Allocation is CoreContract, IExecutor, IHook {
             uint _actual = _token.balanceOf(address(_subaccount));
             if (_actual >= _recorded) continue;
 
-            _utilize(_key, _recorded - _actual, hookData);
+            uint _utilized = _recorded - _actual;
+            uint _totalAlloc = totalAllocation[_key];
+            if (_totalAlloc == 0) revert Error.Allocation__ZeroAllocation();
+
+            uint _epoch = currentEpoch[_key];
+            uint _remaining = epochRemaining[_key][_epoch];
+            uint _newRemaining = (_remaining * (_totalAlloc - _utilized)) / _totalAlloc;
+            epochRemaining[_key][_epoch] = _newRemaining;
+
+            uint _newTotalUtil = totalUtilization[_key] + _utilized;
+            uint _allocated = _totalAlloc - _utilized;
+            totalUtilization[_key] = _newTotalUtil;
+            totalAllocation[_key] = _allocated;
+            subaccountRecordedBalance[_key] = _actual;
+
+            _logEvent("Action", abi.encode(_key, _token, _subaccount, _utilized, _newTotalUtil, _allocated, _hookData));
         }
     }
 
-    // ===================== Allocate =====================
+    // ===================== External =====================
 
     function allocate(
         IERC20 _collateralToken,
@@ -182,9 +196,18 @@ contract Allocation is CoreContract, IExecutor, IHook {
         }
 
         bytes32 _key = PositionUtils.getTraderMatchingKey(_collateralToken, _traderAddr);
-        _settle(_key, _collateralToken);
-        _initEpochIfNeeded(_key);
-        _registerTraderIfNeeded(_key, _trader, _traderAddr, _collateralToken);
+        uint _cumulative = _settle(_key, _collateralToken);
+        uint _epoch = currentEpoch[_key];
+        if (epochRemaining[_key][_epoch] == 0) {
+            currentEpoch[_key] = ++_epoch;
+            epochRemaining[_key][_epoch] = Precision.FLOAT_PRECISION;
+        }
+
+        if (subaccountMap[_key] == IERC7579Account(address(0))) {
+            subaccountMap[_key] = _trader;
+            subaccountTraderMap[_trader] = _traderAddr;
+            _subaccountTokenList[_trader].push(_collateralToken);
+        }
 
         uint _puppetTotal = 0;
         uint[] memory _puppetUtilList = new uint[](_puppetCount);
@@ -210,19 +233,19 @@ contract Allocation is CoreContract, IExecutor, IHook {
             uint _newAlloc = allocationBalance[_key][_puppet] + _amount;
             allocationBalance[_key][_puppet] = _newAlloc;
 
-            uint _util = getUserUtilization(_key, _puppet);
-            if (_util == 0) _updateUserCheckpoints(_key, _puppet, _newAlloc);
+            uint _utilized = getUserUtilization(_key, _puppet);
+            if (_utilized == 0) _updateUserCheckpoints(_key, _puppet, _epoch, _cumulative, _newAlloc);
 
-            _puppetUtilList[_i] = _util;
+            _puppetUtilList[_i] = _utilized;
             _puppetTotal += _amount;
         }
 
-        uint _traderUtil = 0;
+        uint _traderUtilized = 0;
         if (_traderAllocation > 0) {
             uint _newAlloc = allocationBalance[_key][_traderAddr] + _traderAllocation;
             allocationBalance[_key][_traderAddr] = _newAlloc;
-            _traderUtil = getUserUtilization(_key, _traderAddr);
-            if (_traderUtil == 0) _updateUserCheckpoints(_key, _traderAddr, _newAlloc);
+            _traderUtilized = getUserUtilization(_key, _traderAddr);
+            if (_traderUtilized == 0) _updateUserCheckpoints(_key, _traderAddr, _epoch, _cumulative, _newAlloc);
         }
 
         uint _total = _traderAllocation + _puppetTotal;
@@ -232,56 +255,31 @@ contract Allocation is CoreContract, IExecutor, IHook {
         subaccountRecordedBalance[_key] += _total;
 
         _logEvent("Allocate", abi.encode(
-            _key, _collateralToken, _trader, _traderAllocation, _traderUtil,
+            _key, _collateralToken, _trader, _traderAllocation, _traderUtilized,
             _puppetTotal, _total, _puppetList, _allocationList, _puppetUtilList
         ));
     }
 
-    // ===================== Utilize =====================
-
-    function utilize(bytes32 _key, uint _utilization, bytes calldata _calldata) external auth {
-        _utilize(_key, _utilization, _calldata);
-    }
-
-    function _utilize(bytes32 _key, uint _utilization, bytes calldata _calldata) internal {
-        uint _totalAlloc = totalAllocation[_key];
-        if (_totalAlloc == 0) revert Error.Allocation__ZeroAllocation();
-
-        uint _epoch = currentEpoch[_key];
-        uint _remaining = epochRemaining[_key][_epoch];
-        uint _newRemaining = (_remaining * (_totalAlloc - _utilization)) / _totalAlloc;
-        epochRemaining[_key][_epoch] = _newRemaining;
-
-        uint _newTotalUtil = totalUtilization[_key] + _utilization;
-        uint _newTotalAlloc = _totalAlloc - _utilization;
-        totalUtilization[_key] = _newTotalUtil;
-        totalAllocation[_key] = _newTotalAlloc;
-        subaccountRecordedBalance[_key] -= _utilization;
-
-        _logEvent("Utilize", abi.encode(_key, _epoch, _utilization, _newRemaining, _newTotalUtil, _newTotalAlloc, _calldata));
-    }
-
-    // ===================== Withdraw =====================
-
     function withdraw(IERC20 _token, bytes32 _key, address _user, uint _amount) external auth {
         uint _cumulative = _settle(_key, _token);
-        uint _utilization = getUserUtilization(_key, _user);
+        uint _epoch = currentEpoch[_key];
+        uint _utilized = getUserUtilization(_key, _user);
         uint _allocation = allocationBalance[_key][_user];
         uint _realized = 0;
 
-        if (_utilization > 0) {
+        if (_utilized > 0) {
             uint _checkpoint = userSettlementCheckpoint[_key][_user];
-            if (_cumulative <= _checkpoint) revert Error.Allocation__UtilizationNotSettled(_utilization);
+            if (_cumulative <= _checkpoint) revert Error.Allocation__UtilizationNotSettled(_utilized);
 
-            _realized = Precision.applyFactor(_cumulative - _checkpoint, _utilization);
-            totalUtilization[_key] -= _utilization;
+            _realized = Precision.applyFactor(_cumulative - _checkpoint, _utilized);
+            totalUtilization[_key] -= _utilized;
             totalAllocation[_key] += _realized;
-            _allocation = _allocation + _realized - _utilization;
+            _allocation = _allocation + _realized - _utilized;
         }
 
         if (_amount == 0) {
             allocationBalance[_key][_user] = _allocation;
-            _updateUserCheckpoints(_key, _user, _allocation);
+            _updateUserCheckpoints(_key, _user, _epoch, _cumulative, _allocation);
             return;
         }
 
@@ -290,12 +288,18 @@ contract Allocation is CoreContract, IExecutor, IHook {
         uint _newAlloc = _allocation - _amount;
         allocationBalance[_key][_user] = _newAlloc;
         totalAllocation[_key] -= _amount;
-        _updateUserCheckpoints(_key, _user, _newAlloc);
+        _updateUserCheckpoints(_key, _user, _epoch, _cumulative, _newAlloc);
 
-        _token.safeTransferFrom(address(subaccountMap[_key]), _user, _amount);
+        bytes[] memory _result = subaccountMap[_key].executeFromExecutor{gas: config.transferOutGasLimit}(
+            ModeLib.encodeSimpleSingle(),
+            ExecutionLib.encodeSingle(address(_token), 0, abi.encodeCall(IERC20.transfer, (_user, _amount)))
+        );
+        if (_result[0].length > 0 && !abi.decode(_result[0], (bool))) {
+            revert Error.Allocation__TransferFailed();
+        }
         subaccountRecordedBalance[_key] -= _amount;
 
-        _logEvent("Withdraw", abi.encode(_key, _token, _user, _amount, _realized, _utilization, _newAlloc));
+        _logEvent("Withdraw", abi.encode(_key, _token, _user, _amount, _realized, _utilized, _newAlloc));
     }
 
     // ===================== Internal =====================
@@ -318,38 +322,17 @@ contract Allocation is CoreContract, IExecutor, IHook {
         _logEvent("Settle", abi.encode(_key, _token, _subaccount, _settled, _totalUtil, _cumulative));
     }
 
-    function _initEpochIfNeeded(bytes32 _key) internal {
-        uint _epoch = currentEpoch[_key];
-        if (epochRemaining[_key][_epoch] != 0) return;
-
-        bool _firstInit = _epoch == 0 && totalUtilization[_key] == 0 && totalAllocation[_key] == 0;
-        if (_firstInit) {
-            epochRemaining[_key][0] = Precision.FLOAT_PRECISION;
-        } else {
-            currentEpoch[_key] = ++_epoch;
-            epochRemaining[_key][_epoch] = Precision.FLOAT_PRECISION;
-        }
-    }
-
-    function _registerTraderIfNeeded(bytes32 _key, IERC7579Account _trader, address _traderAddr, IERC20 _token) internal {
-        if (subaccountMap[_key] != IERC7579Account(address(0))) return;
-
-        subaccountMap[_key] = _trader;
-        subaccountTraderMap[_trader] = _traderAddr;
-        _subaccountTokenList[_trader].push(_token);
-    }
-
-    function _updateUserCheckpoints(bytes32 _key, address _user, uint _allocation) internal {
-        uint _epoch = currentEpoch[_key];
+    function _updateUserCheckpoints(bytes32 _key, address _user, uint _epoch, uint _cumulative, uint _allocation) internal {
         userEpoch[_key][_user] = _epoch;
         userRemainingCheckpoint[_key][_user] = epochRemaining[_key][_epoch];
         userAllocationSnapshot[_key][_user] = _allocation;
-        userSettlementCheckpoint[_key][_user] = cumulativeSettlementPerUtilization[_key];
+        userSettlementCheckpoint[_key][_user] = _cumulative;
     }
 
     function _setConfig(bytes memory _data) internal override {
         Config memory _config = abi.decode(_data, (Config));
         if (_config.maxPuppetList == 0) revert("Invalid max puppet list");
+        if (_config.transferOutGasLimit == 0) revert("Invalid transfer out gas limit");
         config = _config;
     }
 }

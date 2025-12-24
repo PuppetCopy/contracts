@@ -28,10 +28,16 @@ contract TestSmartAccount is IERC7579Account {
     // ============ Execution ============
 
     function execute(ModeCode mode, bytes calldata executionCalldata) external payable {
-        // Simulate Smart Sessions: caller must be installed as validator
-        if (!_modules[MODULE_TYPE_VALIDATOR][msg.sender]) revert CallerNotAuthorized();
+        // Simulate Smart Sessions: caller must be installed as validator (or self-call)
+        if (msg.sender != address(this) && !_modules[MODULE_TYPE_VALIDATOR][msg.sender]) revert CallerNotAuthorized();
 
         (CallType callType, ExecType execType,,) = mode.decode();
+
+        // preCheck
+        bytes memory hookData;
+        if (installedHook != address(0)) {
+            hookData = IHook(installedHook).preCheck(msg.sender, 0, executionCalldata);
+        }
 
         if (callType == CALLTYPE_SINGLE) {
             (address target, uint256 value, bytes calldata data) = executionCalldata.decodeSingle();
@@ -53,6 +59,11 @@ contract TestSmartAccount is IERC7579Account {
             }
         } else {
             revert UnsupportedCallType(callType);
+        }
+
+        // postCheck
+        if (installedHook != address(0)) {
+            IHook(installedHook).postCheck(hookData);
         }
     }
 
@@ -192,28 +203,4 @@ contract TestSmartAccount is IERC7579Account {
         require(success, "Transfer failed");
     }
 
-    /// @dev Execute with hook flow (preCheck -> execute -> postCheck)
-    function executeWithHooks(address target, uint256 value, bytes calldata data) external returns (bytes memory) {
-        bytes memory hookData;
-
-        // preCheck
-        if (installedHook != address(0)) {
-            hookData = IHook(installedHook).preCheck(msg.sender, value, data);
-        }
-
-        // Execute
-        (bool success, bytes memory result) = target.call{value: value}(data);
-        if (!success) {
-            assembly {
-                revert(add(result, 32), mload(result))
-            }
-        }
-
-        // postCheck
-        if (installedHook != address(0)) {
-            IHook(installedHook).postCheck(hookData);
-        }
-
-        return result;
-    }
 }

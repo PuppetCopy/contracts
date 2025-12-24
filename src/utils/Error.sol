@@ -92,6 +92,7 @@ library Error {
     error Allocation__ActiveUtilization(uint totalUtilization);
     error Allocation__AlreadyRegistered();
     error Allocation__AlreadyUnregistered();
+    error Allocation__TransferFailed();
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();

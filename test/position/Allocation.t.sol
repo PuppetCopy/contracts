@@ -15,6 +15,8 @@ import {Access} from "src/utils/auth/Access.sol";
 import {Permission} from "src/utils/auth/Permission.sol";
 import {Error} from "src/utils/Error.sol";
 import {MODULE_TYPE_VALIDATOR, MODULE_TYPE_EXECUTOR, MODULE_TYPE_HOOK} from "modulekit/module-bases/utils/ERC7579Constants.sol";
+import {ModeLib} from "erc7579/lib/ModeLib.sol";
+import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
 
 /**
  * @title AllocationTest
@@ -46,11 +48,13 @@ contract AllocationTest is Test {
         dictator = new Dictatorship(owner);
 
         // Deploy Allocation (executor + hook module)
-        allocation = new Allocation(dictator, Allocation.Config({maxPuppetList: 100}));
+        allocation = new Allocation(dictator, Allocation.Config({maxPuppetList: 100, transferOutGasLimit: 200_000}));
         dictator.registerContract(allocation);
 
         // Deploy TestSmartAccount for trader
         traderAccount = new TestSmartAccount();
+        // Install test contract as validator (to allow execute calls in tests)
+        traderAccount.installModule(MODULE_TYPE_VALIDATOR, address(this), "");
         // Install Allocation as hook for settlement/utilization sync
         traderAccount.installModule(MODULE_TYPE_HOOK, address(allocation), "");
         // Install Allocation as executor - triggers onInstall() which registers the subaccount
@@ -58,7 +62,6 @@ contract AllocationTest is Test {
 
         // Owner permissions for testing (owner simulates router)
         dictator.setPermission(allocation, allocation.allocate.selector, owner);
-        dictator.setPermission(allocation, allocation.utilize.selector, owner);
         dictator.setPermission(allocation, allocation.withdraw.selector, owner);
 
         vm.stopPrank();
@@ -99,12 +102,12 @@ contract AllocationTest is Test {
         );
     }
 
-    function _utilize(bytes32 _traderKey, uint _amount) internal {
-        // Simulate funds leaving trader account to GMX
-        vm.prank(address(traderAccount));
-        usdc.transfer(address(0xdead), _amount);
-        vm.prank(owner);
-        allocation.utilize(_traderKey, _amount, "");
+    function _utilize(bytes32, uint _amount) internal {
+        // Execute transfer through subaccount - triggers postCheck hook which calls _utilize
+        traderAccount.execute(
+            ModeLib.encodeSimpleSingle(),
+            ExecutionLib.encodeSingle(address(usdc), 0, abi.encodeCall(IERC20.transfer, (address(0xdead), _amount)))
+        );
     }
 
     function _depositSettlement(uint _amount) internal {
@@ -230,10 +233,6 @@ contract AllocationTest is Test {
         allocations[0] = 500e6;
 
         _allocate(0, puppetList, allocations);
-
-        // Trader account needs to approve Allocation to pull funds back for withdraw
-        vm.prank(address(traderAccount));
-        usdc.approve(address(allocation), type(uint).max);
 
         // Withdraw (no utilization yet, so can withdraw)
         vm.prank(owner);
@@ -684,8 +683,7 @@ contract AllocationTest is Test {
         assertEq(allocation.totalUtilization(traderKey), 0, "No utilization yet");
 
         // Execute transfer via hooks - this should trigger utilization detection
-        bytes memory transferCall = abi.encodeWithSignature("transfer(address,uint256)", address(0xdead), 300e6);
-        traderAccount.executeWithHooks(address(usdc), 0, transferCall);
+        _utilize(bytes32(0), 300e6);
 
         // Utilization should be detected automatically via postCheck
         assertEq(allocation.totalUtilization(traderKey), 300e6, "Utilization should be 300 via hook");
@@ -708,8 +706,7 @@ contract AllocationTest is Test {
         _allocate(0, puppetList, allocations);
 
         // Utilize via hooks
-        bytes memory transferCall = abi.encodeWithSignature("transfer(address,uint256)", address(0xdead), 500e6);
-        traderAccount.executeWithHooks(address(usdc), 0, transferCall);
+        _utilize(bytes32(0), 500e6);
 
         assertEq(allocation.totalUtilization(traderKey), 500e6, "Full utilization");
 
@@ -717,9 +714,10 @@ contract AllocationTest is Test {
         usdc.mint(address(traderAccount), 600e6);
 
         // Any execution should trigger settlement detection via preCheck
-        // Execute a no-op transfer (0 amount) to trigger hooks
-        bytes memory noopCall = abi.encodeWithSignature("transfer(address,uint256)", address(0xdead), 0);
-        traderAccount.executeWithHooks(address(usdc), 0, noopCall);
+        traderAccount.execute(
+            ModeLib.encodeSimpleSingle(),
+            ExecutionLib.encodeSingle(address(usdc), 0, abi.encodeCall(IERC20.transfer, (address(0xdead), 0)))
+        );
 
         // Settlement should be detected - recorded balance updated
         assertEq(allocation.subaccountRecordedBalance(traderKey), 600e6, "Recorded balance should include settlement");
@@ -744,9 +742,10 @@ contract AllocationTest is Test {
         uint allocationBefore = allocation.totalAllocation(traderKey);
 
         // Execute something that doesn't change USDC balance
-        // (just a no-op call that doesn't transfer)
-        bytes memory noopCall = abi.encodeWithSignature("balanceOf(address)", address(traderAccount));
-        traderAccount.executeWithHooks(address(usdc), 0, noopCall);
+        traderAccount.execute(
+            ModeLib.encodeSimpleSingle(),
+            ExecutionLib.encodeSingle(address(usdc), 0, abi.encodeCall(IERC20.balanceOf, (address(traderAccount))))
+        );
 
         // State should be unchanged
         assertEq(allocation.totalUtilization(traderKey), utilizationBefore, "Utilization unchanged");
@@ -756,12 +755,15 @@ contract AllocationTest is Test {
     function test_hookFlow_unregisteredAccount_noOp() public {
         // Create a new account that's NOT registered with Allocation
         TestSmartAccount unregisteredAccount = new TestSmartAccount();
+        unregisteredAccount.installModule(MODULE_TYPE_VALIDATOR, address(this), "");
         unregisteredAccount.installModule(MODULE_TYPE_HOOK, address(allocation), "");
         usdc.mint(address(unregisteredAccount), 1000e6);
 
         // Execute with hooks - should not revert, just no-op
-        bytes memory transferCall = abi.encodeWithSignature("transfer(address,uint256)", address(0xdead), 100e6);
-        unregisteredAccount.executeWithHooks(address(usdc), 0, transferCall);
+        unregisteredAccount.execute(
+            ModeLib.encodeSimpleSingle(),
+            ExecutionLib.encodeSingle(address(usdc), 0, abi.encodeCall(IERC20.transfer, (address(0xdead), 100e6)))
+        );
 
         // Transfer happened but no allocation tracking (unregistered)
         assertEq(usdc.balanceOf(address(unregisteredAccount)), 900e6, "Transfer should succeed");
@@ -1155,8 +1157,10 @@ contract AllocationTest is Test {
         _depositSettlement(600e6);
 
         // Trigger settle via hook (any execution)
-        bytes memory noopCall = abi.encodeWithSignature("balanceOf(address)", address(traderAccount));
-        traderAccount.executeWithHooks(address(usdc), 0, noopCall);
+        traderAccount.execute(
+            ModeLib.encodeSimpleSingle(),
+            ExecutionLib.encodeSingle(address(usdc), 0, abi.encodeCall(IERC20.balanceOf, (address(traderAccount))))
+        );
 
         // Now pending should show
         assertEq(allocation.pendingSettlement(traderKey, address(puppetAccount)), 600e6, "Pending after settle");

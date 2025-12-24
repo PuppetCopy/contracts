@@ -32,7 +32,7 @@ contract DeployPosition is BaseScript {
         // Traders install this as both executor (type 2) and hook (type 4)
         Allocation allocation = new Allocation(
             dictatorship,
-            Allocation.Config({maxPuppetList: 100})
+            Allocation.Config({maxPuppetList: 100, transferOutGasLimit: 200_000})
         );
         dictatorship.registerContract(allocation);
         console.log("Allocation:", address(allocation));
