@@ -1,8 +1,20 @@
 {
+  "lib/flatbytes": {
+    "tag": {
+      "name": "v0.0.1",
+      "rev": "bb0859e85ef2213d08d6280c8af9a7da4596b30f"
+    }
+  },
   "lib/forge-std": {
     "tag": {
       "name": "v1.12.0",
       "rev": "7117c90c8cf6c68e5acce4f09a6b24715cea4de6"
+    }
+  },
+  "lib/modulekit": {
+    "tag": {
+      "name": "v0.5.9",
+      "rev": "b696ccbe1b16a55d8b1a1de192309500af0fae5e"
     }
   },
   "lib/openzeppelin-contracts": {
@@ -12,6 +24,9 @@
     }
   },
   "lib/smartsessions": {
-    "rev": "f5aaf867f7e22f3b9d746ce6f404f3a56833757f"
+    "tag": {
+      "name": "v1.0.0",
+      "rev": "dc20f0b90541ef93e88177690b0c882384896332"
+    }
   }
 }

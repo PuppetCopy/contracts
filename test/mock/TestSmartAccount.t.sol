@@ -4,22 +4,17 @@ pragma solidity ^0.8.23;
 import {IERC7579Account, Execution} from "erc7579/interfaces/IERC7579Account.sol";
 import {IModule} from "erc7579/interfaces/IERC7579Module.sol";
 import {ModeCode, ModeLib, CallType, ExecType, CALLTYPE_SINGLE, CALLTYPE_BATCH, EXECTYPE_DEFAULT, EXECTYPE_TRY} from "erc7579/lib/ModeLib.sol";
-import {ExecutionLib} from "erc7579/lib/ExecutionLib.sol";
+import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
+import {MODULE_TYPE_VALIDATOR, MODULE_TYPE_EXECUTOR, MODULE_TYPE_FALLBACK, MODULE_TYPE_HOOK} from "modulekit/module-bases/utils/ERC7579Constants.sol";
 
 /**
  * @title TestSmartAccount
  * @notice Minimal ERC-7579 Smart Account for testing
- * @dev Uses lib's interfaces and types, implements core functionality
+ * @dev Uses modulekit interfaces and types, implements core functionality
  */
 contract TestSmartAccount is IERC7579Account {
     using ModeLib for ModeCode;
     using ExecutionLib for bytes;
-
-    // Module types
-    uint256 constant TYPE_VALIDATOR = 1;
-    uint256 constant TYPE_EXECUTOR = 2;
-    uint256 constant TYPE_FALLBACK = 3;
-    uint256 constant TYPE_HOOK = 4;
 
     // Module storage
     mapping(uint256 => mapping(address => bool)) internal _modules;
@@ -33,7 +28,7 @@ contract TestSmartAccount is IERC7579Account {
 
     function execute(ModeCode mode, bytes calldata executionCalldata) external payable {
         // Simulate Smart Sessions: caller must be installed as validator
-        if (!_modules[TYPE_VALIDATOR][msg.sender]) revert CallerNotAuthorized();
+        if (!_modules[MODULE_TYPE_VALIDATOR][msg.sender]) revert CallerNotAuthorized();
 
         (CallType callType, ExecType execType,,) = mode.decode();
 
@@ -135,7 +130,10 @@ contract TestSmartAccount is IERC7579Account {
     }
 
     function supportsModule(uint256 moduleTypeId) external pure returns (bool) {
-        return moduleTypeId >= 1 && moduleTypeId <= 4;
+        return moduleTypeId == MODULE_TYPE_VALIDATOR
+            || moduleTypeId == MODULE_TYPE_EXECUTOR
+            || moduleTypeId == MODULE_TYPE_FALLBACK
+            || moduleTypeId == MODULE_TYPE_HOOK;
     }
 
     // ============ ERC-1271 ============

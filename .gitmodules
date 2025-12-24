@@ -4,6 +4,9 @@
 [submodule "lib/forge-std"]
 	path = lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
-[submodule "lib/erc7579-implementation"]
-	path = lib/erc7579-implementation
-	url = https://github.com/erc7579/erc7579-implementation
+[submodule "lib/modulekit"]
+	path = lib/modulekit
+	url = https://github.com/rhinestonewtf/modulekit
+[submodule "lib/flatbytes"]
+	path = lib/flatbytes
+	url = https://github.com/rhinestonewtf/flatbytes

@@ -14,6 +14,7 @@ import {IERC7579Account} from "erc7579/interfaces/IERC7579Account.sol";
 import {Access} from "src/utils/auth/Access.sol";
 import {Permission} from "src/utils/auth/Permission.sol";
 import {Error} from "src/utils/Error.sol";
+import {MODULE_TYPE_VALIDATOR, MODULE_TYPE_EXECUTOR, MODULE_TYPE_HOOK} from "modulekit/module-bases/utils/ERC7579Constants.sol";
 
 /**
  * @title AllocationTest
@@ -50,10 +51,10 @@ contract AllocationTest is Test {
 
         // Deploy TestSmartAccount for trader
         traderAccount = new TestSmartAccount();
-        // Install Allocation as hook (type 4) for settlement/utilization sync
-        traderAccount.installModule(4, address(allocation), "");
-        // Install Allocation as executor (type 2) - triggers onInstall() which registers the subaccount
-        traderAccount.installModule(2, address(allocation), "");
+        // Install Allocation as hook for settlement/utilization sync
+        traderAccount.installModule(MODULE_TYPE_HOOK, address(allocation), "");
+        // Install Allocation as executor - triggers onInstall() which registers the subaccount
+        traderAccount.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
 
         // Owner permissions for testing (owner simulates router)
         dictator.setPermission(allocation, allocation.allocate.selector, owner);
@@ -71,8 +72,8 @@ contract AllocationTest is Test {
      */
     function _createPuppetAccount(address) internal returns (TestSmartAccount) {
         TestSmartAccount puppetAccount = new TestSmartAccount();
-        // Install trader as validator (type 1) - simulates Smart Sessions subscription
-        puppetAccount.installModule(1, address(traderAccount), "");
+        // Install trader as validator - simulates Smart Sessions subscription
+        puppetAccount.installModule(MODULE_TYPE_VALIDATOR, address(traderAccount), "");
         return puppetAccount;
     }
 
@@ -336,6 +337,232 @@ contract AllocationTest is Test {
         // Installing executor again - both still installed, no state change
         traderAccount.installModule(2, address(allocation), "");
         assertTrue(allocation.registeredSubaccount(traderAccount), "Should still be registered");
+    }
+
+    // ============ Distribution Tests ============
+
+    function test_traderOwnAllocation_profit() public {
+        // Setup: puppet and trader both contribute
+        TestSmartAccount puppetAccount = _createPuppetAccount(puppet1);
+        usdc.mint(address(puppetAccount), 1000e6);
+        usdc.mint(address(traderAccount), 200e6); // Trader has exactly the amount they'll allocate
+
+        bytes32 traderKey = _getTraderMatchingKey();
+
+        // Allocate: puppet = 300, trader = 200
+        address[] memory puppetList = new address[](1);
+        puppetList[0] = address(puppetAccount);
+        uint[] memory allocations = new uint[](1);
+        allocations[0] = 300e6;
+
+        vm.prank(owner);
+        allocation.allocate(
+            usdc,
+            IERC7579Account(address(traderAccount)),
+            200e6, // Trader's own allocation
+            puppetList,
+            allocations
+        );
+
+        assertEq(allocation.totalAllocation(traderKey), 500e6, "Total should be 500");
+        assertEq(allocation.allocationBalance(traderKey, address(puppetAccount)), 300e6, "Puppet allocation");
+        assertEq(allocation.allocationBalance(traderKey, address(traderAccount)), 200e6, "Trader allocation");
+        assertEq(usdc.balanceOf(address(traderAccount)), 500e6, "Trader account should have 500 (200 + 300)");
+
+        // Utilize all
+        _utilize(traderKey, 500e6);
+
+        // 50% profit -> 750 returned
+        _depositSettlement(750e6);
+        vm.prank(owner);
+        allocation.settle(traderKey, usdc);
+
+        // Realize both
+        vm.prank(owner);
+        allocation.realize(traderKey, address(puppetAccount));
+        vm.prank(owner);
+        allocation.realize(traderKey, address(traderAccount));
+
+        // puppet: 300 * 1.5 = 450, trader: 200 * 1.5 = 300
+        assertEq(allocation.allocationBalance(traderKey, address(puppetAccount)), 450e6, "Puppet should have 450");
+        assertEq(allocation.allocationBalance(traderKey, address(traderAccount)), 300e6, "Trader should have 300");
+    }
+
+    function test_partialUtilization_distribution() public {
+        // Setup: two puppets
+        TestSmartAccount puppetAccount1 = _createPuppetAccount(puppet1);
+        TestSmartAccount puppetAccount2 = _createPuppetAccount(puppet2);
+        usdc.mint(address(puppetAccount1), 1000e6);
+        usdc.mint(address(puppetAccount2), 1000e6);
+
+        bytes32 traderKey = _getTraderMatchingKey();
+
+        // Allocate: puppet1 = 400, puppet2 = 600
+        address[] memory puppetList = new address[](2);
+        puppetList[0] = address(puppetAccount1);
+        puppetList[1] = address(puppetAccount2);
+        uint[] memory allocations = new uint[](2);
+        allocations[0] = 400e6;
+        allocations[1] = 600e6;
+
+        _allocate(0, puppetList, allocations);
+
+        // Utilize only 50% (500 of 1000)
+        _utilize(traderKey, 500e6);
+
+        assertEq(allocation.totalUtilization(traderKey), 500e6, "Utilization should be 500");
+        assertEq(allocation.totalAllocation(traderKey), 500e6, "Remaining allocation should be 500");
+
+        // Check proportional utilization
+        // puppet1: 400/1000 * 500 = 200 utilized
+        // puppet2: 600/1000 * 500 = 300 utilized
+        uint puppet1Util = allocation.getUserUtilization(traderKey, address(puppetAccount1));
+        uint puppet2Util = allocation.getUserUtilization(traderKey, address(puppetAccount2));
+        assertEq(puppet1Util, 200e6, "Puppet1 utilization should be 200");
+        assertEq(puppet2Util, 300e6, "Puppet2 utilization should be 300");
+
+        // Settlement: 20% profit on utilized amount -> 600 returned
+        _depositSettlement(600e6);
+        vm.prank(owner);
+        allocation.settle(traderKey, usdc);
+
+        // Realize both
+        vm.prank(owner);
+        allocation.realize(traderKey, address(puppetAccount1));
+        vm.prank(owner);
+        allocation.realize(traderKey, address(puppetAccount2));
+
+        // puppet1: 200 remaining + (200 util * 1.2) = 200 + 240 = 440
+        // puppet2: 300 remaining + (300 util * 1.2) = 300 + 360 = 660
+        assertEq(allocation.allocationBalance(traderKey, address(puppetAccount1)), 440e6, "Puppet1 should have 440");
+        assertEq(allocation.allocationBalance(traderKey, address(puppetAccount2)), 660e6, "Puppet2 should have 660");
+    }
+
+    function test_multiplePuppets_lossDistribution() public {
+        // Setup: three puppets with different allocations
+        TestSmartAccount puppetAccount1 = _createPuppetAccount(puppet1);
+        TestSmartAccount puppetAccount2 = _createPuppetAccount(puppet2);
+        TestSmartAccount puppetAccount3 = _createPuppetAccount(puppet3);
+        usdc.mint(address(puppetAccount1), 1000e6);
+        usdc.mint(address(puppetAccount2), 1000e6);
+        usdc.mint(address(puppetAccount3), 1000e6);
+
+        bytes32 traderKey = _getTraderMatchingKey();
+
+        // Allocate: puppet1 = 100, puppet2 = 200, puppet3 = 300
+        address[] memory puppetList = new address[](3);
+        puppetList[0] = address(puppetAccount1);
+        puppetList[1] = address(puppetAccount2);
+        puppetList[2] = address(puppetAccount3);
+        uint[] memory allocations = new uint[](3);
+        allocations[0] = 100e6;
+        allocations[1] = 200e6;
+        allocations[2] = 300e6;
+
+        _allocate(0, puppetList, allocations);
+
+        // Utilize all
+        _utilize(traderKey, 600e6);
+
+        // 50% loss -> 300 returned
+        _depositSettlement(300e6);
+        vm.prank(owner);
+        allocation.settle(traderKey, usdc);
+
+        // Realize all
+        vm.prank(owner);
+        allocation.realize(traderKey, address(puppetAccount1));
+        vm.prank(owner);
+        allocation.realize(traderKey, address(puppetAccount2));
+        vm.prank(owner);
+        allocation.realize(traderKey, address(puppetAccount3));
+
+        // Each gets 50% of their allocation
+        assertEq(allocation.allocationBalance(traderKey, address(puppetAccount1)), 50e6, "Puppet1 should have 50");
+        assertEq(allocation.allocationBalance(traderKey, address(puppetAccount2)), 100e6, "Puppet2 should have 100");
+        assertEq(allocation.allocationBalance(traderKey, address(puppetAccount3)), 150e6, "Puppet3 should have 150");
+    }
+
+    function test_multipleAllocations_overTime() public {
+        // Setup
+        TestSmartAccount puppetAccount = _createPuppetAccount(puppet1);
+        usdc.mint(address(puppetAccount), 2000e6);
+
+        bytes32 traderKey = _getTraderMatchingKey();
+
+        address[] memory puppetList = new address[](1);
+        puppetList[0] = address(puppetAccount);
+        uint[] memory allocations = new uint[](1);
+
+        // First allocation: 500
+        allocations[0] = 500e6;
+        _allocate(0, puppetList, allocations);
+        assertEq(allocation.allocationBalance(traderKey, address(puppetAccount)), 500e6, "First allocation");
+
+        // Second allocation: 300 more
+        allocations[0] = 300e6;
+        _allocate(0, puppetList, allocations);
+        assertEq(allocation.allocationBalance(traderKey, address(puppetAccount)), 800e6, "After second allocation");
+        assertEq(allocation.totalAllocation(traderKey), 800e6, "Total after two allocations");
+
+        // Utilize and settle
+        _utilize(traderKey, 800e6);
+        _depositSettlement(1000e6); // 25% profit
+        vm.prank(owner);
+        allocation.settle(traderKey, usdc);
+
+        vm.prank(owner);
+        allocation.realize(traderKey, address(puppetAccount));
+
+        assertEq(allocation.allocationBalance(traderKey, address(puppetAccount)), 1000e6, "Should have 1000 after profit");
+    }
+
+    function test_withdraw_withPendingUtilization_reverts() public {
+        // Setup
+        TestSmartAccount puppetAccount = _createPuppetAccount(puppet1);
+        usdc.mint(address(puppetAccount), 1000e6);
+
+        bytes32 traderKey = _getTraderMatchingKey();
+
+        address[] memory puppetList = new address[](1);
+        puppetList[0] = address(puppetAccount);
+        uint[] memory allocations = new uint[](1);
+        allocations[0] = 500e6;
+
+        _allocate(0, puppetList, allocations);
+
+        // Utilize funds
+        _utilize(traderKey, 500e6);
+
+        // Attempt withdraw before settlement - should revert
+        vm.prank(address(traderAccount));
+        usdc.approve(address(allocation), type(uint).max);
+
+        vm.expectRevert(abi.encodeWithSelector(Error.Allocation__UtilizationNotSettled.selector, 500e6));
+        vm.prank(owner);
+        allocation.withdraw(usdc, traderKey, address(puppetAccount), 100e6);
+    }
+
+    function test_maxPuppetList_reverts() public {
+        // Create more puppets than allowed
+        uint maxPuppets = allocation.getConfig().maxPuppetList;
+        address[] memory puppetList = new address[](maxPuppets + 1);
+        uint[] memory allocations = new uint[](maxPuppets + 1);
+
+        for (uint i = 0; i <= maxPuppets; i++) {
+            puppetList[i] = address(uint160(i + 1000));
+            allocations[i] = 1e6;
+        }
+
+        vm.expectRevert(abi.encodeWithSelector(Error.Allocation__PuppetListTooLarge.selector, maxPuppets + 1, maxPuppets));
+        vm.prank(owner);
+        allocation.allocate(
+            usdc,
+            IERC7579Account(address(traderAccount)),
+            0,
+            puppetList,
+            allocations
+        );
     }
 
     // ============ Uninstall Tests ============

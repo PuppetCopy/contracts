@@ -9,7 +9,7 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {IERC7579Account} from "erc7579/interfaces/IERC7579Account.sol";
 import {IExecutor, IHook, MODULE_TYPE_EXECUTOR, MODULE_TYPE_HOOK} from "erc7579/interfaces/IERC7579Module.sol";
 import {ModeLib, ModeCode, CallType, ExecType, ModeSelector, ModePayload, CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT} from "erc7579/lib/ModeLib.sol";
-import {ExecutionLib} from "erc7579/lib/ExecutionLib.sol";
+import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
 import {Error} from "./../utils/Error.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 

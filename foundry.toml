@@ -7,11 +7,14 @@
   libs = ["lib"]
   ignored_error_codes = [2424, 4591]  # Suppress deprecated natspec memory-safe-assembly and "more than 256 warnings" warnings
   remappings = [
-    "forge-std/=lib/forge-std/",
+    "forge-std/=lib/modulekit/node_modules/forge-std/",
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
-    "erc7579/=lib/erc7579-implementation/src/",
+    "erc7579/=lib/modulekit/src/accounts/common/",
+    "modulekit/=lib/modulekit/src/",
+    "flatbytes/=lib/flatbytes/src/",
     "@rhinestone/sentinellist/=lib/sentinellist/",
     "sentinellist/=lib/sentinellist/src/",
+    "@ERC4337/account-abstraction/=lib/modulekit/node_modules/@ERC4337/account-abstraction/",
     "account-abstraction/=lib/account-abstraction/contracts/",
     "solady/=lib/solady/src/",
     "src/=src/",
