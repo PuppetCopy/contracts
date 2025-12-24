@@ -30,16 +30,6 @@ export default [
     name: 'allocate',
     inputs: [
       {
-        name: '_account',
-        type: 'address',
-        internalType: 'contract Account'
-      },
-      {
-        name: '_subscribe',
-        type: 'address',
-        internalType: 'contract Subscribe'
-      },
-      {
         name: '_collateralToken',
         type: 'address',
         internalType: 'contract IERC20'
@@ -47,12 +37,7 @@ export default [
       {
         name: '_trader',
         type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: '_subaccount',
-        type: 'address',
-        internalType: 'address'
+        internalType: 'contract IERC7579Account'
       },
       {
         name: '_traderAllocation',
@@ -63,6 +48,11 @@ export default [
         name: '_puppetList',
         type: 'address[]',
         internalType: 'address[]'
+      },
+      {
+        name: '_allocationList',
+        type: 'uint256[]',
+        internalType: 'uint256[]'
       }
     ],
     outputs: [],
@@ -255,7 +245,7 @@ export default [
       {
         name: '_subaccount',
         type: 'address',
-        internalType: 'address'
+        internalType: 'contract IERC7579Account'
       }
     ],
     outputs: [
@@ -293,33 +283,10 @@ export default [
   },
   {
     type: 'function',
-    name: 'initializeTraderActivityThrottle',
+    name: 'isInitialized',
     inputs: [
       {
-        name: '_traderMatchingKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
-      },
-      {
-        name: '_puppet',
-        type: 'address',
-        internalType: 'address'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'lastActivityThrottleMap',
-    inputs: [
-      {
-        name: 'traderMatchingKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
-      },
-      {
-        name: 'puppet',
+        name: '_smartAccount',
         type: 'address',
         internalType: 'address'
       }
@@ -327,11 +294,56 @@ export default [
     outputs: [
       {
         name: '',
+        type: 'bool',
+        internalType: 'bool'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'isModuleType',
+    inputs: [
+      {
+        name: 'moduleTypeId',
         type: 'uint256',
         internalType: 'uint256'
       }
     ],
-    stateMutability: 'view'
+    outputs: [
+      {
+        name: '',
+        type: 'bool',
+        internalType: 'bool'
+      }
+    ],
+    stateMutability: 'pure'
+  },
+  {
+    type: 'function',
+    name: 'onInstall',
+    inputs: [
+      {
+        name: '',
+        type: 'bytes',
+        internalType: 'bytes'
+      }
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable'
+  },
+  {
+    type: 'function',
+    name: 'onUninstall',
+    inputs: [
+      {
+        name: '',
+        type: 'bytes',
+        internalType: 'bytes'
+      }
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable'
   },
   {
     type: 'function',
@@ -388,6 +400,48 @@ export default [
   },
   {
     type: 'function',
+    name: 'postCheck',
+    inputs: [
+      {
+        name: 'hookData',
+        type: 'bytes',
+        internalType: 'bytes'
+      }
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable'
+  },
+  {
+    type: 'function',
+    name: 'preCheck',
+    inputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address'
+      },
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'callData',
+        type: 'bytes',
+        internalType: 'bytes'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'bytes',
+        internalType: 'bytes'
+      }
+    ],
+    stateMutability: 'nonpayable'
+  },
+  {
+    type: 'function',
     name: 'realize',
     inputs: [
       {
@@ -412,30 +466,12 @@ export default [
   },
   {
     type: 'function',
-    name: 'registerSubaccount',
-    inputs: [
-      {
-        name: '_subaccount',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: '_hook',
-        type: 'address',
-        internalType: 'address'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
     name: 'registeredSubaccount',
     inputs: [
       {
         name: 'subaccount',
         type: 'address',
-        internalType: 'address'
+        internalType: 'contract IERC7579Account'
       }
     ],
     outputs: [
@@ -515,7 +551,7 @@ export default [
       {
         name: '',
         type: 'address',
-        internalType: 'address'
+        internalType: 'contract IERC7579Account'
       }
     ],
     stateMutability: 'view'
@@ -546,7 +582,7 @@ export default [
       {
         name: 'subaccount',
         type: 'address',
-        internalType: 'address'
+        internalType: 'contract IERC7579Account'
       }
     ],
     outputs: [
@@ -576,37 +612,6 @@ export default [
       }
     ],
     stateMutability: 'pure'
-  },
-  {
-    type: 'function',
-    name: 'syncSettlement',
-    inputs: [
-      {
-        name: '_subaccount',
-        type: 'address',
-        internalType: 'address'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'syncUtilization',
-    inputs: [
-      {
-        name: '_subaccount',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: '_executionCalldata',
-        type: 'bytes',
-        internalType: 'bytes'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
   },
   {
     type: 'function',
@@ -770,11 +775,6 @@ export default [
     name: 'withdraw',
     inputs: [
       {
-        name: '_account',
-        type: 'address',
-        internalType: 'contract Account'
-      },
-      {
         name: '_collateralToken',
         type: 'address',
         internalType: 'contract IERC20'
@@ -800,15 +800,10 @@ export default [
   },
   {
     type: 'error',
-    name: 'Allocation__InsufficientAllocation',
+    name: 'Allocation__ActiveUtilization',
     inputs: [
       {
-        name: 'available',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'required',
+        name: 'totalUtilization',
         type: 'uint256',
         internalType: 'uint256'
       }
@@ -816,7 +811,7 @@ export default [
   },
   {
     type: 'error',
-    name: 'Allocation__InsufficientTraderBalance',
+    name: 'Allocation__InsufficientAllocation',
     inputs: [
       {
         name: 'available',
@@ -874,6 +869,28 @@ export default [
   },
   {
     type: 'error',
+    name: 'ModuleAlreadyInitialized',
+    inputs: [
+      {
+        name: 'smartAccount',
+        type: 'address',
+        internalType: 'address'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'NotInitialized',
+    inputs: [
+      {
+        name: 'smartAccount',
+        type: 'address',
+        internalType: 'address'
+      }
+    ]
+  },
+  {
+    type: 'error',
     name: 'Permission__CallerNotAuthority',
     inputs: []
   },
@@ -886,5 +903,16 @@ export default [
     type: 'error',
     name: 'ReentrancyGuardReentrantCall',
     inputs: []
+  },
+  {
+    type: 'error',
+    name: 'SafeERC20FailedOperation',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address'
+      }
+    ]
   }
 ] as const

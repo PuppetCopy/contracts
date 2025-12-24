@@ -209,7 +209,6 @@ async function generateIndex(): Promise<void> {
   const indexContent = `// This file is auto-generated. Do not edit manually.
 
 export * from './contracts.js'
-export * from './contract.js'
 export * from './events.js'
 export * from './errors.js'
 `
@@ -244,8 +243,36 @@ async function formatGeneratedFiles(): Promise<void> {
   await Bun.$`bunx @biomejs/biome check --fix --unsafe ${OUTPUT_DIR}`
 }
 
+async function cleanGeneratedFiles(): Promise<void> {
+  console.log('Cleaning old generated files...')
+
+  // Clean ABI files (except external ones we want to keep)
+  const keepFiles = new Set(['erc20.ts', 'externalReferralStorage.ts'])
+  const abiDir = `${OUTPUT_DIR}/abi`
+
+  try {
+    const files = await Array.fromAsync(new Bun.Glob('*.ts').scan({ cwd: abiDir }))
+    for (const file of files) {
+      if (!keepFiles.has(file)) {
+        await Bun.$`rm -f ${abiDir}/${file}`
+      }
+    }
+  } catch {
+    // Directory may not exist yet
+  }
+
+  // Clean top-level generated files (but not gmx folder)
+  const topLevelFiles = ['contracts.ts', 'contract.ts', 'events.ts', 'errors.ts', 'index.ts']
+  for (const file of topLevelFiles) {
+    await Bun.$`rm -f ${OUTPUT_DIR}/${file}`
+  }
+}
+
 async function main(): Promise<void> {
   console.log('=== Puppet Contracts TypeScript Generator ===\n')
+
+  // Clean old generated files
+  await cleanGeneratedFiles()
 
   // Ensure output directories exist
   await Bun.$`mkdir -p ${OUTPUT_DIR}/abi`

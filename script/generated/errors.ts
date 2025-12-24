@@ -108,11 +108,6 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'TokenRouter__EmptyTokenTranferGasLimit',
-    inputs: []
-  },
-  {
-    type: 'error',
     name: 'BankStore__InsufficientBalance',
     inputs: []
   },
@@ -120,22 +115,6 @@ export const puppetErrorAbi = [
     type: 'error',
     name: 'PuppetVoteToken__Unsupported',
     inputs: []
-  },
-  {
-    type: 'error',
-    name: 'RewardDistributor__InvalidAmount',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'RewardDistributor__InsufficientRewards',
-    inputs: [
-      {
-        name: 'accured',
-        internalType: 'uint256',
-        type: 'uint256'
-      }
-    ]
   },
   {
     type: 'error',
@@ -740,17 +719,28 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'AllocationAccount__UnauthorizedOperator',
+    name: 'Allocation__ExecutorNotInstalled',
     inputs: []
   },
   {
     type: 'error',
-    name: 'AllocationAccount__InsufficientBalance',
+    name: 'Allocation__ActiveUtilization',
+    inputs: [
+      {
+        name: 'totalUtilization',
+        internalType: 'uint256',
+        type: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Allocation__AlreadyRegistered',
     inputs: []
   },
   {
     type: 'error',
-    name: 'MatchmakerRouter__FailedRefundExecutionFee',
+    name: 'Allocation__AlreadyUnregistered',
     inputs: []
   },
   {

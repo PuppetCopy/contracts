@@ -11,11 +11,6 @@ export default [
         internalType: 'contract IAuthority'
       },
       {
-        name: '_router',
-        type: 'address',
-        internalType: 'contract TokenRouter'
-      },
-      {
         name: '_protocolToken',
         type: 'address',
         internalType: 'contract PuppetToken'
@@ -239,6 +234,17 @@ export default [
     type: 'error',
     name: 'ReentrancyGuardReentrantCall',
     inputs: []
+  },
+  {
+    type: 'error',
+    name: 'SafeERC20FailedOperation',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address'
+      }
+    ]
   },
   {
     type: 'error',
