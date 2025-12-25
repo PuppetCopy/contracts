@@ -6,7 +6,7 @@ import {ERC7579ActionPolicy} from "modulekit/module-bases/ERC7579ActionPolicy.so
 import {ERC7579PolicyBase} from "modulekit/module-bases/ERC7579PolicyBase.sol";
 import {IPolicy, IActionPolicy, ConfigId} from "modulekit/module-bases/interfaces/IPolicy.sol";
 import {VALIDATION_SUCCESS, VALIDATION_FAILED} from "erc7579/interfaces/IERC7579Module.sol";
-import {IPuppetPolicy} from "./IPuppetPolicy.sol";
+import {IPuppetPolicy} from "./interfaces/IPuppetPolicy.sol";
 
 /**
  * @title ThrottlePolicy

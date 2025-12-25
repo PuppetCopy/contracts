@@ -31,17 +31,20 @@ contract UserRouter {
      * @dev Allocation contract executes transfers from puppet accounts.
      *      Puppet policies validate each transfer.
      * @param _collateralToken The collateral token
+     * @param _masterAllocation Master's own capital (skin in the game)
      * @param _puppetList List of puppet accounts to pull from
      * @param _allocationList Allocation amounts per puppet
      */
     function allocate(
         IERC20 _collateralToken,
+        uint _masterAllocation,
         address[] calldata _puppetList,
         uint[] calldata _allocationList
     ) external {
         allocation.allocate(
             _collateralToken,
             msg.sender,
+            _masterAllocation,
             _puppetList,
             _allocationList
         );

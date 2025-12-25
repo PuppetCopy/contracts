@@ -37,13 +37,12 @@ contract Allocation is CoreContract, IExecutor, IHook {
     // Settlement distribution
     mapping(bytes32 => uint) public cumulativeSettlementPerUtilization;
     mapping(bytes32 => mapping(address => uint)) public userSettlementCheckpoint;
+    mapping(bytes32 => mapping(uint => uint)) public epochFirstUtilizationCumulative;
 
     // Subaccount registry
     mapping(bytes32 => IERC7579Account) public subaccountMap;
     mapping(bytes32 => uint) public subaccountRecordedBalance;
-    mapping(IERC7579Account => address) public subaccountMasterMap;
-    mapping(IERC7579Account => IERC20[]) internal _subaccountTokenList;
-    mapping(IERC7579Account => bool) public registeredSubaccount;
+    mapping(IERC7579Account => IERC20[]) public masterCollateralList;
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
@@ -53,11 +52,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
         return config;
     }
 
-    function getSubaccountTokenList(IERC7579Account _subaccount) external view returns (IERC20[] memory) {
-        return _subaccountTokenList[_subaccount];
-    }
-
-    function getUserUtilization(bytes32 _key, address _user) public view returns (uint) {
+    function getUtilization(bytes32 _key, address _user) public view returns (uint) {
         uint _snapshot = userAllocationSnapshot[_key][_user];
         if (_snapshot == 0) return 0;
 
@@ -72,14 +67,14 @@ contract Allocation is CoreContract, IExecutor, IHook {
         return (_snapshot * (_checkpoint - _current)) / _checkpoint;
     }
 
-    function getAvailableAllocation(bytes32 _key, address _user) external view returns (uint) {
+    function getAllocation(bytes32 _key, address _user) external view returns (uint) {
         uint _allocation = allocationBalance[_key][_user];
-        uint _utilized = getUserUtilization(_key, _user);
+        uint _utilized = getUtilization(_key, _user);
         return _utilized >= _allocation ? 0 : _allocation - _utilized;
     }
 
     function pendingSettlement(bytes32 _key, address _user) external view returns (uint) {
-        return pendingSettlement(_key, _user, getUserUtilization(_key, _user));
+        return pendingSettlement(_key, _user, getUtilization(_key, _user));
     }
 
     function pendingSettlement(bytes32 _key, address _user, uint _utilization) public view returns (uint) {
@@ -87,6 +82,12 @@ contract Allocation is CoreContract, IExecutor, IHook {
 
         uint _cumulative = cumulativeSettlementPerUtilization[_key];
         uint _checkpoint = userSettlementCheckpoint[_key][_user];
+
+        // First claim - use epoch baseline (set at first utilization)
+        if (_checkpoint == 0) {
+            _checkpoint = epochFirstUtilizationCumulative[_key][userEpoch[_key][_user]];
+        }
+
         if (_cumulative <= _checkpoint) return 0;
 
         return Precision.applyFactor(_cumulative - _checkpoint, _utilization);
@@ -99,18 +100,10 @@ contract Allocation is CoreContract, IExecutor, IHook {
     }
 
     function isInitialized(address _smartAccount) external view returns (bool) {
-        return registeredSubaccount[IERC7579Account(_smartAccount)];
+        return masterCollateralList[IERC7579Account(_smartAccount)].length > 0;
     }
 
-    function onInstall(bytes calldata) external {
-        IERC7579Account _master = IERC7579Account(msg.sender);
-        bool _bothInstalled = _master.isModuleInstalled(MODULE_TYPE_EXECUTOR, address(this), "")
-            && _master.isModuleInstalled(MODULE_TYPE_HOOK, address(this), "");
-
-        if (_bothInstalled) {
-            registeredSubaccount[_master] = true;
-        }
-    }
+    function onInstall(bytes calldata) external {}
 
     function onUninstall(bytes calldata) external {
         IERC7579Account _master = IERC7579Account(msg.sender);
@@ -118,13 +111,13 @@ contract Allocation is CoreContract, IExecutor, IHook {
             && _master.isModuleInstalled(MODULE_TYPE_HOOK, address(this), "");
 
         if (_bothInstalled) {
-            IERC20[] memory _tokens = _subaccountTokenList[_master];
+            IERC20[] memory _tokens = masterCollateralList[_master];
             for (uint _i = 0; _i < _tokens.length; ++_i) {
-                bytes32 _key = PositionUtils.getMatchingKey(_tokens[_i], subaccountMasterMap[_master]);
+                bytes32 _key = PositionUtils.getMatchingKey(_tokens[_i], address(_master));
                 uint _utilized = totalUtilization[_key];
                 if (_utilized > 0) revert Error.Allocation__ActiveUtilization(_utilized);
             }
-            delete registeredSubaccount[_master];
+            delete masterCollateralList[_master];
         }
     }
 
@@ -132,8 +125,8 @@ contract Allocation is CoreContract, IExecutor, IHook {
 
     function preCheck(address, uint256, bytes calldata _callData) external returns (bytes memory) {
         IERC7579Account _subaccount = IERC7579Account(msg.sender);
-        address _master = subaccountMasterMap[_subaccount];
-        IERC20[] memory _tokens = _subaccountTokenList[_subaccount];
+        address _master = address(_subaccount);
+        IERC20[] memory _tokens = masterCollateralList[_subaccount];
 
         for (uint _i = 0; _i < _tokens.length; ++_i) {
             _settle(PositionUtils.getMatchingKey(_tokens[_i], _master), _tokens[_i]);
@@ -143,8 +136,8 @@ contract Allocation is CoreContract, IExecutor, IHook {
 
     function postCheck(bytes calldata _hookData) external {
         IERC7579Account _subaccount = IERC7579Account(msg.sender);
-        address _master = subaccountMasterMap[_subaccount];
-        IERC20[] memory _tokens = _subaccountTokenList[_subaccount];
+        address _master = address(_subaccount);
+        IERC20[] memory _tokens = masterCollateralList[_subaccount];
 
         for (uint _i = 0; _i < _tokens.length; ++_i) {
             IERC20 _token = _tokens[_i];
@@ -162,6 +155,12 @@ contract Allocation is CoreContract, IExecutor, IHook {
 
             uint _epoch = currentEpoch[_key];
             uint _remaining = epochRemaining[_key][_epoch];
+
+            // First utilization of epoch - snapshot cumulative as baseline
+            if (_remaining == Precision.FLOAT_PRECISION) {
+                epochFirstUtilizationCumulative[_key][_epoch] = cumulativeSettlementPerUtilization[_key];
+            }
+
             uint _newRemaining = (_remaining * (_totalAlloc - _utilized)) / _totalAlloc;
             epochRemaining[_key][_epoch] = _newRemaining;
 
@@ -180,11 +179,14 @@ contract Allocation is CoreContract, IExecutor, IHook {
     function allocate(
         IERC20 _collateralToken,
         address _masterAddr,
+        uint _masterAllocation,
         address[] calldata _puppetList,
         uint[] calldata _allocationList
     ) external auth {
         IERC7579Account _master = IERC7579Account(_masterAddr);
-        if (!registeredSubaccount[_master]) revert Error.Allocation__UnregisteredSubaccount();
+        bool _bothInstalled = _master.isModuleInstalled(MODULE_TYPE_EXECUTOR, address(this), "")
+            && _master.isModuleInstalled(MODULE_TYPE_HOOK, address(this), "");
+        if (!_bothInstalled) revert Error.Allocation__UnregisteredSubaccount();
 
         uint _puppetCount = _puppetList.length;
         if (_puppetCount > config.maxPuppetList) {
@@ -204,11 +206,22 @@ contract Allocation is CoreContract, IExecutor, IHook {
 
         if (subaccountMap[_key] == IERC7579Account(address(0))) {
             subaccountMap[_key] = _master;
-            subaccountMasterMap[_master] = _masterAddr;
-            _subaccountTokenList[_master].push(_collateralToken);
+            masterCollateralList[_master].push(_collateralToken);
         }
 
-        uint _total = 0;
+        // Track master's own allocation (skin in the game)
+        uint _masterUtilized = 0;
+        if (_masterAllocation > 0) {
+            uint _allocation = allocationBalance[_key][_masterAddr] += _masterAllocation;
+            _masterUtilized = getUtilization(_key, _masterAddr);
+            if (_masterUtilized == 0) {
+                userEpoch[_key][_masterAddr] = _epoch;
+                userRemainingCheckpoint[_key][_masterAddr] = epochRemaining[_key][_epoch];
+                userAllocationSnapshot[_key][_masterAddr] = _allocation;
+            }
+        }
+
+        uint _total = _masterAllocation;
         uint[] memory _puppetUtilList = new uint[](_puppetCount);
 
         for (uint _i = 0; _i < _puppetCount; ++_i) {
@@ -228,8 +241,14 @@ contract Allocation is CoreContract, IExecutor, IHook {
             if (_result.length > 0) continue;
 
             uint _allocation = allocationBalance[_key][_puppet] += _amount;
-            uint _utilized = getUserUtilization(_key, _puppet);
-            if (_utilized == 0) _updateUserCheckpoints(_key, _puppet, _epoch, _cumulative, _allocation);
+            uint _utilized = getUtilization(_key, _puppet);
+            if (_utilized == 0) {
+                // New user - set epoch checkpoints but NOT settlement checkpoint
+                // Settlement checkpoint stays 0 to indicate "use epochFirstUtilizationCumulative"
+                userEpoch[_key][_puppet] = _epoch;
+                userRemainingCheckpoint[_key][_puppet] = epochRemaining[_key][_epoch];
+                userAllocationSnapshot[_key][_puppet] = _allocation;
+            }
 
             _puppetUtilList[_i] = _utilized;
             _total += _amount;
@@ -241,19 +260,25 @@ contract Allocation is CoreContract, IExecutor, IHook {
         subaccountRecordedBalance[_key] += _total;
 
         _logEvent("Allocate", abi.encode(
-            _key, _collateralToken, _master, _total, _puppetList, _allocationList, _puppetUtilList
+            _key, _collateralToken, _master, _masterAllocation, _masterUtilized, _total, _puppetList, _allocationList, _puppetUtilList
         ));
     }
 
     function withdraw(IERC20 _token, bytes32 _key, address _user, uint _amount) external auth {
         uint _cumulative = _settle(_key, _token);
         uint _epoch = currentEpoch[_key];
-        uint _utilized = getUserUtilization(_key, _user);
+        uint _utilized = getUtilization(_key, _user);
         uint _allocation = allocationBalance[_key][_user];
         uint _realized = 0;
 
         if (_utilized > 0) {
             uint _checkpoint = userSettlementCheckpoint[_key][_user];
+
+            // First claim - use epoch baseline (set at first utilization)
+            if (_checkpoint == 0) {
+                _checkpoint = epochFirstUtilizationCumulative[_key][userEpoch[_key][_user]];
+            }
+
             if (_cumulative <= _checkpoint) revert Error.Allocation__UtilizationNotSettled(_utilized);
 
             _realized = Precision.applyFactor(_cumulative - _checkpoint, _utilized);

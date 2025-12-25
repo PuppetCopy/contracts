@@ -82,11 +82,17 @@ contract AllocationTest is Test {
         return PositionUtils.getMatchingKey(usdc, address(masterAccount));
     }
 
+    function _isModuleInstalled(TestSmartAccount _account) internal view returns (bool) {
+        return _account.isModuleInstalled(2, address(allocation), "")
+            && _account.isModuleInstalled(4, address(allocation), "");
+    }
+
     /**
      * @notice Master gathers allocations from puppets
      * @dev Router calls allocate() with master as parameter
      */
     function _allocate(
+        uint _masterAllocation,
         address[] memory _puppetList,
         uint[] memory _puppetAllocations
     ) internal {
@@ -95,9 +101,17 @@ contract AllocationTest is Test {
         allocation.allocate(
             usdc,
             address(masterAccount),
+            _masterAllocation,
             _puppetList,
             _puppetAllocations
         );
+    }
+
+    function _allocate(
+        address[] memory _puppetList,
+        uint[] memory _puppetAllocations
+    ) internal {
+        _allocate(0, _puppetList, _puppetAllocations);
     }
 
     function _utilize(bytes32, uint _amount) internal {
@@ -253,6 +267,7 @@ contract AllocationTest is Test {
         allocation.allocate(
             usdc,
             address(masterAccount),
+            0,
             puppetList,
             allocations
         );
@@ -301,6 +316,7 @@ contract AllocationTest is Test {
         allocation.allocate(
             usdc,
             address(masterAccount),
+            0,
             puppetList,
             amounts
         );
@@ -308,11 +324,11 @@ contract AllocationTest is Test {
 
     function test_install_idempotent() public {
         // Master is already registered from setUp (installed as both hook and executor)
-        assertTrue(allocation.registeredSubaccount(masterAccount), "Should be registered");
+        assertTrue(_isModuleInstalled(masterAccount), "Should be registered");
 
         // Installing executor again - both still installed, no state change
         masterAccount.installModule(2, address(allocation), "");
-        assertTrue(allocation.registeredSubaccount(masterAccount), "Should still be registered");
+        assertTrue(_isModuleInstalled(masterAccount), "Should still be registered");
     }
 
     // ============ Distribution Tests ============
@@ -345,8 +361,8 @@ contract AllocationTest is Test {
         // Check proportional utilization
         // puppet1: 400/1000 * 500 = 200 utilized
         // puppet2: 600/1000 * 500 = 300 utilized
-        uint puppet1Util = allocation.getUserUtilization(matchingKey, address(puppetAccount1));
-        uint puppet2Util = allocation.getUserUtilization(matchingKey, address(puppetAccount2));
+        uint puppet1Util = allocation.getUtilization(matchingKey, address(puppetAccount1));
+        uint puppet2Util = allocation.getUtilization(matchingKey, address(puppetAccount2));
         assertEq(puppet1Util, 200e6, "Puppet1 utilization should be 200");
         assertEq(puppet2Util, 300e6, "Puppet2 utilization should be 300");
 
@@ -483,6 +499,7 @@ contract AllocationTest is Test {
         allocation.allocate(
             usdc,
             address(masterAccount),
+            0,
             puppetList,
             allocations
         );
@@ -506,12 +523,12 @@ contract AllocationTest is Test {
         _allocate(puppetList, allocations);
 
         // No utilization - master can uninstall
-        assertTrue(allocation.registeredSubaccount(masterAccount), "Should be registered before uninstall");
+        assertTrue(_isModuleInstalled(masterAccount), "Should be registered before uninstall");
 
         // Uninstall executor module - triggers Allocation.onUninstall()
         masterAccount.uninstallModule(2, address(allocation), "");
 
-        assertFalse(allocation.registeredSubaccount(masterAccount), "Should be unregistered after uninstall");
+        assertFalse(_isModuleInstalled(masterAccount), "Should be unregistered after uninstall");
 
         // Allocations still exist - puppets can withdraw
         assertEq(allocation.allocationBalance(matchingKey, address(puppetAccount)), 500e6, "Allocation should remain");
@@ -541,7 +558,7 @@ contract AllocationTest is Test {
         masterAccount.uninstallModule(2, address(allocation), "");
 
         // Still registered
-        assertTrue(allocation.registeredSubaccount(masterAccount), "Should still be registered");
+        assertTrue(_isModuleInstalled(masterAccount), "Should still be registered");
     }
 
     function test_uninstall_afterSettlement_succeeds() public {
@@ -574,7 +591,7 @@ contract AllocationTest is Test {
         // Now uninstall should succeed
         masterAccount.uninstallModule(2, address(allocation), "");
 
-        assertFalse(allocation.registeredSubaccount(masterAccount), "Should be unregistered");
+        assertFalse(_isModuleInstalled(masterAccount), "Should be unregistered");
     }
 
     function test_allocate_afterUninstall_reverts() public {
@@ -596,6 +613,7 @@ contract AllocationTest is Test {
         allocation.allocate(
             usdc,
             address(masterAccount),
+            0,
             puppetList,
             allocations
         );
@@ -604,11 +622,11 @@ contract AllocationTest is Test {
     function test_uninstall_idempotent() public {
         // Uninstall executor first - both still show installed → unregisters
         masterAccount.uninstallModule(2, address(allocation), "");
-        assertFalse(allocation.registeredSubaccount(masterAccount), "Should be unregistered");
+        assertFalse(_isModuleInstalled(masterAccount), "Should be unregistered");
 
         // Uninstall hook - only hook shows installed → no-op (already unregistered)
         masterAccount.uninstallModule(4, address(allocation), "");
-        assertFalse(allocation.registeredSubaccount(masterAccount), "Should still be unregistered");
+        assertFalse(_isModuleInstalled(masterAccount), "Should still be unregistered");
     }
 
     // ============ Hook Flow Tests ============
@@ -962,8 +980,8 @@ contract AllocationTest is Test {
         _allocate(puppetList, allocations);
 
         // Check states
-        assertEq(allocation.getUserUtilization(matchingKey, address(puppetAccount1)), 500e6, "Puppet1 full utilization");
-        assertEq(allocation.getUserUtilization(matchingKey, address(puppetAccount2)), 0, "Puppet2 no utilization yet");
+        assertEq(allocation.getUtilization(matchingKey, address(puppetAccount1)), 500e6, "Puppet1 full utilization");
+        assertEq(allocation.getUtilization(matchingKey, address(puppetAccount2)), 0, "Puppet2 no utilization yet");
         assertEq(allocation.totalAllocation(matchingKey), 300e6, "Only puppet2's allocation available");
 
         // Utilize puppet2's allocation
@@ -1034,11 +1052,11 @@ contract AllocationTest is Test {
 
         // Partial utilize
         _utilize(matchingKey, 400e6);
-        assertEq(allocation.getUserUtilization(matchingKey, address(puppetAccount)), 400e6, "First utilize");
+        assertEq(allocation.getUtilization(matchingKey, address(puppetAccount)), 400e6, "First utilize");
 
         // More utilization
         _utilize(matchingKey, 300e6);
-        assertEq(allocation.getUserUtilization(matchingKey, address(puppetAccount)), 700e6, "Second utilize");
+        assertEq(allocation.getUtilization(matchingKey, address(puppetAccount)), 700e6, "Second utilize");
 
         // Remaining allocation
         assertEq(allocation.totalAllocation(matchingKey), 300e6, "300 remaining");

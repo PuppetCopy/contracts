@@ -7,14 +7,26 @@ import {ERC7579PolicyBase} from "modulekit/module-bases/ERC7579PolicyBase.sol";
 import {IPolicy, IActionPolicy, ConfigId} from "modulekit/module-bases/interfaces/IPolicy.sol";
 import {VALIDATION_SUCCESS, VALIDATION_FAILED} from "erc7579/interfaces/IERC7579Module.sol";
 import {IPuppetPolicy} from "./interfaces/IPuppetPolicy.sol";
+import {Allocation} from "../Allocation.sol";
+import {Precision} from "../../utils/Precision.sol";
 
 /**
- * @title AllowanceRatePolicy
- * @notice Smart Sessions policy that limits transfers to a percentage of balance
+ * @title MinAllocationRatio
+ * @notice Smart Sessions policy requiring master's allocation ratio vs puppets
+ * @dev ratio = masterAllocation / puppetsAllocation
  */
-contract AllowanceRatePolicy is ERC7579ActionPolicy, IPuppetPolicy {
-    // ConfigId => multiplexer => account => allowance rate (basis points, 10000 = 100%)
-    mapping(ConfigId => mapping(address => mapping(address => uint16))) internal _allowanceRate;
+contract MinAllocationRatio is ERC7579ActionPolicy, IPuppetPolicy {
+    Allocation public immutable allocation;
+
+    // ConfigId => multiplexer => account => minimum ratio (in FLOAT_PRECISION)
+    mapping(ConfigId => mapping(address => mapping(address => uint))) internal _minRatio;
+
+    // ConfigId => multiplexer => account => collateral token
+    mapping(ConfigId => mapping(address => mapping(address => IERC20))) internal _collateralToken;
+
+    constructor(Allocation _allocation) {
+        allocation = _allocation;
+    }
 
     // ============ ERC7579 Module ============
 
@@ -31,7 +43,7 @@ contract AllowanceRatePolicy is ERC7579ActionPolicy, IPuppetPolicy {
     }
 
     function isInitialized(address account, ConfigId configId) external view override returns (bool) {
-        return _allowanceRate[configId][msg.sender][account] > 0;
+        return _minRatio[configId][msg.sender][account] > 0;
     }
 
     function isInitialized(
@@ -39,7 +51,7 @@ contract AllowanceRatePolicy is ERC7579ActionPolicy, IPuppetPolicy {
         address multiplexer,
         ConfigId configId
     ) external view override returns (bool) {
-        return _allowanceRate[configId][multiplexer][account] > 0;
+        return _minRatio[configId][multiplexer][account] > 0;
     }
 
     function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
@@ -53,10 +65,9 @@ contract AllowanceRatePolicy is ERC7579ActionPolicy, IPuppetPolicy {
         ConfigId configId,
         bytes calldata initData
     ) external override(ERC7579PolicyBase, IPolicy) {
-        uint16 allowanceRate = abi.decode(initData, (uint16));
-        require(allowanceRate > 0 && allowanceRate <= 10000, "Invalid rate");
-
-        _allowanceRate[configId][msg.sender][account] = allowanceRate;
+        (uint minRatio, IERC20 collateralToken) = abi.decode(initData, (uint, IERC20));
+        _minRatio[configId][msg.sender][account] = minRatio;
+        _collateralToken[configId][msg.sender][account] = collateralToken;
         emit PolicySet(configId, msg.sender, account);
     }
 
@@ -65,7 +76,7 @@ contract AllowanceRatePolicy is ERC7579ActionPolicy, IPuppetPolicy {
     function checkAction(
         ConfigId id,
         address account,
-        address target,
+        address,
         uint256 value,
         bytes calldata data
     ) external view override returns (uint256) {
@@ -73,13 +84,22 @@ contract AllowanceRatePolicy is ERC7579ActionPolicy, IPuppetPolicy {
         if (data.length < 68) return VALIDATION_FAILED;
         if (bytes4(data[:4]) != IERC20.transfer.selector) return VALIDATION_FAILED;
 
-        uint16 allowanceRate = _allowanceRate[id][msg.sender][account];
-        if (allowanceRate == 0) return VALIDATION_FAILED;
+        address master = abi.decode(data[4:36], (address));
 
-        (, uint256 amount) = abi.decode(data[4:], (address, uint256));
-        uint256 maxAllowed = (IERC20(target).balanceOf(account) * allowanceRate) / 10000;
+        uint minRatio = _minRatio[id][msg.sender][account];
+        IERC20 collateralToken = _collateralToken[id][msg.sender][account];
 
-        if (amount > maxAllowed) return VALIDATION_FAILED;
+        bytes32 key = keccak256(abi.encode(collateralToken, master));
+
+        uint masterAllocation = allocation.allocationBalance(key, master);
+        uint totalAlloc = allocation.totalAllocation(key);
+        uint puppetsAllocation = totalAlloc - masterAllocation;
+
+        if (puppetsAllocation == 0) return VALIDATION_SUCCESS;
+
+        uint ratio = Precision.toFactor(masterAllocation, puppetsAllocation);
+
+        if (ratio < minRatio) return VALIDATION_FAILED;
 
         return VALIDATION_SUCCESS;
     }

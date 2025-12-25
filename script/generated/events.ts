@@ -5,70 +5,29 @@ export const CONTRACT_EVENT_MAP = {
   Allocation: {
     Action: {
       hash: '0x84aee0783d8a20ef3f08b2c51282979cf391162b173b75786ed0b56e4881d999',
-      args: [
-        { type: 'bytes32', name: 'key' },
-        { type: 'address', name: 'token' },
-        { type: 'address', name: 'subaccount' },
-        { type: 'uint256', name: 'utilized' },
-        { type: 'uint256', name: 'newTotalUtil' },
-        { type: 'uint256', name: 'allocated' },
-        { type: 'bytes', name: 'hookData' }
-      ]
+      args: [{type:"bytes32",name:"key"},{type:"address",name:"token"},{type:"address",name:"subaccount"},{type:"uint256",name:"utilized"},{type:"uint256",name:"newTotalUtil"},{type:"uint256",name:"allocated"},{type:"bytes",name:"hookData"}]
     },
     Allocate: {
       hash: '0x2d453a8b2eb4888bfee5a5b17781ba95747a5f795cd81b44fe943773178f8d8e',
-      args: [
-        { type: 'bytes32', name: 'key' },
-        { type: 'address', name: 'collateralToken' },
-        { type: 'address', name: 'master' },
-        { type: 'uint256', name: 'total' },
-        { type: 'address[]', name: 'puppetList' },
-        { type: 'uint256[]', name: 'allocationList' },
-        { type: 'uint256[]', name: 'puppetUtilList' }
-      ]
+      args: [{type:"bytes32",name:"key"},{type:"address",name:"collateralToken"},{type:"address",name:"master"},{type:"uint256",name:"masterAllocation"},{type:"uint256",name:"masterUtilized"},{type:"uint256",name:"total"},{type:"address[]",name:"puppetList"},{type:"uint256[]",name:"allocationList"},{type:"uint256[]",name:"puppetUtilList"}]
     },
     Settle: {
       hash: '0xea8fbe0762c74a52b889978a4aff8df9447ec89ed00dff7346b7014a2d0754d2',
-      args: [
-        { type: 'bytes32', name: 'key' },
-        { type: 'address', name: 'token' },
-        { type: 'address', name: 'subaccount' },
-        { type: 'uint256', name: 'settled' },
-        { type: 'uint256', name: 'totalUtil' },
-        { type: 'uint256', name: 'cumulative' }
-      ]
+      args: [{type:"bytes32",name:"key"},{type:"address",name:"token"},{type:"address",name:"subaccount"},{type:"uint256",name:"settled"},{type:"uint256",name:"totalUtil"},{type:"uint256",name:"cumulative"}]
     },
     Withdraw: {
       hash: '0x8d7f87ab38a7f75a63dc465e10aadacecfca64c44ca774040b039bfb004e3367',
-      args: [
-        { type: 'bytes32', name: 'key' },
-        { type: 'address', name: 'token' },
-        { type: 'address', name: 'user' },
-        { type: 'uint256', name: 'amount' },
-        { type: 'uint256', name: 'realized' },
-        { type: 'uint256', name: 'utilized' },
-        { type: 'uint256', name: 'allocation' }
-      ]
+      args: [{type:"bytes32",name:"key"},{type:"address",name:"token"},{type:"address",name:"user"},{type:"uint256",name:"amount"},{type:"uint256",name:"realized"},{type:"uint256",name:"utilized"},{type:"uint256",name:"allocation"}]
     }
   },
   FeeMarketplace: {
     AcceptOffer: {
       hash: '0x7d778e14025c4611dae90acde3cdf239063797ccb4dc030ab8c78b43e4558e02',
-      args: [
-        { type: 'address', name: 'feeToken' },
-        { type: 'address', name: 'buyer' },
-        { type: 'address', name: 'receiver' },
-        { type: 'uint256', name: 'payout' },
-        { type: 'uint256', name: 'cost' }
-      ]
+      args: [{type:"address",name:"feeToken"},{type:"address",name:"buyer"},{type:"address",name:"receiver"},{type:"uint256",name:"payout"},{type:"uint256",name:"cost"}]
     },
     Deposit: {
       hash: '0xe09149d2123147c5f43d258257fef0b7b969db78269369ebcf5ebb9eef8592f2',
-      args: [
-        { type: 'address', name: 'feeToken' },
-        { type: 'address', name: 'depositor' },
-        { type: 'uint256', name: 'amount' }
-      ]
+      args: [{type:"address",name:"feeToken"},{type:"address",name:"depositor"},{type:"uint256",name:"amount"}]
     }
   }
 } as const
