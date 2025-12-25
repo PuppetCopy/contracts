@@ -6,18 +6,24 @@ import {ERC7579ActionPolicy} from "modulekit/module-bases/ERC7579ActionPolicy.so
 import {ERC7579PolicyBase} from "modulekit/module-bases/ERC7579PolicyBase.sol";
 import {IPolicy, IActionPolicy, ConfigId} from "modulekit/module-bases/interfaces/IPolicy.sol";
 import {VALIDATION_SUCCESS, VALIDATION_FAILED} from "erc7579/interfaces/IERC7579Module.sol";
-import {IPuppetPolicy} from "./interfaces/IPuppetPolicy.sol";
+import {IEventEmitter} from "../../utils/interfaces/IEventEmitter.sol";
 
 /**
  * @title AllowedRecipientPolicy
  * @notice Smart Sessions policy that restricts transfers to whitelisted recipients
  */
-contract AllowedRecipientPolicy is ERC7579ActionPolicy, IPuppetPolicy {
+contract AllowedRecipientPolicy is ERC7579ActionPolicy {
+    IEventEmitter public immutable eventEmitter;
+
     // ConfigId => multiplexer => account => initialized
     mapping(ConfigId => mapping(address => mapping(address => bool))) internal _initialized;
 
     // ConfigId => multiplexer => account => recipient => allowed
     mapping(ConfigId => mapping(address => mapping(address => mapping(address => bool)))) internal _allowedRecipients;
+
+    constructor(IEventEmitter _eventEmitter) {
+        eventEmitter = _eventEmitter;
+    }
 
     // ============ ERC7579 Module ============
 
@@ -65,7 +71,7 @@ contract AllowedRecipientPolicy is ERC7579ActionPolicy, IPuppetPolicy {
         }
 
         _initialized[configId][msg.sender][account] = true;
-        emit PolicySet(configId, msg.sender, account);
+        eventEmitter.logEvent("PolicySet", abi.encode(configId, msg.sender, account));
     }
 
     // ============ IActionPolicy ============

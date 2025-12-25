@@ -182,6 +182,30 @@ export default [
   },
   {
     type: 'function',
+    name: 'epochFirstUtilizationCumulative',
+    inputs: [
+      {
+        name: '',
+        type: 'bytes32',
+        internalType: 'bytes32'
+      },
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
     name: 'epochRemaining',
     inputs: [
       {
@@ -206,7 +230,7 @@ export default [
   },
   {
     type: 'function',
-    name: 'getAvailableAllocation',
+    name: 'getAllocation',
     inputs: [
       {
         name: '_key',
@@ -255,26 +279,7 @@ export default [
   },
   {
     type: 'function',
-    name: 'getSubaccountTokenList',
-    inputs: [
-      {
-        name: '_subaccount',
-        type: 'address',
-        internalType: 'contract IERC7579Account'
-      }
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'address[]',
-        internalType: 'contract IERC20[]'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'getUserUtilization',
+    name: 'getUtilization',
     inputs: [
       {
         name: '_key',
@@ -333,6 +338,30 @@ export default [
       }
     ],
     stateMutability: 'pure'
+  },
+  {
+    type: 'function',
+    name: 'masterCollateralList',
+    inputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'contract IERC7579Account'
+      },
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'contract IERC20'
+      }
+    ],
+    stateMutability: 'view'
   },
   {
     type: 'function',
@@ -457,25 +486,6 @@ export default [
   },
   {
     type: 'function',
-    name: 'registeredSubaccount',
-    inputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'contract IERC7579Account'
-      }
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
     name: 'setConfig',
     inputs: [
       {
@@ -525,25 +535,6 @@ export default [
         name: '',
         type: 'address',
         internalType: 'contract IERC7579Account'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'subaccountMasterMap',
-    inputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'contract IERC7579Account'
-      }
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address'
       }
     ],
     stateMutability: 'view'
@@ -762,6 +753,22 @@ export default [
   {
     type: 'error',
     name: 'Allocation__InsufficientAllocation',
+    inputs: [
+      {
+        name: 'available',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'required',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Allocation__InsufficientMasterAllocation',
     inputs: [
       {
         name: 'available',

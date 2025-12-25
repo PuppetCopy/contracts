@@ -98,11 +98,6 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Dictatorship__InvalidTargetAddress',
-    inputs: []
-  },
-  {
-    type: 'error',
     name: 'Dictatorship__InvalidCoreContract',
     inputs: []
   },
@@ -398,6 +393,22 @@ export const puppetErrorAbi = [
     type: 'error',
     name: 'Allocation__TransferFailed',
     inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__InsufficientMasterAllocation',
+    inputs: [
+      {
+        name: 'available',
+        internalType: 'uint256',
+        type: 'uint256'
+      },
+      {
+        name: 'required',
+        internalType: 'uint256',
+        type: 'uint256'
+      }
+    ]
   },
   {
     type: 'error',

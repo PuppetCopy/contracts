@@ -29,7 +29,6 @@ contract DeployBase is BaseScript {
             })
         );
         dictatorship.setAccess(feeMarketplaceStore, address(feeMarketplace));
-        dictatorship.registerContract(feeMarketplace);
 
         UserRouterProxy userRouterProxy = new UserRouterProxy(dictatorship);
         dictatorship.setAccess(userRouterProxy, Const.dao);

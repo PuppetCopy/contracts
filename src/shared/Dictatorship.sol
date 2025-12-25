@@ -8,10 +8,9 @@ import {CoreContract} from "../utils/CoreContract.sol";
 import {Access} from "../utils/auth/Access.sol";
 import {Permission} from "../utils/auth/Permission.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
+import {EventEmitter} from "./EventEmitter.sol";
 
-contract Dictatorship is Ownable, IAuthority {
-    event PuppetEventLog(address indexed coreContract, string indexed method, bytes data);
-
+contract Dictatorship is Ownable, IAuthority, EventEmitter {
     mapping(address => bool) public registeredContract;
 
     constructor(
@@ -26,11 +25,6 @@ contract Dictatorship is Ownable, IAuthority {
 
     function hasPermission(Permission _target, bytes4 _functionSig, address _user) external view returns (bool) {
         return _target.canCall(_functionSig, _user);
-    }
-
-    function logEvent(string calldata _method, bytes calldata _data) external {
-        if (!registeredContract[msg.sender]) revert Error.Dictatorship__ContractNotRegistered();
-        emit PuppetEventLog(msg.sender, _method, _data);
     }
 
     function setAccess(Access _target, address _user) external onlyOwner {
@@ -54,20 +48,17 @@ contract Dictatorship is Ownable, IAuthority {
     }
 
     function registerContract(
-        CoreContract _contract
+        address _contract
     ) external onlyOwner {
-        if (!_contract.supportsInterface(type(CoreContract).interfaceId)) {
-            revert Error.Dictatorship__InvalidCoreContract();
-        }
-        address targetAddress = address(_contract);
-        if (registeredContract[targetAddress]) revert Error.Dictatorship__ContractAlreadyInitialized();
+        if (registeredContract[_contract]) revert Error.Dictatorship__ContractAlreadyInitialized();
 
-        registeredContract[targetAddress] = true;
-        emit PuppetEventLog(targetAddress, "RegisterContract", "");
+        registeredContract[_contract] = true;
+        emit PuppetEventLog(_contract, "RegisterContract", "");
     }
 
     function setConfig(CoreContract _contract, bytes calldata _config) external onlyOwner {
         if (!registeredContract[address(_contract)]) revert Error.Dictatorship__ContractNotRegistered();
+        if (!_contract.supportsInterface(type(CoreContract).interfaceId)) revert Error.Dictatorship__InvalidCoreContract();
 
         try _contract.setConfig(_config) {}
         catch (bytes memory reason) {
@@ -81,12 +72,11 @@ contract Dictatorship is Ownable, IAuthority {
     }
 
     function removeContract(
-        CoreContract _contract
+        address _contract
     ) external onlyOwner {
-        address targetAddress = address(_contract);
-        if (!registeredContract[targetAddress]) revert Error.Dictatorship__ContractNotRegistered();
+        if (!registeredContract[_contract]) revert Error.Dictatorship__ContractNotRegistered();
 
-        registeredContract[targetAddress] = false;
-        emit PuppetEventLog(targetAddress, "RemoveContract", "");
+        registeredContract[_contract] = false;
+        emit PuppetEventLog(_contract, "RemoveContract", "");
     }
 }

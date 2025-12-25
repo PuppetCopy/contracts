@@ -6,18 +6,24 @@ import {ERC7579ActionPolicy} from "modulekit/module-bases/ERC7579ActionPolicy.so
 import {ERC7579PolicyBase} from "modulekit/module-bases/ERC7579PolicyBase.sol";
 import {IPolicy, IActionPolicy, ConfigId} from "modulekit/module-bases/interfaces/IPolicy.sol";
 import {VALIDATION_SUCCESS, VALIDATION_FAILED} from "erc7579/interfaces/IERC7579Module.sol";
-import {IPuppetPolicy} from "./interfaces/IPuppetPolicy.sol";
+import {IEventEmitter} from "../../utils/interfaces/IEventEmitter.sol";
 
 /**
  * @title ThrottlePolicy
  * @notice Smart Sessions policy that enforces minimum time between transfers per recipient
  */
-contract ThrottlePolicy is ERC7579ActionPolicy, IPuppetPolicy {
+contract ThrottlePolicy is ERC7579ActionPolicy {
+    IEventEmitter public immutable eventEmitter;
+
     // ConfigId => multiplexer => account => throttle period (seconds)
     mapping(ConfigId => mapping(address => mapping(address => uint32))) internal _throttlePeriod;
 
     // ConfigId => multiplexer => account => recipient => last activity timestamp
     mapping(ConfigId => mapping(address => mapping(address => mapping(address => uint32)))) internal _lastActivity;
+
+    constructor(IEventEmitter _eventEmitter) {
+        eventEmitter = _eventEmitter;
+    }
 
     // ============ ERC7579 Module ============
 
@@ -58,7 +64,7 @@ contract ThrottlePolicy is ERC7579ActionPolicy, IPuppetPolicy {
     ) external override(ERC7579PolicyBase, IPolicy) {
         uint32 throttlePeriod = abi.decode(initData, (uint32));
         _throttlePeriod[configId][msg.sender][account] = throttlePeriod;
-        emit PolicySet(configId, msg.sender, account);
+        eventEmitter.logEvent("PolicySet", abi.encode(configId, msg.sender, account, throttlePeriod));
     }
 
     // ============ IActionPolicy ============

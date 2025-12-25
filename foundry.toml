@@ -21,7 +21,7 @@
     "test/=test/"
   ]
   evm_version = 'cancun'
-  solc_version = '0.8.31'
+  solc_version = '0.8.33'
   via_ir = true
   extra_output = ["storageLayout", "evm.deployedBytecode.immutableReferences"]
   bytecode_hash = "ipfs"

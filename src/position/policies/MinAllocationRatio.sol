@@ -6,17 +6,18 @@ import {ERC7579ActionPolicy} from "modulekit/module-bases/ERC7579ActionPolicy.so
 import {ERC7579PolicyBase} from "modulekit/module-bases/ERC7579PolicyBase.sol";
 import {IPolicy, IActionPolicy, ConfigId} from "modulekit/module-bases/interfaces/IPolicy.sol";
 import {VALIDATION_SUCCESS, VALIDATION_FAILED} from "erc7579/interfaces/IERC7579Module.sol";
-import {IPuppetPolicy} from "./interfaces/IPuppetPolicy.sol";
 import {Allocation} from "../Allocation.sol";
 import {Precision} from "../../utils/Precision.sol";
+import {IEventEmitter} from "../../utils/interfaces/IEventEmitter.sol";
 
 /**
  * @title MinAllocationRatio
  * @notice Smart Sessions policy requiring master's allocation ratio vs puppets
  * @dev ratio = masterAllocation / puppetsAllocation
  */
-contract MinAllocationRatio is ERC7579ActionPolicy, IPuppetPolicy {
+contract MinAllocationRatio is ERC7579ActionPolicy {
     Allocation public immutable allocation;
+    IEventEmitter public immutable eventEmitter;
 
     // ConfigId => multiplexer => account => minimum ratio (in FLOAT_PRECISION)
     mapping(ConfigId => mapping(address => mapping(address => uint))) internal _minRatio;
@@ -24,8 +25,9 @@ contract MinAllocationRatio is ERC7579ActionPolicy, IPuppetPolicy {
     // ConfigId => multiplexer => account => collateral token
     mapping(ConfigId => mapping(address => mapping(address => IERC20))) internal _collateralToken;
 
-    constructor(Allocation _allocation) {
+    constructor(Allocation _allocation, IEventEmitter _eventEmitter) {
         allocation = _allocation;
+        eventEmitter = _eventEmitter;
     }
 
     // ============ ERC7579 Module ============
@@ -68,7 +70,7 @@ contract MinAllocationRatio is ERC7579ActionPolicy, IPuppetPolicy {
         (uint minRatio, IERC20 collateralToken) = abi.decode(initData, (uint, IERC20));
         _minRatio[configId][msg.sender][account] = minRatio;
         _collateralToken[configId][msg.sender][account] = collateralToken;
-        emit PolicySet(configId, msg.sender, account);
+        eventEmitter.logEvent("PolicySet", abi.encode(configId, msg.sender, account, minRatio, collateralToken));
     }
 
     // ============ IActionPolicy ============

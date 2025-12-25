@@ -104,7 +104,7 @@ export default [
       {
         name: '_contract',
         type: 'address',
-        internalType: 'contract CoreContract'
+        internalType: 'address'
       }
     ],
     outputs: [],
@@ -154,7 +154,7 @@ export default [
       {
         name: '_contract',
         type: 'address',
-        internalType: 'contract CoreContract'
+        internalType: 'address'
       }
     ],
     outputs: [],
@@ -286,7 +286,7 @@ export default [
     name: 'PuppetEventLog',
     inputs: [
       {
-        name: 'coreContract',
+        name: 'source',
         type: 'address',
         indexed: true,
         internalType: 'address'

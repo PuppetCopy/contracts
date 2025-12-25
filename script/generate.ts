@@ -288,8 +288,15 @@ async function main(): Promise<void> {
     Bun.env.SKIP_NETWORK === '1' ||
     Bun.env.SKIP_NETWORK === 'true'
   if (!skipGmx) {
-    await generateGmx()
-    await generateGmxIndex()
+    // Check if @gmx package exists before attempting GMX generation
+    const gmxPath = './node_modules/@gmx'
+    const gmxExists = await Bun.file(`${gmxPath}/deployments`).exists().catch(() => false)
+    if (gmxExists) {
+      await generateGmx()
+      await generateGmxIndex()
+    } else {
+      console.log('Skipping GMX generation (@gmx package not installed)')
+    }
   }
 
   const skipFormat = Bun.env.SKIP_FORMAT === '1' || Bun.env.SKIP_FORMAT === 'true'

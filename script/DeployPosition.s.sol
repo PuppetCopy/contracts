@@ -32,16 +32,15 @@ contract DeployPosition is BaseScript {
         // Masters install this as both executor (type 2) and hook (type 4)
         Allocation allocation = new Allocation(
             dictatorship,
-            Allocation.Config({maxPuppetList: 100, transferOutGasLimit: 200_000})
+            Allocation.Config({maxPuppetList: 100, transferOutGasLimit: 200_000, callGasLimit: 200_000})
         );
-        dictatorship.registerContract(allocation);
         console.log("Allocation:", address(allocation));
 
         // Deploy Smart Sessions policies (stateless, puppets install via Smart Sessions)
         // These validate transfers from puppet accounts to master subaccounts
-        AllowedRecipientPolicy allowedRecipientPolicy = new AllowedRecipientPolicy();
-        AllowanceRatePolicy allowanceRatePolicy = new AllowanceRatePolicy();
-        ThrottlePolicy throttlePolicy = new ThrottlePolicy();
+        AllowedRecipientPolicy allowedRecipientPolicy = new AllowedRecipientPolicy(dictatorship);
+        AllowanceRatePolicy allowanceRatePolicy = new AllowanceRatePolicy(dictatorship);
+        ThrottlePolicy throttlePolicy = new ThrottlePolicy(dictatorship);
 
         console.log("AllowedRecipientPolicy:", address(allowedRecipientPolicy));
         console.log("AllowanceRatePolicy:", address(allowanceRatePolicy));

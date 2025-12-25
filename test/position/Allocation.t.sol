@@ -48,8 +48,8 @@ contract AllocationTest is Test {
         dictator = new Dictatorship(owner);
 
         // Deploy Allocation (executor + hook module)
-        allocation = new Allocation(dictator, Allocation.Config({maxPuppetList: 100, transferOutGasLimit: 200_000}));
-        dictator.registerContract(allocation);
+        allocation = new Allocation(dictator, Allocation.Config({maxPuppetList: 100, transferOutGasLimit: 200_000, callGasLimit: 200_000}));
+        dictator.registerContract(address(allocation));
 
         // Deploy TestSmartAccount for master
         masterAccount = new TestSmartAccount();

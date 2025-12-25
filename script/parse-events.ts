@@ -48,7 +48,9 @@ const SOLIDITY_TO_ABI_TYPE: TypeMap = {
   bytes: 'bytes',
   bytes32: 'bytes32',
   bytes4: 'bytes4',
-  string: 'string'
+  string: 'string',
+  // Custom type aliases
+  ConfigId: 'bytes32'
 }
 
 const SPECIAL_VARS: TypeMap = {
@@ -260,7 +262,8 @@ function extractLogEventCalls(content: string): Array<{ eventName: string; encod
 
   const normalized = content.replace(/\r\n/g, '\n')
 
-  const logEventRegex = /_logEvent\s*\(\s*"(\w+)"\s*,\s*abi\.encode\s*\(/g
+  // Match both _logEvent(...) and eventEmitter.logEvent(...)
+  const logEventRegex = /(?:_logEvent|eventEmitter\.logEvent)\s*\(\s*"(\w+)"\s*,\s*abi\.encode\s*\(/g
   let match: RegExpExecArray | null
 
   while ((match = logEventRegex.exec(normalized)) !== null) {

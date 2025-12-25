@@ -3,6 +3,17 @@
 
 export default [
   {
+    type: 'constructor',
+    inputs: [
+      {
+        name: '_eventEmitter',
+        type: 'address',
+        internalType: 'contract IEventEmitter'
+      }
+    ],
+    stateMutability: 'nonpayable'
+  },
+  {
     type: 'function',
     name: 'checkAction',
     inputs: [
@@ -37,6 +48,19 @@ export default [
         name: '',
         type: 'uint256',
         internalType: 'uint256'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'eventEmitter',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'contract IEventEmitter'
       }
     ],
     stateMutability: 'view'
@@ -199,31 +223,6 @@ export default [
       }
     ],
     stateMutability: 'pure'
-  },
-  {
-    type: 'event',
-    name: 'PolicySet',
-    inputs: [
-      {
-        name: 'id',
-        type: 'bytes32',
-        indexed: true,
-        internalType: 'ConfigId'
-      },
-      {
-        name: 'multiplexer',
-        type: 'address',
-        indexed: true,
-        internalType: 'address'
-      },
-      {
-        name: 'account',
-        type: 'address',
-        indexed: true,
-        internalType: 'address'
-      }
-    ],
-    anonymous: false
   },
   {
     type: 'error',

@@ -39,7 +39,7 @@ contract FeeMarketplaceTest is BasicSetup {
 
         dictator.setAccess(feeMarketplaceStore, address(feeMarketplace));
 
-        dictator.registerContract(feeMarketplace);
+        dictator.registerContract(address(feeMarketplace));
 
         vm.startPrank(users.owner);
 

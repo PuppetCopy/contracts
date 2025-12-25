@@ -14,7 +14,6 @@ library Error {
     error Dictatorship__ContractNotRegistered();
     error Dictatorship__ContractAlreadyInitialized();
     error Dictatorship__ConfigurationUpdateFailed();
-    error Dictatorship__InvalidTargetAddress();
     error Dictatorship__InvalidCoreContract();
 
     error BankStore__InsufficientBalance();
@@ -59,6 +58,7 @@ library Error {
     error Allocation__AlreadyRegistered();
     error Allocation__AlreadyUnregistered();
     error Allocation__TransferFailed();
+    error Allocation__InsufficientMasterAllocation(uint available, uint required);
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();

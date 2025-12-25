@@ -18,6 +18,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
     struct Config {
         uint maxPuppetList;
         uint transferOutGasLimit;
+        uint callGasLimit;
     }
 
     Config public config;
@@ -197,31 +198,22 @@ contract Allocation is CoreContract, IExecutor, IHook {
         }
 
         bytes32 _key = PositionUtils.getMatchingKey(_collateralToken, _masterAddr);
-        uint _cumulative = _settle(_key, _collateralToken);
+        _settle(_key, _collateralToken);
         uint _epoch = currentEpoch[_key];
         if (epochRemaining[_key][_epoch] == 0) {
             currentEpoch[_key] = ++_epoch;
             epochRemaining[_key][_epoch] = Precision.FLOAT_PRECISION;
         }
 
-        if (subaccountMap[_key] == IERC7579Account(address(0))) {
+        if (address(subaccountMap[_key]) == address(0)) {
             subaccountMap[_key] = _master;
             masterCollateralList[_master].push(_collateralToken);
         }
 
-        // Track master's own allocation (skin in the game)
-        uint _masterUtilized = 0;
-        if (_masterAllocation > 0) {
-            uint _allocation = allocationBalance[_key][_masterAddr] += _masterAllocation;
-            _masterUtilized = getUtilization(_key, _masterAddr);
-            if (_masterUtilized == 0) {
-                userEpoch[_key][_masterAddr] = _epoch;
-                userRemainingCheckpoint[_key][_masterAddr] = epochRemaining[_key][_epoch];
-                userAllocationSnapshot[_key][_masterAddr] = _allocation;
-            }
-        }
+        // Snapshot recorded balance after _settle to verify master's contribution
+        uint _recordedBefore = subaccountRecordedBalance[_key];
 
-        uint _total = _masterAllocation;
+        uint _puppetTotal = 0;
         uint[] memory _puppetUtilList = new uint[](_puppetCount);
 
         for (uint _i = 0; _i < _puppetCount; ++_i) {
@@ -232,6 +224,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
             bytes memory _result = _executeFromExecutor(
                 _master,
                 _puppet,
+                config.callGasLimit,
                 abi.encodeCall(
                     IERC7579Account.execute,
                     (ModeLib.encodeSimpleSingle(), ExecutionLib.encodeSingle(address(_collateralToken), 0, abi.encodeCall(IERC20.transfer, (_masterAddr, _amount))))
@@ -251,9 +244,32 @@ contract Allocation is CoreContract, IExecutor, IHook {
             }
 
             _puppetUtilList[_i] = _utilized;
-            _total += _amount;
+            _puppetTotal += _amount;
         }
 
+        // Verify master's contribution: unrecorded balance minus puppet transfers
+        uint _balanceAfter = _collateralToken.balanceOf(_masterAddr);
+        uint _unrecorded = _balanceAfter > _recordedBefore ? _balanceAfter - _recordedBefore : 0;
+        uint _verifiedMasterContribution = _unrecorded > _puppetTotal ? _unrecorded - _puppetTotal : 0;
+
+        // Master must have at least _masterAllocation available
+        if (_verifiedMasterContribution < _masterAllocation) {
+            revert Error.Allocation__InsufficientMasterAllocation(_verifiedMasterContribution, _masterAllocation);
+        }
+
+        // Track master's own allocation (skin in the game)
+        uint _masterUtilized = 0;
+        if (_masterAllocation > 0) {
+            uint _allocation = allocationBalance[_key][_masterAddr] += _masterAllocation;
+            _masterUtilized = getUtilization(_key, _masterAddr);
+            if (_masterUtilized == 0) {
+                userEpoch[_key][_masterAddr] = _epoch;
+                userRemainingCheckpoint[_key][_masterAddr] = epochRemaining[_key][_epoch];
+                userAllocationSnapshot[_key][_masterAddr] = _allocation;
+            }
+        }
+
+        uint _total = _masterAllocation + _puppetTotal;
         if (_total == 0) revert Error.Allocation__ZeroAllocation();
 
         totalAllocation[_key] += _total;
@@ -269,23 +285,19 @@ contract Allocation is CoreContract, IExecutor, IHook {
         uint _epoch = currentEpoch[_key];
         uint _utilized = getUtilization(_key, _user);
         uint _allocation = allocationBalance[_key][_user];
-        uint _realized = 0;
+        uint _checkpoint = userSettlementCheckpoint[_key][_user];
 
-        if (_utilized > 0) {
-            uint _checkpoint = userSettlementCheckpoint[_key][_user];
-
-            // First claim - use epoch baseline (set at first utilization)
-            if (_checkpoint == 0) {
-                _checkpoint = epochFirstUtilizationCumulative[_key][userEpoch[_key][_user]];
-            }
-
-            if (_cumulative <= _checkpoint) revert Error.Allocation__UtilizationNotSettled(_utilized);
-
-            _realized = Precision.applyFactor(_cumulative - _checkpoint, _utilized);
-            totalUtilization[_key] -= _utilized;
-            totalAllocation[_key] += _realized;
-            _allocation = _allocation + _realized - _utilized;
+        // First claim - use epoch baseline (set at first utilization)
+        if (_checkpoint == 0) {
+            _checkpoint = epochFirstUtilizationCumulative[_key][userEpoch[_key][_user]];
         }
+
+        if (_cumulative <= _checkpoint) revert Error.Allocation__UtilizationNotSettled(_utilized);
+
+        uint _realized = Precision.applyFactor(_cumulative - _checkpoint, _utilized);
+        totalUtilization[_key] -= _utilized;
+        totalAllocation[_key] += _realized;
+        _allocation = _allocation + _realized - _utilized;
 
         if (_amount > 0) {
             if (_allocation < _amount) revert Error.Allocation__InsufficientAllocation(_allocation, _amount);
@@ -317,7 +329,8 @@ contract Allocation is CoreContract, IExecutor, IHook {
     }
 
     function _executeFromExecutor(IERC7579Account _from, address _to, uint _gas, bytes memory _data) internal returns (bytes memory) {
-        return _from.executeFromExecutor{gas: _gas}(ModeLib.encodeSimpleSingle(), ExecutionLib.encodeSingle(_to, 0, _data))[0];
+        ModeCode _mode = ModeLib.encode(CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT, ModePayload.wrap(0x00));
+        return _from.executeFromExecutor{gas: _gas}(_mode, ExecutionLib.encodeSingle(_to, 0, _data))[0];
     }
 
     function _settle(bytes32 _key, IERC20 _token) internal returns (uint _cumulative) {
@@ -349,6 +362,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
         Config memory _config = abi.decode(_data, (Config));
         if (_config.maxPuppetList == 0) revert("Invalid max puppet list");
         if (_config.transferOutGasLimit == 0) revert("Invalid transfer out gas limit");
+        if (_config.callGasLimit == 0) revert("Invalid call gas limit");
         config = _config;
     }
 }
