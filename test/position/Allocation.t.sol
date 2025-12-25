@@ -87,7 +87,6 @@ contract AllocationTest is Test {
      * @dev Router calls allocate() with master as parameter
      */
     function _allocate(
-        uint _masterAllocation,
         address[] memory _puppetList,
         uint[] memory _puppetAllocations
     ) internal {
@@ -96,7 +95,6 @@ contract AllocationTest is Test {
         allocation.allocate(
             usdc,
             address(masterAccount),
-            _masterAllocation,
             _puppetList,
             _puppetAllocations
         );
@@ -128,7 +126,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         assertEq(allocation.allocationBalance(matchingKey, address(puppetAccount)), 500e6, "Puppet allocation should be 500");
         assertEq(allocation.totalAllocation(matchingKey), 500e6, "Total allocation should be 500");
@@ -164,7 +162,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         // Utilize: master uses 500 USDC
         _utilize(matchingKey, 500e6);
@@ -197,7 +195,7 @@ contract AllocationTest is Test {
         allocations[0] = 300e6;
         allocations[1] = 600e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         assertEq(allocation.totalAllocation(matchingKey), 900e6, "Total allocation should be 900");
 
@@ -232,7 +230,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         // Withdraw (no utilization yet, so can withdraw)
         vm.prank(owner);
@@ -255,7 +253,6 @@ contract AllocationTest is Test {
         allocation.allocate(
             usdc,
             address(masterAccount),
-            0,
             puppetList,
             allocations
         );
@@ -279,7 +276,7 @@ contract AllocationTest is Test {
         amounts[1] = 500e6;
 
         // Allocate - puppetRejected should be skipped, puppetAllowed should succeed
-        _allocate(0, puppetList, amounts);
+        _allocate(puppetList, amounts);
 
         // Only puppetAllowed's allocation should be recorded
         assertEq(allocation.allocationBalance(matchingKey, address(puppetAllowed)), 500e6);
@@ -304,7 +301,6 @@ contract AllocationTest is Test {
         allocation.allocate(
             usdc,
             address(masterAccount),
-            0,
             puppetList,
             amounts
         );
@@ -320,51 +316,6 @@ contract AllocationTest is Test {
     }
 
     // ============ Distribution Tests ============
-
-    function test_masterOwnAllocation_profit() public {
-        // Setup: puppet and master both contribute
-        TestSmartAccount puppetAccount = _createPuppetAccount(puppet1);
-        usdc.mint(address(puppetAccount), 1000e6);
-        usdc.mint(address(masterAccount), 200e6); // Master has exactly the amount they'll allocate
-
-        bytes32 matchingKey = _getMatchingKey();
-
-        // Allocate: puppet = 300, master = 200
-        address[] memory puppetList = new address[](1);
-        puppetList[0] = address(puppetAccount);
-        uint[] memory allocations = new uint[](1);
-        allocations[0] = 300e6;
-
-        vm.prank(owner);
-        allocation.allocate(
-            usdc,
-            address(masterAccount),
-            200e6, // Master's own allocation
-            puppetList,
-            allocations
-        );
-
-        assertEq(allocation.totalAllocation(matchingKey), 500e6, "Total should be 500");
-        assertEq(allocation.allocationBalance(matchingKey, address(puppetAccount)), 300e6, "Puppet allocation");
-        assertEq(allocation.allocationBalance(matchingKey, address(masterAccount)), 200e6, "Master allocation");
-        assertEq(usdc.balanceOf(address(masterAccount)), 500e6, "Master account should have 500 (200 + 300)");
-
-        // Utilize all
-        _utilize(matchingKey, 500e6);
-
-        // 50% profit -> 750 returned
-        _depositSettlement(750e6);
-
-        // Realize both (settle is called internally by withdraw)
-        vm.prank(owner);
-        allocation.withdraw(usdc, matchingKey, address(puppetAccount), 0);
-        vm.prank(owner);
-        allocation.withdraw(usdc, matchingKey, address(masterAccount), 0);
-
-        // puppet: 300 * 1.5 = 450, master: 200 * 1.5 = 300
-        assertEq(allocation.allocationBalance(matchingKey, address(puppetAccount)), 450e6, "Puppet should have 450");
-        assertEq(allocation.allocationBalance(matchingKey, address(masterAccount)), 300e6, "Master should have 300");
-    }
 
     function test_partialUtilization_distribution() public {
         // Setup: two puppets
@@ -383,7 +334,7 @@ contract AllocationTest is Test {
         allocations[0] = 400e6;
         allocations[1] = 600e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         // Utilize only 50% (500 of 1000)
         _utilize(matchingKey, 500e6);
@@ -435,7 +386,7 @@ contract AllocationTest is Test {
         allocations[1] = 200e6;
         allocations[2] = 300e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         // Utilize all
         _utilize(matchingKey, 600e6);
@@ -470,12 +421,12 @@ contract AllocationTest is Test {
 
         // First allocation: 500
         allocations[0] = 500e6;
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
         assertEq(allocation.allocationBalance(matchingKey, address(puppetAccount)), 500e6, "First allocation");
 
         // Second allocation: 300 more
         allocations[0] = 300e6;
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
         assertEq(allocation.allocationBalance(matchingKey, address(puppetAccount)), 800e6, "After second allocation");
         assertEq(allocation.totalAllocation(matchingKey), 800e6, "Total after two allocations");
 
@@ -502,7 +453,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         // Utilize funds
         _utilize(matchingKey, 500e6);
@@ -532,7 +483,6 @@ contract AllocationTest is Test {
         allocation.allocate(
             usdc,
             address(masterAccount),
-            0,
             puppetList,
             allocations
         );
@@ -553,7 +503,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         // No utilization - master can uninstall
         assertTrue(allocation.registeredSubaccount(masterAccount), "Should be registered before uninstall");
@@ -580,7 +530,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         // Utilize funds (position opened)
         _utilize(matchingKey, 500e6);
@@ -607,7 +557,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         // Utilize all
         _utilize(matchingKey, 500e6);
@@ -646,7 +596,6 @@ contract AllocationTest is Test {
         allocation.allocate(
             usdc,
             address(masterAccount),
-            0,
             puppetList,
             allocations
         );
@@ -677,7 +626,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         assertEq(usdc.balanceOf(address(masterAccount)), 500e6, "Master should have 500");
         assertEq(allocation.totalUtilization(matchingKey), 0, "No utilization yet");
@@ -703,7 +652,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         // Utilize via hooks
         _utilize(bytes32(0), 500e6);
@@ -736,7 +685,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         uint utilizationBefore = allocation.totalUtilization(matchingKey);
         uint allocationBefore = allocation.totalAllocation(matchingKey);
@@ -788,7 +737,7 @@ contract AllocationTest is Test {
         allocations[0] = 400e6;
         allocations[1] = 600e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
         _utilize(matchingKey, 1000e6);
         _depositSettlement(1200e6); // 20% profit
 
@@ -824,7 +773,7 @@ contract AllocationTest is Test {
         allocations[1] = 600e6;
 
         // Allocate and utilize
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
         _utilize(matchingKey, 1000e6);
         _depositSettlement(1200e6); // 20% profit
 
@@ -837,7 +786,7 @@ contract AllocationTest is Test {
         // Puppet1 re-allocates their 480e6
         allocations[0] = 480e6;
         allocations[1] = 0;
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         // Utilize puppet1's new 480e6, but puppet2's 600e6 util is still in totalUtil
         // totalUtil = 600e6 (puppet2's unclaimed) + 480e6 (puppet1's new) = 1080e6
@@ -889,7 +838,7 @@ contract AllocationTest is Test {
         // First allocation
         allocations[0] = 300e6;
         allocations[1] = 700e6;
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         // Full utilize and settle
         _utilize(matchingKey, 1000e6);
@@ -903,7 +852,7 @@ contract AllocationTest is Test {
         // New epoch starts (puppet1 re-allocates)
         allocations[0] = 450e6;
         allocations[1] = 0; // puppet2 doesn't add more
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         // Puppet2 claims now (after new epoch started)
         // Should still get correct amount from first cycle
@@ -926,7 +875,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
         _utilize(matchingKey, 500e6);
 
         // Near-total loss - deposit 1 wei to trigger settlement
@@ -952,7 +901,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
         _utilize(matchingKey, 500e6);
 
         // Break even - same amount returns
@@ -975,7 +924,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 1; // 1 wei allocation
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
         _utilize(matchingKey, 1); // 1 wei utilization
 
         // Settlement with profit
@@ -1004,13 +953,13 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
         _utilize(matchingKey, 500e6);
 
         // Puppet1 has active utilization, puppet2 joins
         puppetList[0] = address(puppetAccount2);
         allocations[0] = 300e6;
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         // Check states
         assertEq(allocation.getUserUtilization(matchingKey, address(puppetAccount1)), 500e6, "Puppet1 full utilization");
@@ -1058,7 +1007,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         vm.prank(address(masterAccount));
         usdc.approve(address(allocation), type(uint).max);
@@ -1081,7 +1030,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 1000e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
 
         // Partial utilize
         _utilize(matchingKey, 400e6);
@@ -1119,7 +1068,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
         _utilize(matchingKey, 500e6);
         _depositSettlement(600e6);
 
@@ -1147,7 +1096,7 @@ contract AllocationTest is Test {
         uint[] memory allocations = new uint[](1);
         allocations[0] = 500e6;
 
-        _allocate(0, puppetList, allocations);
+        _allocate(puppetList, allocations);
         _utilize(matchingKey, 500e6);
 
         // Before settlement

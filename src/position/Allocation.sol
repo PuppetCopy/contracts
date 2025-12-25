@@ -180,7 +180,6 @@ contract Allocation is CoreContract, IExecutor, IHook {
     function allocate(
         IERC20 _collateralToken,
         address _masterAddr,
-        uint _masterAllocation,
         address[] calldata _puppetList,
         uint[] calldata _allocationList
     ) external auth {
@@ -209,7 +208,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
             _subaccountTokenList[_master].push(_collateralToken);
         }
 
-        uint _puppetTotal = 0;
+        uint _total = 0;
         uint[] memory _puppetUtilList = new uint[](_puppetCount);
 
         for (uint _i = 0; _i < _puppetCount; ++_i) {
@@ -233,25 +232,16 @@ contract Allocation is CoreContract, IExecutor, IHook {
             if (_utilized == 0) _updateUserCheckpoints(_key, _puppet, _epoch, _cumulative, _allocation);
 
             _puppetUtilList[_i] = _utilized;
-            _puppetTotal += _amount;
+            _total += _amount;
         }
 
-        uint _masterUtilized = 0;
-        if (_masterAllocation > 0) {
-            uint _allocation = allocationBalance[_key][_masterAddr] += _masterAllocation;
-            _masterUtilized = getUserUtilization(_key, _masterAddr);
-            if (_masterUtilized == 0) _updateUserCheckpoints(_key, _masterAddr, _epoch, _cumulative, _allocation);
-        }
-
-        uint _total = _masterAllocation + _puppetTotal;
         if (_total == 0) revert Error.Allocation__ZeroAllocation();
 
         totalAllocation[_key] += _total;
         subaccountRecordedBalance[_key] += _total;
 
         _logEvent("Allocate", abi.encode(
-            _key, _collateralToken, _master, _masterAllocation, _masterUtilized,
-            _puppetTotal, _total, _puppetList, _allocationList, _puppetUtilList
+            _key, _collateralToken, _master, _total, _puppetList, _allocationList, _puppetUtilList
         ));
     }
 
