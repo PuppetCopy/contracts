@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.31;
+pragma solidity ^0.8.33;
 
 import {IGmxExchangeRouter} from "src/position/interface/IGmxExchangeRouter.sol";
 import {IBaseOrderUtils} from "src/position/interface/IGmxTypes.sol";

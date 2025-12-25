@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 
-pragma solidity ^0.8.31;
+pragma solidity ^0.8.33;
 
 interface IGmxOracle {
     function getStablePrice(address dataStore, address token) external view returns (uint);

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.31;
+pragma solidity ^0.8.33;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -119,6 +119,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
                 if (_utilized > 0) revert Error.Allocation__ActiveUtilization(_utilized);
             }
             delete masterCollateralList[_master];
+            // TODO: clear subaccountMap entries for each _key
         }
     }
 
@@ -153,6 +154,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
             uint _utilized = _recorded - _actual;
             uint _totalAlloc = totalAllocation[_key];
             if (_totalAlloc == 0) revert Error.Allocation__ZeroAllocation();
+            if (_utilized > _totalAlloc) revert Error.Allocation__UtilizationExceedsAllocation(_utilized, _totalAlloc);
 
             uint _epoch = currentEpoch[_key];
             uint _remaining = epochRemaining[_key][_epoch];
@@ -231,7 +233,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
                 )
             );
 
-            if (_result.length > 0) continue;
+            if (_result.length == 0) continue;
 
             uint _allocation = allocationBalance[_key][_puppet] += _amount;
             uint _utilized = getUtilization(_key, _puppet);
@@ -285,19 +287,22 @@ contract Allocation is CoreContract, IExecutor, IHook {
         uint _epoch = currentEpoch[_key];
         uint _utilized = getUtilization(_key, _user);
         uint _allocation = allocationBalance[_key][_user];
-        uint _checkpoint = userSettlementCheckpoint[_key][_user];
+        uint _realized = 0;
+        if (_utilized > 0) {
+            uint _checkpoint = userSettlementCheckpoint[_key][_user];
 
-        // First claim - use epoch baseline (set at first utilization)
-        if (_checkpoint == 0) {
-            _checkpoint = epochFirstUtilizationCumulative[_key][userEpoch[_key][_user]];
+            // First claim - use epoch baseline (set at first utilization)
+            if (_checkpoint == 0) {
+                _checkpoint = epochFirstUtilizationCumulative[_key][userEpoch[_key][_user]];
+            }
+
+            if (_cumulative <= _checkpoint) revert Error.Allocation__UtilizationNotSettled(_utilized);
+
+            _realized = Precision.applyFactor(_cumulative - _checkpoint, _utilized);
+            totalUtilization[_key] -= _utilized;
+            totalAllocation[_key] += _realized;
+            _allocation = _allocation + _realized - _utilized;
         }
-
-        if (_cumulative <= _checkpoint) revert Error.Allocation__UtilizationNotSettled(_utilized);
-
-        uint _realized = Precision.applyFactor(_cumulative - _checkpoint, _utilized);
-        totalUtilization[_key] -= _utilized;
-        totalAllocation[_key] += _realized;
-        _allocation = _allocation + _realized - _utilized;
 
         if (_amount > 0) {
             if (_allocation < _amount) revert Error.Allocation__InsufficientAllocation(_allocation, _amount);
@@ -312,7 +317,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
             bytes memory _result = _executeFromExecutor(
                 subaccountMap[_key], address(_token), config.transferOutGasLimit, abi.encodeCall(IERC20.transfer, (_user, _amount))
             );
-            if (_result.length > 0 && !abi.decode(_result, (bool))) {
+            if (_result.length == 0 || !abi.decode(_result, (bool))) {
                 revert Error.Allocation__TransferFailed();
             }
             subaccountRecordedBalance[_key] -= _amount;

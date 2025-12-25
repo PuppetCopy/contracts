@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.31;
+pragma solidity ^0.8.33;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -59,6 +59,7 @@ library Error {
     error Allocation__AlreadyUnregistered();
     error Allocation__TransferFailed();
     error Allocation__InsufficientMasterAllocation(uint available, uint required);
+    error Allocation__UtilizationExceedsAllocation(uint utilized, uint allocated);
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.31;
+pragma solidity ^0.8.33;
 
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";

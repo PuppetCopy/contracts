@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.31;
+pragma solidity ^0.8.33;
 
 library Const {
     address constant dao = 0x145E9Ee481Bb885A49E1fF4c1166222587D61916;

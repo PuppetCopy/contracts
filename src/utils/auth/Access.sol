@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.31;
+pragma solidity ^0.8.33;
 
 import {TransientSlot} from "@openzeppelin/contracts/utils/TransientSlot.sol";
 import {Error} from "./../../utils/Error.sol"; // Adjust path
