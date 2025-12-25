@@ -415,7 +415,7 @@ export default [
                   },
                   {
                     internalType: 'address',
-                    name: 'trader',
+                    name: 'master',
                     type: 'address'
                   },
                   {
@@ -435,7 +435,7 @@ export default [
                   },
                   {
                     internalType: 'uint256',
-                    name: 'traderDiscountFactor',
+                    name: 'masterDiscountFactor',
                     type: 'uint256'
                   },
                   {
@@ -445,7 +445,7 @@ export default [
                   },
                   {
                     internalType: 'uint256',
-                    name: 'traderDiscountAmount',
+                    name: 'masterDiscountAmount',
                     type: 'uint256'
                   },
                   {
@@ -462,17 +462,17 @@ export default [
                 components: [
                   {
                     internalType: 'uint256',
-                    name: 'traderTier',
+                    name: 'masterTier',
                     type: 'uint256'
                   },
                   {
                     internalType: 'uint256',
-                    name: 'traderDiscountFactor',
+                    name: 'masterDiscountFactor',
                     type: 'uint256'
                   },
                   {
                     internalType: 'uint256',
-                    name: 'traderDiscountAmount',
+                    name: 'masterDiscountAmount',
                     type: 'uint256'
                   }
                 ],
@@ -3202,7 +3202,7 @@ export default [
                   },
                   {
                     internalType: 'address',
-                    name: 'trader',
+                    name: 'master',
                     type: 'address'
                   },
                   {
@@ -3222,7 +3222,7 @@ export default [
                   },
                   {
                     internalType: 'uint256',
-                    name: 'traderDiscountFactor',
+                    name: 'masterDiscountFactor',
                     type: 'uint256'
                   },
                   {
@@ -3232,7 +3232,7 @@ export default [
                   },
                   {
                     internalType: 'uint256',
-                    name: 'traderDiscountAmount',
+                    name: 'masterDiscountAmount',
                     type: 'uint256'
                   },
                   {
@@ -3249,17 +3249,17 @@ export default [
                 components: [
                   {
                     internalType: 'uint256',
-                    name: 'traderTier',
+                    name: 'masterTier',
                     type: 'uint256'
                   },
                   {
                     internalType: 'uint256',
-                    name: 'traderDiscountFactor',
+                    name: 'masterDiscountFactor',
                     type: 'uint256'
                   },
                   {
                     internalType: 'uint256',
-                    name: 'traderDiscountAmount',
+                    name: 'masterDiscountAmount',
                     type: 'uint256'
                   }
                 ],
@@ -3717,7 +3717,7 @@ export default [
                   },
                   {
                     internalType: 'address',
-                    name: 'trader',
+                    name: 'master',
                     type: 'address'
                   },
                   {
@@ -3737,7 +3737,7 @@ export default [
                   },
                   {
                     internalType: 'uint256',
-                    name: 'traderDiscountFactor',
+                    name: 'masterDiscountFactor',
                     type: 'uint256'
                   },
                   {
@@ -3747,7 +3747,7 @@ export default [
                   },
                   {
                     internalType: 'uint256',
-                    name: 'traderDiscountAmount',
+                    name: 'masterDiscountAmount',
                     type: 'uint256'
                   },
                   {
@@ -3764,17 +3764,17 @@ export default [
                 components: [
                   {
                     internalType: 'uint256',
-                    name: 'traderTier',
+                    name: 'masterTier',
                     type: 'uint256'
                   },
                   {
                     internalType: 'uint256',
-                    name: 'traderDiscountFactor',
+                    name: 'masterDiscountFactor',
                     type: 'uint256'
                   },
                   {
                     internalType: 'uint256',
-                    name: 'traderDiscountAmount',
+                    name: 'masterDiscountAmount',
                     type: 'uint256'
                   }
                 ],

@@ -71,7 +71,7 @@ export default [
       { indexed: false, internalType: 'address', name: 'account', type: 'address' },
       { indexed: false, internalType: 'bytes32', name: 'code', type: 'bytes32' }
     ],
-    name: 'SetTraderReferralCode',
+    name: 'SetMasterReferralCode',
     type: 'event'
   },
   {
@@ -90,7 +90,7 @@ export default [
   },
   {
     inputs: [{ internalType: 'address', name: '_account', type: 'address' }],
-    name: 'getTraderReferralInfo',
+    name: 'getMasterReferralInfo',
     outputs: [
       { internalType: 'bytes32', name: '', type: 'bytes32' },
       { internalType: 'address', name: '', type: 'address' }
@@ -203,14 +203,14 @@ export default [
       { internalType: 'address', name: '_account', type: 'address' },
       { internalType: 'bytes32', name: '_code', type: 'bytes32' }
     ],
-    name: 'setTraderReferralCode',
+    name: 'setMasterReferralCode',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function'
   },
   {
     inputs: [{ internalType: 'bytes32', name: '_code', type: 'bytes32' }],
-    name: 'setTraderReferralCodeByUser',
+    name: 'setMasterReferralCodeByUser',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function'
@@ -227,7 +227,7 @@ export default [
   },
   {
     inputs: [{ internalType: 'address', name: '', type: 'address' }],
-    name: 'traderReferralCodes',
+    name: 'masterReferralCodes',
     outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
     stateMutability: 'view',
     type: 'function'

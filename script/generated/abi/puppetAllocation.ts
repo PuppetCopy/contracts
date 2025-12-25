@@ -19,6 +19,11 @@ export default [
             name: 'maxPuppetList',
             type: 'uint256',
             internalType: 'uint256'
+          },
+          {
+            name: 'transferOutGasLimit',
+            type: 'uint256',
+            internalType: 'uint256'
           }
         ]
       }
@@ -35,12 +40,12 @@ export default [
         internalType: 'contract IERC20'
       },
       {
-        name: '_trader',
+        name: '_masterAddr',
         type: 'address',
-        internalType: 'contract IERC7579Account'
+        internalType: 'address'
       },
       {
-        name: '_traderAllocation',
+        name: '_masterAllocation',
         type: 'uint256',
         internalType: 'uint256'
       },
@@ -63,12 +68,12 @@ export default [
     name: 'allocationBalance',
     inputs: [
       {
-        name: 'traderMatchingKey',
+        name: '',
         type: 'bytes32',
         internalType: 'bytes32'
       },
       {
-        name: 'user',
+        name: '',
         type: 'address',
         internalType: 'address'
       }
@@ -128,6 +133,11 @@ export default [
         name: 'maxPuppetList',
         type: 'uint256',
         internalType: 'uint256'
+      },
+      {
+        name: 'transferOutGasLimit',
+        type: 'uint256',
+        internalType: 'uint256'
       }
     ],
     stateMutability: 'view'
@@ -137,7 +147,7 @@ export default [
     name: 'cumulativeSettlementPerUtilization',
     inputs: [
       {
-        name: 'traderMatchingKey',
+        name: '',
         type: 'bytes32',
         internalType: 'bytes32'
       }
@@ -156,7 +166,7 @@ export default [
     name: 'currentEpoch',
     inputs: [
       {
-        name: 'traderMatchingKey',
+        name: '',
         type: 'bytes32',
         internalType: 'bytes32'
       }
@@ -175,12 +185,12 @@ export default [
     name: 'epochRemaining',
     inputs: [
       {
-        name: 'traderMatchingKey',
+        name: '',
         type: 'bytes32',
         internalType: 'bytes32'
       },
       {
-        name: 'epoch',
+        name: '',
         type: 'uint256',
         internalType: 'uint256'
       }
@@ -199,7 +209,7 @@ export default [
     name: 'getAvailableAllocation',
     inputs: [
       {
-        name: '_traderMatchingKey',
+        name: '_key',
         type: 'bytes32',
         internalType: 'bytes32'
       },
@@ -232,6 +242,11 @@ export default [
             name: 'maxPuppetList',
             type: 'uint256',
             internalType: 'uint256'
+          },
+          {
+            name: 'transferOutGasLimit',
+            type: 'uint256',
+            internalType: 'uint256'
           }
         ]
       }
@@ -262,7 +277,7 @@ export default [
     name: 'getUserUtilization',
     inputs: [
       {
-        name: '_traderMatchingKey',
+        name: '_key',
         type: 'bytes32',
         internalType: 'bytes32'
       },
@@ -350,7 +365,7 @@ export default [
     name: 'pendingSettlement',
     inputs: [
       {
-        name: '_traderMatchingKey',
+        name: '_key',
         type: 'bytes32',
         internalType: 'bytes32'
       },
@@ -374,7 +389,7 @@ export default [
     name: 'pendingSettlement',
     inputs: [
       {
-        name: '_traderMatchingKey',
+        name: '_key',
         type: 'bytes32',
         internalType: 'bytes32'
       },
@@ -403,7 +418,7 @@ export default [
     name: 'postCheck',
     inputs: [
       {
-        name: 'hookData',
+        name: '_hookData',
         type: 'bytes',
         internalType: 'bytes'
       }
@@ -426,7 +441,7 @@ export default [
         internalType: 'uint256'
       },
       {
-        name: 'callData',
+        name: '_callData',
         type: 'bytes',
         internalType: 'bytes'
       }
@@ -442,34 +457,10 @@ export default [
   },
   {
     type: 'function',
-    name: 'realize',
-    inputs: [
-      {
-        name: '_traderMatchingKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
-      },
-      {
-        name: '_user',
-        type: 'address',
-        internalType: 'address'
-      }
-    ],
-    outputs: [
-      {
-        name: '_realized',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
     name: 'registeredSubaccount',
     inputs: [
       {
-        name: 'subaccount',
+        name: '',
         type: 'address',
         internalType: 'contract IERC7579Account'
       }
@@ -521,28 +512,10 @@ export default [
   },
   {
     type: 'function',
-    name: 'settle',
-    inputs: [
-      {
-        name: '_traderMatchingKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
-      },
-      {
-        name: '_collateralToken',
-        type: 'address',
-        internalType: 'contract IERC20'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
     name: 'subaccountMap',
     inputs: [
       {
-        name: 'traderMatchingKey',
+        name: '',
         type: 'bytes32',
         internalType: 'bytes32'
       }
@@ -552,6 +525,25 @@ export default [
         name: '',
         type: 'address',
         internalType: 'contract IERC7579Account'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'subaccountMasterMap',
+    inputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'contract IERC7579Account'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address'
       }
     ],
     stateMutability: 'view'
@@ -561,7 +553,7 @@ export default [
     name: 'subaccountRecordedBalance',
     inputs: [
       {
-        name: 'traderMatchingKey',
+        name: '',
         type: 'bytes32',
         internalType: 'bytes32'
       }
@@ -571,25 +563,6 @@ export default [
         name: '',
         type: 'uint256',
         internalType: 'uint256'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'subaccountTraderMap',
-    inputs: [
-      {
-        name: 'subaccount',
-        type: 'address',
-        internalType: 'contract IERC7579Account'
-      }
-    ],
-    outputs: [
-      {
-        name: 'trader',
-        type: 'address',
-        internalType: 'address'
       }
     ],
     stateMutability: 'view'
@@ -618,7 +591,7 @@ export default [
     name: 'totalAllocation',
     inputs: [
       {
-        name: 'traderMatchingKey',
+        name: '',
         type: 'bytes32',
         internalType: 'bytes32'
       }
@@ -637,7 +610,7 @@ export default [
     name: 'totalUtilization',
     inputs: [
       {
-        name: 'traderMatchingKey',
+        name: '',
         type: 'bytes32',
         internalType: 'bytes32'
       }
@@ -656,12 +629,12 @@ export default [
     name: 'userAllocationSnapshot',
     inputs: [
       {
-        name: 'traderMatchingKey',
+        name: '',
         type: 'bytes32',
         internalType: 'bytes32'
       },
       {
-        name: 'user',
+        name: '',
         type: 'address',
         internalType: 'address'
       }
@@ -680,12 +653,12 @@ export default [
     name: 'userEpoch',
     inputs: [
       {
-        name: 'traderMatchingKey',
+        name: '',
         type: 'bytes32',
         internalType: 'bytes32'
       },
       {
-        name: 'user',
+        name: '',
         type: 'address',
         internalType: 'address'
       }
@@ -704,12 +677,12 @@ export default [
     name: 'userRemainingCheckpoint',
     inputs: [
       {
-        name: 'traderMatchingKey',
+        name: '',
         type: 'bytes32',
         internalType: 'bytes32'
       },
       {
-        name: 'user',
+        name: '',
         type: 'address',
         internalType: 'address'
       }
@@ -728,12 +701,12 @@ export default [
     name: 'userSettlementCheckpoint',
     inputs: [
       {
-        name: 'traderMatchingKey',
+        name: '',
         type: 'bytes32',
         internalType: 'bytes32'
       },
       {
-        name: 'user',
+        name: '',
         type: 'address',
         internalType: 'address'
       }
@@ -749,38 +722,15 @@ export default [
   },
   {
     type: 'function',
-    name: 'utilize',
-    inputs: [
-      {
-        name: '_traderMatchingKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
-      },
-      {
-        name: '_utilization',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: '_executionCalldata',
-        type: 'bytes',
-        internalType: 'bytes'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
     name: 'withdraw',
     inputs: [
       {
-        name: '_collateralToken',
+        name: '_token',
         type: 'address',
         internalType: 'contract IERC20'
       },
       {
-        name: '_traderMatchingKey',
+        name: '_key',
         type: 'bytes32',
         internalType: 'bytes32'
       },
@@ -827,11 +777,6 @@ export default [
   },
   {
     type: 'error',
-    name: 'Allocation__NoUtilization',
-    inputs: []
-  },
-  {
-    type: 'error',
     name: 'Allocation__PuppetListTooLarge',
     inputs: [
       {
@@ -845,6 +790,11 @@ export default [
         internalType: 'uint256'
       }
     ]
+  },
+  {
+    type: 'error',
+    name: 'Allocation__TransferFailed',
+    inputs: []
   },
   {
     type: 'error',
@@ -903,16 +853,5 @@ export default [
     type: 'error',
     name: 'ReentrancyGuardReentrantCall',
     inputs: []
-  },
-  {
-    type: 'error',
-    name: 'SafeERC20FailedOperation',
-    inputs: [
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address'
-      }
-    ]
   }
 ] as const

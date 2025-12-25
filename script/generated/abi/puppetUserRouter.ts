@@ -23,7 +23,7 @@ export default [
         internalType: 'contract IERC20'
       },
       {
-        name: '_traderAllocation',
+        name: '_masterAllocation',
         type: 'uint256',
         internalType: 'uint256'
       },
@@ -56,7 +56,7 @@ export default [
   },
   {
     type: 'function',
-    name: 'realize',
+    name: 'syncAllocation',
     inputs: [
       {
         name: '_collateralToken',
@@ -64,25 +64,7 @@ export default [
         internalType: 'contract IERC20'
       },
       {
-        name: '_trader',
-        type: 'address',
-        internalType: 'address'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'settle',
-    inputs: [
-      {
-        name: '_collateralToken',
-        type: 'address',
-        internalType: 'contract IERC20'
-      },
-      {
-        name: '_trader',
+        name: '_master',
         type: 'address',
         internalType: 'address'
       }
@@ -100,7 +82,7 @@ export default [
         internalType: 'contract IERC20'
       },
       {
-        name: '_trader',
+        name: '_master',
         type: 'address',
         internalType: 'address'
       },

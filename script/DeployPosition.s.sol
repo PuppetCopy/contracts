@@ -13,7 +13,7 @@ import {BaseScript} from "./BaseScript.s.sol";
 
 /**
  * @notice Deploy position contracts: Allocation, Policies
- * @dev Allocation is an ERC-7579 executor+hook module installed on trader accounts
+ * @dev Allocation is an ERC-7579 executor+hook module installed on master accounts
  *      Policies are Smart Sessions compatible - users install them via Rhinestone
  *
  * Deployment order:
@@ -28,8 +28,8 @@ contract DeployPosition is BaseScript {
         // Load existing contracts
         Dictatorship dictatorship = Dictatorship(getDeployedAddress("Dictatorship"));
 
-        // Deploy Allocation (executor + hook module for trader subaccounts)
-        // Traders install this as both executor (type 2) and hook (type 4)
+        // Deploy Allocation (executor + hook module for master subaccounts)
+        // Masters install this as both executor (type 2) and hook (type 4)
         Allocation allocation = new Allocation(
             dictatorship,
             Allocation.Config({maxPuppetList: 100, transferOutGasLimit: 200_000})
@@ -38,7 +38,7 @@ contract DeployPosition is BaseScript {
         console.log("Allocation:", address(allocation));
 
         // Deploy Smart Sessions policies (stateless, puppets install via Smart Sessions)
-        // These validate transfers from puppet accounts to trader subaccounts
+        // These validate transfers from puppet accounts to master subaccounts
         AllowedRecipientPolicy allowedRecipientPolicy = new AllowedRecipientPolicy();
         AllowanceRatePolicy allowanceRatePolicy = new AllowanceRatePolicy();
         ThrottlePolicy throttlePolicy = new ThrottlePolicy();
