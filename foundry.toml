@@ -17,6 +17,9 @@
     "@ERC4337/account-abstraction/=lib/modulekit/node_modules/@ERC4337/account-abstraction/",
     "account-abstraction/=lib/account-abstraction/contracts/",
     "solady/=lib/solady/src/",
+    "gmx-synthetics/=lib/gmx-synthetics/contracts/",
+    "prb-math/=lib/prb-math/",
+    "@chainlink/contracts/=lib/chainlink/contracts/",
     "src/=src/",
     "test/=test/"
   ]

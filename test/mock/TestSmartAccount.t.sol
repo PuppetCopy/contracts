@@ -33,10 +33,10 @@ contract TestSmartAccount is IERC7579Account {
 
         (CallType callType, ExecType execType,,) = mode.decode();
 
-        // preCheck
+        // preCheck - pass full msg.data per ERC-7579 spec
         bytes memory hookData;
         if (installedHook != address(0)) {
-            hookData = IHook(installedHook).preCheck(msg.sender, 0, executionCalldata);
+            hookData = IHook(installedHook).preCheck(msg.sender, msg.value, msg.data);
         }
 
         if (callType == CALLTYPE_SINGLE) {
@@ -71,6 +71,9 @@ contract TestSmartAccount is IERC7579Account {
         ModeCode mode,
         bytes calldata executionCalldata
     ) external payable returns (bytes[] memory returnData) {
+        // Caller must be installed as executor
+        if (!_modules[MODULE_TYPE_EXECUTOR][msg.sender]) revert CallerNotAuthorized();
+
         (CallType callType, ExecType execType,,) = mode.decode();
 
         if (callType == CALLTYPE_SINGLE) {

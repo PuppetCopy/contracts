@@ -60,8 +60,14 @@ library Error {
     error Allocation__TransferFailed();
     error Allocation__InsufficientMasterAllocation(uint available, uint required);
     error Allocation__UtilizationExceedsAllocation(uint utilized, uint allocated);
+    error Allocation__ArrayLengthMismatch(uint puppetCount, uint allocationCount);
+    error Allocation__TargetNotWhitelisted(address target);
+    error Allocation__DelegateCallNotAllowed();
+    error Allocation__InvalidCallType();
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();
     error FeeMarketplace__InvalidConfig();
+
+    error VenueRegistry__ContractNotWhitelisted(address venue);
 }

@@ -290,7 +290,9 @@ async function main(): Promise<void> {
   if (!skipGmx) {
     // Check if @gmx package exists before attempting GMX generation
     const gmxPath = './node_modules/@gmx'
-    const gmxExists = await Bun.file(`${gmxPath}/deployments`).exists().catch(() => false)
+    const gmxExists = await Bun.file(`${gmxPath}/deployments`)
+      .exists()
+      .catch(() => false)
     if (gmxExists) {
       await generateGmx()
       await generateGmxIndex()

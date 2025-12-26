@@ -1,4 +1,10 @@
 {
+  "lib/chainlink": {
+    "tag": {
+      "name": "v2.6.0",
+      "rev": "8392f18c79cdae0c2fc44ec89c5fe2b0f1484a2f"
+    }
+  },
   "lib/flatbytes": {
     "tag": {
       "name": "v0.0.1",
@@ -21,6 +27,18 @@
     "tag": {
       "name": "v5.5.0",
       "rev": "fcbae5394ae8ad52d8e580a3477db99814b9d565"
+    }
+  },
+  "lib/openzeppelin-contracts-4": {
+    "tag": {
+      "name": "v4.9.6",
+      "rev": "dc44c9f1a4c3b10af99492eed84f83ed244203f6"
+    }
+  },
+  "lib/prb-math": {
+    "tag": {
+      "name": "v2.5.0",
+      "rev": "8fc0c1a6944af02619a8c0757d480eea1d239331"
     }
   },
   "lib/smartsessions": {

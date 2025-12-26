@@ -10,3 +10,15 @@
 [submodule "lib/flatbytes"]
 	path = lib/flatbytes
 	url = https://github.com/rhinestonewtf/flatbytes
+[submodule "lib/gmx-synthetics"]
+	path = lib/gmx-synthetics
+	url = https://github.com/gmx-io/gmx-synthetics
+[submodule "lib/prb-math"]
+	path = lib/prb-math
+	url = https://github.com/PaulRBerg/prb-math
+[submodule "lib/chainlink"]
+	path = lib/chainlink
+	url = https://github.com/smartcontractkit/chainlink
+[submodule "lib/openzeppelin-contracts-4"]
+	path = lib/openzeppelin-contracts-4
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts

@@ -24,42 +24,30 @@ contract UserRouter {
         allocation = _allocation;
     }
 
-    // ============ Allocation (Master) ============
-
     /**
      * @notice Master gathers allocations from puppets
      * @dev Allocation contract executes transfers from puppet accounts.
      *      Puppet policies validate each transfer.
      * @param _collateralToken The collateral token
-     * @param _masterAllocation Master's own capital (skin in the game)
      * @param _puppetList List of puppet accounts to pull from
      * @param _allocationList Allocation amounts per puppet
      */
     function allocate(
         IERC20 _collateralToken,
-        uint _masterAllocation,
         address[] calldata _puppetList,
         uint[] calldata _allocationList
     ) external {
-        allocation.allocate(
-            _collateralToken,
-            msg.sender,
-            _masterAllocation,
-            _puppetList,
-            _allocationList
-        );
+        allocation.allocate(_collateralToken, msg.sender, _puppetList, _allocationList);
     }
 
-    // ============ Settlement Operations ============
-
     /**
-     * @notice Sync pending settlements for caller's subaccount (lazy claim)
+     * @notice Master deposits own capital (skin in the game)
+     * @dev Must be called by master's 7579 account. Funds must already be in subaccount.
      * @param _collateralToken The collateral token
-     * @param _master The master address
+     * @param _amount Amount to allocate as master's stake
      */
-    function syncAllocation(IERC20 _collateralToken, address _master) external {
-        bytes32 _matchingKey = _getMatchingKey(_collateralToken, _master);
-        allocation.withdraw(_collateralToken, _matchingKey, msg.sender, 0);
+    function masterDeposit(IERC20 _collateralToken, uint _amount) external {
+        allocation.masterDeposit(_collateralToken, msg.sender, _amount);
     }
 
     /**
@@ -68,12 +56,10 @@ contract UserRouter {
      * @param _master The master address
      * @param _amount Amount to withdraw from allocation
      */
-    function withdrawAllocation(IERC20 _collateralToken, address _master, uint _amount) external {
+    function withdraw(IERC20 _collateralToken, address _master, uint _amount) external {
         bytes32 _matchingKey = _getMatchingKey(_collateralToken, _master);
         allocation.withdraw(_collateralToken, _matchingKey, msg.sender, _amount);
     }
-
-    // ============ Internal ============
 
     function _getMatchingKey(IERC20 _collateralToken, address _master) internal pure returns (bytes32) {
         return keccak256(abi.encode(_collateralToken, _master));
