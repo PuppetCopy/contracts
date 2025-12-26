@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC7579ActionPolicy} from "modulekit/module-bases/ERC7579ActionPolicy.sol";
 import {ERC7579PolicyBase} from "modulekit/module-bases/ERC7579PolicyBase.sol";
 import {IPolicy, IActionPolicy, ConfigId} from "modulekit/module-bases/interfaces/IPolicy.sol";
-import {VALIDATION_SUCCESS, VALIDATION_FAILED} from "erc7579/interfaces/IERC7579Module.sol";
+import {VALIDATION_SUCCESS, VALIDATION_FAILED} from "modulekit/accounts/common/interfaces/IERC7579Module.sol";
 import {IEventEmitter} from "../../utils/interfaces/IEventEmitter.sol";
 
 /**

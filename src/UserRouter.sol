@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Allocation} from "./position/Allocation.sol";
-import {IERC7579Account} from "erc7579/interfaces/IERC7579Account.sol";
+import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 
 /**
  * @title UserRouter

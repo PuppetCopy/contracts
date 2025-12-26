@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.23;
 
-import {IERC7579Account, Execution} from "erc7579/interfaces/IERC7579Account.sol";
-import {IModule, IHook} from "erc7579/interfaces/IERC7579Module.sol";
-import {ModeCode, ModeLib, CallType, ExecType, CALLTYPE_SINGLE, CALLTYPE_BATCH, EXECTYPE_DEFAULT, EXECTYPE_TRY} from "erc7579/lib/ModeLib.sol";
+import {IERC7579Account, Execution} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
+import {IModule, IHook} from "modulekit/accounts/common/interfaces/IERC7579Module.sol";
+import {ModeCode, ModeLib, CallType, ExecType, CALLTYPE_SINGLE, CALLTYPE_BATCH, EXECTYPE_DEFAULT, EXECTYPE_TRY} from "modulekit/accounts/common/lib/ModeLib.sol";
 import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
 import {MODULE_TYPE_VALIDATOR, MODULE_TYPE_EXECUTOR, MODULE_TYPE_FALLBACK, MODULE_TYPE_HOOK} from "modulekit/module-bases/utils/ERC7579Constants.sol";
 

@@ -9,19 +9,8 @@
   remappings = [
     "forge-std/=lib/modulekit/node_modules/forge-std/",
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
-    "erc7579/=lib/modulekit/src/accounts/common/",
     "modulekit/=lib/modulekit/src/",
-    "flatbytes/=lib/flatbytes/src/",
-    "@rhinestone/sentinellist/=lib/sentinellist/",
-    "sentinellist/=lib/sentinellist/src/",
-    "@ERC4337/account-abstraction/=lib/modulekit/node_modules/@ERC4337/account-abstraction/",
-    "account-abstraction/=lib/account-abstraction/contracts/",
-    "solady/=lib/solady/src/",
-    "gmx-synthetics/=lib/gmx-synthetics/contracts/",
-    "prb-math/=lib/prb-math/",
-    "@chainlink/contracts/=lib/chainlink/contracts/",
-    "src/=src/",
-    "test/=test/"
+    "gmx-synthetics/=lib/gmx-synthetics/contracts/"
   ]
   evm_version = 'cancun'
   solc_version = '0.8.33'
