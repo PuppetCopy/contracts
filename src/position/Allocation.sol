@@ -31,23 +31,22 @@ contract Allocation is CoreContract, IExecutor, IHook {
     // Balance tracking
     mapping(bytes32 => mapping(address => uint)) public allocationBalance;
     mapping(bytes32 => uint) public totalAllocation;
-    mapping(bytes32 => uint) public totalUtilization;
 
-    // Direct utilization tracking per user
-    mapping(bytes32 => mapping(address => uint)) public userUtilization;
+    // Share-based distribution (priced at NPV for fair distribution)
+    mapping(bytes32 => mapping(address => uint)) public userShares;
+    mapping(bytes32 => uint) public totalShares;
+    mapping(bytes32 => uint) public cumulativeSettlementPerShare;
+    mapping(bytes32 => mapping(address => uint)) public userShareCheckpoint;
+    mapping(bytes32 => uint) public pendingUtilization;
 
-    // Settlement distribution (cumulative per utilization)
-    mapping(bytes32 => uint) public cumulativeSettlementPerUtilization;
-    mapping(bytes32 => mapping(address => uint)) public userSettlementCheckpoint;
-
-    // Subaccount registry
     mapping(bytes32 => IERC7579Account) public subaccountMap;
     mapping(bytes32 => uint) public subaccountRecordedBalance;
     mapping(IERC7579Account => IERC20[]) public masterCollateralList;
 
-    // Open position tracking (subaccount => position keys)
+    // Position tracking
+    mapping(bytes32 => INpvReader) public keyReader;
     mapping(address => bytes32[]) public openPositionKeys;
-    mapping(address => mapping(bytes32 => uint)) public positionKeyIndex; // 1-indexed for existence check
+    mapping(address => mapping(bytes32 => uint)) public positionKeyIndex;
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
@@ -57,43 +56,47 @@ contract Allocation is CoreContract, IExecutor, IHook {
         return config;
     }
 
-    function getUtilization(bytes32 _key, address _user) public view returns (uint) {
-        return userUtilization[_key][_user];
+    function getTotalNPV(bytes32 _key) public view returns (uint) {
+        address _master = address(subaccountMap[_key]);
+        if (_master == address(0)) return 0;
+
+        INpvReader _reader = keyReader[_key];
+        if (address(_reader) == address(0)) return 0;
+
+        bytes32[] memory _posKeys = openPositionKeys[_master];
+        uint _total = 0;
+        for (uint _i = 0; _i < _posKeys.length; ++_i) {
+            int256 _npv = _reader.getPositionNetValue(_posKeys[_i]);
+            if (_npv > 0) _total += uint(_npv);
+        }
+        return _total;
     }
 
-    function getAllocation(bytes32 _key, address _user) external view returns (uint) {
+    function getSharePrice(bytes32 _key) public view returns (uint) {
+        if (totalShares[_key] == 0) return Precision.FLOAT_PRECISION;
+        uint _npv = getTotalNPV(_key);
+        if (_npv == 0) return Precision.FLOAT_PRECISION;
+        return Precision.toFactor(_npv, totalShares[_key]);
+    }
+
+    function getUserValue(bytes32 _key, address _user) external view returns (uint) {
+        uint _shares = userShares[_key][_user];
+        uint _pending = pendingSettlement(_key, _user);
         uint _allocation = allocationBalance[_key][_user];
-        uint _utilized = getUtilization(_key, _user);
-        return _utilized >= _allocation ? 0 : _allocation - _utilized;
+
+        uint _shareValue = Precision.applyFactor(getSharePrice(_key), _shares);
+        return _allocation + _shareValue + _pending;
     }
 
-    function pendingSettlement(bytes32 _key, address _user) external view returns (uint) {
-        uint _util = getUtilization(_key, _user);
-        if (_util == 0) return 0;
+    function pendingSettlement(bytes32 _key, address _user) public view returns (uint) {
+        uint _shares = userShares[_key][_user];
+        if (_shares == 0) return 0;
 
-        uint _checkpoint = userSettlementCheckpoint[_key][_user];
-        uint _cumulative = cumulativeSettlementPerUtilization[_key];
+        uint _checkpoint = userShareCheckpoint[_key][_user];
+        uint _cumulative = cumulativeSettlementPerShare[_key];
         if (_cumulative <= _checkpoint) return 0;
 
-        return Precision.applyFactor(_cumulative - _checkpoint, _util);
-    }
-
-    function getOpenPositions(address _subaccount) external view returns (bytes32[] memory) {
-        return openPositionKeys[_subaccount];
-    }
-
-    function hasOpenPosition(address _subaccount, bytes32 _positionKey) external view returns (bool) {
-        return positionKeyIndex[_subaccount][_positionKey] > 0;
-    }
-
-    /// @notice Get net value of a position for a specific venue target
-    /// @param _venue The venue contract address (e.g., GMX ExchangeRouter)
-    /// @param _positionKey The position key
-    /// @return netValue Position net value (collateral + PnL - fees)
-    function getPositionNetValue(address _venue, bytes32 _positionKey) external view returns (int256) {
-        INpvReader _reader = venueReaders[_venue];
-        if (address(_reader) == address(0)) revert Error.VenueRegistry__ContractNotWhitelisted(_venue);
-        return _reader.getPositionNetValue(_positionKey);
+        return Precision.applyFactor(_cumulative - _checkpoint, _shares);
     }
 
     // ===================== External =====================
@@ -126,15 +129,14 @@ contract Allocation is CoreContract, IExecutor, IHook {
         }
 
         uint _allocated = 0;
-        uint[] memory _puppetUtilList = new uint[](_puppetCount);
-        uint _settleCumulative = cumulativeSettlementPerUtilization[_key];
+        uint[] memory _puppetShareList = new uint[](_puppetCount);
+        uint _cumulative = cumulativeSettlementPerShare[_key];
 
         for (uint _i = 0; _i < _puppetCount; ++_i) {
             address _puppet = _puppetList[_i];
             uint _amount = _allocationList[_i];
             if (_amount == 0) continue;
 
-            // Call executeFromExecutor directly on puppet (Allocation is puppet's executor)
             bytes memory _result = _executeFromExecutor(
                 IERC7579Account(_puppet),
                 address(_collateralToken),
@@ -142,12 +144,10 @@ contract Allocation is CoreContract, IExecutor, IHook {
                 abi.encodeCall(IERC20.transfer, (_masterAddr, _amount))
             );
 
-            // EXECTYPE_TRY returns empty bytes on failure, actual result on success
             if (_result.length == 0 || !abi.decode(_result, (bool))) continue;
 
-            // Record current utilization and sync settlement checkpoint
-            _puppetUtilList[_i] = userUtilization[_key][_puppet];
-            userSettlementCheckpoint[_key][_puppet] = _settleCumulative;
+            _puppetShareList[_i] = userShares[_key][_puppet];
+            userShareCheckpoint[_key][_puppet] = _cumulative;
 
             allocationBalance[_key][_puppet] += _amount;
             _allocated += _amount;
@@ -158,7 +158,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
         totalAllocation[_key] += _allocated;
         subaccountRecordedBalance[_key] += _allocated;
 
-        _logEvent("Allocate", abi.encode(_key, _collateralToken, _master, _allocated, _puppetList, _allocationList, _puppetUtilList));
+        _logEvent("Allocate", abi.encode(_key, _collateralToken, _master, _allocated, _puppetList, _allocationList, _puppetShareList));
     }
 
     function masterDeposit(IERC20 _collateralToken, address _masterAddr, uint _amount) external auth {
@@ -176,34 +176,32 @@ contract Allocation is CoreContract, IExecutor, IHook {
             masterCollateralList[_master].push(_collateralToken);
         }
 
-        // Record current utilization and sync settlement checkpoint
-        uint _util = userUtilization[_key][_masterAddr];
-        userSettlementCheckpoint[_key][_masterAddr] = cumulativeSettlementPerUtilization[_key];
+        uint _shares = userShares[_key][_masterAddr];
+        userShareCheckpoint[_key][_masterAddr] = cumulativeSettlementPerShare[_key];
 
         uint _allocation = allocationBalance[_key][_masterAddr] += _amount;
 
         totalAllocation[_key] += _amount;
         subaccountRecordedBalance[_key] += _amount;
 
-        _logEvent("MasterDeposit", abi.encode(_key, _collateralToken, _master, _amount, _util, _allocation));
+        _logEvent("MasterDeposit", abi.encode(_key, _collateralToken, _master, _amount, _shares, _allocation));
     }
 
     function withdraw(IERC20 _token, bytes32 _key, address _user, uint _amount) external auth {
-        uint _settleCumulative = _settle(_key, _token);
+        uint _cumulative = _settle(_key, _token);
         uint _allocation = allocationBalance[_key][_user];
-        uint _util = userUtilization[_key][_user];
+        uint _shares = userShares[_key][_user];
         uint _realized = 0;
 
-        // Realize utilization settlement
-        if (_util > 0) {
-            uint _checkpoint = userSettlementCheckpoint[_key][_user];
-            if (_settleCumulative <= _checkpoint) revert Error.Allocation__UtilizationNotSettled(_util);
+        // Realize share settlement
+        if (_shares > 0) {
+            uint _checkpoint = userShareCheckpoint[_key][_user];
+            if (_cumulative <= _checkpoint) revert Error.Allocation__SharesNotSettled(_shares);
 
-            _realized = Precision.applyFactor(_settleCumulative - _checkpoint, _util);
-            totalUtilization[_key] -= _util;
-            totalAllocation[_key] += _realized;
-            _allocation = _allocation + _realized - _util;
-            userUtilization[_key][_user] = 0;
+            _realized = Precision.applyFactor(_cumulative - _checkpoint, _shares);
+            totalShares[_key] -= _shares;
+            _allocation += _realized;
+            userShares[_key][_user] = 0;
         }
 
         if (_amount > 0) {
@@ -213,7 +211,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
         }
 
         allocationBalance[_key][_user] = _allocation;
-        userSettlementCheckpoint[_key][_user] = _settleCumulative;
+        userShareCheckpoint[_key][_user] = _cumulative;
 
         if (_amount > 0) {
             bytes memory _result = _executeFromExecutor(
@@ -224,7 +222,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
             }
             subaccountRecordedBalance[_key] -= _amount;
 
-            _logEvent("Withdraw", abi.encode(_key, _token, _user, _amount, _realized, _util, _allocation));
+            _logEvent("Withdraw", abi.encode(_key, _token, _user, _amount, _realized, _shares, _allocation));
         }
     }
 
@@ -249,11 +247,10 @@ contract Allocation is CoreContract, IExecutor, IHook {
             IERC20[] memory _tokens = masterCollateralList[_master];
             for (uint _i = 0; _i < _tokens.length; ++_i) {
                 bytes32 _key = PositionUtils.getMatchingKey(_tokens[_i], address(_master));
-                uint _utilized = totalUtilization[_key];
-                if (_utilized > 0) revert Error.Allocation__ActiveUtilization(_utilized);
+                uint _shares = totalShares[_key];
+                if (_shares > 0) revert Error.Allocation__ActiveShares(_shares);
             }
             delete masterCollateralList[_master];
-            // TODO: clear subaccountMap entries for each _key
         }
     }
 
@@ -291,7 +288,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
                 INpvReader _reader = venueReaders[_target];
                 if (address(_reader) == address(0)) revert Error.VenueRegistry__ContractNotWhitelisted(_target);
 
-                _trackPosition(_master, _callData, _reader);
+                _trackPosition(_master, _callData, _reader, _tokens);
             } else if (_calltype == CALLTYPE_BATCH) {
                 Execution[] calldata _executions = ExecutionLib.decodeBatch(_executionData);
                 for (uint256 _i = 0; _i < _executions.length; _i++) {
@@ -300,7 +297,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
                     INpvReader _reader = venueReaders[_target];
                     if (address(_reader) == address(0)) revert Error.VenueRegistry__ContractNotWhitelisted(_target);
 
-                    _trackPosition(_master, _executions[_i].callData, _reader);
+                    _trackPosition(_master, _executions[_i].callData, _reader, _tokens);
                 }
             } else if (_calltype == CALLTYPE_DELEGATECALL) {
                 revert Error.Allocation__DelegateCallNotAllowed();
@@ -328,71 +325,60 @@ contract Allocation is CoreContract, IExecutor, IHook {
             if (_actual >= _recorded) continue;
 
             uint _utilized = _recorded - _actual;
-            uint _totalAlloc = totalAllocation[_key];
 
-            // Update globals
-            uint _newTotalUtil = totalUtilization[_key] + _utilized;
-            uint _allocated = _totalAlloc - _utilized;
-            totalUtilization[_key] = _newTotalUtil;
-            totalAllocation[_key] = _allocated;
+            pendingUtilization[_key] += _utilized;
+            totalAllocation[_key] -= _utilized;
             subaccountRecordedBalance[_key] = _actual;
 
-            _logEvent("Action", abi.encode(_key, _token, _subaccount, _utilized, _newTotalUtil, _allocated, _hookData));
+            _logEvent("Action", abi.encode(_key, _token, _subaccount, _utilized, pendingUtilization[_key], _hookData));
         }
     }
 
-    /// @notice Distribute utilization to a specific user
-    /// @dev Called externally after utilization to update individual user state
-    function distributeUtilization(bytes32 _key, address _user, uint _amount) external auth {
-        uint _allocation = allocationBalance[_key][_user];
-        uint _currentUtil = userUtilization[_key][_user];
-        uint _available = _allocation - _currentUtil;
+    /// @notice Distribute pending utilization to users as shares priced at current NPV
+    /// @dev Called after postCheck to convert pending utilization into shares
+    function distributeShares(bytes32 _key, address[] calldata _users) external auth {
+        uint _pending = pendingUtilization[_key];
+        if (_pending == 0) return;
 
-        // Cap utilization at available allocation
-        uint _toUtilize = _amount > _available ? _available : _amount;
-        if (_toUtilize == 0) return;
+        uint _sharePrice = getSharePrice(_key);
+        uint _cumulative = cumulativeSettlementPerShare[_key];
 
-        userUtilization[_key][_user] = _currentUtil + _toUtilize;
-        allocationBalance[_key][_user] = _allocation - _toUtilize;
-    }
-
-    /// @notice Batch distribute utilization to multiple users proportionally
-    /// @dev Called after postCheck to attribute utilization to specific users
-    function distributeUtilizationBatch(
-        bytes32 _key,
-        address[] calldata _users,
-        uint _totalUtilized
-    ) external auth {
         uint _totalAlloc = 0;
         uint[] memory _allocations = new uint[](_users.length);
 
-        // Calculate total allocation of provided users
         for (uint _i = 0; _i < _users.length; ++_i) {
-            uint _alloc = allocationBalance[_key][_users[_i]];
-            uint _util = userUtilization[_key][_users[_i]];
-            _allocations[_i] = _alloc - _util; // Available allocation
+            _allocations[_i] = allocationBalance[_key][_users[_i]];
             _totalAlloc += _allocations[_i];
         }
 
         if (_totalAlloc == 0) return;
 
-        // Distribute proportionally
-        uint _distributed = 0;
+        uint _totalNewShares = 0;
         for (uint _i = 0; _i < _users.length; ++_i) {
             if (_allocations[_i] == 0) continue;
 
-            uint _share = Precision.applyFactor(
+            // User's portion of pending utilization based on their allocation
+            uint _userPortion = Precision.applyFactor(
                 Precision.toFactor(_allocations[_i], _totalAlloc),
-                _totalUtilized
+                _pending
             );
 
-            // Cap at available
-            if (_share > _allocations[_i]) _share = _allocations[_i];
+            // Cap at available allocation
+            if (_userPortion > _allocations[_i]) _userPortion = _allocations[_i];
 
-            userUtilization[_key][_users[_i]] += _share;
-            allocationBalance[_key][_users[_i]] -= _share;
-            _distributed += _share;
+            // Convert to shares at current NPV price
+            uint _newShares = Precision.toFactor(_userPortion, _sharePrice);
+
+            userShares[_key][_users[_i]] += _newShares;
+            userShareCheckpoint[_key][_users[_i]] = _cumulative;
+            allocationBalance[_key][_users[_i]] -= _userPortion;
+            _totalNewShares += _newShares;
         }
+
+        totalShares[_key] += _totalNewShares;
+        pendingUtilization[_key] = 0;
+
+        _logEvent("DistributeShares", abi.encode(_key, _users, _pending, _sharePrice, _totalNewShares));
     }
 
     // ===================== Internal =====================
@@ -412,9 +398,9 @@ contract Allocation is CoreContract, IExecutor, IHook {
     }
 
     function _settle(bytes32 _key, IERC20 _token) internal returns (uint _cumulative) {
-        uint _totalUtil = totalUtilization[_key];
-        _cumulative = cumulativeSettlementPerUtilization[_key];
-        if (_totalUtil == 0) return _cumulative;
+        uint _totalShares = totalShares[_key];
+        _cumulative = cumulativeSettlementPerShare[_key];
+        if (_totalShares == 0) return _cumulative;
 
         address _subaccount = address(subaccountMap[_key]);
         uint _actual = _token.balanceOf(_subaccount);
@@ -423,10 +409,10 @@ contract Allocation is CoreContract, IExecutor, IHook {
 
         uint _settled = _actual - _recorded;
         subaccountRecordedBalance[_key] = _actual;
-        _cumulative += Precision.toFactor(_settled, _totalUtil);
-        cumulativeSettlementPerUtilization[_key] = _cumulative;
+        _cumulative += Precision.toFactor(_settled, _totalShares);
+        cumulativeSettlementPerShare[_key] = _cumulative;
 
-        _logEvent("Settle", abi.encode(_key, _token, _subaccount, _settled, _totalUtil, _cumulative));
+        _logEvent("Settle", abi.encode(_key, _token, _subaccount, _settled, _totalShares, _cumulative));
     }
 
     function _setConfig(bytes memory _data) internal override {
@@ -437,21 +423,26 @@ contract Allocation is CoreContract, IExecutor, IHook {
         config = _config;
     }
 
-    /// @notice Set venue readers (batch)
-    function setVenueReaders(address[] calldata _venues, INpvReader _reader) external auth {
-        for (uint256 i = 0; i < _venues.length; i++) {
-            venueReaders[_venues[i]] = _reader;
-        }
-        _logEvent("SetVenueReaders", abi.encode(_venues, address(_reader)));
+    function setVenueReader(address _venue, INpvReader _reader) external auth {
+        venueReaders[_venue] = _reader;
+        _logEvent("SetVenueReader", abi.encode(_venue, _reader));
     }
 
-    function _trackPosition(address _master, bytes calldata _callData, INpvReader _reader) internal {
+    function _trackPosition(address _master, bytes calldata _callData, INpvReader _reader, IERC20[] memory _tokens) internal {
         bytes32 _posKey = _reader.parsePositionKey(_master, _callData);
         if (_posKey == bytes32(0)) return;
 
         if (positionKeyIndex[_master][_posKey] == 0) {
             openPositionKeys[_master].push(_posKey);
             positionKeyIndex[_master][_posKey] = openPositionKeys[_master].length;
+
+            // Set reader for all collateral keys if not set
+            for (uint _i = 0; _i < _tokens.length; ++_i) {
+                bytes32 _key = PositionUtils.getMatchingKey(_tokens[_i], _master);
+                if (address(keyReader[_key]) == address(0)) {
+                    keyReader[_key] = _reader;
+                }
+            }
         }
     }
 

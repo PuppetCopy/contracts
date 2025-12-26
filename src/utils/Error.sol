@@ -50,16 +50,14 @@ library Error {
     error Allocation__InsufficientAllocation(uint available, uint required);
     error Allocation__PuppetListTooLarge(uint provided, uint maximum);
     error Allocation__ZeroAllocation();
-    error Allocation__NoUtilization();
-    error Allocation__UtilizationNotSettled(uint utilization);
+    error Allocation__SharesNotSettled(uint shares);
     error Allocation__UnregisteredSubaccount();
     error Allocation__ExecutorNotInstalled();
-    error Allocation__ActiveUtilization(uint totalUtilization);
+    error Allocation__ActiveShares(uint totalShares);
     error Allocation__AlreadyRegistered();
     error Allocation__AlreadyUnregistered();
     error Allocation__TransferFailed();
     error Allocation__InsufficientMasterAllocation(uint available, uint required);
-    error Allocation__UtilizationExceedsAllocation(uint utilized, uint allocated);
     error Allocation__ArrayLengthMismatch(uint puppetCount, uint allocationCount);
     error Allocation__TargetNotWhitelisted(address target);
     error Allocation__DelegateCallNotAllowed();

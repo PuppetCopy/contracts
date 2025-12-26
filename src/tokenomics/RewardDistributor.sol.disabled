@@ -118,7 +118,7 @@ contract RewardDistributor is CoreContract {
         if (_emission > 0 && _totalVTokens > 0) {
             totalUndistributed -= _emission;
             uint _cumulativeRewardPerToken = cumulativeRewardPerToken + Precision.toFactor(_emission, _totalVTokens);
-            cumulativeRewardPerToken += _cumulativeRewardPerToken;
+            cumulativeRewardPerToken = _cumulativeRewardPerToken;
             _logEvent("Distribute", abi.encode(_cumulativeRewardPerToken, _emission));
 
             return _cumulativeRewardPerToken;
