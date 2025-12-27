@@ -8,21 +8,21 @@ import {IPolicy, IActionPolicy, ConfigId} from "modulekit/module-bases/interface
 import {VALIDATION_SUCCESS, VALIDATION_FAILED} from "modulekit/accounts/common/interfaces/IERC7579Module.sol";
 import {IEventEmitter} from "../../utils/interfaces/IEventEmitter.sol";
 
-/**
- * @title AllowanceRatePolicy
- * @notice Smart Sessions policy that limits transfers to a percentage of balance
- */
-contract AllowanceRatePolicy is ERC7579ActionPolicy {
+contract SubscriptionPolicy is ERC7579ActionPolicy {
+    struct Subscription {
+        uint16 allowanceRate;      // basis points (10000 = 100%)
+        uint16 minAllocationRatio; // minimum allocation ratio in basis points
+        uint64 expiry;             // unix timestamp
+    }
+
     IEventEmitter public immutable eventEmitter;
 
-    // ConfigId => multiplexer => account => allowance rate (basis points, 10000 = 100%)
-    mapping(ConfigId => mapping(address => mapping(address => uint16))) internal _allowanceRate;
+    // ConfigId => multiplexer => puppet => master => subscription
+    mapping(ConfigId => mapping(address => mapping(address => mapping(address => Subscription)))) internal _subscriptions;
 
     constructor(IEventEmitter _eventEmitter) {
         eventEmitter = _eventEmitter;
     }
-
-    // ============ ERC7579 Module ============
 
     function onInstall(bytes calldata) external override {}
 
@@ -37,36 +37,45 @@ contract AllowanceRatePolicy is ERC7579ActionPolicy {
     }
 
     function isInitialized(address account, ConfigId configId) external view override returns (bool) {
-        return _allowanceRate[configId][msg.sender][account] > 0;
+        return false;
     }
 
-    function isInitialized(
-        address account,
-        address multiplexer,
-        ConfigId configId
-    ) external view override returns (bool) {
-        return _allowanceRate[configId][multiplexer][account] > 0;
+    function isInitialized(address account, address multiplexer, ConfigId configId) external view override returns (bool) {
+        return false;
     }
 
     function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
         return interfaceId == type(IActionPolicy).interfaceId || interfaceId == 0x01ffc9a7;
     }
 
-    // ============ IPolicy ============
-
     function initializeWithMultiplexer(
         address account,
         ConfigId configId,
         bytes calldata initData
     ) external override(ERC7579PolicyBase, IPolicy) {
-        uint16 allowanceRate = abi.decode(initData, (uint16));
-        require(allowanceRate > 0 && allowanceRate <= 10000, "Invalid rate");
+        (address master, uint16 allowanceRate, uint16 minAllocationRatio, uint64 expiry) =
+            abi.decode(initData, (address, uint16, uint16, uint64));
 
-        _allowanceRate[configId][msg.sender][account] = allowanceRate;
-        eventEmitter.logEvent("PolicySet", abi.encode(configId, msg.sender, account, allowanceRate));
+        require(allowanceRate <= 10000, "Invalid allowance rate");
+        require(minAllocationRatio <= 10000, "Invalid min allocation ratio");
+
+        _subscriptions[configId][msg.sender][account][master] = Subscription({
+            allowanceRate: allowanceRate,
+            minAllocationRatio: minAllocationRatio,
+            expiry: expiry
+        });
+
+        eventEmitter.logEvent("Subscribe", abi.encode(configId, account, master, allowanceRate, minAllocationRatio, expiry));
     }
 
-    // ============ IActionPolicy ============
+    function getSubscription(
+        ConfigId configId,
+        address multiplexer,
+        address puppet,
+        address master
+    ) external view returns (Subscription memory) {
+        return _subscriptions[configId][multiplexer][puppet][master];
+    }
 
     function checkAction(
         ConfigId id,
@@ -79,12 +88,14 @@ contract AllowanceRatePolicy is ERC7579ActionPolicy {
         if (data.length < 68) return VALIDATION_FAILED;
         if (bytes4(data[:4]) != IERC20.transfer.selector) return VALIDATION_FAILED;
 
-        uint16 allowanceRate = _allowanceRate[id][msg.sender][account];
-        if (allowanceRate == 0) return VALIDATION_FAILED;
+        (address recipient, uint256 amount) = abi.decode(data[4:], (address, uint256));
 
-        (, uint256 amount) = abi.decode(data[4:], (address, uint256));
-        uint256 maxAllowed = (IERC20(target).balanceOf(account) * allowanceRate) / 10000;
+        Subscription memory sub = _subscriptions[id][msg.sender][account][recipient];
 
+        if (sub.allowanceRate == 0) return VALIDATION_FAILED;
+        if (block.timestamp > sub.expiry) return VALIDATION_FAILED;
+
+        uint256 maxAllowed = (IERC20(target).balanceOf(account) * sub.allowanceRate) / 10000;
         if (amount > maxAllowed) return VALIDATION_FAILED;
 
         return VALIDATION_SUCCESS;

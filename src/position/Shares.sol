@@ -17,7 +17,7 @@ import {PositionUtils} from "./utils/PositionUtils.sol";
 import {INpvReader} from "./interface/INpvReader.sol";
 
 contract Shares is CoreContract, IExecutor, EIP712 {
-    enum IntentType { Deposit, Withdraw }
+    enum IntentType { MasterDeposit, Allocate, Withdraw }
 
     struct Config {
         INpvReader npvReader;
@@ -38,6 +38,11 @@ contract Shares is CoreContract, IExecutor, EIP712 {
         uint256 nonce;
     }
 
+    struct AllocateParams {
+        address[] puppets;
+        uint256[] amounts;
+    }
+
     bytes32 public constant INTENT_TYPEHASH = keccak256(
         "Intent(uint8 intentType,address user,address master,address token,uint256 amount,uint256 acceptablePrice,uint256 deadline,uint256 nonce)"
     );
@@ -56,14 +61,6 @@ contract Shares is CoreContract, IExecutor, EIP712 {
 
     function getConfig() external view returns (Config memory) {
         return config;
-    }
-
-    function getKey(IERC20 _token, address _master) external pure returns (bytes32) {
-        return PositionUtils.getMatchingKey(_token, _master);
-    }
-
-    function getSubaccount(bytes32 _key) external view returns (address) {
-        return address(subaccountMap[_key]);
     }
 
     function getSharePrice(bytes32 _key, uint _totalAssets) public view returns (uint) {
@@ -90,13 +87,16 @@ contract Shares is CoreContract, IExecutor, EIP712 {
     function execute(
         Intent[] calldata _intents,
         bytes[] calldata _signatures,
-        bytes32[][] calldata _positionKeys
+        bytes32[][] calldata _positionKeys,
+        AllocateParams[] calldata _allocateParams
     ) external auth {
         uint _intentCount = _intents.length;
         if (_intentCount == 0) revert Error.Allocation__ZeroAllocation();
         if (_intentCount != _signatures.length || _intentCount != _positionKeys.length) {
             revert Error.Allocation__ArrayLengthMismatch(_intentCount, _signatures.length);
         }
+
+        uint _allocateIdx = 0;
 
         for (uint _i = 0; _i < _intentCount; ++_i) {
             Intent calldata _intent = _intents[_i];
@@ -108,8 +108,10 @@ contract Shares is CoreContract, IExecutor, EIP712 {
             bytes32 _key = PositionUtils.getMatchingKey(IERC20(_intent.token), _intent.master);
             uint _totalAssets = _calculateTotalAssets(_key, _intent.token, _positionKeys[_i]);
 
-            if (_intent.intentType == IntentType.Deposit) {
-                _executeDeposit(_intent, _key, _totalAssets);
+            if (_intent.intentType == IntentType.MasterDeposit) {
+                _executeMasterDeposit(_intent, _key, _totalAssets);
+            } else if (_intent.intentType == IntentType.Allocate) {
+                _executeAllocate(_intent, _key, _totalAssets, _allocateParams[_allocateIdx++]);
             } else {
                 _executeWithdraw(_intent, _key, _totalAssets);
             }
@@ -129,7 +131,9 @@ contract Shares is CoreContract, IExecutor, EIP712 {
         return _total;
     }
 
-    function _executeDeposit(Intent calldata _intent, bytes32 _key, uint _totalAssets) internal {
+    function _executeMasterDeposit(Intent calldata _intent, bytes32 _key, uint _totalAssets) internal {
+        if (_intent.user != _intent.master) revert Error.Allocation__InvalidSignature(_intent.master, _intent.user);
+
         if (address(subaccountMap[_key]) == address(0)) {
             IERC7579Account _master = IERC7579Account(_intent.master);
             if (!_master.isModuleInstalled(MODULE_TYPE_EXECUTOR, address(this), "")) {
@@ -146,19 +150,59 @@ contract Shares is CoreContract, IExecutor, EIP712 {
         }
 
         bytes memory _result = _executeFromExecutor(
-            IERC7579Account(_intent.user),
+            IERC7579Account(_intent.master),
             _intent.token,
             config.callGasLimit,
-            abi.encodeCall(IERC20.transfer, (_intent.master, _intent.amount))
+            abi.encodeCall(IERC20.transfer, (address(subaccountMap[_key]), _intent.amount))
         );
 
         if (_result.length == 0 || !abi.decode(_result, (bool))) revert Error.Allocation__TransferFailed();
 
         uint _sharesOut = Precision.toFactor(_intent.amount, _sharePrice);
-        userShares[_key][_intent.user] += _sharesOut;
+        userShares[_key][_intent.master] += _sharesOut;
         totalShares[_key] += _sharesOut;
 
-        _logEvent("Deposit", abi.encode(_key, _intent.token, _intent.master, _intent.user, _intent.amount, _sharesOut, _sharePrice));
+        _logEvent("MasterDeposit", abi.encode(_key, _intent.token, _intent.master, _intent.amount, _sharesOut, _sharePrice));
+    }
+
+    function _executeAllocate(Intent calldata _intent, bytes32 _key, uint _totalAssets, AllocateParams calldata _params) internal {
+        if (_intent.user != _intent.master) revert Error.Allocation__InvalidSignature(_intent.master, _intent.user);
+        if (address(subaccountMap[_key]) == address(0)) revert Error.Allocation__UnregisteredSubaccount();
+        if (_params.puppets.length != _params.amounts.length) {
+            revert Error.Allocation__ArrayLengthMismatch(_params.puppets.length, _params.amounts.length);
+        }
+        if (_params.puppets.length > config.maxPuppetList) {
+            revert Error.Allocation__PuppetListTooLarge(_params.puppets.length, config.maxPuppetList);
+        }
+
+        uint _sharePrice = getSharePrice(_key, _totalAssets);
+
+        if (_intent.acceptablePrice > 0 && _sharePrice > _intent.acceptablePrice) {
+            revert Error.Allocation__PriceTooHigh(_sharePrice, _intent.acceptablePrice);
+        }
+
+        uint _totalAllocated = 0;
+
+        for (uint _i = 0; _i < _params.puppets.length; ++_i) {
+            address _puppet = _params.puppets[_i];
+            uint _amount = _params.amounts[_i];
+
+            bytes memory _result = _executeFromExecutor(
+                IERC7579Account(_puppet),
+                _intent.token,
+                config.callGasLimit,
+                abi.encodeCall(IERC20.transfer, (address(subaccountMap[_key]), _amount))
+            );
+
+            if (_result.length == 0 || !abi.decode(_result, (bool))) continue;
+
+            uint _sharesOut = Precision.toFactor(_amount, _sharePrice);
+            userShares[_key][_puppet] += _sharesOut;
+            totalShares[_key] += _sharesOut;
+            _totalAllocated += _amount;
+        }
+
+        _logEvent("Allocate", abi.encode(_key, _intent.token, _intent.master, _params.puppets.length, _totalAllocated, _sharePrice));
     }
 
     function _executeWithdraw(Intent calldata _intent, bytes32 _key, uint _totalAssets) internal {
