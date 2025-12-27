@@ -22,6 +22,11 @@ contract Allocation is CoreContract, IExecutor, IHook {
         uint callGasLimit;
     }
 
+    struct UserPosition {
+        uint shares;
+        uint returnCheckpoint;
+    }
+
     Config public config;
     mapping(address => INpvReader) public venueReaders;
     uint256 constant EXEC_OFFSET = 100;
@@ -30,9 +35,8 @@ contract Allocation is CoreContract, IExecutor, IHook {
     mapping(bytes32 => mapping(address => uint)) public allocationBalance;
 
     mapping(bytes32 => uint) public totalShares;
-    mapping(bytes32 => uint) public accReturnPerShare;
-    mapping(bytes32 => mapping(address => uint)) public userShares;
-    mapping(bytes32 => mapping(address => uint)) public userReturnCheckpoint;
+    mapping(bytes32 => uint) public cumulativeReturnPerShare;
+    mapping(bytes32 => mapping(address => UserPosition)) public userPosition;
 
     mapping(bytes32 => IERC7579Account) public subaccountMap;
     mapping(bytes32 => uint) public subaccountRecordedBalance;
@@ -75,27 +79,31 @@ contract Allocation is CoreContract, IExecutor, IHook {
         return Precision.toFactor(_npv, totalShares[_key]);
     }
 
-    function getUserValue(bytes32 _key, address _user) external view returns (uint) {
-        uint _shares = userShares[_key][_user];
-        uint _pending = pendingReturn(_key, _user);
+    function getUserValue(IERC20 _token, address _master, address _user) external view returns (uint) {
+        bytes32 _key = PositionUtils.getMatchingKey(_token, _master);
+        uint _shares = userPosition[_key][_user].shares;
+        uint _pending = pendingReturn(_token, _master, _user);
         uint _shareValue = Precision.applyFactor(getSharePrice(_key), _shares);
         return _shareValue + _pending;
     }
 
-    function pendingReturn(bytes32 _key, address _user) public view returns (uint) {
-        uint _shares = userShares[_key][_user];
+    function pendingReturn(IERC20 _token, address _master, address _user) public view returns (uint) {
+        bytes32 _key = PositionUtils.getMatchingKey(_token, _master);
+        UserPosition memory _position = userPosition[_key][_user];
+        uint _allocation = allocationBalance[_key][_user];
         uint _totalShares = totalShares[_key];
-        if (_shares == 0 || _totalShares == 0) return 0;
+
+        if (_position.shares == 0 || _totalShares == 0) return _allocation;
 
         address _subaccount = address(subaccountMap[_key]);
-        IERC20[] memory _tokens = masterCollateralList[IERC7579Account(_subaccount)];
-        if (_tokens.length == 0) return 0;
+        uint _actual = _token.balanceOf(_subaccount);
+        uint _recorded = subaccountRecordedBalance[_key];
+        uint _pendingSettlement = _actual > _recorded ? _actual - _recorded : 0;
 
-        uint _balance = _tokens[0].balanceOf(_subaccount);
-        uint _idle = totalAllocation[_key];
-        uint _settledBalance = _balance > _idle ? _balance - _idle : 0;
+        uint _cumulative = cumulativeReturnPerShare[_key] + Precision.toFactor(_pendingSettlement, _totalShares);
+        uint _pending = Precision.applyFactor(_cumulative - _position.returnCheckpoint, _position.shares);
 
-        return Precision.applyFactor(Precision.toFactor(_shares, _totalShares), _settledBalance);
+        return _allocation + _pending;
     }
 
     function allocate(
@@ -165,18 +173,10 @@ contract Allocation is CoreContract, IExecutor, IHook {
 
         if (pendingUtilization[_key] > 0) revert Error.Allocation__InsufficientMasterAllocation(pendingUtilization[_key], 0);
 
+        _syncReturns(_key, _collateralToken);
+
         uint _totalShares = totalShares[_key];
-        uint _cumulative = accReturnPerShare[_key];
-        address _subaccount = address(subaccountMap[_key]);
-        uint _actual = _collateralToken.balanceOf(_subaccount);
-        uint _recorded = subaccountRecordedBalance[_key];
-        if (_actual < _recorded) revert Error.Allocation__InsufficientMasterBalance(_actual, _recorded);
-        uint _settled = _actual - _recorded;
-
-        subaccountRecordedBalance[_key] = _actual;
-        _cumulative += _totalShares > 0 ? Precision.toFactor(_settled, _totalShares) : 0;
-        accReturnPerShare[_key] = _cumulative;
-
+        uint _cumulative = cumulativeReturnPerShare[_key];
         uint _netPositionValue = getTotalNetPositionValue(_key);
         uint _sharePrice = Precision.toFactor(_netPositionValue, _totalShares);
 
@@ -191,15 +191,15 @@ contract Allocation is CoreContract, IExecutor, IHook {
             if (_amount > _available) revert Error.Allocation__InsufficientBalance(_available, _amount);
 
             uint _newShares = Precision.toFactor(_amount, _sharePrice);
-            uint _oldShares = userShares[_key][_puppet];
+            UserPosition storage _position = userPosition[_key][_puppet];
+            uint _oldShares = _position.shares;
 
-            userShares[_key][_puppet] = _oldShares + _newShares;
+            _position.shares = _oldShares + _newShares;
 
             if (_oldShares == 0) {
-                userReturnCheckpoint[_key][_puppet] = _cumulative;
+                _position.returnCheckpoint = _cumulative;
             } else {
-                uint _oldCheckpoint = userReturnCheckpoint[_key][_puppet];
-                userReturnCheckpoint[_key][_puppet] = (_oldShares * _oldCheckpoint + _newShares * _cumulative) / (_oldShares + _newShares);
+                _position.returnCheckpoint = (_oldShares * _position.returnCheckpoint + _newShares * _cumulative) / (_oldShares + _newShares);
             }
 
             allocationBalance[_key][_puppet] -= _amount;
@@ -214,24 +214,6 @@ contract Allocation is CoreContract, IExecutor, IHook {
         pendingUtilization[_key] = _totalUtilized;
 
         _logEvent("Utilize", abi.encode(_key, _collateralToken, _masterAddr, _totalUtilized, _totalNewShares, _sharePrice, _puppetList, _utilizationList));
-    }
-
-    function withdrawAllocation(IERC20 _token, bytes32 _key, address _user, uint _amount) external auth {
-        uint _available = allocationBalance[_key][_user];
-        if (_amount > _available) revert Error.Allocation__InsufficientBalance(_available, _amount);
-
-        allocationBalance[_key][_user] -= _amount;
-        totalAllocation[_key] -= _amount;
-
-        bytes memory _result = _executeFromExecutor(
-            subaccountMap[_key], address(_token), config.transferOutGasLimit, abi.encodeCall(IERC20.transfer, (_user, _amount))
-        );
-        if (_result.length == 0 || !abi.decode(_result, (bool))) {
-            revert Error.Allocation__TransferFailed();
-        }
-        subaccountRecordedBalance[_key] -= _amount;
-
-        _logEvent("WithdrawAllocation", abi.encode(_key, _token, _user, _amount, allocationBalance[_key][_user]));
     }
 
     function masterDeposit(IERC20 _collateralToken, address _masterAddr, uint _amount) external auth {
@@ -256,21 +238,20 @@ contract Allocation is CoreContract, IExecutor, IHook {
     }
 
     function withdraw(IERC20 _token, bytes32 _key, address _user, uint _amount) external auth {
-        uint _shares = userShares[_key][_user];
-        uint _totalShares = totalShares[_key];
-        if (_shares == 0) revert Error.Allocation__InsufficientBalance(0, _amount);
+        UserPosition storage _position = userPosition[_key][_user];
 
-        address _subaccount = address(subaccountMap[_key]);
-        uint _balance = _token.balanceOf(_subaccount);
-        uint _idle = totalAllocation[_key];
-        uint _settledBalance = _balance > _idle ? _balance - _idle : 0;
+        _syncReturns(_key, _token);
 
-        uint _claimable = Precision.applyFactor(Precision.toFactor(_shares, _totalShares), _settledBalance);
+        uint _cumulative = cumulativeReturnPerShare[_key];
+        uint _pending = Precision.applyFactor(_cumulative - _position.returnCheckpoint, _position.shares);
+        uint _allocation = allocationBalance[_key][_user];
+        uint _claimable = _allocation + _pending;
+
         if (_amount > _claimable) revert Error.Allocation__InsufficientBalance(_claimable, _amount);
 
-        uint _sharesToBurn = Precision.applyFactor(Precision.toFactor(_amount, _claimable), _shares);
-        userShares[_key][_user] -= _sharesToBurn;
-        totalShares[_key] -= _sharesToBurn;
+        allocationBalance[_key][_user] = _claimable - _amount;
+        totalAllocation[_key] = totalAllocation[_key] - _allocation + (_claimable - _amount);
+        _position.returnCheckpoint = _cumulative;
 
         if (_amount > 0) {
             bytes memory _result = _executeFromExecutor(
@@ -279,7 +260,9 @@ contract Allocation is CoreContract, IExecutor, IHook {
 
             if (_result.length == 0 || !abi.decode(_result, (bool))) revert Error.Allocation__TransferFailed();
 
-            _logEvent("Withdraw", abi.encode(_key, _token, _user, _amount, _claimable, _sharesToBurn, _shares));
+            subaccountRecordedBalance[_key] -= _amount;
+
+            _logEvent("Withdraw", abi.encode(_key, _token, _user, _amount, _claimable));
         }
     }
 
@@ -367,6 +350,24 @@ contract Allocation is CoreContract, IExecutor, IHook {
         } catch {
             return "";
         }
+    }
+
+    function _syncReturns(bytes32 _key, IERC20 _token) internal returns (uint) {
+        uint _totalShares = totalShares[_key];
+        if (_totalShares == 0) return 0;
+
+        address _subaccount = address(subaccountMap[_key]);
+        uint _actual = _token.balanceOf(_subaccount);
+        uint _recorded = subaccountRecordedBalance[_key];
+        if (_actual < _recorded) revert Error.Allocation__InsufficientMasterBalance(_actual, _recorded);
+
+        uint _settled = _actual - _recorded;
+        uint _cumulative = Precision.toFactor(_settled, _totalShares);
+
+        subaccountRecordedBalance[_key] = _actual;
+        cumulativeReturnPerShare[_key] += _cumulative;
+
+        return _cumulative;
     }
 
     function _setConfig(bytes memory _data) internal override {
