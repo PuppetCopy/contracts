@@ -15,8 +15,8 @@ contract MockNpvReader is INpvReader {
         return positionValues[_positionKey];
     }
 
-    function parsePositionKey(address _account, bytes calldata) external pure returns (bytes32) {
-        return keccak256(abi.encode(_account, "mock_position"));
+    function parsePositionCall(address _account, bytes calldata) external pure returns (PositionCallInfo memory _info) {
+        _info.positionKey = keccak256(abi.encode(_account, "mock_position"));
     }
 }
 
@@ -26,8 +26,8 @@ contract PassthroughReader is INpvReader {
         return 0;
     }
 
-    function parsePositionKey(address, bytes calldata) external pure returns (bytes32) {
-        return bytes32(0);
+    function parsePositionCall(address, bytes calldata) external pure returns (PositionCallInfo memory _info) {
+        _info.positionKey = bytes32(0);
     }
 }
 

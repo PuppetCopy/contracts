@@ -37,12 +37,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         uint256 nonce;
     }
 
-    struct CallAllocateParams {
-        address[] puppetList;
-        uint256[] amountList;
-    }
-
-    struct CallPosition {
+    struct CallOrder {
         address master;
         address target;
         bytes callData;
@@ -60,23 +55,26 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         "CallIntent(uint8 intentType,address user,address master,address token,uint256 amount,uint256 acceptablePrice,uint256 deadline,uint256 nonce)"
     );
 
-    bytes32 public constant CALL_POSITION_TYPEHASH = keccak256(
-        "CallPosition(address master,address target,bytes callData,uint256 deadline,uint256 nonce)"
+    bytes32 public constant CALL_ORDER_TYPEHASH = keccak256(
+        "CallOrder(address master,address target,bytes callData,uint256 deadline,uint256 nonce)"
     );
 
     Config public config;
+
     mapping(bytes32 => uint) public totalShares;
     mapping(bytes32 => mapping(address => uint)) public userShares;
+
     mapping(address => uint256) public nonces;
     mapping(bytes32 => IERC7579Account) public subaccountMap;
     mapping(IERC7579Account => IERC20[]) public masterCollateralList;
+
     mapping(bytes32 => bytes32[]) public positionKeyList;
     mapping(address => INpvReader) public npvReaderMap;
     mapping(bytes32 => address) public positionTargetMap;
 
     constructor(IAuthority _authority, Config memory _config)
         CoreContract(_authority, abi.encode(_config))
-        EIP712("Puppet Shares", "1")
+        EIP712("Puppet Allocation", "1")
     {}
 
     function getConfig() external view returns (Config memory) {
@@ -99,7 +97,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         uint _shares = userShares[_key][_user];
         if (_shares == 0) return 0;
 
-        AssetsInfo memory _assets = calcNetPositionsValue(_key, address(_token));
+        AssetsInfo memory _assets = _calcNetPositionsValue(_key, address(_token));
         uint _sharePrice = getSharePrice(_key, _assets.total);
         return Precision.applyFactor(_sharePrice, _shares);
     }
@@ -112,24 +110,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         npvReaderMap[_target] = _reader;
     }
 
-    function addPositionKey(bytes32 _key, bytes32 _positionKey, address _target) external auth {
-        positionKeyList[_key].push(_positionKey);
-        positionTargetMap[_positionKey] = _target;
-    }
-
-    function removePositionKey(bytes32 _key, bytes32 _positionKey) external auth {
-        bytes32[] storage _keys = positionKeyList[_key];
-        for (uint _i = 0; _i < _keys.length; ++_i) {
-            if (_keys[_i] == _positionKey) {
-                _keys[_i] = _keys[_keys.length - 1];
-                _keys.pop();
-                delete positionTargetMap[_positionKey];
-                return;
-            }
-        }
-    }
-
-    function masterDeposit(
+    function executeMasterDeposit(
         CallIntent calldata _intent,
         bytes calldata _signature
     ) external auth {
@@ -138,7 +119,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         _verifyIntent(_intent, _signature);
 
         bytes32 _key = PositionUtils.getMatchingKey(IERC20(_intent.token), _intent.master);
-        AssetsInfo memory _assets = calcNetPositionsValue(_key, _intent.token);
+        AssetsInfo memory _assets = _calcNetPositionsValue(_key, _intent.token);
 
         if (_intent.user != _intent.master) revert Error.Allocation__InvalidSignature(_intent.master, _intent.user);
 
@@ -170,7 +151,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         userShares[_key][_intent.master] += _sharesOut;
         totalShares[_key] += _sharesOut;
 
-        _logEvent("MasterDeposit", abi.encode(
+        _logEvent("ExecuteMasterDeposit", abi.encode(
             _key,
             _intent.token,
             _intent.master,
@@ -183,25 +164,26 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         ));
     }
 
-    function allocate(
+    function executeAllocate(
         CallIntent calldata _intent,
         bytes calldata _signature,
-        CallAllocateParams calldata _params
+        address[] calldata _puppetList,
+        uint256[] calldata _amountList
     ) external auth {
         if (_intent.intentType != IntentType.Allocate) revert Error.Allocation__InvalidCallType();
         if (block.timestamp > _intent.deadline) revert Error.Allocation__IntentExpired(_intent.deadline, block.timestamp);
         _verifyIntent(_intent, _signature);
 
         bytes32 _key = PositionUtils.getMatchingKey(IERC20(_intent.token), _intent.master);
-        AssetsInfo memory _assets = calcNetPositionsValue(_key, _intent.token);
+        AssetsInfo memory _assets = _calcNetPositionsValue(_key, _intent.token);
 
         if (_intent.user != _intent.master) revert Error.Allocation__InvalidSignature(_intent.master, _intent.user);
         if (address(subaccountMap[_key]) == address(0)) revert Error.Allocation__UnregisteredSubaccount();
-        if (_params.puppetList.length != _params.amountList.length) {
-            revert Error.Allocation__ArrayLengthMismatch(_params.puppetList.length, _params.amountList.length);
+        if (_puppetList.length != _amountList.length) {
+            revert Error.Allocation__ArrayLengthMismatch(_puppetList.length, _amountList.length);
         }
-        if (_params.puppetList.length > config.maxPuppetList) {
-            revert Error.Allocation__PuppetListTooLarge(_params.puppetList.length, config.maxPuppetList);
+        if (_puppetList.length > config.maxPuppetList) {
+            revert Error.Allocation__PuppetListTooLarge(_puppetList.length, config.maxPuppetList);
         }
 
         uint _sharePrice = getSharePrice(_key, _assets.total);
@@ -212,9 +194,9 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
 
         uint _totalAllocated = 0;
 
-        for (uint _i = 0; _i < _params.puppetList.length; ++_i) {
-            address _puppet = _params.puppetList[_i];
-            uint _amount = _params.amountList[_i];
+        for (uint _i = 0; _i < _puppetList.length; ++_i) {
+            address _puppet = _puppetList[_i];
+            uint _amount = _amountList[_i];
 
             (bytes memory _result, bytes memory _error) = _executeFromExecutor(
                 IERC7579Account(_puppet),
@@ -224,7 +206,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             );
 
             if (_error.length > 0 || _result.length == 0 || !abi.decode(_result, (bool))) {
-                _logEvent("AllocateFailed", abi.encode(_key, _puppet, _amount, _error));
+                _logEvent("ExecuteAllocateFailed", abi.encode(_key, _puppet, _amount, _error));
                 continue;
             }
 
@@ -234,12 +216,12 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             _totalAllocated += _amount;
         }
 
-        _logEvent("Allocate", abi.encode(
+        _logEvent("ExecuteAllocate", abi.encode(
             _key,
             _intent.token,
             _intent.master,
-            _params.puppetList,
-            _params.amountList,
+            _puppetList,
+            _amountList,
             _totalAllocated,
             _sharePrice,
             _assets.idleBalance,
@@ -248,7 +230,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         ));
     }
 
-    function withdraw(
+    function executeWithdraw(
         CallIntent calldata _intent,
         bytes calldata _signature
     ) external auth {
@@ -257,7 +239,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         _verifyIntent(_intent, _signature);
 
         bytes32 _key = PositionUtils.getMatchingKey(IERC20(_intent.token), _intent.master);
-        AssetsInfo memory _assets = calcNetPositionsValue(_key, _intent.token);
+        AssetsInfo memory _assets = _calcNetPositionsValue(_key, _intent.token);
 
         uint _userBalance = userShares[_key][_intent.user];
         if (_intent.amount > _userBalance) revert Error.Allocation__InsufficientBalance(_userBalance, _intent.amount);
@@ -284,7 +266,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
 
         if (_error.length > 0 || _result.length == 0 || !abi.decode(_result, (bool))) revert Error.Allocation__TransferFailed();
 
-        _logEvent("Withdraw", abi.encode(
+        _logEvent("ExecuteWithdraw", abi.encode(
             _key,
             _intent.token,
             _intent.master,
@@ -299,42 +281,62 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         ));
     }
 
-    function callPosition(
-        CallPosition calldata _call,
+    function executeOrder(
+        CallOrder calldata _order,
         bytes calldata _signature
     ) external auth {
-        INpvReader _reader = npvReaderMap[_call.target];
-        if (address(_reader) == address(0)) revert Error.Allocation__TargetNotWhitelisted(_call.target);
-        if (block.timestamp > _call.deadline) revert Error.Allocation__IntentExpired(_call.deadline, block.timestamp);
+        INpvReader _reader = npvReaderMap[_order.target];
+        if (address(_reader) == address(0)) revert Error.Allocation__TargetNotWhitelisted(_order.target);
+        if (block.timestamp > _order.deadline) revert Error.Allocation__IntentExpired(_order.deadline, block.timestamp);
 
         bytes32 _hash = _hashTypedDataV4(keccak256(abi.encode(
-            CALL_POSITION_TYPEHASH,
-            _call.master,
-            _call.target,
-            keccak256(_call.callData),
-            _call.deadline,
-            _call.nonce
+            CALL_ORDER_TYPEHASH,
+            _order.master,
+            _order.target,
+            keccak256(_order.callData),
+            _order.deadline,
+            _order.nonce
         )));
         address _signer = ECDSA.recover(_hash, _signature);
-        if (_signer != _call.master) revert Error.Allocation__InvalidSignature(_call.master, _signer);
+        if (_signer != _order.master) revert Error.Allocation__InvalidSignature(_order.master, _signer);
 
-        uint256 _expectedNonce = nonces[_call.master]++;
-        if (_expectedNonce != _call.nonce) revert Error.Allocation__InvalidNonce(_expectedNonce, _call.nonce);
+        uint256 _expectedNonce = nonces[_order.master]++;
+        if (_expectedNonce != _order.nonce) revert Error.Allocation__InvalidNonce(_expectedNonce, _order.nonce);
 
-        INpvReader.PositionCallInfo memory _posInfo = _reader.parsePositionCall(_call.master, _call.callData);
+        INpvReader.PositionCallInfo memory _posInfo = _reader.parsePositionCall(_order.master, _order.callData);
+        bytes32 _key = PositionUtils.getMatchingKey(IERC20(_posInfo.collateralToken), _order.master);
+
+        // Track new positions on increase
+        if (_posInfo.isIncrease && _posInfo.positionKey != bytes32(0) && positionTargetMap[_posInfo.positionKey] == address(0)) {
+            positionKeyList[_key].push(_posInfo.positionKey);
+            positionTargetMap[_posInfo.positionKey] = _order.target;
+        }
 
         (bytes memory _result, bytes memory _error) = _executeFromExecutor(
-            IERC7579Account(_call.master),
-            _call.target,
+            IERC7579Account(_order.master),
+            _order.target,
             config.callGasLimit,
-            _call.callData
+            _order.callData
         );
 
         int256 _netValue = _reader.getPositionNetValue(_posInfo.positionKey);
 
-        _logEvent("CallPosition", abi.encode(
-            _call.master,
-            _call.target,
+        // Remove closed positions (NPV = 0)
+        if (_netValue == 0 && _posInfo.positionKey != bytes32(0)) {
+            bytes32[] storage _keys = positionKeyList[_key];
+            for (uint _i = 0; _i < _keys.length; ++_i) {
+                if (_keys[_i] == _posInfo.positionKey) {
+                    _keys[_i] = _keys[_keys.length - 1];
+                    _keys.pop();
+                    delete positionTargetMap[_posInfo.positionKey];
+                    break;
+                }
+            }
+        }
+
+        _logEvent("ExecuteOrder", abi.encode(
+            _order.master,
+            _order.target,
             _posInfo,
             _netValue,
             _result,
@@ -342,7 +344,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         ));
     }
 
-    function calcNetPositionsValue(bytes32 _key, address _token) internal view returns (AssetsInfo memory _info) {
+    function _calcNetPositionsValue(bytes32 _key, address _token) internal view returns (AssetsInfo memory _info) {
         IERC7579Account _subaccount = subaccountMap[_key];
         if (address(_subaccount) == address(0)) return _info;
 

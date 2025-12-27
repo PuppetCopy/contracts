@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import {console} from "forge-std/src/console.sol";
 
 import {Dictatorship} from "src/shared/Dictatorship.sol";
-import {Shares} from "src/position/Shares.sol";
+import {Allocation} from "src/position/Allocation.sol";
 import {SubscriptionPolicy} from "src/position/policies/SubscriptionPolicy.sol";
 import {ThrottlePolicy} from "src/position/policies/ThrottlePolicy.sol";
 
@@ -16,16 +16,16 @@ contract DeployPosition is BaseScript {
 
         Dictatorship dictatorship = Dictatorship(getDeployedAddress("Dictatorship"));
 
-        Shares shares = new Shares(
+        Allocation allocation = new Allocation(
             dictatorship,
-            Shares.Config({
+            Allocation.Config({
                 maxPuppetList: 100,
                 transferGasLimit: 200_000,
                 callGasLimit: 200_000,
                 virtualShareOffset: 1e6
             })
         );
-        console.log("Shares:", address(shares));
+        console.log("Allocation:", address(allocation));
 
         SubscriptionPolicy subscriptionPolicy = new SubscriptionPolicy(dictatorship);
         ThrottlePolicy throttlePolicy = new ThrottlePolicy(dictatorship);
