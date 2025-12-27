@@ -46,6 +46,7 @@ library Error {
     error Account__InvalidTokenAddress();
     error Account__AmountExceedsUnaccounted();
 
+    error Allocation__InsufficientBalance(uint available, uint required);
     error Allocation__InsufficientMasterBalance(uint available, uint required);
     error Allocation__InsufficientAllocation(uint available, uint required);
     error Allocation__PuppetListTooLarge(uint provided, uint maximum);

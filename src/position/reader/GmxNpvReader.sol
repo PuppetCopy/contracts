@@ -160,7 +160,6 @@ contract GmxNpvReader is INpvReader {
     // ============ Constructor ============
 
     constructor(
-        IAuthority _authority,
         address _dataStore,
         address _reader,
         address _referralStorage

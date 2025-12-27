@@ -35,7 +35,7 @@ contract GmxNpvReaderForkTest is Test {
 
     function setUp() public {
         dictator = new Dictatorship(address(this));
-        npvReader = new GmxNpvReader(dictator, GMX_DATASTORE, GMX_READER, GMX_REFERRAL_STORAGE);
+        npvReader = new GmxNpvReader(GMX_DATASTORE, GMX_READER, GMX_REFERRAL_STORAGE);
         dictator.registerContract(address(npvReader));
         dataStore = IDataStore(GMX_DATASTORE);
     }

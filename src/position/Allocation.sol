@@ -24,82 +24,79 @@ contract Allocation is CoreContract, IExecutor, IHook {
 
     Config public config;
     mapping(address => INpvReader) public venueReaders;
-
-    // ERC-7579 calldata offset for execute functions
     uint256 constant EXEC_OFFSET = 100;
 
-    // Balance tracking
-    mapping(bytes32 => mapping(address => uint)) public allocationBalance;
     mapping(bytes32 => uint) public totalAllocation;
+    mapping(bytes32 => mapping(address => uint)) public allocationBalance;
 
-    // Share-based distribution (priced at NPV for fair distribution)
-    mapping(bytes32 => mapping(address => uint)) public userShares;
     mapping(bytes32 => uint) public totalShares;
-    mapping(bytes32 => uint) public cumulativeSettlementPerShare;
-    mapping(bytes32 => mapping(address => uint)) public userShareCheckpoint;
-    mapping(bytes32 => uint) public pendingUtilization;
+    mapping(bytes32 => uint) public accReturnPerShare;
+    mapping(bytes32 => mapping(address => uint)) public userShares;
+    mapping(bytes32 => mapping(address => uint)) public userReturnCheckpoint;
 
     mapping(bytes32 => IERC7579Account) public subaccountMap;
     mapping(bytes32 => uint) public subaccountRecordedBalance;
     mapping(IERC7579Account => IERC20[]) public masterCollateralList;
 
-    // Position tracking
     mapping(bytes32 => INpvReader) public keyReader;
     mapping(address => bytes32[]) public openPositionKeys;
     mapping(address => mapping(bytes32 => uint)) public positionKeyIndex;
 
-    constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
+    mapping(bytes32 => uint) public pendingUtilization;
 
-    // ===================== Views =====================
+    constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
     function getConfig() external view returns (Config memory) {
         return config;
     }
 
-    function getTotalNPV(bytes32 _key) public view returns (uint) {
+    function getTotalNetPositionValue(bytes32 _key) public view returns (uint) {
         address _master = address(subaccountMap[_key]);
         if (_master == address(0)) return 0;
 
-        INpvReader _reader = keyReader[_key];
-        if (address(_reader) == address(0)) return 0;
-
         bytes32[] memory _posKeys = openPositionKeys[_master];
         uint _total = 0;
+
         for (uint _i = 0; _i < _posKeys.length; ++_i) {
-            int256 _npv = _reader.getPositionNetValue(_posKeys[_i]);
+            bytes32 _posKey = _posKeys[_i];
+            INpvReader _reader = keyReader[_posKey];
+            if (address(_reader) == address(0)) continue;
+            int256 _npv = _reader.getPositionNetValue(_posKey);
             if (_npv > 0) _total += uint(_npv);
         }
+
         return _total;
     }
 
     function getSharePrice(bytes32 _key) public view returns (uint) {
         if (totalShares[_key] == 0) return Precision.FLOAT_PRECISION;
-        uint _npv = getTotalNPV(_key);
+        uint _npv = getTotalNetPositionValue(_key);
         if (_npv == 0) return Precision.FLOAT_PRECISION;
         return Precision.toFactor(_npv, totalShares[_key]);
     }
 
     function getUserValue(bytes32 _key, address _user) external view returns (uint) {
         uint _shares = userShares[_key][_user];
-        uint _pending = pendingSettlement(_key, _user);
-        uint _allocation = allocationBalance[_key][_user];
-
+        uint _pending = pendingReturn(_key, _user);
         uint _shareValue = Precision.applyFactor(getSharePrice(_key), _shares);
-        return _allocation + _shareValue + _pending;
+        return _shareValue + _pending;
     }
 
-    function pendingSettlement(bytes32 _key, address _user) public view returns (uint) {
+    function pendingReturn(bytes32 _key, address _user) public view returns (uint) {
         uint _shares = userShares[_key][_user];
-        if (_shares == 0) return 0;
+        uint _totalShares = totalShares[_key];
+        if (_shares == 0 || _totalShares == 0) return 0;
 
-        uint _checkpoint = userShareCheckpoint[_key][_user];
-        uint _cumulative = cumulativeSettlementPerShare[_key];
-        if (_cumulative <= _checkpoint) return 0;
+        address _subaccount = address(subaccountMap[_key]);
+        IERC20[] memory _tokens = masterCollateralList[IERC7579Account(_subaccount)];
+        if (_tokens.length == 0) return 0;
 
-        return Precision.applyFactor(_cumulative - _checkpoint, _shares);
+        uint _balance = _tokens[0].balanceOf(_subaccount);
+        uint _idle = totalAllocation[_key];
+        uint _settledBalance = _balance > _idle ? _balance - _idle : 0;
+
+        return Precision.applyFactor(Precision.toFactor(_shares, _totalShares), _settledBalance);
     }
-
-    // ===================== External =====================
 
     function allocate(
         IERC20 _collateralToken,
@@ -121,16 +118,13 @@ contract Allocation is CoreContract, IExecutor, IHook {
         }
 
         bytes32 _key = PositionUtils.getMatchingKey(_collateralToken, _masterAddr);
-        _settle(_key, _collateralToken);
 
         if (address(subaccountMap[_key]) == address(0)) {
             subaccountMap[_key] = _master;
             masterCollateralList[_master].push(_collateralToken);
         }
 
-        uint _allocated = 0;
-        uint[] memory _puppetShareList = new uint[](_puppetCount);
-        uint _cumulative = cumulativeSettlementPerShare[_key];
+        uint _totalTransferred = 0;
 
         for (uint _i = 0; _i < _puppetCount; ++_i) {
             address _puppet = _puppetList[_i];
@@ -146,19 +140,98 @@ contract Allocation is CoreContract, IExecutor, IHook {
 
             if (_result.length == 0 || !abi.decode(_result, (bool))) continue;
 
-            _puppetShareList[_i] = userShares[_key][_puppet];
-            userShareCheckpoint[_key][_puppet] = _cumulative;
-
             allocationBalance[_key][_puppet] += _amount;
-            _allocated += _amount;
+            _totalTransferred += _amount;
         }
 
-        if (_allocated == 0) revert Error.Allocation__ZeroAllocation();
+        if (_totalTransferred == 0) revert Error.Allocation__ZeroAllocation();
 
-        totalAllocation[_key] += _allocated;
-        subaccountRecordedBalance[_key] += _allocated;
+        totalAllocation[_key] += _totalTransferred;
+        subaccountRecordedBalance[_key] += _totalTransferred;
 
-        _logEvent("Allocate", abi.encode(_key, _collateralToken, _master, _allocated, _puppetList, _allocationList, _puppetShareList));
+        _logEvent("Allocate", abi.encode(_key, _collateralToken, _master, _totalTransferred, totalAllocation[_key], _puppetList, _allocationList));
+    }
+
+    function utilize(
+        IERC20 _collateralToken,
+        address _masterAddr,
+        address[] calldata _puppetList,
+        uint[] calldata _utilizationList
+    ) external auth {
+        uint _puppetCount = _puppetList.length;
+        if (_puppetCount != _utilizationList.length) revert Error.Allocation__ArrayLengthMismatch(_puppetCount, _utilizationList.length);
+
+        bytes32 _key = PositionUtils.getMatchingKey(_collateralToken, _masterAddr);
+
+        if (pendingUtilization[_key] > 0) revert Error.Allocation__InsufficientMasterAllocation(pendingUtilization[_key], 0);
+
+        uint _totalShares = totalShares[_key];
+        uint _cumulative = accReturnPerShare[_key];
+        address _subaccount = address(subaccountMap[_key]);
+        uint _actual = _collateralToken.balanceOf(_subaccount);
+        uint _recorded = subaccountRecordedBalance[_key];
+        if (_actual < _recorded) revert Error.Allocation__InsufficientMasterBalance(_actual, _recorded);
+        uint _settled = _actual - _recorded;
+
+        subaccountRecordedBalance[_key] = _actual;
+        _cumulative += _totalShares > 0 ? Precision.toFactor(_settled, _totalShares) : 0;
+        accReturnPerShare[_key] = _cumulative;
+
+        uint _netPositionValue = getTotalNetPositionValue(_key);
+        uint _sharePrice = Precision.toFactor(_netPositionValue, _totalShares);
+
+        uint _totalUtilized = 0;
+        uint _totalNewShares = 0;
+        for (uint _i = 0; _i < _puppetCount; ++_i) {
+            address _puppet = _puppetList[_i];
+            uint _amount = _utilizationList[_i];
+            if (_amount == 0) continue;
+
+            uint _available = allocationBalance[_key][_puppet];
+            if (_amount > _available) revert Error.Allocation__InsufficientBalance(_available, _amount);
+
+            uint _newShares = Precision.toFactor(_amount, _sharePrice);
+            uint _oldShares = userShares[_key][_puppet];
+
+            userShares[_key][_puppet] = _oldShares + _newShares;
+
+            if (_oldShares == 0) {
+                userReturnCheckpoint[_key][_puppet] = _cumulative;
+            } else {
+                uint _oldCheckpoint = userReturnCheckpoint[_key][_puppet];
+                userReturnCheckpoint[_key][_puppet] = (_oldShares * _oldCheckpoint + _newShares * _cumulative) / (_oldShares + _newShares);
+            }
+
+            allocationBalance[_key][_puppet] -= _amount;
+            _totalUtilized += _amount;
+            _totalNewShares += _newShares;
+        }
+
+        if (_totalUtilized == 0) revert Error.Allocation__ZeroAllocation();
+
+        totalAllocation[_key] -= _totalUtilized;
+        totalShares[_key] += _totalNewShares;
+        pendingUtilization[_key] = _totalUtilized;
+
+        _logEvent("Utilize", abi.encode(_key, _collateralToken, _masterAddr, _totalUtilized, _totalNewShares, _sharePrice, _puppetList, _utilizationList));
+    }
+
+    function withdrawAllocation(IERC20 _token, bytes32 _key, address _user, uint _amount) external auth {
+        uint _available = allocationBalance[_key][_user];
+        if (_amount > _available) revert Error.Allocation__InsufficientBalance(_available, _amount);
+
+        allocationBalance[_key][_user] -= _amount;
+        totalAllocation[_key] -= _amount;
+
+        bytes memory _result = _executeFromExecutor(
+            subaccountMap[_key], address(_token), config.transferOutGasLimit, abi.encodeCall(IERC20.transfer, (_user, _amount))
+        );
+        if (_result.length == 0 || !abi.decode(_result, (bool))) {
+            revert Error.Allocation__TransferFailed();
+        }
+        subaccountRecordedBalance[_key] -= _amount;
+
+        _logEvent("WithdrawAllocation", abi.encode(_key, _token, _user, _amount, allocationBalance[_key][_user]));
     }
 
     function masterDeposit(IERC20 _collateralToken, address _masterAddr, uint _amount) external auth {
@@ -169,64 +242,46 @@ contract Allocation is CoreContract, IExecutor, IHook {
         if (!_bothInstalled) revert Error.Allocation__UnregisteredSubaccount();
 
         bytes32 _key = PositionUtils.getMatchingKey(_collateralToken, _masterAddr);
-        _settle(_key, _collateralToken);
 
         if (address(subaccountMap[_key]) == address(0)) {
             subaccountMap[_key] = _master;
             masterCollateralList[_master].push(_collateralToken);
         }
 
-        uint _shares = userShares[_key][_masterAddr];
-        userShareCheckpoint[_key][_masterAddr] = cumulativeSettlementPerShare[_key];
-
-        uint _allocation = allocationBalance[_key][_masterAddr] += _amount;
-
+        allocationBalance[_key][_masterAddr] += _amount;
         totalAllocation[_key] += _amount;
         subaccountRecordedBalance[_key] += _amount;
 
-        _logEvent("MasterDeposit", abi.encode(_key, _collateralToken, _master, _amount, _shares, _allocation));
+        _logEvent("MasterDeposit", abi.encode(_key, _collateralToken, _master, _amount, totalAllocation[_key]));
     }
 
     function withdraw(IERC20 _token, bytes32 _key, address _user, uint _amount) external auth {
-        uint _cumulative = _settle(_key, _token);
-        uint _allocation = allocationBalance[_key][_user];
         uint _shares = userShares[_key][_user];
-        uint _realized = 0;
+        uint _totalShares = totalShares[_key];
+        if (_shares == 0) revert Error.Allocation__InsufficientBalance(0, _amount);
 
-        // Realize share settlement
-        if (_shares > 0) {
-            uint _checkpoint = userShareCheckpoint[_key][_user];
-            if (_cumulative <= _checkpoint) revert Error.Allocation__SharesNotSettled(_shares);
+        address _subaccount = address(subaccountMap[_key]);
+        uint _balance = _token.balanceOf(_subaccount);
+        uint _idle = totalAllocation[_key];
+        uint _settledBalance = _balance > _idle ? _balance - _idle : 0;
 
-            _realized = Precision.applyFactor(_cumulative - _checkpoint, _shares);
-            totalShares[_key] -= _shares;
-            _allocation += _realized;
-            userShares[_key][_user] = 0;
-        }
+        uint _claimable = Precision.applyFactor(Precision.toFactor(_shares, _totalShares), _settledBalance);
+        if (_amount > _claimable) revert Error.Allocation__InsufficientBalance(_claimable, _amount);
 
-        if (_amount > 0) {
-            if (_allocation < _amount) revert Error.Allocation__InsufficientAllocation(_allocation, _amount);
-            _allocation -= _amount;
-            totalAllocation[_key] -= _amount;
-        }
-
-        allocationBalance[_key][_user] = _allocation;
-        userShareCheckpoint[_key][_user] = _cumulative;
+        uint _sharesToBurn = Precision.applyFactor(Precision.toFactor(_amount, _claimable), _shares);
+        userShares[_key][_user] -= _sharesToBurn;
+        totalShares[_key] -= _sharesToBurn;
 
         if (_amount > 0) {
             bytes memory _result = _executeFromExecutor(
                 subaccountMap[_key], address(_token), config.transferOutGasLimit, abi.encodeCall(IERC20.transfer, (_user, _amount))
             );
-            if (_result.length == 0 || !abi.decode(_result, (bool))) {
-                revert Error.Allocation__TransferFailed();
-            }
-            subaccountRecordedBalance[_key] -= _amount;
 
-            _logEvent("Withdraw", abi.encode(_key, _token, _user, _amount, _realized, _shares, _allocation));
+            if (_result.length == 0 || !abi.decode(_result, (bool))) revert Error.Allocation__TransferFailed();
+
+            _logEvent("Withdraw", abi.encode(_key, _token, _user, _amount, _claimable, _sharesToBurn, _shares));
         }
     }
-
-    // ===================== ERC-7579 Module =====================
 
     function isModuleType(uint256 moduleTypeId) external pure returns (bool) {
         return moduleTypeId == MODULE_TYPE_EXECUTOR || moduleTypeId == MODULE_TYPE_HOOK;
@@ -248,30 +303,17 @@ contract Allocation is CoreContract, IExecutor, IHook {
             for (uint _i = 0; _i < _tokens.length; ++_i) {
                 bytes32 _key = PositionUtils.getMatchingKey(_tokens[_i], address(_master));
                 uint _shares = totalShares[_key];
+                uint _allocation = totalAllocation[_key];
                 if (_shares > 0) revert Error.Allocation__ActiveShares(_shares);
+                if (_allocation > 0) revert Error.Allocation__ActiveShares(_allocation);
             }
             delete masterCollateralList[_master];
         }
     }
 
-    /**
-     * @notice Pre-execution hook - settles balances, validates targets, and tracks positions
-     * @dev Only validates direct targets from the smart account's execute call.
-     *      Inner calls by whitelisted contracts (e.g., GMX ExchangeRouter -> OrderHandler)
-     *      don't pass through this hook and work normally.
-     */
     function preCheck(address, uint256, bytes calldata _msgData) external returns (bytes memory) {
-        IERC7579Account _subaccount = IERC7579Account(msg.sender);
-        address _master = address(_subaccount);
-        IERC20[] memory _tokens = masterCollateralList[_subaccount];
+        address _master = msg.sender;
 
-        // Settle all registered collateral tokens before any execution
-        for (uint _i = 0; _i < _tokens.length; ++_i) {
-            IERC20 _token = _tokens[_i];
-            _settle(PositionUtils.getMatchingKey(_token, _master), _token);
-        }
-
-        // Validate execution targets against whitelist
         bytes4 _selector = bytes4(_msgData[0:4]);
         if (_selector == IERC7579Account.execute.selector ||
             _selector == IERC7579Account.executeFromExecutor.selector) {
@@ -288,7 +330,7 @@ contract Allocation is CoreContract, IExecutor, IHook {
                 INpvReader _reader = venueReaders[_target];
                 if (address(_reader) == address(0)) revert Error.VenueRegistry__ContractNotWhitelisted(_target);
 
-                _trackPosition(_master, _callData, _reader, _tokens);
+                _trackPosition(_master, _callData, _reader);
             } else if (_calltype == CALLTYPE_BATCH) {
                 Execution[] calldata _executions = ExecutionLib.decodeBatch(_executionData);
                 for (uint256 _i = 0; _i < _executions.length; _i++) {
@@ -297,96 +339,26 @@ contract Allocation is CoreContract, IExecutor, IHook {
                     INpvReader _reader = venueReaders[_target];
                     if (address(_reader) == address(0)) revert Error.VenueRegistry__ContractNotWhitelisted(_target);
 
-                    _trackPosition(_master, _executions[_i].callData, _reader, _tokens);
+                    _trackPosition(_master, _executions[_i].callData, _reader);
                 }
             } else if (_calltype == CALLTYPE_DELEGATECALL) {
                 revert Error.Allocation__DelegateCallNotAllowed();
             } else {
                 revert Error.Allocation__InvalidCallType();
             }
+
+            IERC20[] memory _tokens = masterCollateralList[IERC7579Account(_master)];
+            for (uint _i = 0; _i < _tokens.length; ++_i) {
+                bytes32 _key = PositionUtils.getMatchingKey(_tokens[_i], _master);
+                pendingUtilization[_key] = 0;
+            }
         }
 
         return _msgData;
     }
 
-    function postCheck(bytes calldata _hookData) external {
-        IERC7579Account _subaccount = IERC7579Account(msg.sender);
-        address _master = address(_subaccount);
-        IERC20[] memory _tokens = masterCollateralList[_subaccount];
+    function postCheck(bytes calldata) external {}
 
-        for (uint _i = 0; _i < _tokens.length; ++_i) {
-            IERC20 _token = _tokens[_i];
-            bytes32 _key = PositionUtils.getMatchingKey(_token, _master);
-
-            uint _recorded = subaccountRecordedBalance[_key];
-            if (_recorded == 0) continue;
-
-            uint _actual = _token.balanceOf(address(_subaccount));
-            if (_actual >= _recorded) continue;
-
-            uint _utilized = _recorded - _actual;
-
-            pendingUtilization[_key] += _utilized;
-            totalAllocation[_key] -= _utilized;
-            subaccountRecordedBalance[_key] = _actual;
-
-            _logEvent("Action", abi.encode(_key, _token, _subaccount, _utilized, pendingUtilization[_key], _hookData));
-        }
-    }
-
-    /// @notice Distribute pending utilization to users as shares priced at current NPV
-    /// @dev Called after postCheck to convert pending utilization into shares
-    function distributeShares(bytes32 _key, address[] calldata _users) external auth {
-        uint _pending = pendingUtilization[_key];
-        if (_pending == 0) return;
-
-        uint _sharePrice = getSharePrice(_key);
-        uint _cumulative = cumulativeSettlementPerShare[_key];
-
-        uint _totalAlloc = 0;
-        uint[] memory _allocations = new uint[](_users.length);
-
-        for (uint _i = 0; _i < _users.length; ++_i) {
-            _allocations[_i] = allocationBalance[_key][_users[_i]];
-            _totalAlloc += _allocations[_i];
-        }
-
-        if (_totalAlloc == 0) return;
-
-        uint _totalNewShares = 0;
-        for (uint _i = 0; _i < _users.length; ++_i) {
-            if (_allocations[_i] == 0) continue;
-
-            // User's portion of pending utilization based on their allocation
-            uint _userPortion = Precision.applyFactor(
-                Precision.toFactor(_allocations[_i], _totalAlloc),
-                _pending
-            );
-
-            // Cap at available allocation
-            if (_userPortion > _allocations[_i]) _userPortion = _allocations[_i];
-
-            // Convert to shares at current NPV price
-            uint _newShares = Precision.toFactor(_userPortion, _sharePrice);
-
-            userShares[_key][_users[_i]] += _newShares;
-            userShareCheckpoint[_key][_users[_i]] = _cumulative;
-            allocationBalance[_key][_users[_i]] -= _userPortion;
-            _totalNewShares += _newShares;
-        }
-
-        totalShares[_key] += _totalNewShares;
-        pendingUtilization[_key] = 0;
-
-        _logEvent("DistributeShares", abi.encode(_key, _users, _pending, _sharePrice, _totalNewShares));
-    }
-
-    // ===================== Internal =====================
-
-    function _executeFromExecutor(IERC7579Account _from, address _to, bytes memory _data) internal returns (bytes memory) {
-        ModeCode _mode = ModeLib.encode(CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT, ModePayload.wrap(0x00));
-        return _from.executeFromExecutor(_mode, ExecutionLib.encodeSingle(_to, 0, _data))[0];
-    }
 
     function _executeFromExecutor(IERC7579Account _from, address _to, uint _gas, bytes memory _data) internal returns (bytes memory) {
         ModeCode _mode = ModeLib.encode(CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT, ModePayload.wrap(0x00));
@@ -395,24 +367,6 @@ contract Allocation is CoreContract, IExecutor, IHook {
         } catch {
             return "";
         }
-    }
-
-    function _settle(bytes32 _key, IERC20 _token) internal returns (uint _cumulative) {
-        uint _totalShares = totalShares[_key];
-        _cumulative = cumulativeSettlementPerShare[_key];
-        if (_totalShares == 0) return _cumulative;
-
-        address _subaccount = address(subaccountMap[_key]);
-        uint _actual = _token.balanceOf(_subaccount);
-        uint _recorded = subaccountRecordedBalance[_key];
-        if (_actual <= _recorded) return _cumulative;
-
-        uint _settled = _actual - _recorded;
-        subaccountRecordedBalance[_key] = _actual;
-        _cumulative += Precision.toFactor(_settled, _totalShares);
-        cumulativeSettlementPerShare[_key] = _cumulative;
-
-        _logEvent("Settle", abi.encode(_key, _token, _subaccount, _settled, _totalShares, _cumulative));
     }
 
     function _setConfig(bytes memory _data) internal override {
@@ -428,45 +382,15 @@ contract Allocation is CoreContract, IExecutor, IHook {
         _logEvent("SetVenueReader", abi.encode(_venue, _reader));
     }
 
-    function _trackPosition(address _master, bytes calldata _callData, INpvReader _reader, IERC20[] memory _tokens) internal {
+    function _trackPosition(address _master, bytes calldata _callData, INpvReader _reader) internal {
         bytes32 _posKey = _reader.parsePositionKey(_master, _callData);
         if (_posKey == bytes32(0)) return;
 
         if (positionKeyIndex[_master][_posKey] == 0) {
             openPositionKeys[_master].push(_posKey);
             positionKeyIndex[_master][_posKey] = openPositionKeys[_master].length;
-
-            // Set reader for all collateral keys if not set
-            for (uint _i = 0; _i < _tokens.length; ++_i) {
-                bytes32 _key = PositionUtils.getMatchingKey(_tokens[_i], _master);
-                if (address(keyReader[_key]) == address(0)) {
-                    keyReader[_key] = _reader;
-                }
-            }
+            keyReader[_posKey] = _reader;
         }
     }
 
-    function _cleanupPositions(address _master, INpvReader _reader) internal {
-        bytes32[] storage _keys = openPositionKeys[_master];
-        uint256 _i = 0;
-
-        while (_i < _keys.length) {
-            bytes32 _posKey = _keys[_i];
-
-            // Remove if position value is 0 (closed or non-existent)
-            if (_reader.getPositionNetValue(_posKey) == 0) {
-                // Swap with last and pop
-                uint256 _lastIdx = _keys.length - 1;
-                if (_i != _lastIdx) {
-                    bytes32 _lastKey = _keys[_lastIdx];
-                    _keys[_i] = _lastKey;
-                    positionKeyIndex[_master][_lastKey] = _i + 1;
-                }
-                _keys.pop();
-                delete positionKeyIndex[_master][_posKey];
-            } else {
-                _i++;
-            }
-        }
-    }
 }

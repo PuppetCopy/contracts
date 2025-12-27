@@ -12,8 +12,8 @@ import {IEventEmitter} from "../../utils/interfaces/IEventEmitter.sol";
 
 /**
  * @title MinAllocationRatio
- * @notice Smart Sessions policy requiring master's allocation ratio vs puppets
- * @dev ratio = masterAllocation / puppetsAllocation
+ * @notice Smart Sessions policy requiring master's share ratio vs puppets
+ * @dev ratio = masterShares / puppetShares
  */
 contract MinAllocationRatio is ERC7579ActionPolicy {
     Allocation public immutable allocation;
@@ -93,13 +93,13 @@ contract MinAllocationRatio is ERC7579ActionPolicy {
 
         bytes32 key = keccak256(abi.encode(collateralToken, master));
 
-        uint masterAllocation = allocation.allocationBalance(key, master);
-        uint totalAlloc = allocation.totalAllocation(key);
-        uint puppetsAllocation = totalAlloc - masterAllocation;
+        uint masterShares = allocation.userShares(key, master);
+        uint totalShares = allocation.totalShares(key);
+        uint puppetShares = totalShares - masterShares;
 
-        if (puppetsAllocation == 0) return VALIDATION_SUCCESS;
+        if (puppetShares == 0) return VALIDATION_SUCCESS;
 
-        uint ratio = Precision.toFactor(masterAllocation, puppetsAllocation);
+        uint ratio = Precision.toFactor(masterShares, puppetShares);
 
         if (ratio < minRatio) return VALIDATION_FAILED;
 
