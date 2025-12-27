@@ -20,7 +20,6 @@ contract Shares is CoreContract, IExecutor, EIP712 {
     enum IntentType { MasterDeposit, Allocate, Withdraw, Trade }
 
     struct Config {
-        INpvReader npvReader;
         uint maxPuppetList;
         uint transferGasLimit;
         uint callGasLimit;
@@ -71,7 +70,9 @@ contract Shares is CoreContract, IExecutor, EIP712 {
     mapping(address => uint256) public nonces;
     mapping(bytes32 => IERC7579Account) public subaccountMap;
     mapping(IERC7579Account => IERC20[]) public masterCollateralList;
-    mapping(bytes32 => bytes32[]) public positionKeys;
+    mapping(bytes32 => bytes32[]) public positionKeyList;
+    mapping(address => INpvReader) public npvReaderMap;
+    mapping(bytes32 => address) public positionTargetMap;
 
     constructor(IAuthority _authority, Config memory _config)
         CoreContract(_authority, abi.encode(_config))
@@ -103,20 +104,26 @@ contract Shares is CoreContract, IExecutor, EIP712 {
         return Precision.applyFactor(_sharePrice, _shares);
     }
 
-    function getPositionKeys(bytes32 _key) external view returns (bytes32[] memory) {
-        return positionKeys[_key];
+    function getPositionKeyList(bytes32 _key) external view returns (bytes32[] memory) {
+        return positionKeyList[_key];
     }
 
-    function addPositionKey(bytes32 _key, bytes32 _positionKey) external auth {
-        positionKeys[_key].push(_positionKey);
+    function setNpvReader(address _target, INpvReader _reader) external auth {
+        npvReaderMap[_target] = _reader;
+    }
+
+    function addPositionKey(bytes32 _key, bytes32 _positionKey, address _target) external auth {
+        positionKeyList[_key].push(_positionKey);
+        positionTargetMap[_positionKey] = _target;
     }
 
     function removePositionKey(bytes32 _key, bytes32 _positionKey) external auth {
-        bytes32[] storage _keys = positionKeys[_key];
+        bytes32[] storage _keys = positionKeyList[_key];
         for (uint _i = 0; _i < _keys.length; ++_i) {
             if (_keys[_i] == _positionKey) {
                 _keys[_i] = _keys[_keys.length - 1];
                 _keys.pop();
+                delete positionTargetMap[_positionKey];
                 return;
             }
         }
@@ -296,6 +303,8 @@ contract Shares is CoreContract, IExecutor, EIP712 {
         CallPosition calldata _call,
         bytes calldata _signature
     ) external auth {
+        INpvReader _reader = npvReaderMap[_call.target];
+        if (address(_reader) == address(0)) revert Error.Allocation__TargetNotWhitelisted(_call.target);
         if (block.timestamp > _call.deadline) revert Error.Allocation__IntentExpired(_call.deadline, block.timestamp);
 
         bytes32 _hash = _hashTypedDataV4(keccak256(abi.encode(
@@ -312,19 +321,22 @@ contract Shares is CoreContract, IExecutor, EIP712 {
         uint256 _expectedNonce = nonces[_call.master]++;
         if (_expectedNonce != _call.nonce) revert Error.Allocation__InvalidNonce(_expectedNonce, _call.nonce);
 
-        IERC7579Account _subaccount = IERC7579Account(_call.master);
+        INpvReader.PositionCallInfo memory _posInfo = _reader.parsePositionCall(_call.master, _call.callData);
 
         (bytes memory _result, bytes memory _error) = _executeFromExecutor(
-            _subaccount,
+            IERC7579Account(_call.master),
             _call.target,
             config.callGasLimit,
             _call.callData
         );
 
+        int256 _netValue = _reader.getPositionNetValue(_posInfo.positionKey);
+
         _logEvent("CallPosition", abi.encode(
             _call.master,
             _call.target,
-            _call.callData,
+            _posInfo,
+            _netValue,
             _result,
             _error
         ));
@@ -336,9 +348,14 @@ contract Shares is CoreContract, IExecutor, EIP712 {
 
         _info.idleBalance = IERC20(_token).balanceOf(address(_subaccount));
 
-        bytes32[] storage _keys = positionKeys[_key];
+        bytes32[] storage _keys = positionKeyList[_key];
         for (uint _i = 0; _i < _keys.length; ++_i) {
-            int256 _npv = config.npvReader.getPositionNetValue(_keys[_i]);
+            bytes32 _positionKey = _keys[_i];
+            address _target = positionTargetMap[_positionKey];
+            INpvReader _reader = npvReaderMap[_target];
+            if (address(_reader) == address(0)) continue;
+
+            int256 _npv = _reader.getPositionNetValue(_positionKey);
             if (_npv > 0) _info.positionValue += uint256(_npv);
         }
 

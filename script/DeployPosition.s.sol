@@ -7,7 +7,6 @@ import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {Shares} from "src/position/Shares.sol";
 import {SubscriptionPolicy} from "src/position/policies/SubscriptionPolicy.sol";
 import {ThrottlePolicy} from "src/position/policies/ThrottlePolicy.sol";
-import {INpvReader} from "src/position/interface/INpvReader.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
 
@@ -16,12 +15,10 @@ contract DeployPosition is BaseScript {
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
 
         Dictatorship dictatorship = Dictatorship(getDeployedAddress("Dictatorship"));
-        INpvReader npvReader = INpvReader(getDeployedAddress("GmxNpvReader"));
 
         Shares shares = new Shares(
             dictatorship,
             Shares.Config({
-                npvReader: npvReader,
                 maxPuppetList: 100,
                 transferGasLimit: 200_000,
                 callGasLimit: 200_000,

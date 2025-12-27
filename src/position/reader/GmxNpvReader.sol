@@ -240,20 +240,31 @@ contract GmxNpvReader is INpvReader {
         return (uint256(price) * multiplier) / FLOAT_PRECISION;
     }
 
-    // ============ Position Key Parsing ============
+    // ============ Position Call Parsing ============
 
     bytes4 private constant CREATE_ORDER = 0x4a393149;
+    uint256 private constant ORDER_TYPE_MARKET_INCREASE = 2;
+    uint256 private constant ORDER_TYPE_LIMIT_INCREASE = 3;
 
-    function parsePositionKey(address _account, bytes calldata _callData) external pure returns (bytes32) {
-        if (_callData.length < 4) return bytes32(0);
-        if (bytes4(_callData[:4]) != CREATE_ORDER) return bytes32(0);
+    function parsePositionCall(address _account, bytes calldata _callData) external pure returns (INpvReader.PositionCallInfo memory _info) {
+        if (_callData.length < 4) return _info;
+        if (bytes4(_callData[:4]) != CREATE_ORDER) return _info;
 
         bytes calldata _params = _callData[4:];
+
         uint256 addressesOffset = abi.decode(_params[:32], (uint256));
+        uint256 numbersOffset = abi.decode(_params[32:64], (uint256));
+
         address market = abi.decode(_params[addressesOffset + 128:addressesOffset + 160], (address));
-        address collateralToken = abi.decode(_params[addressesOffset + 160:addressesOffset + 192], (address));
+        _info.collateralToken = abi.decode(_params[addressesOffset + 160:addressesOffset + 192], (address));
+
+        _info.sizeDelta = abi.decode(_params[numbersOffset:numbersOffset + 32], (uint256));
+        _info.collateralDelta = abi.decode(_params[numbersOffset + 32:numbersOffset + 64], (uint256));
+
+        uint256 orderType = abi.decode(_params[64:96], (uint256));
         bool isLong = abi.decode(_params[128:160], (bool));
 
-        return keccak256(abi.encode(_account, market, collateralToken, isLong));
+        _info.isIncrease = (orderType == ORDER_TYPE_MARKET_INCREASE || orderType == ORDER_TYPE_LIMIT_INCREASE);
+        _info.positionKey = keccak256(abi.encode(_account, market, _info.collateralToken, isLong));
     }
 }
