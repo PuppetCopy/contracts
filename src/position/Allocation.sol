@@ -16,7 +16,7 @@ import {Precision} from "../utils/Precision.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 import {INpvReader} from "./interface/INpvReader.sol";
 
-contract Shares is CoreContract, IExecutor, EIP712 {
+contract Allocation is CoreContract, IExecutor, EIP712 {
     enum IntentType { MasterDeposit, Allocate, Withdraw, Trade }
 
     struct Config {
