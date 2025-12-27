@@ -8,14 +8,14 @@ import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Acco
 
 /**
  * @title UserRouter
- * @notice Aggregates user-facing operations for allocation
+ * @notice Aggregates user-facing operations for two-phase allocation
  *
  * Flow:
  * 1. Puppet installs Smart Sessions with Allocation as session owner
  * 2. Puppet configures policies (AllowedRecipient, AllowanceRate, Throttle)
- * 3. Master (7579 account) calls allocate() via this router
- * 4. Allocation executes transfers from puppets → master
- * 5. Users can sync/withdraw through this router
+ * 3. Master calls allocate() to stage funds from puppets
+ * 4. Master calls utilize() to convert allocations to shares before trading
+ * 5. Users can withdraw shares or idle allocations
  */
 contract UserRouter {
     Allocation public immutable allocation;
@@ -25,40 +25,55 @@ contract UserRouter {
     }
 
     /**
-     * @notice Master gathers allocations from puppets
-     * @dev Allocation contract executes transfers from puppet accounts.
-     *      Puppet policies validate each transfer.
+     * @notice Master stages funds from puppets (idle allocations)
+     * @dev Funds are transferred but not yet utilized. No shares minted.
      * @param _collateralToken The collateral token
      * @param _puppetList List of puppet accounts to pull from
-     * @param _allocationList Allocation amounts per puppet
+     * @param _amountList Allocation amounts per puppet
      */
     function allocate(
         IERC20 _collateralToken,
         address[] calldata _puppetList,
-        uint[] calldata _allocationList
+        uint[] calldata _amountList
     ) external {
-        allocation.allocate(_collateralToken, msg.sender, _puppetList, _allocationList);
+        allocation.allocate(_collateralToken, msg.sender, _puppetList, _amountList);
     }
 
     /**
-     * @notice Master deposits own capital (skin in the game)
-     * @dev Must be called by master's 7579 account. Funds must already be in subaccount.
+     * @notice Master converts allocations to shares (proportionally)
+     * @dev Unused allocations are returned to puppets. Shares minted at current price.
      * @param _collateralToken The collateral token
-     * @param _amount Amount to allocate as master's stake
+     * @param _puppetList List of puppet accounts to process
+     * @param _amountToUtilize Amount to utilize (must be <= totalAllocation)
      */
-    function masterDeposit(IERC20 _collateralToken, uint _amount) external {
-        allocation.masterDeposit(_collateralToken, msg.sender, _amount);
+    function utilize(
+        IERC20 _collateralToken,
+        address[] calldata _puppetList,
+        uint _amountToUtilize
+    ) external {
+        allocation.utilize(_collateralToken, msg.sender, _puppetList, _amountToUtilize);
     }
 
     /**
-     * @notice Withdraw allocation back to puppet's subaccount
+     * @notice Withdraw funds - first from idle allocations, then from shares
+     * @dev Idle allocations are returned 1:1. Shares are burned at current share price.
      * @param _collateralToken The collateral token
      * @param _master The master address
-     * @param _amount Amount to withdraw from allocation
+     * @param _amount Amount of tokens to withdraw
      */
     function withdraw(IERC20 _collateralToken, address _master, uint _amount) external {
         bytes32 _matchingKey = _getMatchingKey(_collateralToken, _master);
         allocation.withdraw(_collateralToken, _matchingKey, msg.sender, _amount);
+    }
+
+    /**
+     * @notice Get user's current value based on share price
+     * @param _collateralToken The collateral token
+     * @param _master The master address
+     * @param _user The user to query
+     */
+    function getUserValue(IERC20 _collateralToken, address _master, address _user) external view returns (uint) {
+        return allocation.getUserValue(_collateralToken, _master, _user);
     }
 
     function _getMatchingKey(IERC20 _collateralToken, address _master) internal pure returns (bytes32) {

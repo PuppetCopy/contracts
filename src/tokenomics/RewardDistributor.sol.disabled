@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BUSL-1.1
+               // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.33;
 
 import {IGmxReferralStorage} from "../position/interface/IGmxReferralStorage.sol";
@@ -12,7 +12,7 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {RewardStore} from "./RewardStore.sol";
 
 contract RewardDistributor is CoreContract {
-    /// @notice Configuration parameters
+    /// @notice Configuration paradmeters
     struct Config {
         uint transferOutGasLimit;
         uint distributionWindow;
