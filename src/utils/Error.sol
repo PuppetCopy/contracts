@@ -81,4 +81,8 @@ library Error {
     error FeeMarketplace__InvalidConfig();
 
     error VenueRegistry__ContractNotWhitelisted(address venue);
+
+    error GmxVenueValidator__InvalidCallData();
+    error GmxVenueValidator__TokenMismatch(address expected, address actual);
+    error GmxVenueValidator__AmountMismatch(uint expected, uint actual);
 }

@@ -6,6 +6,7 @@ import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Acco
 import {Permission} from "../../utils/auth/Permission.sol";
 import {IAuthority} from "../../utils/interfaces/IAuthority.sol";
 import {IVenueValidator} from "../interface/IVenueValidator.sol";
+import {Error} from "../../utils/Error.sol";
 
 import {Position} from "gmx-synthetics/position/Position.sol";
 import {Market} from "gmx-synthetics/market/Market.sol";
@@ -249,10 +250,6 @@ contract GmxVenueValidator is IVenueValidator {
     uint256 private constant ORDER_TYPE_MARKET_INCREASE = 2;
     uint256 private constant ORDER_TYPE_LIMIT_INCREASE = 3;
 
-    error InvalidCallData();
-    error TokenMismatch(address expected, address actual);
-    error AmountMismatch(uint256 expected, uint256 actual);
-
     /// @inheritdoc IVenueValidator
     function validate(
         IERC7579Account _subaccount,
@@ -262,9 +259,9 @@ contract GmxVenueValidator is IVenueValidator {
     ) external pure {
         (address parsedToken, uint256 tokenDelta,) = _parseCallData(address(_subaccount), _callData);
 
-        if (parsedToken == address(0)) revert InvalidCallData();
-        if (parsedToken != address(_token)) revert TokenMismatch(address(_token), parsedToken);
-        if (tokenDelta != _amount) revert AmountMismatch(_amount, tokenDelta);
+        if (parsedToken == address(0)) revert Error.GmxVenueValidator__InvalidCallData();
+        if (parsedToken != address(_token)) revert Error.GmxVenueValidator__TokenMismatch(address(_token), parsedToken);
+        if (tokenDelta != _amount) revert Error.GmxVenueValidator__AmountMismatch(_amount, tokenDelta);
     }
 
     /// @inheritdoc IVenueValidator
