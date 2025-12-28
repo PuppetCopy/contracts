@@ -52,17 +52,16 @@ library Error {
     error Allocation__AlreadyRegistered();
     error Allocation__UnregisteredSubaccount();
     error Allocation__TransferFailed();
-    error Allocation__NetValueBelowAcceptable(uint netValue, uint acceptable);
     error Allocation__ArrayLengthMismatch(uint puppetCount, uint allocationCount);
     error Allocation__PuppetListTooLarge(uint provided, uint maximum);
     error Allocation__TargetNotWhitelisted(address target);
-    error Allocation__InvalidCallType();
     error Allocation__IntentExpired(uint deadline, uint currentTime);
     error Allocation__InvalidSignature(address expected, address recovered);
     error Allocation__InvalidNonce(uint expected, uint provided);
+    error Allocation__InvalidPuppetAllocation();
+    error Allocation__InvalidPosition();
     error Allocation__InvalidMaxPuppetList();
-    error Allocation__InvalidTransferGasLimit();
-    error Allocation__InvalidCallGasLimit();
+    error Allocation__InvalidGasLimit();
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();
@@ -71,9 +70,12 @@ library Error {
     error VenueRegistry__ContractNotWhitelisted(address venue);
 
     error Position__VenueNotRegistered(bytes32 venueKey);
+    error Position__NetValueBelowAcceptable(uint netValue, uint acceptable);
 
     error GmxVenueValidator__InvalidCallData();
     error GmxVenueValidator__TokenMismatch(address expected, address actual);
     error GmxVenueValidator__AmountMismatch(uint expected, uint actual);
 
+    // PuppetAllocation errors
+    error PuppetAllocation__InvalidTransferGasLimit();
 }

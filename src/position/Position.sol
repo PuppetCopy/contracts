@@ -8,8 +8,22 @@ import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {IVenueValidator} from "./interface/IVenueValidator.sol";
+import {PositionUtils} from "./utils/PositionUtils.sol";
 
 contract Position is CoreContract {
+    enum IntentType { MasterDeposit, Allocate, Withdraw, Order }
+
+    struct CallIntent {
+        IntentType intentType;
+        address account;
+        IERC7579Account subaccount;
+        IERC20 token;
+        uint256 amount;
+        uint256 acceptableNetValue;
+        uint256 deadline;
+        uint256 nonce;
+    }
+
     struct Venue {
         bytes32 venueKey;
         IVenueValidator validator;
@@ -71,21 +85,33 @@ contract Position is CoreContract {
         }
     }
 
-    function calcNetPositionsValue(
-        IERC7579Account _subaccount,
-        IERC20 _token,
-        bytes32 _matchingKey
-    ) external view returns (
+    function getNetValue(IERC20 _token, IERC7579Account _subaccount) external view returns (uint256) {
+        bytes32 _matchingKey = PositionUtils.getMatchingKey(_token, _subaccount);
+        uint256 _netValue = _token.balanceOf(address(_subaccount));
+
+        bytes32[] storage _keys = positionKeyListMap[_matchingKey];
+        for (uint _i = 0; _i < _keys.length; ++_i) {
+            _netValue += positionVenueMap[_keys[_i]].validator.getPositionNetValue(_keys[_i]);
+        }
+
+        return _netValue;
+    }
+
+    function snapshotPositionValue(
+        CallIntent calldata _intent
+    ) external returns (
+        bytes32 matchingKey,
         uint256 allocation,
         uint256 positionValue,
         uint256 netValue,
         PositionInfo[] memory positions
     ) {
-        if (address(_subaccount) == address(0)) return (0, 0, 0, new PositionInfo[](0));
+        if (address(_intent.subaccount) == address(0)) return (bytes32(0), 0, 0, 0, new PositionInfo[](0));
 
-        allocation = _token.balanceOf(address(_subaccount));
+        matchingKey = PositionUtils.getMatchingKey(_intent.token, _intent.subaccount);
+        allocation = _intent.token.balanceOf(address(_intent.subaccount));
 
-        bytes32[] storage _keys = positionKeyListMap[_matchingKey];
+        bytes32[] storage _keys = positionKeyListMap[matchingKey];
         positions = new PositionInfo[](_keys.length);
 
         for (uint _i = 0; _i < _keys.length; ++_i) {
@@ -104,6 +130,19 @@ contract Position is CoreContract {
         }
 
         netValue = allocation + positionValue;
+
+        if (_intent.acceptableNetValue > 0 && netValue < _intent.acceptableNetValue) {
+            revert Error.Position__NetValueBelowAcceptable(netValue, _intent.acceptableNetValue);
+        }
+
+        _logEvent("SnapshotPositionValue", abi.encode(
+            _intent,
+            matchingKey,
+            allocation,
+            positionValue,
+            netValue,
+            positions
+        ));
     }
 
     function _setConfig(bytes memory) internal override {}

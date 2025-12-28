@@ -5,6 +5,7 @@ import {console} from "forge-std/src/console.sol";
 
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {Allocation} from "src/position/Allocation.sol";
+import {PuppetAllocation} from "src/position/PuppetAllocation.sol";
 import {Position} from "src/position/Position.sol";
 import {SubscriptionPolicy} from "src/position/policies/SubscriptionPolicy.sol";
 import {ThrottlePolicy} from "src/position/policies/ThrottlePolicy.sol";
@@ -21,12 +22,21 @@ contract DeployPosition is BaseScript {
         Position position = new Position(dictatorship);
         console.log("Position:", address(position));
 
+        PuppetAllocation puppetAllocation = new PuppetAllocation(
+            dictatorship,
+            PuppetAllocation.Config({
+                transferGasLimit: 200_000
+            })
+        );
+        console.log("PuppetAllocation:", address(puppetAllocation));
+
         Allocation allocation = new Allocation(
             dictatorship,
             Allocation.Config({
+                puppetAllocation: puppetAllocation,
+                position: position,
                 maxPuppetList: 100,
-                transferGasLimit: 200_000,
-                callGasLimit: 200_000,
+                gasLimit: 200_000,
                 virtualShareOffset: 1e6
             })
         );
