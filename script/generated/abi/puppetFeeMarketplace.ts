@@ -80,7 +80,7 @@ export default [
   },
   {
     type: 'function',
-    name: 'accountedBalance',
+    name: 'accountedBalanceMap',
     inputs: [
       {
         name: '',
@@ -279,7 +279,7 @@ export default [
   },
   {
     type: 'function',
-    name: 'lastAskResetTimestamp',
+    name: 'lastAskResetTimestampMap',
     inputs: [
       {
         name: '',
@@ -298,7 +298,7 @@ export default [
   },
   {
     type: 'function',
-    name: 'lastUnlockTimestamp',
+    name: 'lastUnlockTimestampMap',
     inputs: [
       {
         name: '',
@@ -411,7 +411,7 @@ export default [
   },
   {
     type: 'function',
-    name: 'unlockedFees',
+    name: 'unlockedFeesMap',
     inputs: [
       {
         name: '',

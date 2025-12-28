@@ -5,49 +5,144 @@ export const CONTRACT_EVENT_MAP = {
   Allocation: {
     CreateSubaccount: {
       hash: '0x1dbdfee265d85ada636001fb932284f24366604ff063c6829977cf0de853aa1f',
-      args: [{type:"bytes32",name:"key"},{type:"address",name:"user"},{type:"address",name:"signer"},{type:"address",name:"subaccount"},{type:"address",name:"token"},{type:"uint256",name:"amount"},{type:"uint256",name:"sharesOut"},{type:"uint256",name:"sharePrice"},{type:"uint256",name:"totalShares"}]
+      args: [
+        { type: 'bytes32', name: 'key' },
+        { type: 'address', name: 'account' },
+        { type: 'address', name: 'signer' },
+        { type: 'uint256', name: 'param' },
+        { type: 'uint256', name: 'param2' },
+        { type: 'uint256', name: 'amount' },
+        { type: 'uint256', name: 'sharesOut' },
+        { type: 'uint256', name: 'sharePrice' },
+        { type: 'uint256', name: 'totalSharesMap' }
+      ]
     },
     ExecuteAllocate: {
       hash: '0xc8e7f8df3ca4c122ae1fbf63eae5c258f59a8cee842870bab121051deca41d18',
-      args: [{type:"bytes32",name:"key"},{type:"address",name:"account"},{type:"address",name:"subaccount"},{type:"address",name:"token"},{type:"uint256",name:"amount"},{type:"uint256",name:"acceptablePrice"},{type:"address[]",name:"puppetList"},{type:"uint256[]",name:"amountList"},{type:"uint256",name:"totalAllocated"},{type:"uint256",name:"sharePrice"},{type:"uint256",name:"idleBalance"},{type:"uint256",name:"positionValue"},{type:"uint256",name:"totalShares"}]
+      args: [
+        { type: 'bytes32', name: 'key' },
+        { type: 'address', name: 'account' },
+        { type: 'address', name: 'subaccount' },
+        { type: 'address', name: 'token' },
+        { type: 'uint256', name: 'amount' },
+        { type: 'uint256', name: 'acceptableNetValue' },
+        { type: 'address[]', name: 'puppetList' },
+        { type: 'uint256[]', name: 'amountList' },
+        { type: 'uint256', name: 'totalAllocated' },
+        { type: 'uint256', name: 'sharePrice' },
+        { type: 'uint256', name: 'allocation' },
+        { type: 'uint256', name: 'positionValue' },
+        { type: 'uint256', name: 'positions' },
+        { type: 'uint256', name: 'totalSharesMap' }
+      ]
     },
     ExecuteAllocateFailed: {
       hash: '0x4793193416ccb8eee5829a7187ac57810646f3b0584ded07ffa004dddd5fded2',
-      args: [{type:"bytes32",name:"key"},{type:"address",name:"puppet"},{type:"uint256",name:"amount"},{type:"bytes",name:"errorValue"}]
+      args: [
+        { type: 'bytes32', name: 'key' },
+        { type: 'address', name: 'puppet' },
+        { type: 'uint256', name: 'amount' },
+        { type: 'bytes', name: 'errorValue' }
+      ]
     },
     ExecuteMasterDeposit: {
       hash: '0xc09b54e9e91c8d3b47792ff326c25a035639604ecc545cc1017ce275b7722a5e',
-      args: [{type:"bytes32",name:"key"},{type:"address",name:"account"},{type:"address",name:"subaccount"},{type:"address",name:"token"},{type:"uint256",name:"amount"},{type:"uint256",name:"acceptablePrice"},{type:"uint256",name:"sharesOut"},{type:"uint256",name:"sharePrice"},{type:"uint256",name:"idleBalance"},{type:"uint256",name:"positionValue"},{type:"uint256",name:"totalShares"}]
+      args: [
+        { type: 'bytes32', name: 'key' },
+        { type: 'address', name: 'account' },
+        { type: 'address', name: 'subaccount' },
+        { type: 'address', name: 'token' },
+        { type: 'uint256', name: 'amount' },
+        { type: 'uint256', name: 'acceptableNetValue' },
+        { type: 'uint256', name: 'sharesOut' },
+        { type: 'uint256', name: 'sharePrice' },
+        { type: 'uint256', name: 'allocation' },
+        { type: 'uint256', name: 'positionValue' },
+        { type: 'uint256', name: 'positions' },
+        { type: 'uint256', name: 'totalSharesMap' }
+      ]
     },
     ExecuteOrder: {
       hash: '0x8ed4dfaad885776d6924f1ff8b354c36a605f24a988d21cccbf5b9133dc2a2ad',
-      args: [{type:"bytes32",name:"key"},{type:"address",name:"account"},{type:"address",name:"subaccount"},{type:"address",name:"token"},{type:"uint256",name:"amount"},{type:"uint256",name:"acceptablePrice"},{type:"address",name:"target"},{type:"bytes",name:"callData"},{type:"bytes32",name:"orderKey"},{type:"bytes32",name:"positionKey"},{type:"address",name:"collateralToken"},{type:"bool",name:"isIncrease"},{type:"uint256",name:"sizeDelta"},{type:"uint256",name:"collateralDelta"},{type:"uint256",name:"netValue"},{type:"bytes",name:"result"},{type:"bytes",name:"errorValue"}]
+      args: [
+        { type: 'bytes32', name: 'key' },
+        { type: 'address', name: 'account' },
+        { type: 'address', name: 'subaccount' },
+        { type: 'address', name: 'token' },
+        { type: 'uint256', name: 'amount' },
+        { type: 'uint256', name: 'acceptableNetValue' },
+        { type: 'address', name: 'target' },
+        { type: 'bytes', name: 'callData' },
+        { type: 'bytes32', name: 'positionKey' },
+        { type: 'uint256', name: 'netValue' },
+        { type: 'uint256', name: 'allocation' },
+        { type: 'uint256', name: 'positionValue' },
+        { type: 'uint256', name: 'positions' },
+        { type: 'bytes', name: 'result' },
+        { type: 'bytes', name: 'errorValue' }
+      ]
     },
     ExecuteWithdraw: {
       hash: '0xcb64880bdc7e62dd4b02aedd4304adf2d6fbf5b649a653a21a9beadd95e24298',
-      args: [{type:"bytes32",name:"key"},{type:"address",name:"account"},{type:"address",name:"subaccount"},{type:"address",name:"token"},{type:"uint256",name:"amount"},{type:"uint256",name:"acceptablePrice"},{type:"uint256",name:"amountOut"},{type:"uint256",name:"sharePrice"},{type:"uint256",name:"idleBalance"},{type:"uint256",name:"positionValue"},{type:"uint256",name:"totalShares"},{type:"uint256",name:"userShares"}]
+      args: [
+        { type: 'bytes32', name: 'key' },
+        { type: 'address', name: 'account' },
+        { type: 'address', name: 'subaccount' },
+        { type: 'address', name: 'token' },
+        { type: 'uint256', name: 'amount' },
+        { type: 'uint256', name: 'acceptableNetValue' },
+        { type: 'uint256', name: 'amountOut' },
+        { type: 'uint256', name: 'sharePrice' },
+        { type: 'uint256', name: 'allocation' },
+        { type: 'uint256', name: 'positionValue' },
+        { type: 'uint256', name: 'positions' },
+        { type: 'uint256', name: 'totalSharesMap' },
+        { type: 'uint256', name: 'shareBalanceMap' }
+      ]
     }
   },
   FeeMarketplace: {
     AcceptOffer: {
       hash: '0x7d778e14025c4611dae90acde3cdf239063797ccb4dc030ab8c78b43e4558e02',
-      args: [{type:"address",name:"feeToken"},{type:"address",name:"buyer"},{type:"address",name:"receiver"},{type:"uint256",name:"payout"},{type:"uint256",name:"cost"}]
+      args: [
+        { type: 'address', name: 'feeToken' },
+        { type: 'address', name: 'buyer' },
+        { type: 'address', name: 'receiver' },
+        { type: 'uint256', name: 'payout' },
+        { type: 'uint256', name: 'cost' }
+      ]
     },
     Deposit: {
       hash: '0xe09149d2123147c5f43d258257fef0b7b969db78269369ebcf5ebb9eef8592f2',
-      args: [{type:"address",name:"feeToken"},{type:"address",name:"depositor"},{type:"uint256",name:"amount"}]
+      args: [
+        { type: 'address', name: 'feeToken' },
+        { type: 'address', name: 'depositor' },
+        { type: 'uint256', name: 'amount' }
+      ]
     }
   },
   SubscriptionPolicy: {
     Subscribe: {
       hash: '0x48d404d629614f23fea65a9948e14b556ebee2cdcec7eb97cad37db32d0f210e',
-      args: [{type:"bytes32",name:"configId"},{type:"address",name:"account"},{type:"address",name:"master"},{type:"uint256",name:"allowanceRate"},{type:"uint256",name:"minAllocationRatio"},{type:"uint256",name:"expiry"}]
+      args: [
+        { type: 'bytes32', name: 'configId' },
+        { type: 'address', name: 'account' },
+        { type: 'address', name: 'master' },
+        { type: 'uint256', name: 'allowanceRate' },
+        { type: 'uint256', name: 'minAllocationRatio' },
+        { type: 'uint256', name: 'expiry' }
+      ]
     }
   },
   ThrottlePolicy: {
     PolicySet: {
       hash: '0x10a5a35de07bd472b98b6688a9a3781b329b6c62b3e933bcac704f94e16607c2',
-      args: [{type:"bytes32",name:"configId"},{type:"address",name:"sender"},{type:"address",name:"account"},{type:"uint32",name:"throttlePeriod"}]
+      args: [
+        { type: 'bytes32', name: 'configId' },
+        { type: 'address', name: 'sender' },
+        { type: 'address', name: 'account' },
+        { type: 'uint32', name: 'throttlePeriod' }
+      ]
     }
   }
 } as const

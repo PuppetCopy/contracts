@@ -15,7 +15,7 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "../utils/Precision.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 import {IVenueValidator} from "./interface/IVenueValidator.sol";
-import {VenueManager} from "./VenueManager.sol";
+import {Position} from "./Position.sol";
 
 contract Allocation is CoreContract, IExecutor, EIP712 {
     enum IntentType { MasterDeposit, Allocate, Withdraw, Order }
@@ -74,7 +74,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         return shareBalanceMap[_key][_account];
     }
 
-    function getUserNpv(VenueManager _venueManager, IERC20 _token, IERC7579Account _subaccount, address _account) external view returns (uint) {
+    function getUserNpv(Position _venueManager, IERC20 _token, IERC7579Account _subaccount, address _account) external view returns (uint) {
         bytes32 _key = PositionUtils.getMatchingKey(_token, _subaccount);
         uint _shares = shareBalanceMap[_key][_account];
         if (_shares == 0) return 0;
@@ -127,14 +127,14 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
     function executeMasterDeposit(
         CallIntent calldata _intent,
         bytes calldata _signature,
-        VenueManager _venueManager
+        Position _venueManager
     ) external auth {
         _verifyIntent(_intent, _signature, IntentType.MasterDeposit);
 
         bytes32 _key = PositionUtils.getMatchingKey(_intent.token, _intent.subaccount);
         if (address(masterSubaccountMap[_key]) == address(0)) revert Error.Allocation__UnregisteredSubaccount();
 
-        (uint256 _allocation, uint256 _positionValue, uint256 _netValue, VenueManager.PositionInfo[] memory _positions) = _venueManager.calcNetPositionsValue(_intent.subaccount, _intent.token, _key);
+        (uint256 _allocation, uint256 _positionValue, uint256 _netValue, Position.PositionInfo[] memory _positions) = _venueManager.calcNetPositionsValue(_intent.subaccount, _intent.token, _key);
 
         if (_intent.acceptableNetValue > 0 && _netValue < _intent.acceptableNetValue) {
             revert Error.Allocation__NetValueBelowAcceptable(_netValue, _intent.acceptableNetValue);
@@ -169,7 +169,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
     function executeAllocate(
         CallIntent calldata _intent,
         bytes calldata _signature,
-        VenueManager _venueManager,
+        Position _venueManager,
         IERC7579Account[] calldata _puppetList,
         uint256[] calldata _amountList
     ) external auth {
@@ -178,7 +178,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         bytes32 _key = PositionUtils.getMatchingKey(_intent.token, _intent.subaccount);
         if (address(masterSubaccountMap[_key]) == address(0)) revert Error.Allocation__UnregisteredSubaccount();
 
-        (uint256 _allocation, uint256 _positionValue, uint256 _netValue, VenueManager.PositionInfo[] memory _positions) = _venueManager.calcNetPositionsValue(_intent.subaccount, _intent.token, _key);
+        (uint256 _allocation, uint256 _positionValue, uint256 _netValue, Position.PositionInfo[] memory _positions) = _venueManager.calcNetPositionsValue(_intent.subaccount, _intent.token, _key);
         if (_puppetList.length != _amountList.length) {
             revert Error.Allocation__ArrayLengthMismatch(_puppetList.length, _amountList.length);
         }
@@ -237,14 +237,14 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
     function executeWithdraw(
         CallIntent calldata _intent,
         bytes calldata _signature,
-        VenueManager _venueManager
+        Position _venueManager
     ) external auth {
         _verifyIntent(_intent, _signature, IntentType.Withdraw);
 
         bytes32 _key = PositionUtils.getMatchingKey(_intent.token, _intent.subaccount);
         if (address(masterSubaccountMap[_key]) == address(0)) revert Error.Allocation__UnregisteredSubaccount();
 
-        (uint256 _allocation, uint256 _positionValue, uint256 _netValue, VenueManager.PositionInfo[] memory _positions) = _venueManager.calcNetPositionsValue(_intent.subaccount, _intent.token, _key);
+        (uint256 _allocation, uint256 _positionValue, uint256 _netValue, Position.PositionInfo[] memory _positions) = _venueManager.calcNetPositionsValue(_intent.subaccount, _intent.token, _key);
 
         if (_intent.acceptableNetValue > 0 && _netValue < _intent.acceptableNetValue) revert Error.Allocation__NetValueBelowAcceptable(_netValue, _intent.acceptableNetValue);
 
@@ -289,19 +289,19 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
     function executeOrder(
         CallIntent calldata _intent,
         bytes calldata _signature,
-        VenueManager _venueManager,
+        Position _venueManager,
         address _target,
         bytes calldata _callData
     ) external auth {
         _verifyIntent(_intent, _signature, IntentType.Order);
 
-        VenueManager.Venue memory _venue = _venueManager.getVenue(_target);
+        Position.Venue memory _venue = _venueManager.getVenue(_target);
         if (address(_venue.validator) == address(0)) revert Error.Allocation__TargetNotWhitelisted(_target);
 
         bytes32 _key = PositionUtils.getMatchingKey(_intent.token, _intent.subaccount);
         if (address(masterSubaccountMap[_key]) == address(0)) revert Error.Allocation__UnregisteredSubaccount();
 
-        (uint256 _allocation, uint256 _positionValue, uint256 _netValue, VenueManager.PositionInfo[] memory _positions) = _venueManager.calcNetPositionsValue(_intent.subaccount, _intent.token, _key);
+        (uint256 _allocation, uint256 _positionValue, uint256 _netValue, Position.PositionInfo[] memory _positions) = _venueManager.calcNetPositionsValue(_intent.subaccount, _intent.token, _key);
 
         if (_intent.acceptableNetValue > 0 && _netValue < _intent.acceptableNetValue) {
             revert Error.Allocation__NetValueBelowAcceptable(_netValue, _intent.acceptableNetValue);

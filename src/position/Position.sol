@@ -9,7 +9,7 @@ import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {IVenueValidator} from "./interface/IVenueValidator.sol";
 
-contract VenueManager is CoreContract {
+contract Position is CoreContract {
     struct Venue {
         bytes32 venueKey;
         IVenueValidator validator;
@@ -91,7 +91,7 @@ contract VenueManager is CoreContract {
         for (uint _i = 0; _i < _keys.length; ++_i) {
             bytes32 _positionKey = _keys[_i];
             Venue storage _venue = positionVenueMap[_positionKey];
-            if (address(_venue.validator) == address(0)) revert Error.Allocation__VenueNotRegistered(_venue.venueKey);
+            if (address(_venue.validator) == address(0)) revert Error.Position__VenueNotRegistered(_venue.venueKey);
 
             uint256 _npv = _venue.validator.getPositionNetValue(_positionKey);
             positionValue += _npv;

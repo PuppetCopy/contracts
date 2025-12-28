@@ -112,7 +112,7 @@ export default [
   },
   {
     type: 'function',
-    name: 'registeredContract',
+    name: 'registeredContractMap',
     inputs: [
       {
         name: '',

@@ -6,22 +6,22 @@ export default [
     type: 'constructor',
     inputs: [
       {
-        name: '_allocation',
+        name: '_allocate',
         type: 'address',
-        internalType: 'contract Allocation'
+        internalType: 'contract Allocate'
       }
     ],
     stateMutability: 'nonpayable'
   },
   {
     type: 'function',
-    name: 'allocation',
+    name: 'allocate',
     inputs: [],
     outputs: [
       {
         name: '',
         type: 'address',
-        internalType: 'contract Allocation'
+        internalType: 'contract Allocate'
       }
     ],
     stateMutability: 'view'
@@ -38,12 +38,12 @@ export default [
       {
         name: '_subaccount',
         type: 'address',
-        internalType: 'address'
+        internalType: 'contract IERC7579Account'
       },
       {
         name: '_token',
         type: 'address',
-        internalType: 'address'
+        internalType: 'contract IERC20'
       },
       {
         name: '_amount',

@@ -307,80 +307,6 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Allocation__InsufficientMasterBalance',
-    inputs: [
-      {
-        name: 'available',
-        internalType: 'uint256',
-        type: 'uint256'
-      },
-      {
-        name: 'required',
-        internalType: 'uint256',
-        type: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Allocation__InsufficientAllocation',
-    inputs: [
-      {
-        name: 'available',
-        internalType: 'uint256',
-        type: 'uint256'
-      },
-      {
-        name: 'required',
-        internalType: 'uint256',
-        type: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Allocation__PuppetListTooLarge',
-    inputs: [
-      {
-        name: 'provided',
-        internalType: 'uint256',
-        type: 'uint256'
-      },
-      {
-        name: 'maximum',
-        internalType: 'uint256',
-        type: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Allocation__ZeroAllocation',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Allocation__SharesNotSettled',
-    inputs: [
-      {
-        name: 'shares',
-        internalType: 'uint256',
-        type: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Allocation__UnregisteredSubaccount',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Allocation__ExecutorNotInstalled',
-    inputs: []
-  },
-  {
-    type: 'error',
     name: 'Allocation__ActiveShares',
     inputs: [
       {
@@ -397,7 +323,7 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Allocation__AlreadyUnregistered',
+    name: 'Allocation__UnregisteredSubaccount',
     inputs: []
   },
   {
@@ -407,15 +333,15 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Allocation__InsufficientMasterAllocation',
+    name: 'Allocation__NetValueBelowAcceptable',
     inputs: [
       {
-        name: 'available',
+        name: 'netValue',
         internalType: 'uint256',
         type: 'uint256'
       },
       {
-        name: 'required',
+        name: 'acceptable',
         internalType: 'uint256',
         type: 'uint256'
       }
@@ -439,6 +365,22 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
+    name: 'Allocation__PuppetListTooLarge',
+    inputs: [
+      {
+        name: 'provided',
+        internalType: 'uint256',
+        type: 'uint256'
+      },
+      {
+        name: 'maximum',
+        internalType: 'uint256',
+        type: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
     name: 'Allocation__TargetNotWhitelisted',
     inputs: [
       {
@@ -450,45 +392,8 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
-    name: 'Allocation__DelegateCallNotAllowed',
-    inputs: []
-  },
-  {
-    type: 'error',
     name: 'Allocation__InvalidCallType',
     inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Allocation__InvalidPoolState',
-    inputs: [
-      {
-        name: 'supply',
-        internalType: 'uint256',
-        type: 'uint256'
-      },
-      {
-        name: 'utilizationValue',
-        internalType: 'uint256',
-        type: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Allocation__InsufficientFirstDeposit',
-    inputs: [
-      {
-        name: 'shares',
-        internalType: 'uint256',
-        type: 'uint256'
-      },
-      {
-        name: 'minimum',
-        internalType: 'uint256',
-        type: 'uint256'
-      }
-    ]
   },
   {
     type: 'error',
@@ -501,38 +406,6 @@ export const puppetErrorAbi = [
       },
       {
         name: 'currentTime',
-        internalType: 'uint256',
-        type: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Allocation__PriceTooHigh',
-    inputs: [
-      {
-        name: 'sharePrice',
-        internalType: 'uint256',
-        type: 'uint256'
-      },
-      {
-        name: 'maxAcceptable',
-        internalType: 'uint256',
-        type: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Allocation__PriceTooLow',
-    inputs: [
-      {
-        name: 'sharePrice',
-        internalType: 'uint256',
-        type: 'uint256'
-      },
-      {
-        name: 'minAcceptable',
         internalType: 'uint256',
         type: 'uint256'
       }
@@ -614,6 +487,54 @@ export const puppetErrorAbi = [
         name: 'venue',
         internalType: 'address',
         type: 'address'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Position__VenueNotRegistered',
+    inputs: [
+      {
+        name: 'venueKey',
+        internalType: 'bytes32',
+        type: 'bytes32'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'GmxVenueValidator__InvalidCallData',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'GmxVenueValidator__TokenMismatch',
+    inputs: [
+      {
+        name: 'expected',
+        internalType: 'address',
+        type: 'address'
+      },
+      {
+        name: 'actual',
+        internalType: 'address',
+        type: 'address'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'GmxVenueValidator__AmountMismatch',
+    inputs: [
+      {
+        name: 'expected',
+        internalType: 'uint256',
+        type: 'uint256'
+      },
+      {
+        name: 'actual',
+        internalType: 'uint256',
+        type: 'uint256'
       }
     ]
   }

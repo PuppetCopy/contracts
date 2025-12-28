@@ -1,10 +1,9 @@
 // This file is auto-generated from Puppet deployments.json and forge-artifacts
 // Do not edit manually.
 
-import allocationAbi from './abi/puppetAllocation.js'
-import allowanceratepolicyAbi from './abi/puppetAllowanceRatePolicy.js'
-import allowedrecipientpolicyAbi from './abi/puppetAllowedRecipientPolicy.js'
+import allocateAbi from './abi/puppetAllocate.js'
 import dictatorshipAbi from './abi/puppetDictatorship.js'
+import executeAbi from './abi/puppetExecute.js'
 import feemarketplaceAbi from './abi/puppetFeeMarketplace.js'
 import feemarketplacestoreAbi from './abi/puppetFeeMarketplaceStore.js'
 import puppettokenAbi from './abi/puppetPuppetToken.js'
@@ -53,20 +52,23 @@ export const PUPPET_CONTRACT_MAP = {
     address: '0x0000000000000000000000000000000000000003',
     chainId: 42161
   },
-  Allocation: {
+  Allocate: {
     address: '0x0000000000000000000000000000000000000004',
     chainId: 42161,
-    abi: allocationAbi
+    abi: allocateAbi
+  },
+  Execute: {
+    address: '0x0000000000000000000000000000000000000008',
+    chainId: 42161,
+    abi: executeAbi
   },
   AllowedRecipientPolicy: {
     address: '0x0000000000000000000000000000000000000005',
-    chainId: 42161,
-    abi: allowedrecipientpolicyAbi
+    chainId: 42161
   },
   AllowanceRatePolicy: {
     address: '0x0000000000000000000000000000000000000006',
-    chainId: 42161,
-    abi: allowanceratepolicyAbi
+    chainId: 42161
   },
   ThrottlePolicy: {
     address: '0x0000000000000000000000000000000000000007',

@@ -8,7 +8,7 @@ import {ERC7579PolicyBase} from "modulekit/module-bases/ERC7579PolicyBase.sol";
 import {IPolicy, IActionPolicy, ConfigId} from "modulekit/module-bases/interfaces/IPolicy.sol";
 import {VALIDATION_SUCCESS, VALIDATION_FAILED} from "modulekit/accounts/common/interfaces/IERC7579Module.sol";
 import {IEventEmitter} from "../../utils/interfaces/IEventEmitter.sol";
-import {IAllocation} from "../interface/IAllocation.sol";
+import {IAllocate} from "../interface/IAllocate.sol";
 import {Precision} from "../../utils/Precision.sol";
 
 contract SubscriptionPolicy is ERC7579ActionPolicy {
@@ -19,13 +19,13 @@ contract SubscriptionPolicy is ERC7579ActionPolicy {
     }
 
     IEventEmitter public immutable eventEmitter;
-    IAllocation public immutable allocation;
+    IAllocate public immutable allocate;
 
     mapping(ConfigId => mapping(address => mapping(address => mapping(address => Subscription)))) internal subscriptionMap;
 
-    constructor(IEventEmitter _eventEmitter, IAllocation _allocation) {
+    constructor(IEventEmitter _eventEmitter, IAllocate _allocate) {
         eventEmitter = _eventEmitter;
-        allocation = _allocation;
+        allocate = _allocate;
     }
 
     function onInstall(bytes calldata) external override {}
@@ -103,12 +103,12 @@ contract SubscriptionPolicy is ERC7579ActionPolicy {
         uint256 maxAllowed = Precision.applyBasisPoints(sub.allowanceRate, puppetBalance);
         if (amount > maxAllowed) return VALIDATION_FAILED;
 
-        address masterAccount = allocation.subaccountOwnerMap(masterSubaccount);
+        address masterAccount = allocate.subaccountOwnerMap(masterSubaccount);
         if (masterAccount == address(0)) return VALIDATION_FAILED;
 
         bytes32 key = keccak256(abi.encodePacked(IERC20(token), IERC7579Account(masterSubaccount)));
-        uint256 totalShares = allocation.totalSharesMap(key);
-        uint256 masterShares = allocation.shareBalanceMap(key, masterAccount);
+        uint256 totalShares = allocate.totalSharesMap(key);
+        uint256 masterShares = allocate.shareBalanceMap(key, masterAccount);
         uint256 puppetShares = totalShares - masterShares;
 
         uint256 minMasterShares = Precision.applyBasisPoints(sub.minAllocationRatio, puppetShares);

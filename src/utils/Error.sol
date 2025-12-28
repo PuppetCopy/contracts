@@ -46,35 +46,23 @@ library Error {
     error Account__InvalidTokenAddress();
     error Account__AmountExceedsUnaccounted();
 
+    // Allocation errors
     error Allocation__InsufficientBalance(uint available, uint required);
-    error Allocation__InsufficientMasterBalance(uint available, uint required);
-    error Allocation__InsufficientAllocation(uint available, uint required);
-    error Allocation__PuppetListTooLarge(uint provided, uint maximum);
-    error Allocation__ZeroAllocation();
-    error Allocation__SharesNotSettled(uint shares);
-    error Allocation__UnregisteredSubaccount();
-    error Allocation__ExecutorNotInstalled();
     error Allocation__ActiveShares(uint totalShares);
     error Allocation__AlreadyRegistered();
-    error Allocation__AlreadyUnregistered();
+    error Allocation__UnregisteredSubaccount();
     error Allocation__TransferFailed();
-    error Allocation__InsufficientMasterAllocation(uint available, uint required);
-    error Allocation__ArrayLengthMismatch(uint puppetCount, uint allocationCount);
-    error Allocation__TargetNotWhitelisted(address target);
-    error Allocation__VenueNotRegistered(bytes32 venueKey);
-    error Allocation__DelegateCallNotAllowed();
-    error Allocation__InvalidCallType();
-    error Allocation__InvalidPoolState(uint supply, uint utilizationValue);
-    error Allocation__InsufficientFirstDeposit(uint shares, uint minimum);
-    error Allocation__IntentExpired(uint deadline, uint currentTime);
     error Allocation__NetValueBelowAcceptable(uint netValue, uint acceptable);
+    error Allocation__ArrayLengthMismatch(uint puppetCount, uint allocationCount);
+    error Allocation__PuppetListTooLarge(uint provided, uint maximum);
+    error Allocation__TargetNotWhitelisted(address target);
+    error Allocation__InvalidCallType();
+    error Allocation__IntentExpired(uint deadline, uint currentTime);
     error Allocation__InvalidSignature(address expected, address recovered);
     error Allocation__InvalidNonce(uint expected, uint provided);
     error Allocation__InvalidMaxPuppetList();
     error Allocation__InvalidTransferGasLimit();
     error Allocation__InvalidCallGasLimit();
-    error Allocation__TokenMismatch(address expected, address actual);
-    error Allocation__AmountMismatch(uint expected, uint actual);
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();
@@ -82,7 +70,22 @@ library Error {
 
     error VenueRegistry__ContractNotWhitelisted(address venue);
 
+    error Position__VenueNotRegistered(bytes32 venueKey);
+
     error GmxVenueValidator__InvalidCallData();
     error GmxVenueValidator__TokenMismatch(address expected, address actual);
     error GmxVenueValidator__AmountMismatch(uint expected, uint actual);
+
+    // Executor errors
+    error Executor__UnregisteredSubaccount();
+    error Executor__NetValueBelowAcceptable(uint netValue, uint acceptable);
+    error Executor__TargetNotWhitelisted(address target);
+    error Executor__InvalidIntentType();
+    error Executor__IntentExpired(uint deadline, uint currentTime);
+    error Executor__InvalidSignature(address expected, address recovered);
+    error Executor__ModuleNotInstalled();
+    error Executor__InvalidNonce(uint expected, uint provided);
+    error Executor__InvalidAllocation();
+    error Executor__InvalidPosition();
+    error Executor__InvalidCallGasLimit();
 }
