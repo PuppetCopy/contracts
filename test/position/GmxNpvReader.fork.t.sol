@@ -60,12 +60,8 @@ contract GmxNpvReaderForkTest is Test {
             console2.log("\nPosition", i);
             console2.logBytes32(posKey);
 
-            try npvReader.getPositionNetValue(posKey) returns (int256 netValue) {
-                if (netValue >= 0) {
-                    console2.log("Net Value (token units):", uint256(netValue));
-                } else {
-                    console2.log("Net Value (token units): -", uint256(-netValue));
-                }
+            try npvReader.getPositionNetValue(posKey) returns (uint256 netValue) {
+                console2.log("Net Value (token units):", netValue);
             } catch Error(string memory reason) {
                 console2.log("Error:", reason);
             } catch (bytes memory) {
@@ -84,7 +80,7 @@ contract GmxNpvReaderForkTest is Test {
             return;
         }
 
-        int256 netValue = npvReader.getPositionNetValue(positionKey);
+        uint256 netValue = npvReader.getPositionNetValue(positionKey);
         console2.log("Net Value:", netValue);
     }
 }

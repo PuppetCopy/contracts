@@ -5,13 +5,13 @@ import {INpvReader} from "src/position/interface/INpvReader.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract MockNpvReader is INpvReader {
-    mapping(bytes32 => int256) public positionValues;
+    mapping(bytes32 => uint256) public positionValues;
 
-    function setPositionValue(bytes32 _posKey, int256 _value) external {
+    function setPositionValue(bytes32 _posKey, uint256 _value) external {
         positionValues[_posKey] = _value;
     }
 
-    function getPositionNetValue(bytes32 _positionKey) external view returns (int256) {
+    function getPositionNetValue(bytes32 _positionKey) external view returns (uint256) {
         return positionValues[_positionKey];
     }
 
@@ -22,7 +22,7 @@ contract MockNpvReader is INpvReader {
 
 /// @dev Passthrough reader that returns bytes32(0) for all calls - used for whitelisting non-venue contracts like tokens
 contract PassthroughReader is INpvReader {
-    function getPositionNetValue(bytes32) external pure returns (int256) {
+    function getPositionNetValue(bytes32) external pure returns (uint256) {
         return 0;
     }
 

@@ -10,6 +10,6 @@ interface INpvReader {
         uint256 collateralDelta;
     }
 
-    function getPositionNetValue(bytes32 _positionKey) external view returns (int256 netValue);
+    function getPositionNetValue(bytes32 _positionKey) external view returns (uint256 netValue);
     function parsePositionCall(address _account, bytes calldata _callData) external pure returns (PositionCallInfo memory);
 }

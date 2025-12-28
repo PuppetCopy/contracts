@@ -172,7 +172,7 @@ contract GmxNpvReader is INpvReader {
     // ============ External ============
 
     /// @inheritdoc INpvReader
-    function getPositionNetValue(bytes32 _positionKey) external view returns (int256 netValue) {
+    function getPositionNetValue(bytes32 _positionKey) external view returns (uint256 netValue) {
         Position.Props memory pos = reader.getPosition(address(dataStore), _positionKey);
         if (pos.numbers.sizeInUsd == 0) return 0;
 
@@ -192,7 +192,8 @@ contract GmxNpvReader is INpvReader {
                 (info.basePnlUsd * int256(FLOAT_PRECISION)) / int256(collateralPrice.min) / int256(FLOAT_PRECISION);
         }
 
-        netValue = int256(pos.numbers.collateralAmount) + pnlInTokens - int256(info.fees.totalCostAmount);
+        int256 _value = int256(pos.numbers.collateralAmount) + pnlInTokens - int256(info.fees.totalCostAmount);
+        netValue = _value > 0 ? uint256(_value) : 0;
     }
 
     // ============ Internal: Price Building ============
