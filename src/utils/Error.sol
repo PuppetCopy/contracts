@@ -47,18 +47,16 @@ library Error {
     error Account__AmountExceedsUnaccounted();
 
     // Allocation errors
-    error Allocation__InsufficientBalance(uint available, uint required);
+    error Allocation__InsufficientBalance();
     error Allocation__ActiveShares(uint totalShares);
     error Allocation__AlreadyRegistered();
     error Allocation__UnregisteredSubaccount();
     error Allocation__TransferFailed();
     error Allocation__ArrayLengthMismatch(uint puppetCount, uint allocationCount);
     error Allocation__PuppetListTooLarge(uint provided, uint maximum);
-    error Allocation__TargetNotWhitelisted(address target);
     error Allocation__IntentExpired(uint deadline, uint currentTime);
     error Allocation__InvalidSignature(address expected, address recovered);
     error Allocation__InvalidNonce(uint expected, uint provided);
-    error Allocation__InvalidPuppetAllocation();
     error Allocation__InvalidPosition();
     error Allocation__InvalidMaxPuppetList();
     error Allocation__InvalidGasLimit();
@@ -75,7 +73,4 @@ library Error {
     error GmxVenueValidator__InvalidCallData();
     error GmxVenueValidator__TokenMismatch(address expected, address actual);
     error GmxVenueValidator__AmountMismatch(uint expected, uint actual);
-
-    // PuppetAllocation errors
-    error PuppetAllocation__InvalidTransferGasLimit();
 }

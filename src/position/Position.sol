@@ -48,6 +48,19 @@ contract Position is CoreContract {
         _venue.validator = venueValidatorMap[_venue.venueKey];
     }
 
+    function validateCall(
+        IERC7579Account _subaccount,
+        IERC20 _token,
+        uint256 _amount,
+        address _target,
+        bytes calldata _callData
+    ) external view returns (Venue memory _venue) {
+        _venue.venueKey = venueKeyMap[_target];
+        _venue.validator = venueValidatorMap[_venue.venueKey];
+        if (address(_venue.validator) == address(0)) revert Error.Position__VenueNotRegistered(_venue.venueKey);
+        _venue.validator.validate(_subaccount, _token, _amount, _callData);
+    }
+
     function getValidator(bytes32 _venueKey) external view returns (IVenueValidator) {
         return venueValidatorMap[_venueKey];
     }
@@ -97,7 +110,7 @@ contract Position is CoreContract {
         return _netValue;
     }
 
-    function snapshotPositionValue(
+    function snapshotNetValue(
         CallIntent calldata _intent
     ) external returns (
         bytes32 matchingKey,
@@ -135,7 +148,7 @@ contract Position is CoreContract {
             revert Error.Position__NetValueBelowAcceptable(netValue, _intent.acceptableNetValue);
         }
 
-        _logEvent("SnapshotPositionValue", abi.encode(
+        _logEvent("SnapshotNetValue", abi.encode(
             _intent,
             matchingKey,
             allocation,
