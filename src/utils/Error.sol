@@ -76,16 +76,4 @@ library Error {
     error GmxVenueValidator__TokenMismatch(address expected, address actual);
     error GmxVenueValidator__AmountMismatch(uint expected, uint actual);
 
-    // Executor errors
-    error Executor__UnregisteredSubaccount();
-    error Executor__NetValueBelowAcceptable(uint netValue, uint acceptable);
-    error Executor__TargetNotWhitelisted(address target);
-    error Executor__InvalidIntentType();
-    error Executor__IntentExpired(uint deadline, uint currentTime);
-    error Executor__InvalidSignature(address expected, address recovered);
-    error Executor__ModuleNotInstalled();
-    error Executor__InvalidNonce(uint expected, uint provided);
-    error Executor__InvalidAllocation();
-    error Executor__InvalidPosition();
-    error Executor__InvalidCallGasLimit();
 }

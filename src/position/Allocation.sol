@@ -366,9 +366,9 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         if (_expectedNonce != _intent.nonce) revert Error.Allocation__InvalidNonce(_expectedNonce, _intent.nonce);
     }
 
-    function _executeFromExecutor(IERC7579Account _from, address _to, uint _gas, bytes memory _data) internal returns (bytes memory _result, bytes memory _error) {
+    function _executeFromExecutor(IERC7579Account _from, address _to, uint _gasLimit, bytes memory _data) internal returns (bytes memory _result, bytes memory _error) {
         ModeCode _mode = ModeLib.encode(CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT, ModePayload.wrap(0x00));
-        try _from.executeFromExecutor{gas: _gas}(_mode, ExecutionLib.encodeSingle(_to, 0, _data)) returns (bytes[] memory _results) {
+        try _from.executeFromExecutor{gas: _gasLimit}(_mode, ExecutionLib.encodeSingle(_to, 0, _data)) returns (bytes[] memory _results) {
             _result = _results[0];
         } catch (bytes memory _reason) {
             _error = _reason;
