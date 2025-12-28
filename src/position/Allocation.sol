@@ -14,7 +14,8 @@ import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "../utils/Precision.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
-import {INpvReader} from "./interface/INpvReader.sol";
+import {IVenueValidator} from "./interface/IVenueValidator.sol";
+import {VenueManager} from "./VenueManager.sol";
 
 contract Allocation is CoreContract, IExecutor, EIP712 {
     enum IntentType { MasterDeposit, Allocate, Withdraw, Order }
@@ -29,38 +30,29 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
     struct CallIntent {
         IntentType intentType;
         address account;
-        address subaccount;
-        address token;
+        IERC7579Account subaccount;
+        IERC20 token;
         uint256 amount;
-        uint256 acceptablePrice;
+        uint256 acceptableNetValue;
         uint256 deadline;
         uint256 nonce;
     }
 
-    struct AssetsInfo {
-        uint idleBalance;
-        uint positionValue;
-        uint total;
-    }
-
     bytes32 public constant CALL_INTENT_TYPEHASH = keccak256(
-        "CallIntent(uint8 intentType,address account,address subaccount,address token,uint256 amount,uint256 acceptablePrice,uint256 deadline,uint256 nonce)"
+        "CallIntent(uint8 intentType,address account,address subaccount,address token,uint256 amount,uint256 acceptableNetValue,uint256 deadline,uint256 nonce)"
     );
 
     Config public config;
 
-    mapping(bytes32 => uint) public totalShares;
-    mapping(bytes32 => mapping(address => uint)) public userShares;
+    mapping(address account => uint256) public nonceMap;
+    mapping(address account => address signer) public sessionSignerMap;
 
-    mapping(address => uint256) public nonces;
-    mapping(bytes32 => IERC7579Account) public masterSubaccountMap;
-    mapping(IERC7579Account => IERC20[]) public masterCollateralList;
+    mapping(bytes32 matchingKey => IERC7579Account) public masterSubaccountMap;
+    mapping(address subaccount => IERC20) public subaccountCollateralMap;
+    mapping(address subaccount => address owner) public subaccountOwnerMap;
 
-    mapping(bytes32 => bytes32[]) public positionKeyList;
-    mapping(address => INpvReader) public npvReaderMap;
-    mapping(bytes32 => address) public positionTargetMap;
-
-    mapping(address => address) public sessionSigner;
+    mapping(bytes32 matchingKey => uint) public totalSharesMap;
+    mapping(bytes32 matchingKey => mapping(address account => uint)) public shareBalanceMap;
 
     constructor(IAuthority _authority, Config memory _config)
         CoreContract(_authority, abi.encode(_config))
@@ -73,95 +65,90 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
 
     function getSharePrice(bytes32 _key, uint _totalAssets) public view returns (uint) {
         uint _assets = _totalAssets + config.virtualShareOffset;
-        uint _shares = totalShares[_key] + config.virtualShareOffset;
+        uint _shares = totalSharesMap[_key] + config.virtualShareOffset;
         return Precision.toFactor(_assets, _shares);
     }
 
-    function getUserShares(IERC20 _token, address _subaccount, address _user) external view returns (uint) {
+    function getUserShares(IERC20 _token, IERC7579Account _subaccount, address _account) external view returns (uint) {
         bytes32 _key = PositionUtils.getMatchingKey(_token, _subaccount);
-        return userShares[_key][_user];
+        return shareBalanceMap[_key][_account];
     }
 
-    function getUserNpv(IERC20 _token, address _subaccount, address _user) external view returns (uint) {
+    function getUserNpv(VenueManager _venueManager, IERC20 _token, IERC7579Account _subaccount, address _account) external view returns (uint) {
         bytes32 _key = PositionUtils.getMatchingKey(_token, _subaccount);
-        uint _shares = userShares[_key][_user];
+        uint _shares = shareBalanceMap[_key][_account];
         if (_shares == 0) return 0;
 
-        AssetsInfo memory _assets = _calcNetPositionsValue(_key, address(_token));
-        uint _sharePrice = getSharePrice(_key, _assets.total);
+        (,, uint256 _netValue,) = _venueManager.calcNetPositionsValue(_subaccount, _token, _key);
+        uint _sharePrice = getSharePrice(_key, _netValue);
         return Precision.applyFactor(_sharePrice, _shares);
     }
 
-    function getPositionKeyList(bytes32 _key) external view returns (bytes32[] memory) {
-        return positionKeyList[_key];
-    }
-
-    function setNpvReader(address _target, INpvReader _reader) external auth {
-        npvReaderMap[_target] = _reader;
-    }
-
     function createSubaccount(
-        address _user,
+        address _account,
         address _signer,
-        address _subaccount,
-        address _token,
+        IERC7579Account _subaccount,
+        IERC20 _token,
         uint _amount
     ) external auth {
-        bytes32 _key = PositionUtils.getMatchingKey(IERC20(_token), _subaccount);
+        bytes32 _key = PositionUtils.getMatchingKey(_token, _subaccount);
         if (address(masterSubaccountMap[_key]) != address(0)) revert Error.Allocation__AlreadyRegistered();
-        if (!IERC7579Account(_subaccount).isModuleInstalled(MODULE_TYPE_EXECUTOR, address(this), "")) {
+        if (!_subaccount.isModuleInstalled(MODULE_TYPE_EXECUTOR, address(this), "")) {
             revert Error.Allocation__UnregisteredSubaccount();
         }
 
-        sessionSigner[_user] = _signer;
-        masterSubaccountMap[_key] = IERC7579Account(_subaccount);
-        masterCollateralList[IERC7579Account(_subaccount)].push(IERC20(_token));
+        sessionSignerMap[_account] = _signer;
+        masterSubaccountMap[_key] = _subaccount;
+        subaccountCollateralMap[address(_subaccount)] = _token;
+        subaccountOwnerMap[address(_subaccount)] = _account;
 
-        if (!IERC20(_token).transferFrom(_user, _subaccount, _amount)) {
+        if (!_token.transferFrom(_account, address(_subaccount), _amount)) {
             revert Error.Allocation__TransferFailed();
         }
 
         uint _sharePrice = getSharePrice(_key, 0);
         uint _sharesOut = Precision.toFactor(_amount, _sharePrice);
-        userShares[_key][_user] += _sharesOut;
-        totalShares[_key] += _sharesOut;
+        shareBalanceMap[_key][_account] += _sharesOut;
+        totalSharesMap[_key] += _sharesOut;
 
         _logEvent("CreateSubaccount", abi.encode(
             _key,
-            _user,
+            _account,
             _signer,
-            _subaccount,
-            _token,
+            address(_subaccount),
+            address(_token),
             _amount,
             _sharesOut,
             _sharePrice,
-            totalShares[_key]
+            totalSharesMap[_key]
         ));
     }
 
     function executeMasterDeposit(
         CallIntent calldata _intent,
-        bytes calldata _signature
+        bytes calldata _signature,
+        VenueManager _venueManager
     ) external auth {
         _verifyIntent(_intent, _signature, IntentType.MasterDeposit);
 
-        bytes32 _key = PositionUtils.getMatchingKey(IERC20(_intent.token), _intent.subaccount);
+        bytes32 _key = PositionUtils.getMatchingKey(_intent.token, _intent.subaccount);
         if (address(masterSubaccountMap[_key]) == address(0)) revert Error.Allocation__UnregisteredSubaccount();
 
-        AssetsInfo memory _assets = _calcNetPositionsValue(_key, _intent.token);
-        uint _sharePrice = getSharePrice(_key, _assets.total);
+        (uint256 _allocation, uint256 _positionValue, uint256 _netValue, VenueManager.PositionInfo[] memory _positions) = _venueManager.calcNetPositionsValue(_intent.subaccount, _intent.token, _key);
 
-        if (_intent.acceptablePrice > 0 && _sharePrice > _intent.acceptablePrice) {
-            revert Error.Allocation__PriceTooHigh(_sharePrice, _intent.acceptablePrice);
+        if (_intent.acceptableNetValue > 0 && _netValue < _intent.acceptableNetValue) {
+            revert Error.Allocation__NetValueBelowAcceptable(_netValue, _intent.acceptableNetValue);
         }
 
-        if (!IERC20(_intent.token).transferFrom(_intent.account, _intent.subaccount, _intent.amount)) {
+        uint _sharePrice = getSharePrice(_key, _netValue);
+
+        if (!_intent.token.transferFrom(_intent.account, address(_intent.subaccount), _intent.amount)) {
             revert Error.Allocation__TransferFailed();
         }
 
         uint _sharesOut = Precision.toFactor(_intent.amount, _sharePrice);
-        userShares[_key][_intent.account] += _sharesOut;
-        totalShares[_key] += _sharesOut;
+        shareBalanceMap[_key][_intent.account] += _sharesOut;
+        totalSharesMap[_key] += _sharesOut;
 
         _logEvent("ExecuteMasterDeposit", abi.encode(
             _key,
@@ -169,27 +156,29 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             _intent.subaccount,
             _intent.token,
             _intent.amount,
-            _intent.acceptablePrice,
+            _intent.acceptableNetValue,
             _sharesOut,
             _sharePrice,
-            _assets.idleBalance,
-            _assets.positionValue,
-            totalShares[_key]
+            _allocation,
+            _positionValue,
+            _positions,
+            totalSharesMap[_key]
         ));
     }
 
     function executeAllocate(
         CallIntent calldata _intent,
         bytes calldata _signature,
-        address[] calldata _puppetList,
+        VenueManager _venueManager,
+        IERC7579Account[] calldata _puppetList,
         uint256[] calldata _amountList
     ) external auth {
         _verifyIntent(_intent, _signature, IntentType.Allocate);
 
-        bytes32 _key = PositionUtils.getMatchingKey(IERC20(_intent.token), _intent.subaccount);
-        AssetsInfo memory _assets = _calcNetPositionsValue(_key, _intent.token);
-
+        bytes32 _key = PositionUtils.getMatchingKey(_intent.token, _intent.subaccount);
         if (address(masterSubaccountMap[_key]) == address(0)) revert Error.Allocation__UnregisteredSubaccount();
+
+        (uint256 _allocation, uint256 _positionValue, uint256 _netValue, VenueManager.PositionInfo[] memory _positions) = _venueManager.calcNetPositionsValue(_intent.subaccount, _intent.token, _key);
         if (_puppetList.length != _amountList.length) {
             revert Error.Allocation__ArrayLengthMismatch(_puppetList.length, _amountList.length);
         }
@@ -197,23 +186,23 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             revert Error.Allocation__PuppetListTooLarge(_puppetList.length, config.maxPuppetList);
         }
 
-        uint _sharePrice = getSharePrice(_key, _assets.total);
-
-        if (_intent.acceptablePrice > 0 && _sharePrice > _intent.acceptablePrice) {
-            revert Error.Allocation__PriceTooHigh(_sharePrice, _intent.acceptablePrice);
+        if (_intent.acceptableNetValue > 0 && _netValue < _intent.acceptableNetValue) {
+            revert Error.Allocation__NetValueBelowAcceptable(_netValue, _intent.acceptableNetValue);
         }
+
+        uint _sharePrice = getSharePrice(_key, _netValue);
 
         uint _totalAllocated = 0;
 
         for (uint _i = 0; _i < _puppetList.length; ++_i) {
-            address _puppet = _puppetList[_i];
+            IERC7579Account _puppet = _puppetList[_i];
             uint _amount = _amountList[_i];
 
             (bytes memory _result, bytes memory _error) = _executeFromExecutor(
-                IERC7579Account(_puppet),
-                _intent.token,
+                _puppet,
+                address(_intent.token),
                 config.callGasLimit,
-                abi.encodeCall(IERC20.transfer, (_intent.subaccount, _amount))
+                abi.encodeCall(IERC20.transfer, (address(_intent.subaccount), _amount))
             );
 
             if (_error.length > 0 || _result.length == 0 || !abi.decode(_result, (bool))) {
@@ -222,8 +211,8 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             }
 
             uint _sharesOut = Precision.toFactor(_amount, _sharePrice);
-            userShares[_key][_puppet] += _sharesOut;
-            totalShares[_key] += _sharesOut;
+            shareBalanceMap[_key][address(_puppet)] += _sharesOut;
+            totalSharesMap[_key] += _sharesOut;
             _totalAllocated += _amount;
         }
 
@@ -233,47 +222,47 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             _intent.subaccount,
             _intent.token,
             _intent.amount,
-            _intent.acceptablePrice,
+            _intent.acceptableNetValue,
             _puppetList,
             _amountList,
             _totalAllocated,
             _sharePrice,
-            _assets.idleBalance,
-            _assets.positionValue,
-            totalShares[_key]
+            _allocation,
+            _positionValue,
+            _positions,
+            totalSharesMap[_key]
         ));
     }
 
     function executeWithdraw(
         CallIntent calldata _intent,
-        bytes calldata _signature
+        bytes calldata _signature,
+        VenueManager _venueManager
     ) external auth {
         _verifyIntent(_intent, _signature, IntentType.Withdraw);
 
-        bytes32 _key = PositionUtils.getMatchingKey(IERC20(_intent.token), _intent.subaccount);
+        bytes32 _key = PositionUtils.getMatchingKey(_intent.token, _intent.subaccount);
         if (address(masterSubaccountMap[_key]) == address(0)) revert Error.Allocation__UnregisteredSubaccount();
 
-        AssetsInfo memory _assets = _calcNetPositionsValue(_key, _intent.token);
+        (uint256 _allocation, uint256 _positionValue, uint256 _netValue, VenueManager.PositionInfo[] memory _positions) = _venueManager.calcNetPositionsValue(_intent.subaccount, _intent.token, _key);
 
-        uint _userBalance = userShares[_key][_intent.account];
-        if (_intent.amount > _userBalance) revert Error.Allocation__InsufficientBalance(_userBalance, _intent.amount);
+        if (_intent.acceptableNetValue > 0 && _netValue < _intent.acceptableNetValue) revert Error.Allocation__NetValueBelowAcceptable(_netValue, _intent.acceptableNetValue);
 
-        uint _sharePrice = getSharePrice(_key, _assets.total);
+        uint _balance = shareBalanceMap[_key][_intent.account];
+        if (_intent.amount > _balance) revert Error.Allocation__InsufficientBalance(_balance, _intent.amount);
 
-        if (_intent.acceptablePrice > 0 && _sharePrice < _intent.acceptablePrice) {
-            revert Error.Allocation__PriceTooLow(_sharePrice, _intent.acceptablePrice);
-        }
+        uint _sharePrice = getSharePrice(_key, _netValue);
 
         uint _amountOut = Precision.applyFactor(_sharePrice, _intent.amount);
 
-        if (_amountOut > _assets.idleBalance) revert Error.Allocation__InsufficientBalance(_assets.idleBalance, _amountOut);
+        if (_amountOut > _allocation) revert Error.Allocation__InsufficientBalance(_allocation, _amountOut);
 
-        userShares[_key][_intent.account] -= _intent.amount;
-        totalShares[_key] -= _intent.amount;
+        shareBalanceMap[_key][_intent.account] -= _intent.amount;
+        totalSharesMap[_key] -= _intent.amount;
 
         (bytes memory _result, bytes memory _error) = _executeFromExecutor(
-            IERC7579Account(_intent.subaccount),
-            _intent.token,
+            _intent.subaccount,
+            address(_intent.token),
             config.transferGasLimit,
             abi.encodeCall(IERC20.transfer, (_intent.account, _amountOut))
         );
@@ -286,59 +275,50 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             _intent.subaccount,
             _intent.token,
             _intent.amount,
-            _intent.acceptablePrice,
+            _intent.acceptableNetValue,
             _amountOut,
             _sharePrice,
-            _assets.idleBalance,
-            _assets.positionValue,
-            totalShares[_key],
-            userShares[_key][_intent.account]
+            _allocation,
+            _positionValue,
+            _positions,
+            totalSharesMap[_key],
+            shareBalanceMap[_key][_intent.account]
         ));
     }
 
     function executeOrder(
         CallIntent calldata _intent,
         bytes calldata _signature,
+        VenueManager _venueManager,
         address _target,
         bytes calldata _callData
     ) external auth {
         _verifyIntent(_intent, _signature, IntentType.Order);
 
-        INpvReader _reader = npvReaderMap[_target];
-        if (address(_reader) == address(0)) revert Error.Allocation__TargetNotWhitelisted(_target);
+        VenueManager.Venue memory _venue = _venueManager.getVenue(_target);
+        if (address(_venue.validator) == address(0)) revert Error.Allocation__TargetNotWhitelisted(_target);
 
-        bytes32 _key = PositionUtils.getMatchingKey(IERC20(_intent.token), _intent.subaccount);
+        bytes32 _key = PositionUtils.getMatchingKey(_intent.token, _intent.subaccount);
         if (address(masterSubaccountMap[_key]) == address(0)) revert Error.Allocation__UnregisteredSubaccount();
 
-        INpvReader.PositionCallInfo memory _posInfo = _reader.parsePositionCall(_intent.subaccount, _callData);
+        (uint256 _allocation, uint256 _positionValue, uint256 _netValue, VenueManager.PositionInfo[] memory _positions) = _venueManager.calcNetPositionsValue(_intent.subaccount, _intent.token, _key);
 
-        // Track new positions on increase
-        if (_posInfo.isIncrease && _posInfo.positionKey != bytes32(0) && positionTargetMap[_posInfo.positionKey] == address(0)) {
-            positionKeyList[_key].push(_posInfo.positionKey);
-            positionTargetMap[_posInfo.positionKey] = _target;
+        if (_intent.acceptableNetValue > 0 && _netValue < _intent.acceptableNetValue) {
+            revert Error.Allocation__NetValueBelowAcceptable(_netValue, _intent.acceptableNetValue);
         }
 
+        _venue.validator.validate(_intent.subaccount, _intent.token, _intent.amount, _callData);
+
         (bytes memory _result, bytes memory _error) = _executeFromExecutor(
-            IERC7579Account(_intent.subaccount),
+            _intent.subaccount,
             _target,
             config.callGasLimit,
             _callData
         );
 
-        uint256 _netValue = _reader.getPositionNetValue(_posInfo.positionKey);
+        IVenueValidator.PositionInfo memory _posInfo = _venue.validator.getPositionInfo(_intent.subaccount, _callData);
 
-        // Remove closed positions (NPV = 0)
-        if (_netValue == 0 && _posInfo.positionKey != bytes32(0)) {
-            bytes32[] storage _keys = positionKeyList[_key];
-            for (uint _i = 0; _i < _keys.length; ++_i) {
-                if (_keys[_i] == _posInfo.positionKey) {
-                    _keys[_i] = _keys[_keys.length - 1];
-                    _keys.pop();
-                    delete positionTargetMap[_posInfo.positionKey];
-                    break;
-                }
-            }
-        }
+        _venueManager.updatePosition(_key, _posInfo.positionKey, _venue, _posInfo.netValue);
 
         _logEvent("ExecuteOrder", abi.encode(
             _key,
@@ -346,34 +326,17 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             _intent.subaccount,
             _intent.token,
             _intent.amount,
-            _intent.acceptablePrice,
+            _intent.acceptableNetValue,
             _target,
             _callData,
-            _posInfo,
-            _netValue,
+            _posInfo.positionKey,
+            _posInfo.netValue,
+            _allocation,
+            _positionValue,
+            _positions,
             _result,
             _error
         ));
-    }
-
-    function _calcNetPositionsValue(bytes32 _key, address _token) internal view returns (AssetsInfo memory _info) {
-        IERC7579Account _subaccount = masterSubaccountMap[_key];
-        if (address(_subaccount) == address(0)) return _info;
-
-        _info.idleBalance = IERC20(_token).balanceOf(address(_subaccount));
-
-        bytes32[] storage _keys = positionKeyList[_key];
-        for (uint _i = 0; _i < _keys.length; ++_i) {
-            bytes32 _positionKey = _keys[_i];
-            address _target = positionTargetMap[_positionKey];
-            INpvReader _reader = npvReaderMap[_target];
-            if (address(_reader) == address(0)) continue;
-
-            uint256 _npv = _reader.getPositionNetValue(_positionKey);
-            _info.positionValue += _npv;
-        }
-
-        _info.total = _info.idleBalance + _info.positionValue;
     }
 
     function _verifyIntent(CallIntent calldata _intent, bytes calldata _signature, IntentType _expectedType) internal {
@@ -387,19 +350,19 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             _intent.subaccount,
             _intent.token,
             _intent.amount,
-            _intent.acceptablePrice,
+            _intent.acceptableNetValue,
             _intent.deadline,
             _intent.nonce
         )));
         address _signer = ECDSA.recover(_hash, _signature);
-        if (_signer != _intent.account && _signer != sessionSigner[_intent.account]) {
+        if (_signer != _intent.account && _signer != sessionSignerMap[_intent.account]) {
             revert Error.Allocation__InvalidSignature(_intent.account, _signer);
         }
-        if (!IERC7579Account(_intent.subaccount).isModuleInstalled(MODULE_TYPE_EXECUTOR, address(this), "")) {
+        if (!_intent.subaccount.isModuleInstalled(MODULE_TYPE_EXECUTOR, address(this), "")) {
             revert Error.Allocation__UnregisteredSubaccount();
         }
 
-        uint256 _expectedNonce = nonces[_intent.account]++;
+        uint256 _expectedNonce = nonceMap[_intent.account]++;
         if (_expectedNonce != _intent.nonce) revert Error.Allocation__InvalidNonce(_expectedNonce, _intent.nonce);
     }
 
@@ -424,22 +387,20 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         return _moduleTypeId == MODULE_TYPE_EXECUTOR;
     }
 
-    function isInitialized(address _smartAccount) external view returns (bool) {
-        return masterCollateralList[IERC7579Account(_smartAccount)].length > 0;
+    function isInitialized(address _subaccount) external view returns (bool) {
+        return address(subaccountCollateralMap[_subaccount]) != address(0);
     }
 
     function onInstall(bytes calldata) external {}
 
     function onUninstall(bytes calldata) external {
-        IERC7579Account _master = IERC7579Account(msg.sender);
-        if (!_master.isModuleInstalled(MODULE_TYPE_EXECUTOR, address(this), "")) return;
+        IERC20 _token = subaccountCollateralMap[msg.sender];
+        if (address(_token) == address(0)) return;
 
-        IERC20[] memory _tokens = masterCollateralList[_master];
-        for (uint _i = 0; _i < _tokens.length; ++_i) {
-            bytes32 _key = PositionUtils.getMatchingKey(_tokens[_i], address(_master));
-            uint _shares = totalShares[_key];
-            if (_shares > 0) revert Error.Allocation__ActiveShares(_shares);
-        }
-        delete masterCollateralList[_master];
+        bytes32 _key = PositionUtils.getMatchingKey(_token, IERC7579Account(msg.sender));
+        uint _shares = totalSharesMap[_key];
+        if (_shares > 0) revert Error.Allocation__ActiveShares(_shares);
+
+        delete subaccountCollateralMap[msg.sender];
     }
 }

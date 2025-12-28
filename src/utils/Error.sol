@@ -61,18 +61,20 @@ library Error {
     error Allocation__InsufficientMasterAllocation(uint available, uint required);
     error Allocation__ArrayLengthMismatch(uint puppetCount, uint allocationCount);
     error Allocation__TargetNotWhitelisted(address target);
+    error Allocation__VenueNotRegistered(bytes32 venueKey);
     error Allocation__DelegateCallNotAllowed();
     error Allocation__InvalidCallType();
     error Allocation__InvalidPoolState(uint supply, uint utilizationValue);
     error Allocation__InsufficientFirstDeposit(uint shares, uint minimum);
     error Allocation__IntentExpired(uint deadline, uint currentTime);
-    error Allocation__PriceTooHigh(uint sharePrice, uint maxAcceptable);
-    error Allocation__PriceTooLow(uint sharePrice, uint minAcceptable);
+    error Allocation__NetValueBelowAcceptable(uint netValue, uint acceptable);
     error Allocation__InvalidSignature(address expected, address recovered);
     error Allocation__InvalidNonce(uint expected, uint provided);
     error Allocation__InvalidMaxPuppetList();
     error Allocation__InvalidTransferGasLimit();
     error Allocation__InvalidCallGasLimit();
+    error Allocation__TokenMismatch(address expected, address actual);
+    error Allocation__AmountMismatch(uint expected, uint actual);
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();

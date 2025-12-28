@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.33;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 import {Permission} from "../../utils/auth/Permission.sol";
 import {IAuthority} from "../../utils/interfaces/IAuthority.sol";
-import {INpvReader} from "../interface/INpvReader.sol";
+import {IVenueValidator} from "../interface/IVenueValidator.sol";
 
 import {Position} from "gmx-synthetics/position/Position.sol";
 import {Market} from "gmx-synthetics/market/Market.sol";
@@ -27,7 +29,7 @@ interface IGmxReader {
         uint256 sizeDeltaUsd,
         address uiFeeReceiver,
         bool usePositionSizeAsSizeDeltaUsd
-    ) external view returns (PositionInfo memory);
+    ) external view returns (GmxPositionInfo memory);
 }
 
 interface IPriceFeed {
@@ -42,7 +44,7 @@ struct MarketPrices {
     Price.Props shortTokenPrice;
 }
 
-struct PositionInfo {
+struct GmxPositionInfo {
     bytes32 positionKey;
     Position.Props position;
     PositionFees fees;
@@ -130,11 +132,11 @@ struct ExecutionPriceResult {
 }
 
 /**
- * @title GmxNpvReader
- * @notice GMX V2 implementation for reading position Net Value
+ * @title GmxVenueValidator
+ * @notice GMX V2 venue validator for parsing calls and reading position Net Value
  * @dev Net Value = collateral + PnL - fees (in collateral token units)
  */
-contract GmxNpvReader is INpvReader {
+contract GmxVenueValidator is IVenueValidator {
     // ============ Constants ============
 
     uint256 private constant FLOAT_PRECISION = 1e30;
@@ -171,7 +173,7 @@ contract GmxNpvReader is INpvReader {
 
     // ============ External ============
 
-    /// @inheritdoc INpvReader
+    /// @inheritdoc IVenueValidator
     function getPositionNetValue(bytes32 _positionKey) external view returns (uint256 netValue) {
         Position.Props memory pos = reader.getPosition(address(dataStore), _positionKey);
         if (pos.numbers.sizeInUsd == 0) return 0;
@@ -179,7 +181,7 @@ contract GmxNpvReader is INpvReader {
         Market.Props memory market = reader.getMarket(address(dataStore), pos.addresses.market);
         MarketPrices memory prices = _buildMarketPrices(market);
 
-        PositionInfo memory info = reader.getPositionInfo(
+        GmxPositionInfo memory info = reader.getPositionInfo(
             address(dataStore), referralStorage, _positionKey, prices, 0, address(0), true
         );
 
@@ -241,15 +243,40 @@ contract GmxNpvReader is INpvReader {
         return (uint256(price) * multiplier) / FLOAT_PRECISION;
     }
 
-    // ============ Position Call Parsing ============
+    // ============ Validation ============
 
     bytes4 private constant CREATE_ORDER = 0x4a393149;
     uint256 private constant ORDER_TYPE_MARKET_INCREASE = 2;
     uint256 private constant ORDER_TYPE_LIMIT_INCREASE = 3;
 
-    function parsePositionCall(address _account, bytes calldata _callData) external pure returns (INpvReader.PositionCallInfo memory _info) {
-        if (_callData.length < 4) return _info;
-        if (bytes4(_callData[:4]) != CREATE_ORDER) return _info;
+    error InvalidCallData();
+    error TokenMismatch(address expected, address actual);
+    error AmountMismatch(uint256 expected, uint256 actual);
+
+    /// @inheritdoc IVenueValidator
+    function validate(
+        IERC7579Account _subaccount,
+        IERC20 _token,
+        uint256 _amount,
+        bytes calldata _callData
+    ) external pure {
+        (address parsedToken, uint256 tokenDelta,) = _parseCallData(address(_subaccount), _callData);
+
+        if (parsedToken == address(0)) revert InvalidCallData();
+        if (parsedToken != address(_token)) revert TokenMismatch(address(_token), parsedToken);
+        if (tokenDelta != _amount) revert AmountMismatch(_amount, tokenDelta);
+    }
+
+    /// @inheritdoc IVenueValidator
+    function getPositionInfo(IERC7579Account _subaccount, bytes calldata _callData) external view returns (IVenueValidator.PositionInfo memory _info) {
+        (,, bytes32 positionKey) = _parseCallData(address(_subaccount), _callData);
+        _info.positionKey = positionKey;
+        _info.netValue = this.getPositionNetValue(positionKey);
+    }
+
+    function _parseCallData(address _account, bytes calldata _callData) internal pure returns (address token, uint256 tokenDelta, bytes32 positionKey) {
+        if (_callData.length < 4) return (address(0), 0, bytes32(0));
+        if (bytes4(_callData[:4]) != CREATE_ORDER) return (address(0), 0, bytes32(0));
 
         bytes calldata _params = _callData[4:];
 
@@ -257,15 +284,12 @@ contract GmxNpvReader is INpvReader {
         uint256 numbersOffset = abi.decode(_params[32:64], (uint256));
 
         address market = abi.decode(_params[addressesOffset + 128:addressesOffset + 160], (address));
-        _info.collateralToken = abi.decode(_params[addressesOffset + 160:addressesOffset + 192], (address));
+        token = abi.decode(_params[addressesOffset + 160:addressesOffset + 192], (address));
 
-        _info.sizeDelta = abi.decode(_params[numbersOffset:numbersOffset + 32], (uint256));
-        _info.collateralDelta = abi.decode(_params[numbersOffset + 32:numbersOffset + 64], (uint256));
+        tokenDelta = abi.decode(_params[numbersOffset + 32:numbersOffset + 64], (uint256));
 
-        uint256 orderType = abi.decode(_params[64:96], (uint256));
         bool isLong = abi.decode(_params[128:160], (bool));
 
-        _info.isIncrease = (orderType == ORDER_TYPE_MARKET_INCREASE || orderType == ORDER_TYPE_LIMIT_INCREASE);
-        _info.positionKey = keccak256(abi.encode(_account, market, _info.collateralToken, isLong));
+        positionKey = keccak256(abi.encode(_account, market, token, isLong));
     }
 }

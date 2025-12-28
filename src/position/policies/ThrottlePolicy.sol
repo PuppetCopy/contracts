@@ -16,10 +16,10 @@ contract ThrottlePolicy is ERC7579ActionPolicy {
     IEventEmitter public immutable eventEmitter;
 
     // ConfigId => multiplexer => account => throttle period (seconds)
-    mapping(ConfigId => mapping(address => mapping(address => uint32))) internal _throttlePeriod;
+    mapping(ConfigId => mapping(address => mapping(address => uint32))) internal throttlePeriodMap;
 
     // ConfigId => multiplexer => account => recipient => last activity timestamp
-    mapping(ConfigId => mapping(address => mapping(address => mapping(address => uint32)))) internal _lastActivity;
+    mapping(ConfigId => mapping(address => mapping(address => mapping(address => uint32)))) internal lastActivityMap;
 
     constructor(IEventEmitter _eventEmitter) {
         eventEmitter = _eventEmitter;
@@ -40,7 +40,7 @@ contract ThrottlePolicy is ERC7579ActionPolicy {
     }
 
     function isInitialized(address account, ConfigId configId) external view override returns (bool) {
-        return _throttlePeriod[configId][msg.sender][account] > 0;
+        return throttlePeriodMap[configId][msg.sender][account] > 0;
     }
 
     function isInitialized(
@@ -48,7 +48,7 @@ contract ThrottlePolicy is ERC7579ActionPolicy {
         address multiplexer,
         ConfigId configId
     ) external view override returns (bool) {
-        return _throttlePeriod[configId][multiplexer][account] > 0;
+        return throttlePeriodMap[configId][multiplexer][account] > 0;
     }
 
     function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
@@ -63,7 +63,7 @@ contract ThrottlePolicy is ERC7579ActionPolicy {
         bytes calldata initData
     ) external override(ERC7579PolicyBase, IPolicy) {
         uint32 throttlePeriod = abi.decode(initData, (uint32));
-        _throttlePeriod[configId][msg.sender][account] = throttlePeriod;
+        throttlePeriodMap[configId][msg.sender][account] = throttlePeriod;
         eventEmitter.logEvent("PolicySet", abi.encode(configId, msg.sender, account, throttlePeriod));
     }
 
@@ -82,14 +82,14 @@ contract ThrottlePolicy is ERC7579ActionPolicy {
 
         address recipient = abi.decode(data[4:36], (address));
 
-        uint32 throttlePeriod = _throttlePeriod[id][msg.sender][account];
-        uint32 lastActivity = _lastActivity[id][msg.sender][account][recipient];
+        uint32 throttlePeriod = throttlePeriodMap[id][msg.sender][account];
+        uint32 lastActivity = lastActivityMap[id][msg.sender][account][recipient];
 
         if (block.timestamp < lastActivity + throttlePeriod) {
             return VALIDATION_FAILED;
         }
 
-        _lastActivity[id][msg.sender][account][recipient] = uint32(block.timestamp);
+        lastActivityMap[id][msg.sender][account][recipient] = uint32(block.timestamp);
 
         return VALIDATION_SUCCESS;
     }

@@ -5,8 +5,10 @@ import {console} from "forge-std/src/console.sol";
 
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {Allocation} from "src/position/Allocation.sol";
+import {VenueManager} from "src/position/VenueManager.sol";
 import {SubscriptionPolicy} from "src/position/policies/SubscriptionPolicy.sol";
 import {ThrottlePolicy} from "src/position/policies/ThrottlePolicy.sol";
+import {IAllocation} from "src/position/interface/IAllocation.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
 
@@ -15,6 +17,9 @@ contract DeployPosition is BaseScript {
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
 
         Dictatorship dictatorship = Dictatorship(getDeployedAddress("Dictatorship"));
+
+        VenueManager venueManager = new VenueManager(dictatorship);
+        console.log("VenueManager:", address(venueManager));
 
         Allocation allocation = new Allocation(
             dictatorship,
@@ -27,7 +32,7 @@ contract DeployPosition is BaseScript {
         );
         console.log("Allocation:", address(allocation));
 
-        SubscriptionPolicy subscriptionPolicy = new SubscriptionPolicy(dictatorship);
+        SubscriptionPolicy subscriptionPolicy = new SubscriptionPolicy(dictatorship, IAllocation(address(allocation)));
         ThrottlePolicy throttlePolicy = new ThrottlePolicy(dictatorship);
 
         console.log("SubscriptionPolicy:", address(subscriptionPolicy));

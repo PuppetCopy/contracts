@@ -25,10 +25,10 @@ contract FeeMarketplace is CoreContract {
     PuppetToken public immutable protocolToken;
     FeeMarketplaceStore public immutable store;
 
-    mapping(IERC20 => uint) public accountedBalance;
-    mapping(IERC20 => uint) public unlockedFees;
-    mapping(IERC20 => uint) public lastUnlockTimestamp;
-    mapping(IERC20 => uint) public lastAskResetTimestamp;
+    mapping(IERC20 => uint) public accountedBalanceMap;
+    mapping(IERC20 => uint) public unlockedFeesMap;
+    mapping(IERC20 => uint) public lastUnlockTimestampMap;
+    mapping(IERC20 => uint) public lastAskResetTimestampMap;
 
     Config public config;
 
@@ -47,12 +47,12 @@ contract FeeMarketplace is CoreContract {
     }
 
     function getPendingUnlock(IERC20 _feeToken) public view returns (uint) {
-        uint _accounted = accountedBalance[_feeToken];
-        uint _unlocked = unlockedFees[_feeToken];
+        uint _accounted = accountedBalanceMap[_feeToken];
+        uint _unlocked = unlockedFeesMap[_feeToken];
         if (_accounted <= _unlocked) return 0;
 
         uint _locked = _accounted - _unlocked;
-        uint _lastTimestamp = lastUnlockTimestamp[_feeToken];
+        uint _lastTimestamp = lastUnlockTimestampMap[_feeToken];
         if (_lastTimestamp == 0) return 0;
 
         uint _elapsed = block.timestamp - _lastTimestamp;
@@ -61,11 +61,11 @@ contract FeeMarketplace is CoreContract {
     }
 
     function getUnlockedBalance(IERC20 _feeToken) external view returns (uint) {
-        return unlockedFees[_feeToken] + getPendingUnlock(_feeToken);
+        return unlockedFeesMap[_feeToken] + getPendingUnlock(_feeToken);
     }
 
     function getAskPrice(IERC20 _feeToken) public view returns (uint) {
-        uint _lastReset = lastAskResetTimestamp[_feeToken];
+        uint _lastReset = lastAskResetTimestampMap[_feeToken];
         if (_lastReset == 0) return config.askStart;
 
         uint _elapsed = block.timestamp - _lastReset;
@@ -80,12 +80,12 @@ contract FeeMarketplace is CoreContract {
 
         _syncUnlock(_feeToken);
 
-        if (accountedBalance[_feeToken] == 0 && unlockedFees[_feeToken] == 0) {
-            lastAskResetTimestamp[_feeToken] = block.timestamp;
+        if (accountedBalanceMap[_feeToken] == 0 && unlockedFeesMap[_feeToken] == 0) {
+            lastAskResetTimestampMap[_feeToken] = block.timestamp;
         }
 
         store.transferIn(_feeToken, _depositor, _amount);
-        accountedBalance[_feeToken] += _amount;
+        accountedBalanceMap[_feeToken] += _amount;
 
         _logEvent("Deposit", abi.encode(_feeToken, _depositor, _amount));
     }
@@ -96,11 +96,11 @@ contract FeeMarketplace is CoreContract {
 
         _syncUnlock(_feeToken);
 
-        if (accountedBalance[_feeToken] == 0 && unlockedFees[_feeToken] == 0) {
-            lastAskResetTimestamp[_feeToken] = block.timestamp;
+        if (accountedBalanceMap[_feeToken] == 0 && unlockedFeesMap[_feeToken] == 0) {
+            lastAskResetTimestampMap[_feeToken] = block.timestamp;
         }
 
-        accountedBalance[_feeToken] += _unaccounted;
+        accountedBalanceMap[_feeToken] += _unaccounted;
 
         _logEvent("Deposit", abi.encode(_feeToken, address(0), _unaccounted));
     }
@@ -108,7 +108,7 @@ contract FeeMarketplace is CoreContract {
     function acceptOffer(IERC20 _feeToken, address _buyer, address _receiver, uint _minOut) external auth {
         _syncUnlock(_feeToken);
 
-        uint _payout = unlockedFees[_feeToken];
+        uint _payout = unlockedFeesMap[_feeToken];
         if (_payout == 0) revert Error.FeeMarketplace__InsufficientUnlockedBalance(0);
         if (_payout < _minOut) revert Error.FeeMarketplace__InsufficientUnlockedBalance(_payout);
 
@@ -119,12 +119,12 @@ contract FeeMarketplace is CoreContract {
             store.burn(_cost);
         }
 
-        unlockedFees[_feeToken] = 0;
-        accountedBalance[_feeToken] -= _payout;
+        unlockedFeesMap[_feeToken] = 0;
+        accountedBalanceMap[_feeToken] -= _payout;
 
         store.transferOut(config.transferOutGasLimit, _feeToken, _receiver, _payout);
 
-        lastAskResetTimestamp[_feeToken] = block.timestamp;
+        lastAskResetTimestampMap[_feeToken] = block.timestamp;
 
         _logEvent("AcceptOffer", abi.encode(_feeToken, _buyer, _receiver, _payout, _cost));
     }
@@ -132,9 +132,9 @@ contract FeeMarketplace is CoreContract {
     function _syncUnlock(IERC20 _feeToken) internal {
         uint _pending = getPendingUnlock(_feeToken);
         if (_pending > 0) {
-            unlockedFees[_feeToken] += _pending;
+            unlockedFeesMap[_feeToken] += _pending;
         }
-        lastUnlockTimestamp[_feeToken] = block.timestamp;
+        lastUnlockTimestampMap[_feeToken] = block.timestamp;
     }
 
     function _setConfig(bytes memory _data) internal override {

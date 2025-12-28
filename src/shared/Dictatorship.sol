@@ -11,12 +11,12 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {EventEmitter} from "./EventEmitter.sol";
 
 contract Dictatorship is Ownable, IAuthority, EventEmitter {
-    mapping(address => bool) public registeredContract;
+    mapping(address => bool) public registeredContractMap;
 
     constructor(
         address _initialOwner
     ) Ownable(_initialOwner) {
-        registeredContract[address(this)] = true;
+        registeredContractMap[address(this)] = true;
     }
 
     function hasAccess(Access _target, address _user) external view returns (bool) {
@@ -50,14 +50,14 @@ contract Dictatorship is Ownable, IAuthority, EventEmitter {
     function registerContract(
         address _contract
     ) external onlyOwner {
-        if (registeredContract[_contract]) revert Error.Dictatorship__ContractAlreadyInitialized();
+        if (registeredContractMap[_contract]) revert Error.Dictatorship__ContractAlreadyInitialized();
 
-        registeredContract[_contract] = true;
+        registeredContractMap[_contract] = true;
         emit PuppetEventLog(_contract, "RegisterContract", "");
     }
 
     function setConfig(CoreContract _contract, bytes calldata _config) external onlyOwner {
-        if (!registeredContract[address(_contract)]) revert Error.Dictatorship__ContractNotRegistered();
+        if (!registeredContractMap[address(_contract)]) revert Error.Dictatorship__ContractNotRegistered();
         if (!_contract.supportsInterface(type(CoreContract).interfaceId)) revert Error.Dictatorship__InvalidCoreContract();
 
         try _contract.setConfig(_config) {}
@@ -74,9 +74,9 @@ contract Dictatorship is Ownable, IAuthority, EventEmitter {
     function removeContract(
         address _contract
     ) external onlyOwner {
-        if (!registeredContract[_contract]) revert Error.Dictatorship__ContractNotRegistered();
+        if (!registeredContractMap[_contract]) revert Error.Dictatorship__ContractNotRegistered();
 
-        registeredContract[_contract] = false;
+        registeredContractMap[_contract] = false;
         emit PuppetEventLog(_contract, "RemoveContract", "");
     }
 }

@@ -59,9 +59,9 @@ contract FeeMarketplaceTest is BasicSetup {
         feeMarketplace.deposit(usdc, users.owner, 100e6);
 
         assertEq(usdc.balanceOf(address(feeMarketplaceStore)), 100e6, "Store balance mismatch");
-        assertEq(feeMarketplace.lastUnlockTimestamp(usdc), block.timestamp, "lastUnlockTimestamp should be set");
-        assertEq(feeMarketplace.unlockedFees(usdc), 0, "Unlocked fees should be zero immediately");
-        assertEq(feeMarketplace.accountedBalance(usdc), 100e6, "Accounted balance should match deposit");
+        assertEq(feeMarketplace.lastUnlockTimestampMap(usdc), block.timestamp, "lastUnlockTimestamp should be set");
+        assertEq(feeMarketplace.unlockedFeesMap(usdc), 0, "Unlocked fees should be zero immediately");
+        assertEq(feeMarketplace.accountedBalanceMap(usdc), 100e6, "Accounted balance should match deposit");
     }
 
     function testPartialUnlock() public {
@@ -111,7 +111,7 @@ contract FeeMarketplaceTest is BasicSetup {
 
         assertEq(usdc.balanceOf(users.alice), 100e6, "Alice should receive all unlocked fees");
         assertEq(puppetToken.totalSupply(), initialSupply - askBefore, "PUPPET should be burned");
-        assertEq(feeMarketplace.unlockedFees(usdc), 0, "Unlocked fees should be zero after redeem");
+        assertEq(feeMarketplace.unlockedFeesMap(usdc), 0, "Unlocked fees should be zero after redeem");
     }
 
     function testAcceptOfferResetsAsk() public {
@@ -121,7 +121,7 @@ contract FeeMarketplaceTest is BasicSetup {
         _acceptOfferAll(address(usdc), users.alice);
 
         assertEq(feeMarketplace.getAskPrice(usdc), ASK_START, "Ask should reset to askStart after redeem");
-        assertEq(feeMarketplace.lastAskResetTimestamp(usdc), block.timestamp, "Reset timestamp should be updated");
+        assertEq(feeMarketplace.lastAskResetTimestampMap(usdc), block.timestamp, "Reset timestamp should be updated");
     }
 
     function testAcceptOfferAtZeroCostWhenDecayed() public {
@@ -183,13 +183,13 @@ contract FeeMarketplaceTest is BasicSetup {
         vm.prank(users.alice);
         usdc.transfer(address(feeMarketplaceStore), 100e6);
 
-        assertEq(feeMarketplace.accountedBalance(usdc), 0, "Accounted balance should be 0 before sync");
+        assertEq(feeMarketplace.accountedBalanceMap(usdc), 0, "Accounted balance should be 0 before sync");
 
         vm.prank(users.owner);
         feeMarketplace.recordTransferIn(usdc);
 
-        assertEq(feeMarketplace.accountedBalance(usdc), 100e6, "Accounted balance should update after sync");
-        assertEq(feeMarketplace.lastUnlockTimestamp(usdc), block.timestamp, "Timestamp should be set");
+        assertEq(feeMarketplace.accountedBalanceMap(usdc), 100e6, "Accounted balance should update after sync");
+        assertEq(feeMarketplace.lastUnlockTimestampMap(usdc), block.timestamp, "Timestamp should be set");
 
         skip(UNLOCK_TIMEFRAME);
         assertEq(feeMarketplace.getUnlockedBalance(usdc), 100e6, "Full amount should unlock");
@@ -363,8 +363,8 @@ contract FeeMarketplaceTest is BasicSetup {
         // Deposit in same block as redeem
         feeMarketplace.deposit(usdc, users.owner, 50e6);
 
-        assertEq(feeMarketplace.accountedBalance(usdc), 50e6, "New deposit accounted");
-        assertEq(feeMarketplace.unlockedFees(usdc), 0, "No unlocked fees yet");
+        assertEq(feeMarketplace.accountedBalanceMap(usdc), 50e6, "New deposit accounted");
+        assertEq(feeMarketplace.unlockedFeesMap(usdc), 0, "No unlocked fees yet");
         assertEq(feeMarketplace.getAskPrice(usdc), ASK_START, "Ask just reset");
     }
 
@@ -422,15 +422,15 @@ contract FeeMarketplaceTest is BasicSetup {
 
         // Other token unaffected
         assertEq(feeMarketplace.getUnlockedBalance(wnt), 0.5e18, "WNT still 50%");
-        assertEq(feeMarketplace.accountedBalance(wnt), 1e18, "WNT accounted unchanged");
+        assertEq(feeMarketplace.accountedBalanceMap(wnt), 1e18, "WNT accounted unchanged");
     }
 
     function testEdge_FirstDepositStartsBothClocks() public {
         // First deposit to empty marketplace starts both clocks
         feeMarketplace.deposit(usdc, users.owner, 100e6);
 
-        assertEq(feeMarketplace.lastUnlockTimestamp(usdc), block.timestamp, "Unlock clock started");
-        assertEq(feeMarketplace.lastAskResetTimestamp(usdc), block.timestamp, "Ask clock started");
+        assertEq(feeMarketplace.lastUnlockTimestampMap(usdc), block.timestamp, "Unlock clock started");
+        assertEq(feeMarketplace.lastAskResetTimestampMap(usdc), block.timestamp, "Ask clock started");
         assertEq(feeMarketplace.getAskPrice(usdc), ASK_START, "Ask at askStart immediately after deposit");
 
         // Immediately redeem (0 unlocked) should fail
@@ -449,8 +449,8 @@ contract FeeMarketplaceTest is BasicSetup {
         feeMarketplace.deposit(usdc, users.owner, 100e6);
 
         // unlockedFees should now include the 50e6
-        assertEq(feeMarketplace.unlockedFees(usdc), 50e6, "Unlocked fees checkpointed");
-        assertEq(feeMarketplace.accountedBalance(usdc), 200e6, "Total accounted");
+        assertEq(feeMarketplace.unlockedFeesMap(usdc), 50e6, "Unlocked fees checkpointed");
+        assertEq(feeMarketplace.accountedBalanceMap(usdc), 200e6, "Total accounted");
 
         // After deposit, unlock rate considers new total locked
         skip(12 hours);
@@ -467,13 +467,13 @@ contract FeeMarketplaceTest is BasicSetup {
         usdc.transfer(address(feeMarketplaceStore), 100e6);
 
         // State not updated
-        assertEq(feeMarketplace.accountedBalance(usdc), 0, "Not accounted yet");
+        assertEq(feeMarketplace.accountedBalanceMap(usdc), 0, "Not accounted yet");
 
         // recordTransferIn picks up the transfer
         vm.startPrank(users.owner);
         feeMarketplace.recordTransferIn(usdc);
 
-        assertEq(feeMarketplace.accountedBalance(usdc), 100e6, "Now accounted");
+        assertEq(feeMarketplace.accountedBalanceMap(usdc), 100e6, "Now accounted");
 
         // Can redeem after unlock
         skip(UNLOCK_TIMEFRAME);
@@ -495,7 +495,7 @@ contract FeeMarketplaceTest is BasicSetup {
         vm.prank(users.owner);
         feeMarketplace.recordTransferIn(usdc);
 
-        assertEq(feeMarketplace.accountedBalance(usdc), 150e6, "Both amounts accounted");
+        assertEq(feeMarketplace.accountedBalanceMap(usdc), 150e6, "Both amounts accounted");
     }
 
     function testEdge_AcceptOfferPartialThenFull() public {
@@ -512,7 +512,7 @@ contract FeeMarketplaceTest is BasicSetup {
         assertEq(usdc.balanceOf(users.bob), 50e6, "Got remaining 50%");
 
         // Nothing left
-        assertEq(feeMarketplace.accountedBalance(usdc), 0, "All redeemed");
+        assertEq(feeMarketplace.accountedBalanceMap(usdc), 0, "All redeemed");
     }
 
     function testEdge_UnlockCalculationNeverExceedsLocked() public {
@@ -567,12 +567,12 @@ contract FeeMarketplaceTest is BasicSetup {
         feeMarketplace.deposit(usdc, users.owner, 100e6);
         skip(12 hours);
 
-        uint timestampBefore = feeMarketplace.lastUnlockTimestamp(usdc);
+        uint timestampBefore = feeMarketplace.lastUnlockTimestampMap(usdc);
 
         skip(1 hours);
         feeMarketplace.deposit(usdc, users.owner, 50e6);
 
-        uint timestampAfter = feeMarketplace.lastUnlockTimestamp(usdc);
+        uint timestampAfter = feeMarketplace.lastUnlockTimestampMap(usdc);
         assertGt(timestampAfter, timestampBefore, "Unlock timestamp updated on deposit");
     }
 
@@ -603,7 +603,7 @@ contract FeeMarketplaceTest is BasicSetup {
         assertEq(pending, 0, "No pending after checkpoint when fully unlocked");
 
         // unlockedFees now holds the checkpointed amount
-        assertEq(feeMarketplace.unlockedFees(usdc), 100e6, "Unlocked fees checkpointed");
+        assertEq(feeMarketplace.unlockedFeesMap(usdc), 100e6, "Unlocked fees checkpointed");
     }
 
     function testEdge_RoundingOnSmallUnlock() public {
@@ -694,7 +694,7 @@ contract FeeMarketplaceTest is BasicSetup {
         vm.prank(users.owner);
         feeMarketplace.deposit(usdc, users.alice, 50e6);
 
-        assertEq(feeMarketplace.accountedBalance(usdc), 150e6, "Both deposits accounted");
+        assertEq(feeMarketplace.accountedBalanceMap(usdc), 150e6, "Both deposits accounted");
     }
 
     function testEdge_AcceptOfferToSelf() public {
@@ -733,7 +733,7 @@ contract FeeMarketplaceTest is BasicSetup {
         // accountedBalance = 300e6
         // locked = 250e6
 
-        assertEq(feeMarketplace.unlockedFees(usdc), 50e6, "Previous unlock checkpointed");
+        assertEq(feeMarketplace.unlockedFeesMap(usdc), 50e6, "Previous unlock checkpointed");
 
         // Wait 6 hours - 25% of locked = 62.5e6 pending
         skip(6 hours);
@@ -770,8 +770,8 @@ contract FeeMarketplaceTest is BasicSetup {
         _acceptOfferAll(address(usdc), users.alice);
 
         // accountedBalance = 50e6, unlockedFees = 0 (reset after redeem)
-        assertEq(feeMarketplace.accountedBalance(usdc), 50e6, "50e6 remains");
-        assertEq(feeMarketplace.unlockedFees(usdc), 0, "Unlocked reset to 0");
+        assertEq(feeMarketplace.accountedBalanceMap(usdc), 50e6, "50e6 remains");
+        assertEq(feeMarketplace.unlockedFeesMap(usdc), 0, "Unlocked reset to 0");
 
         // getPendingUnlock should never return more than locked
         skip(UNLOCK_TIMEFRAME * 100);
@@ -798,6 +798,6 @@ contract FeeMarketplaceTest is BasicSetup {
         _acceptOfferAll(address(usdc), users.owner);
 
         // Final state
-        assertEq(feeMarketplace.accountedBalance(usdc), 0, "All fees distributed");
+        assertEq(feeMarketplace.accountedBalanceMap(usdc), 0, "All fees distributed");
     }
 }

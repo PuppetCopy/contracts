@@ -70,14 +70,14 @@ const LITERAL_PATTERNS: Array<{ pattern: RegExp; type: string }> = [
   { pattern: /^address\(0\)$/, type: 'address' }
 ]
 
-async function getAllSolFiles(dir: string): Promise<string[]> {
+async function getAllSolFiles(dir: string, includeInterfaces = false): Promise<string[]> {
   const glob = new Glob('**/*.sol')
   const files: string[] = []
 
   for await (const file of glob.scan({ cwd: dir, absolute: true })) {
-    if (!file.includes('/interface/') && !file.includes('/test/')) {
-      files.push(file)
-    }
+    if (file.includes('/test/')) continue
+    if (!includeInterfaces && file.includes('/interface/')) continue
+    files.push(file)
   }
 
   return files
@@ -500,9 +500,9 @@ export async function parseEventsFromSolidity(): Promise<Map<string, EventDefini
   const contractEvents = new Map<string, EventDefinition[]>()
   const allStructs = new Map<string, StructDefinition>()
 
-  const solFiles = await getAllSolFiles(SRC_PATH)
-
-  for (const file of solFiles) {
+  // Include interface files for struct definitions
+  const allFiles = await getAllSolFiles(SRC_PATH, true)
+  for (const file of allFiles) {
     const content = await Bun.file(file).text()
     const fileStructs = parseStructs(content)
 
@@ -511,6 +511,8 @@ export async function parseEventsFromSolidity(): Promise<Map<string, EventDefini
     }
   }
 
+  // Exclude interface files for event parsing
+  const solFiles = await getAllSolFiles(SRC_PATH, false)
   for (const file of solFiles) {
     const content = await Bun.file(file).text()
     const contractName = extractContractName(content)
@@ -591,7 +593,8 @@ export function generateEventParamsCode(contractEvents: Map<string, EventDefinit
       const eventLines = sortedEvents
         .map(event => {
           const hash = keccak256(toHex(event.name))
-          const paramStr = event.params.map(p => `${p.type} ${p.name}`).join(', ')
+          // Replace 'unknown' types with 'uint256' as fallback (common for nested mappings)
+          const paramStr = event.params.map(p => `${p.type === 'unknown' ? 'uint256' : p.type} ${p.name}`).join(', ')
           const parsed = parseAbiParameters(paramStr)
           const argsStr = JSON.stringify(parsed).replace(/"(\w+)":/g, '$1:')
           return `    ${event.name}: {\n      hash: '${hash}',\n      args: ${argsStr}\n    }`

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.33;
 
 import {Test, console2} from "forge-std/src/Test.sol";
-import {GmxNpvReader} from "../../src/position/reader/GmxNpvReader.sol";
+import {GmxVenueValidator} from "../../src/position/validator/GmxVenueValidator.sol";
 import {Dictatorship} from "../../src/shared/Dictatorship.sol";
 
 interface IPositionStoreUtils {
@@ -16,11 +16,11 @@ interface IDataStore {
 }
 
 /**
- * @title GmxNpvReaderForkTest
- * @notice Fork test to verify GmxNpvReader against real GMX V2 positions
- * @dev Run: forge test --match-contract GmxNpvReaderForkTest --fork-url $RPC_URL -vvvv
+ * @title GmxVenueValidatorForkTest
+ * @notice Fork test to verify GmxVenueValidator against real GMX V2 positions
+ * @dev Run: forge test --match-contract GmxVenueValidatorForkTest --fork-url $RPC_URL -vvvv
  */
-contract GmxNpvReaderForkTest is Test {
+contract GmxVenueValidatorForkTest is Test {
     // GMX V2 Arbitrum Mainnet
     address constant GMX_DATASTORE = 0xFD70de6b91282D8017aA4E741e9Ae325CAb992d8;
     address constant GMX_READER = 0x470fbC46bcC0f16532691Df360A07d8Bf5ee0789;
@@ -30,13 +30,13 @@ contract GmxNpvReaderForkTest is Test {
     bytes32 constant POSITION_LIST = keccak256(abi.encode("POSITION_LIST"));
 
     Dictatorship dictator;
-    GmxNpvReader npvReader;
+    GmxVenueValidator validator;
     IDataStore dataStore;
 
     function setUp() public {
         dictator = new Dictatorship(address(this));
-        npvReader = new GmxNpvReader(GMX_DATASTORE, GMX_READER, GMX_REFERRAL_STORAGE);
-        dictator.registerContract(address(npvReader));
+        validator = new GmxVenueValidator(GMX_DATASTORE, GMX_READER, GMX_REFERRAL_STORAGE);
+        dictator.registerContract(address(validator));
         dataStore = IDataStore(GMX_DATASTORE);
     }
 
@@ -60,7 +60,7 @@ contract GmxNpvReaderForkTest is Test {
             console2.log("\nPosition", i);
             console2.logBytes32(posKey);
 
-            try npvReader.getPositionNetValue(posKey) returns (uint256 netValue) {
+            try validator.getPositionNetValue(posKey) returns (uint256 netValue) {
                 console2.log("Net Value (token units):", netValue);
             } catch Error(string memory reason) {
                 console2.log("Error:", reason);
@@ -80,7 +80,7 @@ contract GmxNpvReaderForkTest is Test {
             return;
         }
 
-        uint256 netValue = npvReader.getPositionNetValue(positionKey);
+        uint256 netValue = validator.getPositionNetValue(positionKey);
         console2.log("Net Value:", netValue);
     }
 }

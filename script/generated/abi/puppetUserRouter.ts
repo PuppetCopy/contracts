@@ -15,34 +15,6 @@ export default [
   },
   {
     type: 'function',
-    name: 'allocate',
-    inputs: [
-      {
-        name: '_collateralToken',
-        type: 'address',
-        internalType: 'contract IERC20'
-      },
-      {
-        name: '_masterAllocation',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: '_puppetList',
-        type: 'address[]',
-        internalType: 'address[]'
-      },
-      {
-        name: '_allocationList',
-        type: 'uint256[]',
-        internalType: 'uint256[]'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
     name: 'allocation',
     inputs: [],
     outputs: [
@@ -56,33 +28,20 @@ export default [
   },
   {
     type: 'function',
-    name: 'syncAllocation',
+    name: 'createSubaccount',
     inputs: [
       {
-        name: '_collateralToken',
-        type: 'address',
-        internalType: 'contract IERC20'
-      },
-      {
-        name: '_master',
+        name: '_signer',
         type: 'address',
         internalType: 'address'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'withdrawAllocation',
-    inputs: [
-      {
-        name: '_collateralToken',
-        type: 'address',
-        internalType: 'contract IERC20'
       },
       {
-        name: '_master',
+        name: '_subaccount',
+        type: 'address',
+        internalType: 'address'
+      },
+      {
+        name: '_token',
         type: 'address',
         internalType: 'address'
       },
