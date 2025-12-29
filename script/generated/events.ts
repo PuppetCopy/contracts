@@ -12,7 +12,7 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'address', name: 'subaccount' },
         { type: 'bytes32', name: 'subaccountName' },
         { type: 'address', name: 'token' },
-        { type: 'uint256', name: 'amount' }
+        { type: 'uint256', name: 'balance' }
       ]
     },
     ExecuteAllocate: {
@@ -28,7 +28,7 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'uint256[]', name: 'amountList' },
         { type: 'uint256', name: 'allocation' },
         { type: 'uint256', name: 'positionValue' },
-        { type: 'tuple[]', name: 'positions', components: [{ type: 'tuple', name: 'venue', components: [{ type: 'bytes32', name: 'venueKey' }, { type: 'address', name: 'validator' }] }, { type: 'uint256', name: 'value' }, { type: 'bytes32', name: 'positionKey' }] },
+        { type: 'tuple[]', name: 'positions', components: [{ type: 'bytes32' }, { type: 'uint256' }] },
         { type: 'uint256', name: 'allocated' },
         { type: 'uint256', name: 'sharePrice' },
         { type: 'uint256', name: 'userShares' },
@@ -41,7 +41,7 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'bytes32', name: 'key' },
         { type: 'address', name: 'puppet' },
         { type: 'uint256', name: 'amount' },
-        { type: 'bytes', name: 'errorValue' }
+        { type: 'uint256', name: 'param' }
       ]
     },
     ExecuteOrder: {
@@ -55,14 +55,14 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'uint256', name: 'amount' },
         { type: 'uint256', name: 'allocation' },
         { type: 'address', name: 'target' },
-        { type: 'tuple', name: 'venue', components: [{ type: 'bytes32', name: 'venueKey' }, { type: 'address', name: 'validator' }] },
+        { type: 'tuple', name: 'venue', components: [{ type: 'bytes32' }, { type: 'address' }] },
         { type: 'bytes32', name: 'positionKey' },
         { type: 'uint256', name: 'positionValue' },
         { type: 'bytes', name: 'result' }
       ]
     },
     ExecuteOrderFailed: {
-      hash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+      hash: '0x931ea7ec58957193febd836dad1ff3f8f2d6cb9217c90ecbdccc96184669d63e',
       args: [
         { type: 'bytes32', name: 'key' },
         { type: 'address', name: 'account' },
@@ -80,9 +80,9 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'bytes32', name: 'subaccountName' },
         { type: 'address', name: 'token' },
         { type: 'uint256', name: 'amount' },
-        { type: 'uint256', name: 'allocation' },
+        { type: 'uint256', name: 'param' },
         { type: 'uint256', name: 'positionValue' },
-        { type: 'tuple[]', name: 'positions', components: [{ type: 'tuple', name: 'venue', components: [{ type: 'bytes32', name: 'venueKey' }, { type: 'address', name: 'validator' }] }, { type: 'uint256', name: 'value' }, { type: 'bytes32', name: 'positionKey' }] },
+        { type: 'tuple[]', name: 'positions', components: [{ type: 'bytes32' }, { type: 'uint256' }] },
         { type: 'uint256', name: 'amountOut' },
         { type: 'uint256', name: 'sharesBurnt' },
         { type: 'uint256', name: 'sharePrice' },
@@ -127,16 +127,34 @@ export const CONTRACT_EVENT_MAP = {
       ]
     }
   },
+  Position: {
+    SetVenue: {
+      hash: '0xa1fd29a836c9e0d9c0cda8c25b4b386b7e5a72917c047427d71a722e6b55cb6f',
+      args: [
+        { type: 'bytes32', name: 'venueKey' },
+        { type: 'address', name: 'validator' },
+        { type: 'address[]', name: 'entrypoints' }
+      ]
+    }
+  },
   SubscriptionPolicy: {
     Subscribe: {
       hash: '0x48d404d629614f23fea65a9948e14b556ebee2cdcec7eb97cad37db32d0f210e',
       args: [
         { type: 'bytes32', name: 'configId' },
         { type: 'address', name: 'account' },
-        { type: 'address', name: 'master' },
-        { type: 'uint256', name: 'allowanceRate' },
-        { type: 'uint256', name: 'minAllocationRatio' },
-        { type: 'uint256', name: 'expiry' }
+        { type: 'bytes32', name: 'key' },
+        { type: 'uint16', name: 'allowanceRate' },
+        { type: 'uint32', name: 'throttlePeriod' },
+        { type: 'uint64', name: 'expiry' }
+      ]
+    },
+    Unsubscribe: {
+      hash: '0x2571bb224427972bee77ecd6edaf0e4ad91d8cc1dc37954a1e160515ca440a49',
+      args: [
+        { type: 'bytes32', name: 'configId' },
+        { type: 'address', name: 'sender' },
+        { type: 'bytes32', name: 'key' }
       ]
     }
   },
@@ -148,16 +166,6 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'address', name: 'sender' },
         { type: 'address', name: 'account' },
         { type: 'uint32', name: 'throttlePeriod' }
-      ]
-    }
-  },
-  Position: {
-    SetVenue: {
-      hash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-      args: [
-        { type: 'bytes32', name: 'venueKey' },
-        { type: 'address', name: 'validator' },
-        { type: 'address[]', name: 'entrypoints' }
       ]
     }
   }

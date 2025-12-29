@@ -77,6 +77,8 @@ library Error {
     error Position__VenueNotRegistered(bytes32 venueKey);
 
     error GmxVenueValidator__InvalidCallData();
+    error GmxVenueValidator__InvalidOrderType();
+    error GmxVenueValidator__InvalidReceiver();
     error GmxVenueValidator__TokenMismatch(address expected, address actual);
     error GmxVenueValidator__AmountMismatch(uint expected, uint actual);
 }

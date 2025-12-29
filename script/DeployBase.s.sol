@@ -6,7 +6,7 @@ import {FeeMarketplace} from "src/shared/FeeMarketplace.sol";
 import {FeeMarketplaceStore} from "src/shared/FeeMarketplaceStore.sol";
 import {PuppetToken} from "src/tokenomics/PuppetToken.sol";
 import {PuppetVoteToken} from "src/tokenomics/PuppetVoteToken.sol";
-import {UserRouterProxy} from "src/utils/UserRouterProxy.sol";
+import {ProxyUserRouter} from "src/utils/ProxyUserRouter.sol";
 
 import {BaseScript} from "./BaseScript.s.sol";
 import {Const} from "./Const.sol";
@@ -30,8 +30,8 @@ contract DeployBase is BaseScript {
         );
         dictatorship.setAccess(feeMarketplaceStore, address(feeMarketplace));
 
-        UserRouterProxy userRouterProxy = new UserRouterProxy(dictatorship);
-        dictatorship.setAccess(userRouterProxy, Const.dao);
+        ProxyUserRouter proxyUserRouter = new ProxyUserRouter(dictatorship);
+        dictatorship.setAccess(proxyUserRouter, Const.dao);
 
         vm.stopBroadcast();
     }

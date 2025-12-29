@@ -1,16 +1,14 @@
 import { $, file, write } from 'bun'
 import { createPublicClient, getAddress, http } from 'viem'
 
-const rpcUrl = process.env.RPC_URL
-const scriptName = process.env.SCRIPT_NAME
+// Bun automatically loads .env files
+const rpcUrl = Bun.env.RPC_URL
+const scriptName = Bun.env.SCRIPT_NAME
+const privateKey = Bun.env.DEPLOYER_PRIVATE_KEY
 
-if (!rpcUrl) {
-  throw new Error('Missing environment variable: RPC_URL')
-}
-
-if (!scriptName) {
-  throw new Error('Missing environment variable: SCRIPT_NAME')
-}
+if (!rpcUrl) throw new Error('Missing RPC_URL')
+if (!scriptName) throw new Error('Missing SCRIPT_NAME')
+if (!privateKey) throw new Error('Missing DEPLOYER_PRIVATE_KEY')
 
 const client = createPublicClient({
   transport: http(rpcUrl)
@@ -35,8 +33,10 @@ const result = await $`forge script \
   script/${scriptFile}:${scriptName} \
   --broadcast \
   --verify \
+  --resume \
   -vvvv \
-  --rpc-url ${rpcUrl}`.nothrow()
+  --rpc-url ${rpcUrl} \
+  --private-key ${privateKey}`.nothrow()
 
 if (result.exitCode !== 0) {
   console.error('Forge script failed')
@@ -68,3 +68,4 @@ console.log(`Updated deployments.json for chain ${chainKey}`)
 console.log('Regenerating TypeScript...')
 await $`bun run generate && bun run build:ts`
 console.log('Done!')
+

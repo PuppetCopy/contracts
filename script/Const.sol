@@ -23,6 +23,7 @@ library Const {
     address constant gmxOrderHandlerGassless = 0xfc9Bc118fdDb89FF6fF720840446D73478dE4153;
     address constant gmxLiquidationHandler = 0xdAb9bA9e3a301CCb353f18B4C8542BA2149E4010;
     address constant gmxAdlHandler = 0x9242FbED25700e82aE26ae319BCf68E9C508451c;
+    address constant gmxReferralStorage = 0xe6fab3F0c7199b0d34d7FbE83394fc0e0D06e99d;
     address constant gmxEthUsdcMarket = 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f;
     address constant chainlinkPriceFeedProvider = 0x527FB0bCfF63C47761039bB386cFE181A92a4701;
 

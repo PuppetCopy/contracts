@@ -26,12 +26,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'gasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'virtualShareOffset',
+            name: 'transferOutGasLimit',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -106,12 +101,7 @@ export default [
         internalType: 'uint256'
       },
       {
-        name: 'gasLimit',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'virtualShareOffset',
+        name: 'transferOutGasLimit',
         type: 'uint256',
         internalType: 'uint256'
       }
@@ -141,11 +131,6 @@ export default [
         name: '_token',
         type: 'address',
         internalType: 'contract IERC20'
-      },
-      {
-        name: '_amount',
-        type: 'uint256',
-        internalType: 'uint256'
       },
       {
         name: '_subaccountName',
@@ -424,12 +409,7 @@ export default [
             internalType: 'uint256'
           },
           {
-            name: 'gasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'virtualShareOffset',
+            name: 'transferOutGasLimit',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -558,9 +538,9 @@ export default [
     name: 'nonceMap',
     inputs: [
       {
-        name: 'account',
-        type: 'address',
-        internalType: 'address'
+        name: 'matchingKey',
+        type: 'bytes32',
+        internalType: 'bytes32'
       }
     ],
     outputs: [
@@ -603,14 +583,14 @@ export default [
     name: 'sessionSignerMap',
     inputs: [
       {
-        name: 'account',
-        type: 'address',
-        internalType: 'address'
+        name: 'matchingKey',
+        type: 'bytes32',
+        internalType: 'bytes32'
       }
     ],
     outputs: [
       {
-        name: 'signer',
+        name: '',
         type: 'address',
         internalType: 'address'
       }
@@ -648,24 +628,6 @@ export default [
         name: 'isEnabled',
         type: 'bool',
         internalType: 'bool'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'setSessionSigner',
-    inputs: [
-      {
-        name: '_account',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: '_signer',
-        type: 'address',
-        internalType: 'address'
       }
     ],
     outputs: [],
@@ -783,6 +745,22 @@ export default [
   },
   {
     type: 'error',
+    name: 'Allocation__AmountMismatch',
+    inputs: [
+      {
+        name: 'expected',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'actual',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
     name: 'Allocation__ArrayLengthMismatch',
     inputs: [
       {
@@ -816,6 +794,11 @@ export default [
   {
     type: 'error',
     name: 'Allocation__InsufficientBalance',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__InsufficientLiquidity',
     inputs: []
   },
   {
@@ -920,6 +903,11 @@ export default [
   {
     type: 'error',
     name: 'Allocation__ZeroAmount',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__ZeroShares',
     inputs: []
   },
   {

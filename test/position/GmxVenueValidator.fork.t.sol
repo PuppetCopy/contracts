@@ -2,13 +2,11 @@
 pragma solidity ^0.8.33;
 
 import {Test, console2} from "forge-std/src/Test.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 import {GmxVenueValidator} from "../../src/position/validator/GmxVenueValidator.sol";
-import {Dictatorship} from "../../src/shared/Dictatorship.sol";
-
-interface IPositionStoreUtils {
-    function getAccountPositionKeys(address dataStore, address account, uint256 start, uint256 end) external view returns (bytes32[] memory);
-    function getAccountPositionCount(address dataStore, address account) external view returns (uint256);
-}
+import {IVenueValidator} from "../../src/position/interface/IVenueValidator.sol";
+import {Const} from "../../script/Const.sol";
 
 interface IDataStore {
     function getBytes32ValuesAt(bytes32 setKey, uint256 start, uint256 end) external view returns (bytes32[] memory);
@@ -17,70 +15,138 @@ interface IDataStore {
 
 /**
  * @title GmxVenueValidatorForkTest
- * @notice Fork test to verify GmxVenueValidator against real GMX V2 positions
- * @dev Run: forge test --match-contract GmxVenueValidatorForkTest --fork-url $RPC_URL -vvvv
+ * @dev Run: forge test --match-contract GmxVenueValidatorForkTest --fork-url arbitrum -vvv
  */
 contract GmxVenueValidatorForkTest is Test {
-    // GMX V2 Arbitrum Mainnet
-    address constant GMX_DATASTORE = 0xFD70de6b91282D8017aA4E741e9Ae325CAb992d8;
-    address constant GMX_READER = 0x470fbC46bcC0f16532691Df360A07d8Bf5ee0789;
-    address constant GMX_REFERRAL_STORAGE = 0xe6fab3F0c7199b0d34d7FbE83394fc0e0D06e99d;
-
-    // Keys for position list
-    bytes32 constant POSITION_LIST = keccak256(abi.encode("POSITION_LIST"));
-
-    Dictatorship dictator;
+    address account;
     GmxVenueValidator validator;
     IDataStore dataStore;
 
+    address constant ETH_USD_MARKET = 0x70d95587d40A2caf56bd97485aB3Eec10Bee6336;
+
     function setUp() public {
-        dictator = new Dictatorship(address(this));
-        validator = new GmxVenueValidator(GMX_DATASTORE, GMX_READER, GMX_REFERRAL_STORAGE);
-        dictator.registerContract(address(validator));
-        dataStore = IDataStore(GMX_DATASTORE);
+        account = vm.envAddress("DEPLOYER_ADDRESS");
+        validator = new GmxVenueValidator(Const.gmxDataStore, Const.gmxReader, Const.gmxReferralStorage);
+        dataStore = IDataStore(Const.gmxDataStore);
     }
+
+    // ============ Position Net Value (requires fork) ============
 
     function test_GetPositionNetValue() public view {
-        // Get first few position keys from GMX DataStore
-        uint256 positionCount = dataStore.getBytes32Count(POSITION_LIST);
-        console2.log("Total positions in GMX:", positionCount);
+        bytes32 listKey = keccak256(abi.encode(keccak256(abi.encode("ACCOUNT_POSITION_LIST")), account));
+        uint256 positionCount = dataStore.getBytes32Count(listKey);
 
-        if (positionCount == 0) {
-            console2.log("No positions found");
-            return;
-        }
+        console2.log("Account:", account);
+        console2.log("Position count:", positionCount);
 
-        // Get up to 5 positions
-        uint256 toFetch = positionCount > 5 ? 5 : positionCount;
-        bytes32[] memory positionKeys = dataStore.getBytes32ValuesAt(POSITION_LIST, 0, toFetch);
+        if (positionCount == 0) return;
 
-        console2.log("\n=== Position Net Values ===");
+        bytes32[] memory positionKeys = dataStore.getBytes32ValuesAt(listKey, 0, positionCount);
         for (uint256 i = 0; i < positionKeys.length; i++) {
-            bytes32 posKey = positionKeys[i];
-            console2.log("\nPosition", i);
-            console2.logBytes32(posKey);
-
-            try validator.getPositionNetValue(posKey) returns (uint256 netValue) {
-                console2.log("Net Value (token units):", netValue);
-            } catch Error(string memory reason) {
-                console2.log("Error:", reason);
-            } catch (bytes memory) {
-                console2.log("Error: low-level revert");
-            }
+            uint256 netValue = validator.getPositionNetValue(positionKeys[i]);
+            console2.log("Position", i, "net value:", netValue);
         }
     }
 
-    function test_SinglePositionValue() public view {
-        // Test with a specific known position key (can be updated)
-        // This is a placeholder - the test_GetPositionNetValue will find real ones
-        bytes32 positionKey = bytes32(0);
+    // ============ createOrder (requires fork for getPositionInfo) ============
 
-        if (positionKey == bytes32(0)) {
-            console2.log("No specific position key set, skipping");
-            return;
-        }
+    function test_ValidateCreateOrder() public {
+        this._validateCreateOrder(
+            hex"f59c48eb0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000005966208be4bb7f8cb56f91f36000000000000000000000000000000000000000000000000000000000000ad91be0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000aaa8aba07435c0000000000000000000000000000000000000000000000000000533ea3d939800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000145e9ee481bb885a49e1ff4c1166222587d6191600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ff0000000000000000000000000000000000000100000000000000000000000070d95587d40a2caf56bd97485ab3eec10bee6336000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e583100000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+        );
+    }
 
-        uint256 netValue = validator.getPositionNetValue(positionKey);
-        console2.log("Net Value:", netValue);
+    function _validateCreateOrder(bytes calldata c) external view {
+        validator.validate(IERC7579Account(account), IERC20(Const.usdc), 11375038, c);
+        assertEq(validator.getPositionInfo(IERC7579Account(account), c).positionKey, keccak256(abi.encode(account, ETH_USD_MARKET, Const.usdc, true)));
+    }
+
+    // ============ updateOrder / cancelOrder ============
+
+    function test_ValidateUpdateOrder() public view {
+        bytes memory callData = abi.encodeWithSignature(
+            "updateOrder(bytes32,uint256,uint256,uint256,uint256,uint256,bool)",
+            keccak256("order"), 1000e30, 3000e30, 2900e30, 0, 0, false
+        );
+        validator.validate(IERC7579Account(account), IERC20(Const.usdc), 0, callData);
+    }
+
+    function test_ValidateCancelOrder() public view {
+        bytes memory callData = abi.encodeWithSignature("cancelOrder(bytes32)", keccak256("order"));
+        validator.validate(IERC7579Account(account), IERC20(Const.usdc), 0, callData);
+    }
+
+    // ============ claimFundingFees ============
+
+    function test_ValidateClaimFundingFees() public {
+        this._validate(hex"c41b1ab3000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000145e9ee481bb885a49e1ff4c1166222587d6191600000000000000000000000000000000000000000000000000000000000000020000000000000000000000000ccb4faa6f1f1b30911619f1184082ab4e25813c000000000000000000000000fec8f404fbca3b11afd3b3f0c57507c2a06de6360000000000000000000000000000000000000000000000000000000000000002000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e5831000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e5831");
+    }
+
+    function _validate(bytes calldata c) external view {
+        validator.validate(IERC7579Account(account), IERC20(Const.usdc), 0, c);
+    }
+
+    function test_ValidateClaimFundingFees_RevertsWithWrongReceiver() public {
+        address[] memory markets = new address[](1);
+        markets[0] = ETH_USD_MARKET;
+        address[] memory tokens = new address[](1);
+        tokens[0] = Const.usdc;
+
+        bytes memory callData = abi.encodeWithSignature(
+            "claimFundingFees(address[],address[],address)",
+            markets, tokens, address(0xdead)
+        );
+
+        vm.expectRevert();
+        validator.validate(IERC7579Account(account), IERC20(Const.usdc), 0, callData);
+    }
+
+    // ============ claimCollateral ============
+
+    function test_ValidateClaimCollateral() public view {
+        address[] memory markets = new address[](1);
+        markets[0] = ETH_USD_MARKET;
+        address[] memory tokens = new address[](1);
+        tokens[0] = Const.usdc;
+        uint256[] memory timeKeys = new uint256[](1);
+        timeKeys[0] = block.timestamp;
+
+        bytes memory callData = abi.encodeWithSignature(
+            "claimCollateral(address[],address[],uint256[],address)",
+            markets, tokens, timeKeys, account
+        );
+
+        validator.validate(IERC7579Account(account), IERC20(Const.usdc), 0, callData);
+    }
+
+    function test_ValidateClaimCollateral_RevertsWithWrongReceiver() public {
+        address[] memory markets = new address[](1);
+        markets[0] = ETH_USD_MARKET;
+        address[] memory tokens = new address[](1);
+        tokens[0] = Const.usdc;
+        uint256[] memory timeKeys = new uint256[](1);
+        timeKeys[0] = block.timestamp;
+
+        bytes memory callData = abi.encodeWithSignature(
+            "claimCollateral(address[],address[],uint256[],address)",
+            markets, tokens, timeKeys, address(0xdead)
+        );
+
+        vm.expectRevert();
+        validator.validate(IERC7579Account(account), IERC20(Const.usdc), 0, callData);
+    }
+
+    // ============ setTraderReferralCodeByUser ============
+
+    function test_ValidateSetReferral() public view {
+        bytes memory callData = abi.encodeWithSignature("setTraderReferralCodeByUser(bytes32)", Const.referralCode);
+        validator.validate(IERC7579Account(account), IERC20(Const.usdc), 0, callData);
+    }
+
+    function test_ValidateSetReferral_RevertsWithNonZeroAmount() public {
+        bytes memory callData = abi.encodeWithSignature("setTraderReferralCodeByUser(bytes32)", Const.referralCode);
+
+        vm.expectRevert();
+        validator.validate(IERC7579Account(account), IERC20(Const.usdc), 100, callData);
     }
 }

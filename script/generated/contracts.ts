@@ -5,14 +5,16 @@ import allocationAbi from './abi/puppetAllocation.js'
 import dictatorshipAbi from './abi/puppetDictatorship.js'
 import feemarketplaceAbi from './abi/puppetFeeMarketplace.js'
 import feemarketplacestoreAbi from './abi/puppetFeeMarketplaceStore.js'
+import gmxvenuevalidatorAbi from './abi/puppetGmxVenueValidator.js'
 import positionAbi from './abi/puppetPosition.js'
 import puppettokenAbi from './abi/puppetPuppetToken.js'
 import puppetvotetokenAbi from './abi/puppetPuppetVoteToken.js'
+import subscriptionpolicyAbi from './abi/puppetSubscriptionPolicy.js'
 import throttlepolicyAbi from './abi/puppetThrottlePolicy.js'
 
 export const PUPPET_CONTRACT_MAP = {
   Dictatorship: {
-    address: '0x686B8A9701659F623c28e0A7c5053D9a499EFfE8',
+    address: '0x2FE36B7fDC9546078EB13b9D946EAA6FfCda3e9B',
     chainId: 42161,
     abi: dictatorshipAbi
   },
@@ -37,18 +39,28 @@ export const PUPPET_CONTRACT_MAP = {
     abi: feemarketplaceAbi
   },
   Allocation: {
-    address: '0x0000000000000000000000000000000000000000',
+    address: '0x710aaBFe9E1ac86f7F93BF29ef547d0CF959B809',
     chainId: 42161,
     abi: allocationAbi
   },
   Position: {
-    address: '0x0000000000000000000000000000000000000000',
+    address: '0xb08328BE0F311Fb27f01BdFdBB7075677e87C4E4',
     chainId: 42161,
     abi: positionAbi
   },
+  SubscriptionPolicy: {
+    address: '0x9DB9575bF24e85957150dA2b3C4100c7576010AF',
+    chainId: 42161,
+    abi: subscriptionpolicyAbi
+  },
   ThrottlePolicy: {
-    address: '0x0000000000000000000000000000000000000007',
+    address: '0x9951b027Cb58E04897348f576dc71248d3f890bb',
     chainId: 42161,
     abi: throttlepolicyAbi
+  },
+  GmxVenueValidator: {
+    address: '0xC7Bd3A18bDE18CDDCe2925a0971404758F6c2eD5',
+    chainId: 42161,
+    abi: gmxvenuevalidatorAbi
   }
 } as const

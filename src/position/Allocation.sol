@@ -22,8 +22,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
     struct Config {
         Position position;
         uint maxPuppetList;
-        uint gasLimit;
-        uint virtualShareOffset;
+        uint transferOutGasLimit;
     }
 
     struct CallIntent {
@@ -62,9 +61,9 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
     }
 
     function getSharePrice(bytes32 _key, uint _totalAssets) public view returns (uint) {
-        uint _assets = _totalAssets + config.virtualShareOffset;
-        uint _shares = totalSharesMap[_key] + config.virtualShareOffset;
-        return Precision.toFactor(_assets, _shares);
+        uint _totalShares = totalSharesMap[_key];
+        if (_totalShares == 0) return Precision.FLOAT_PRECISION;
+        return Precision.toFactor(_totalAssets, _totalShares);
     }
 
     function getUserShares(IERC20 _token, IERC7579Account _subaccount, bytes32 _name, address _account) external view returns (uint) {
@@ -83,7 +82,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         IERC7579Account _subaccount,
         IERC20 _token,
         bytes32 _subaccountName
-    ) external auth {
+    ) external {
         if (!_subaccount.isModuleInstalled(MODULE_TYPE_EXECUTOR, address(this), "")) revert Error.Allocation__UnregisteredSubaccount();
         uint _cap = tokenCapMap[_token];
         if (_cap == 0) revert Error.Allocation__TokenNotAllowed();
@@ -140,7 +139,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         }
 
         uint _allocated = 0;
-        uint _gasLimit = config.gasLimit;
+        uint _gasLimit = config.transferOutGasLimit;
         for (uint _i = 0; _i < _puppetList.length; ++_i) {
             IERC7579Account _puppet = _puppetList[_i];
             if (address(_puppet) == address(_intent.subaccount)) continue;
@@ -205,7 +204,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         (bytes memory _result, bytes memory _error) = _executeFromExecutor(
             _intent.subaccount,
             address(_intent.token),
-            config.gasLimit,
+            config.transferOutGasLimit,
             abi.encodeCall(IERC20.transfer, (_intent.account, _amountOut))
         );
         if (!_isSuccessfulTransfer(_result, _error)) revert Error.Allocation__TransferFailed();
@@ -249,7 +248,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         (bytes memory _result, bytes memory _error) = _executeFromExecutor(
             _intent.subaccount,
             _target,
-            config.gasLimit,
+            config.transferOutGasLimit,
             _callData
         );
 
@@ -331,7 +330,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         Config memory _config = abi.decode(_data, (Config));
         if (address(_config.position) == address(0)) revert Error.Allocation__InvalidPosition();
         if (_config.maxPuppetList == 0) revert Error.Allocation__InvalidMaxPuppetList();
-        if (_config.gasLimit == 0) revert Error.Allocation__InvalidGasLimit();
+        if (_config.transferOutGasLimit == 0) revert Error.Allocation__InvalidGasLimit();
         config = _config;
     }
 

@@ -152,13 +152,34 @@ function parseFunctionSignatures(content: string): Map<string, TypeMap> {
 function parseLocalVariables(functionBody: string): TypeMap {
   const vars: TypeMap = {}
 
-  const patterns = [/(\w+(?:\[\])?)\s+(?:memory\s+|storage\s+|calldata\s+)?(\w+)\s*=/g, /(\w+(?:\[\])?)\s+(\w+)\s*;/g]
+  // Match both simple types and qualified types like Position.PositionInfo[]
+  const patterns = [
+    /([\w.]+(?:\[\])?)\s+(?:memory\s+|storage\s+|calldata\s+)?(\w+)\s*=/g,
+    /([\w.]+(?:\[\])?)\s+(\w+)\s*;/g
+  ]
 
   for (const pattern of patterns) {
     let match: RegExpExecArray | null
     while ((match = pattern.exec(functionBody)) !== null) {
       const type = match[1]!
       const name = match[2]!
+      if (!type.match(/^(if|for|while|return|require|emit|delete|memory|storage|calldata)$/)) {
+        vars[name] = type
+      }
+    }
+  }
+
+  // Parse tuple destructuring: (type1 var1, type2 var2) = ...
+  const tuplePattern = /\(([\s\S]*?)\)\s*=/g
+  let tupleMatch: RegExpExecArray | null
+  while ((tupleMatch = tuplePattern.exec(functionBody)) !== null) {
+    const tupleContent = tupleMatch[1]!
+    // Parse each element in the tuple
+    const elementPattern = /([\w.]+(?:\[\])?)\s+(?:memory\s+|storage\s+|calldata\s+)?(\w+)/g
+    let elemMatch: RegExpExecArray | null
+    while ((elemMatch = elementPattern.exec(tupleContent)) !== null) {
+      const type = elemMatch[1]!
+      const name = elemMatch[2]!
       if (!type.match(/^(if|for|while|return|require|emit|delete|memory|storage|calldata)$/)) {
         vars[name] = type
       }
@@ -198,7 +219,9 @@ function convertSolidityTypeToAbi(solType: string, structs: Map<string, StructDe
     return isArray ? 'address[]' : 'address'
   }
 
-  const structDef = structs.get(baseType)
+  // Handle qualified struct names like "Position.PositionInfo" -> "PositionInfo"
+  const unqualifiedType = baseType.includes('.') ? baseType.split('.').pop()! : baseType
+  const structDef = structs.get(unqualifiedType)
   if (structDef) {
     const tupleTypes = structDef.fields.map(f => convertSolidityTypeToAbi(f.type, structs))
     const tuple = `(${tupleTypes.join(', ')})`

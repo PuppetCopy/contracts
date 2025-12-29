@@ -5,9 +5,9 @@ import {RouterProxy} from "./RouterProxy.sol";
 import {IAuthority} from "./interfaces/IAuthority.sol";
 
 /**
- * @title UserRouterProxy
+ * @title ProxyUserRouter
  * @notice Upgradeable proxy for UserRouter
  */
-contract UserRouterProxy is RouterProxy {
+contract ProxyUserRouter is RouterProxy {
     constructor(IAuthority _authority) RouterProxy(_authority) {}
 }

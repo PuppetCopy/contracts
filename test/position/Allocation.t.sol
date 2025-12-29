@@ -27,7 +27,6 @@ contract AllocationTest is BasicSetup {
     uint constant TOKEN_CAP = 1_000_000e6;
     uint constant MAX_PUPPET_LIST = 10;
     uint constant GAS_LIMIT = 500_000;
-    uint constant VIRTUAL_SHARE_OFFSET = 1e6;
 
     bytes32 constant SUBACCOUNT_NAME = bytes32("main");
     bytes32 venueKey;
@@ -50,8 +49,7 @@ contract AllocationTest is BasicSetup {
             Allocation.Config({
                 position: position,
                 maxPuppetList: MAX_PUPPET_LIST,
-                gasLimit: GAS_LIMIT,
-                virtualShareOffset: VIRTUAL_SHARE_OFFSET
+                transferOutGasLimit: GAS_LIMIT
             })
         );
 

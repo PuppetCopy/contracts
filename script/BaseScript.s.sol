@@ -7,15 +7,17 @@ import {stdJson} from "forge-std/src/StdJson.sol";
 import {Const} from "./Const.sol";
 
 abstract contract BaseScript is Script {
-    address DEPLOYER_ADDRESS = vm.envAddress("DEPLOYER_ADDRESS");
     uint DEPLOYER_PRIVATE_KEY = vm.envUint("DEPLOYER_PRIVATE_KEY");
+    address DEPLOYER_ADDRESS = vm.addr(DEPLOYER_PRIVATE_KEY);
     string ADDRESSES = vm.readFile(string.concat(vm.projectRoot(), "/deployments.json"));
 
     function getDeployedAddress(
         string memory name
     ) internal view returns (address) {
         string memory chainIdStr = vm.toString(block.chainid);
-        return stdJson.readAddress(ADDRESSES, string.concat(".", chainIdStr, ".", name));
+        address addr = stdJson.readAddress(ADDRESSES, string.concat(".", chainIdStr, ".", name));
+        require(addr != address(0), string.concat("Deployed address not found: ", name));
+        return addr;
     }
 
     function getNextCreateAddress(

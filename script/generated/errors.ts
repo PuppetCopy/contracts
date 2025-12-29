@@ -448,6 +448,32 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
+    name: 'Allocation__ZeroShares',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__InsufficientLiquidity',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__AmountMismatch',
+    inputs: [
+      {
+        name: 'expected',
+        internalType: 'uint256',
+        type: 'uint256'
+      },
+      {
+        name: 'actual',
+        internalType: 'uint256',
+        type: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
     name: 'FeeMarketplace__InsufficientUnlockedBalance',
     inputs: [
       {
@@ -492,6 +518,16 @@ export const puppetErrorAbi = [
   {
     type: 'error',
     name: 'GmxVenueValidator__InvalidCallData',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'GmxVenueValidator__InvalidOrderType',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'GmxVenueValidator__InvalidReceiver',
     inputs: []
   },
   {

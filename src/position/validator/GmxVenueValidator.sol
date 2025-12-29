@@ -3,14 +3,23 @@ pragma solidity ^0.8.33;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
+
+import {Position} from "gmx-synthetics/position/Position.sol";
+import {Market} from "gmx-synthetics/market/Market.sol";
+import {Price} from "gmx-synthetics/price/Price.sol";
+import {Order} from "gmx-synthetics/order/Order.sol";
+import {IBaseOrderUtils} from "gmx-synthetics/order/IBaseOrderUtils.sol";
+import {IExchangeRouter} from "gmx-synthetics/router/IExchangeRouter.sol";
+
 import {Permission} from "../../utils/auth/Permission.sol";
 import {IAuthority} from "../../utils/interfaces/IAuthority.sol";
 import {IVenueValidator} from "../interface/IVenueValidator.sol";
 import {Error} from "../../utils/Error.sol";
 
-import {Position} from "gmx-synthetics/position/Position.sol";
-import {Market} from "gmx-synthetics/market/Market.sol";
-import {Price} from "gmx-synthetics/price/Price.sol";
+
+interface IReferralStorageByUser {
+    function setTraderReferralCodeByUser(bytes32 _code) external;
+}
 
 // ============ Interfaces ============
 
@@ -246,9 +255,12 @@ contract GmxVenueValidator is IVenueValidator {
 
     // ============ Validation ============
 
-    bytes4 private constant CREATE_ORDER = 0x4a393149;
-    uint256 private constant ORDER_TYPE_MARKET_INCREASE = 2;
-    uint256 private constant ORDER_TYPE_LIMIT_INCREASE = 3;
+    bytes4 private constant CREATE_ORDER_SELECTOR = IExchangeRouter.createOrder.selector;
+    bytes4 private constant UPDATE_ORDER_SELECTOR = IExchangeRouter.updateOrder.selector;
+    bytes4 private constant CANCEL_ORDER_SELECTOR = IExchangeRouter.cancelOrder.selector;
+    bytes4 private constant CLAIM_FUNDING_FEES_SELECTOR = bytes4(keccak256("claimFundingFees(address[],address[],address)"));
+    bytes4 private constant CLAIM_COLLATERAL_SELECTOR = bytes4(keccak256("claimCollateral(address[],address[],uint256[],address)"));
+    bytes4 private constant SET_REFERRAL_SELECTOR = IReferralStorageByUser.setTraderReferralCodeByUser.selector;
 
     /// @inheritdoc IVenueValidator
     function validate(
@@ -257,36 +269,112 @@ contract GmxVenueValidator is IVenueValidator {
         uint256 _amount,
         bytes calldata _callData
     ) external pure {
-        (address parsedToken, uint256 tokenDelta,) = _parseCallData(address(_subaccount), _callData);
+        if (_callData.length < 4) revert Error.GmxVenueValidator__InvalidCallData();
 
-        if (parsedToken == address(0)) revert Error.GmxVenueValidator__InvalidCallData();
-        if (parsedToken != address(_token)) revert Error.GmxVenueValidator__TokenMismatch(address(_token), parsedToken);
-        if (tokenDelta != _amount) revert Error.GmxVenueValidator__AmountMismatch(_amount, tokenDelta);
+        bytes4 selector = bytes4(_callData[:4]);
+
+        // Hot path: createOrder
+        if (selector == CREATE_ORDER_SELECTOR) {
+            IBaseOrderUtils.CreateOrderParams memory params =
+                abi.decode(_callData[4:], (IBaseOrderUtils.CreateOrderParams));
+
+            // Only allow increase orders (MarketIncrease, LimitIncrease, StopIncrease)
+            if (!Order.isIncreaseOrder(params.orderType)) {
+                revert Error.GmxVenueValidator__InvalidOrderType();
+            }
+
+            // Receiver must be the subaccount to prevent fund redirection
+            if (params.addresses.receiver != address(_subaccount)) {
+                revert Error.GmxVenueValidator__InvalidReceiver();
+            }
+
+            // Cancellation receiver must be subaccount or zero (defaults to account)
+            if (params.addresses.cancellationReceiver != address(0) &&
+                params.addresses.cancellationReceiver != address(_subaccount)) {
+                revert Error.GmxVenueValidator__InvalidReceiver();
+            }
+
+            // No callbacks allowed - prevents arbitrary contract execution
+            if (params.addresses.callbackContract != address(0)) {
+                revert Error.GmxVenueValidator__InvalidCallData();
+            }
+
+            // swapPath is allowed - GMX will swap to initialCollateralToken
+            // We validate initialCollateralToken matches expected token below
+
+            if (params.addresses.initialCollateralToken != address(_token)) {
+                revert Error.GmxVenueValidator__TokenMismatch(address(_token), params.addresses.initialCollateralToken);
+            }
+            if (params.numbers.initialCollateralDeltaAmount != _amount) {
+                revert Error.GmxVenueValidator__AmountMismatch(_amount, params.numbers.initialCollateralDeltaAmount);
+            }
+            return;
+        }
+
+        // Cold path: order management (no token transfer)
+        if (selector == UPDATE_ORDER_SELECTOR || selector == CANCEL_ORDER_SELECTOR) {
+            if (_amount != 0) revert Error.GmxVenueValidator__AmountMismatch(0, _amount);
+            return;
+        }
+
+        // Cold path: claim funding fees (receiver must be subaccount)
+        if (selector == CLAIM_FUNDING_FEES_SELECTOR) {
+            if (_amount != 0) revert Error.GmxVenueValidator__AmountMismatch(0, _amount);
+            (,, address receiver) = abi.decode(_callData[4:], (address[], address[], address));
+            if (receiver != address(_subaccount)) revert Error.GmxVenueValidator__InvalidReceiver();
+            return;
+        }
+
+        // Cold path: claim collateral (receiver must be subaccount)
+        if (selector == CLAIM_COLLATERAL_SELECTOR) {
+            if (_amount != 0) revert Error.GmxVenueValidator__AmountMismatch(0, _amount);
+            (,,, address receiver) = abi.decode(_callData[4:], (address[], address[], uint256[], address));
+            if (receiver != address(_subaccount)) revert Error.GmxVenueValidator__InvalidReceiver();
+            return;
+        }
+
+        // Cold path: setTraderReferralCodeByUser (one-time setup)
+        if (selector == SET_REFERRAL_SELECTOR) {
+            if (_amount != 0) revert Error.GmxVenueValidator__AmountMismatch(0, _amount);
+            return;
+        }
+
+        revert Error.GmxVenueValidator__InvalidCallData();
     }
 
     /// @inheritdoc IVenueValidator
-    function getPositionInfo(IERC7579Account _subaccount, bytes calldata _callData) external view returns (IVenueValidator.PositionInfo memory _info) {
-        (,, bytes32 positionKey) = _parseCallData(address(_subaccount), _callData);
+    function getPositionInfo(
+        IERC7579Account _subaccount,
+        bytes calldata _callData
+    ) external view returns (IVenueValidator.PositionInfo memory _info) {
+        IBaseOrderUtils.CreateOrderParams memory params = _decodeCreateOrder(_callData);
+
+        bytes32 positionKey = keccak256(
+            abi.encode(
+                address(_subaccount),
+                params.addresses.market,
+                params.addresses.initialCollateralToken,
+                params.isLong
+            )
+        );
+
         _info.positionKey = positionKey;
         _info.netValue = this.getPositionNetValue(positionKey);
     }
 
-    function _parseCallData(address _account, bytes calldata _callData) internal pure returns (address token, uint256 tokenDelta, bytes32 positionKey) {
-        if (_callData.length < 4) return (address(0), 0, bytes32(0));
-        if (bytes4(_callData[:4]) != CREATE_ORDER) return (address(0), 0, bytes32(0));
+    /// @notice Decode createOrder calldata into CreateOrderParams
+    function _decodeCreateOrder(
+        bytes calldata _callData
+    ) internal pure returns (IBaseOrderUtils.CreateOrderParams memory params) {
+        if (_callData.length < 4) revert Error.GmxVenueValidator__InvalidCallData();
+        bytes4 selector = bytes4(_callData[:4]);
+        if (selector != CREATE_ORDER_SELECTOR) revert Error.GmxVenueValidator__InvalidCallData();
 
-        bytes calldata _params = _callData[4:];
+        params = abi.decode(_callData[4:], (IBaseOrderUtils.CreateOrderParams));
+    }
 
-        uint256 addressesOffset = abi.decode(_params[:32], (uint256));
-        uint256 numbersOffset = abi.decode(_params[32:64], (uint256));
-
-        address market = abi.decode(_params[addressesOffset + 128:addressesOffset + 160], (address));
-        token = abi.decode(_params[addressesOffset + 160:addressesOffset + 192], (address));
-
-        tokenDelta = abi.decode(_params[numbersOffset + 32:numbersOffset + 64], (uint256));
-
-        bool isLong = abi.decode(_params[128:160], (bool));
-
-        positionKey = keccak256(abi.encode(_account, market, token, isLong));
+    /// @notice Get the referral code from createOrder calldata
+    function getReferralCode(bytes calldata _callData) external pure returns (bytes32) {
+        return _decodeCreateOrder(_callData).referralCode;
     }
 }

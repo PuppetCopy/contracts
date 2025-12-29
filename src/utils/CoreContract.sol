@@ -39,7 +39,7 @@ abstract contract CoreContract is Permission {
 
     function supportsInterface(
         bytes4 interfaceId
-    ) public pure returns (bool) {
+    ) public pure virtual returns (bool) {
         return interfaceId == type(CoreContract).interfaceId;
     }
 }
