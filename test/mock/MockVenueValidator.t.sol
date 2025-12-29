@@ -72,11 +72,12 @@ contract MockVenue {
         shouldRevert = _shouldRevert;
     }
 
-    function openPosition() external {
+    function openPosition() external returns (bool) {
         if (shouldRevert) revert("MockVenue: forced revert");
         if (amountToTake > 0 && address(token) != address(0)) {
             token.transferFrom(msg.sender, address(this), amountToTake);
         }
+        return true;
     }
 
     function closePosition(address _to, uint _amount) external {

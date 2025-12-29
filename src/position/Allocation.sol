@@ -147,8 +147,8 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             uint _amount = _amountList[_i];
 
             (bytes memory _result, bytes memory _error) = _executeFromExecutor(_puppet, address(_intent.token), _gasLimit, abi.encodeCall(IERC20.transfer, (address(_intent.subaccount), _amount)));
-            if (_error.length > 0 || _result.length == 0 || !abi.decode(_result, (bool))) {
-                _logEvent("ExecuteAllocateFailed", abi.encode(_key, _puppet, _amount, _error));
+            if (!_isSuccessfulTransfer(_result, _error)) {
+                _logEvent("ExecuteAllocateFailed", abi.encode(_key, _puppet, _amount, _error.length > 0 ? _error : _result));
                 continue;
             }
 
@@ -208,7 +208,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             config.gasLimit,
             abi.encodeCall(IERC20.transfer, (_intent.account, _amountOut))
         );
-        if (_error.length > 0 || _result.length == 0 || !abi.decode(_result, (bool))) revert Error.Allocation__TransferFailed();
+        if (!_isSuccessfulTransfer(_result, _error)) revert Error.Allocation__TransferFailed();
 
         uint _userShares = _prevUserShares - _sharesBurnt;
         uint _totalShares = totalSharesMap[_key] - _sharesBurnt;
@@ -318,6 +318,13 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         } catch (bytes memory _reason) {
             _error = _reason;
         }
+    }
+
+    function _isSuccessfulTransfer(bytes memory _result, bytes memory _error) internal pure returns (bool) {
+        if (_error.length > 0) return false;
+        if (_result.length == 0) return false;
+        if (_result.length != 32) return false;
+        return abi.decode(_result, (bool));
     }
 
     function _setConfig(bytes memory _data) internal override {
