@@ -60,6 +60,9 @@ library Error {
     error Allocation__InvalidPosition();
     error Allocation__InvalidMaxPuppetList();
     error Allocation__InvalidGasLimit();
+    error Allocation__TokenNotAllowed();
+    error Allocation__DepositExceedsCap(uint amount, uint cap);
+    error Allocation__SubaccountFrozen();
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();
@@ -68,7 +71,6 @@ library Error {
     error VenueRegistry__ContractNotWhitelisted(address venue);
 
     error Position__VenueNotRegistered(bytes32 venueKey);
-    error Position__NetValueBelowAcceptable(uint netValue, uint acceptable);
 
     error GmxVenueValidator__InvalidCallData();
     error GmxVenueValidator__TokenMismatch(address expected, address actual);

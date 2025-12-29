@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 
 library PositionUtils {
-    function getMatchingKey(IERC20 collateralToken, IERC7579Account master) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(collateralToken, master));
+    function getMatchingKey(IERC20 _token, IERC7579Account _subaccount, bytes32 _name) internal pure returns (bytes32) {
+        return keccak256(abi.encode(_token, _subaccount, _name));
     }
 }

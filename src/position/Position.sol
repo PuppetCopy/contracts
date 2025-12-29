@@ -11,19 +11,6 @@ import {IVenueValidator} from "./interface/IVenueValidator.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
 contract Position is CoreContract {
-    enum IntentType { MasterDeposit, Allocate, Withdraw, Order }
-
-    struct CallIntent {
-        IntentType intentType;
-        address account;
-        IERC7579Account subaccount;
-        IERC20 token;
-        uint256 amount;
-        uint256 acceptableNetValue;
-        uint256 deadline;
-        uint256 nonce;
-    }
-
     struct Venue {
         bytes32 venueKey;
         IVenueValidator validator;
@@ -98,8 +85,8 @@ contract Position is CoreContract {
         }
     }
 
-    function getNetValue(IERC20 _token, IERC7579Account _subaccount) external view returns (uint256) {
-        bytes32 _matchingKey = PositionUtils.getMatchingKey(_token, _subaccount);
+    function getNetValue(IERC20 _token, IERC7579Account _subaccount, bytes32 _name) external view returns (uint256) {
+        bytes32 _matchingKey = PositionUtils.getMatchingKey(_token, _subaccount, _name);
         uint256 _netValue = _token.balanceOf(address(_subaccount));
 
         bytes32[] storage _keys = positionKeyListMap[_matchingKey];
@@ -110,22 +97,9 @@ contract Position is CoreContract {
         return _netValue;
     }
 
-    function snapshotNetValue(
-        CallIntent calldata _intent
-    ) external returns (
-        bytes32 matchingKey,
-        uint256 allocation,
-        uint256 positionValue,
-        uint256 netValue,
-        PositionInfo[] memory positions
-    ) {
-        if (address(_intent.subaccount) == address(0)) return (bytes32(0), 0, 0, 0, new PositionInfo[](0));
-
-        matchingKey = PositionUtils.getMatchingKey(_intent.token, _intent.subaccount);
-        allocation = _intent.token.balanceOf(address(_intent.subaccount));
-
-        bytes32[] storage _keys = positionKeyListMap[matchingKey];
-        positions = new PositionInfo[](_keys.length);
+    function snapshotNetValue(bytes32 _matchingKey) external view returns (uint256 _positionValue, PositionInfo[] memory _positions) {
+        bytes32[] storage _keys = positionKeyListMap[_matchingKey];
+        _positions = new PositionInfo[](_keys.length);
 
         for (uint _i = 0; _i < _keys.length; ++_i) {
             bytes32 _positionKey = _keys[_i];
@@ -133,29 +107,14 @@ contract Position is CoreContract {
             if (address(_venue.validator) == address(0)) revert Error.Position__VenueNotRegistered(_venue.venueKey);
 
             uint256 _npv = _venue.validator.getPositionNetValue(_positionKey);
-            positionValue += _npv;
+            _positionValue += _npv;
 
-            positions[_i] = PositionInfo({
+            _positions[_i] = PositionInfo({
                 venue: _venue,
                 value: _npv,
                 positionKey: _positionKey
             });
         }
-
-        netValue = allocation + positionValue;
-
-        if (_intent.acceptableNetValue > 0 && netValue < _intent.acceptableNetValue) {
-            revert Error.Position__NetValueBelowAcceptable(netValue, _intent.acceptableNetValue);
-        }
-
-        _logEvent("SnapshotNetValue", abi.encode(
-            _intent,
-            matchingKey,
-            allocation,
-            positionValue,
-            netValue,
-            positions
-        ));
     }
 
     function _setConfig(bytes memory) internal override {}
