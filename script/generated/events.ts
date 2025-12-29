@@ -31,6 +31,7 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'tuple[]', name: 'positions', components: [{ type: 'tuple', name: 'venue', components: [{ type: 'bytes32', name: 'venueKey' }, { type: 'address', name: 'validator' }] }, { type: 'uint256', name: 'value' }, { type: 'bytes32', name: 'positionKey' }] },
         { type: 'uint256', name: 'allocated' },
         { type: 'uint256', name: 'sharePrice' },
+        { type: 'uint256', name: 'userShares' },
         { type: 'uint256', name: 'totalShares' }
       ]
     },
@@ -52,11 +53,21 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'bytes32', name: 'subaccountName' },
         { type: 'address', name: 'token' },
         { type: 'uint256', name: 'amount' },
+        { type: 'uint256', name: 'allocation' },
         { type: 'address', name: 'target' },
-        { type: 'tuple', name: 'venue', components: [{ type: 'bytes32' }, { type: 'address' }] },
+        { type: 'tuple', name: 'venue', components: [{ type: 'bytes32', name: 'venueKey' }, { type: 'address', name: 'validator' }] },
         { type: 'bytes32', name: 'positionKey' },
         { type: 'uint256', name: 'positionValue' },
-        { type: 'bytes', name: 'result' },
+        { type: 'bytes', name: 'result' }
+      ]
+    },
+    ExecuteOrderFailed: {
+      hash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+      args: [
+        { type: 'bytes32', name: 'key' },
+        { type: 'address', name: 'account' },
+        { type: 'address', name: 'target' },
+        { type: 'bytes', name: 'callData' },
         { type: 'bytes', name: 'errorValue' }
       ]
     },
@@ -137,6 +148,16 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'address', name: 'sender' },
         { type: 'address', name: 'account' },
         { type: 'uint32', name: 'throttlePeriod' }
+      ]
+    }
+  },
+  Position: {
+    SetVenue: {
+      hash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+      args: [
+        { type: 'bytes32', name: 'venueKey' },
+        { type: 'address', name: 'validator' },
+        { type: 'address[]', name: 'entrypoints' }
       ]
     }
   }

@@ -58,6 +58,7 @@ contract PassthroughValidator is IVenueValidator {
 contract MockVenue {
     IERC20 public token;
     uint public amountToTake;
+    bool public shouldRevert;
 
     function setToken(IERC20 _token) external {
         token = _token;
@@ -67,7 +68,12 @@ contract MockVenue {
         amountToTake = _amount;
     }
 
+    function setShouldRevert(bool _shouldRevert) external {
+        shouldRevert = _shouldRevert;
+    }
+
     function openPosition() external {
+        if (shouldRevert) revert("MockVenue: forced revert");
         if (amountToTake > 0 && address(token) != address(0)) {
             token.transferFrom(msg.sender, address(this), amountToTake);
         }

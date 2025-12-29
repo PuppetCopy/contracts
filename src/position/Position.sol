@@ -61,6 +61,7 @@ contract Position is CoreContract {
         for (uint _i = 0; _i < _entrypoints.length; ++_i) {
             venueKeyMap[_entrypoints[_i]] = _venueKey;
         }
+        _logEvent("SetVenue", abi.encode(_venueKey, _validator, _entrypoints));
     }
 
     function updatePosition(

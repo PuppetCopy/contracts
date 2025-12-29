@@ -18,6 +18,7 @@ import {IVenueValidator} from "./interface/IVenueValidator.sol";
 import {Position} from "./Position.sol";
 
 contract Allocation is CoreContract, IExecutor, EIP712 {
+
     struct Config {
         Position position;
         uint maxPuppetList;
@@ -44,7 +45,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
     mapping(IERC20 token => uint) public tokenCapMap;
 
     mapping(bytes32 matchingKey => uint256) public nonceMap;
-    mapping(bytes32 matchingKey => address signer) public sessionSignerMap;
+    mapping(bytes32 matchingKey => address) public sessionSignerMap;
     mapping(bytes32 matchingKey => IERC7579Account) public masterSubaccountMap;
     mapping(bytes32 matchingKey => bool) public frozenMap;
 
@@ -127,12 +128,14 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         (uint _positionValue, Position.PositionInfo[] memory _positions) = config.position.snapshotNetValue(_key);
         uint _sharePrice = getSharePrice(_key, _allocation + _positionValue);
         uint _totalShares = totalSharesMap[_key];
+        uint _userShares = shareBalanceMap[_key][_intent.account];
 
         if (_intent.amount > 0) {
             if (!_intent.token.transferFrom(_intent.account, address(_intent.subaccount), _intent.amount)) revert Error.Allocation__TransferFailed();
             uint _shares = Precision.toFactor(_intent.amount, _sharePrice);
             if (_shares == 0) revert Error.Allocation__ZeroShares();
-            shareBalanceMap[_key][_intent.account] += _shares;
+            _userShares += _shares;
+            shareBalanceMap[_key][_intent.account] = _userShares;
             _totalShares += _shares;
         }
 
@@ -156,8 +159,8 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             _allocated += _amount;
         }
 
-        uint _finalTotal = _allocation + _intent.amount + _allocated;
-        if (_finalTotal > _cap) revert Error.Allocation__DepositExceedsCap(_finalTotal, _cap);
+        _allocation += _intent.amount + _allocated;
+        if (_allocation > _cap) revert Error.Allocation__DepositExceedsCap(_allocation, _cap);
         totalSharesMap[_key] = _totalShares;
 
         _logEvent("ExecuteAllocate", abi.encode(
@@ -174,6 +177,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             _positions,
             _allocated,
             _sharePrice,
+            _userShares,
             _totalShares
         ));
     }
@@ -190,17 +194,13 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
 
         uint _sharePrice = getSharePrice(_key, _netValue);
         uint _sharesBurnt = Precision.toFactor(_intent.amount, _sharePrice);
+        if (_sharesBurnt == 0) revert Error.Allocation__ZeroShares();
         uint _amountOut = Precision.applyFactor(_sharePrice, _sharesBurnt);
 
         uint _prevUserShares = shareBalanceMap[_key][_intent.account];
         if (_sharesBurnt > _prevUserShares) revert Error.Allocation__InsufficientBalance();
         if (_amountOut < _intent.amount) revert Error.Allocation__InsufficientBalance();
-
-        uint _userShares = _prevUserShares - _sharesBurnt;
-        uint _totalShares = totalSharesMap[_key] - _sharesBurnt;
-
-        shareBalanceMap[_key][_intent.account] = _userShares;
-        totalSharesMap[_key] = _totalShares;
+        if (_amountOut > _allocation) revert Error.Allocation__InsufficientLiquidity();
 
         (bytes memory _result, bytes memory _error) = _executeFromExecutor(
             _intent.subaccount,
@@ -208,8 +208,12 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             config.gasLimit,
             abi.encodeCall(IERC20.transfer, (_intent.account, _amountOut))
         );
-
         if (_error.length > 0 || _result.length == 0 || !abi.decode(_result, (bool))) revert Error.Allocation__TransferFailed();
+
+        uint _userShares = _prevUserShares - _sharesBurnt;
+        uint _totalShares = totalSharesMap[_key] - _sharesBurnt;
+        shareBalanceMap[_key][_intent.account] = _userShares;
+        totalSharesMap[_key] = _totalShares;
 
         _logEvent("ExecuteWithdraw", abi.encode(
             _key,
@@ -218,7 +222,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             _intent.subaccountName,
             _intent.token,
             _intent.amount,
-            _allocation,
+            _allocation - _amountOut,
             _positionValue,
             _positions,
             _amountOut,
@@ -240,12 +244,25 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
 
         Position.Venue memory _venue = config.position.validateCall(_intent.subaccount, _intent.token, _intent.amount, _target, _callData);
 
+        uint _balanceBefore = _intent.token.balanceOf(address(_intent.subaccount));
+
         (bytes memory _result, bytes memory _error) = _executeFromExecutor(
             _intent.subaccount,
             _target,
             config.gasLimit,
             _callData
         );
+
+        if (_error.length > 0 || _result.length == 0) {
+            _logEvent("ExecuteOrderFailed", abi.encode(_key, _intent.account, _target, _callData, _error));
+            return;
+        }
+
+        uint _allocation = _intent.token.balanceOf(address(_intent.subaccount));
+        if (_intent.amount > 0) {
+            uint _spent = _balanceBefore - _allocation;
+            if (_spent != _intent.amount) revert Error.Allocation__AmountMismatch(_intent.amount, _spent);
+        }
 
         IVenueValidator.PositionInfo memory _posInfo = _venue.validator.getPositionInfo(_intent.subaccount, _callData);
         bytes32 _positionKey = _posInfo.positionKey;
@@ -260,12 +277,12 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             _intent.subaccountName,
             _intent.token,
             _intent.amount,
+            _allocation,
             _target,
             _venue,
             _positionKey,
             _positionValue,
-            _result,
-            _error
+            _result
         ));
     }
 

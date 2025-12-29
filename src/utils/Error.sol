@@ -65,6 +65,8 @@ library Error {
     error Allocation__SubaccountFrozen();
     error Allocation__ZeroAmount();
     error Allocation__ZeroShares();
+    error Allocation__InsufficientLiquidity();
+    error Allocation__AmountMismatch(uint expected, uint actual);
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();
