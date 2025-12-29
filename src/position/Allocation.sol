@@ -76,6 +76,11 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         _logEvent("SetTokenCap", abi.encode(_token, _cap));
     }
 
+    function setSessionSigner(address _account, address _signer) external auth {
+        sessionSignerMap[_account] = _signer;
+        _logEvent("SetSessionSigner", abi.encode(_account, _signer));
+    }
+
     function createMasterSubaccount(
         address _account,
         address _signer,
@@ -84,6 +89,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         uint _amount,
         bytes32 _subaccountName
     ) external auth {
+        if (_amount == 0) revert Error.Allocation__ZeroAmount();
         uint _cap = tokenCapMap[_token];
         if (_cap == 0) revert Error.Allocation__TokenNotAllowed();
         if (_amount > _cap) revert Error.Allocation__DepositExceedsCap(_amount, _cap);
@@ -138,6 +144,9 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         uint _totalShares = totalSharesMap[_key];
 
         if (_intent.amount > 0) {
+            uint _cap = tokenCapMap[_intent.token];
+            if (_intent.amount > _cap) revert Error.Allocation__DepositExceedsCap(_intent.amount, _cap);
+
             if (!_intent.token.transferFrom(_intent.account, address(_intent.subaccount), _intent.amount)) {
                 revert Error.Allocation__TransferFailed();
             }

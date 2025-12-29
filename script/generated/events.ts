@@ -3,18 +3,16 @@
 
 export const CONTRACT_EVENT_MAP = {
   Allocation: {
-    CreateSubaccount: {
-      hash: '0x1dbdfee265d85ada636001fb932284f24366604ff063c6829977cf0de853aa1f',
+    CreateMasterSubaccount: {
+      hash: '0x748a7eae0a68f954dfe370eee70aa8f604494840a7be6d7b7a152edbb9ecaf65',
       args: [
         { type: 'bytes32', name: 'key' },
         { type: 'address', name: 'account' },
         { type: 'address', name: 'signer' },
-        { type: 'uint256', name: 'param' },
-        { type: 'uint256', name: 'param2' },
-        { type: 'uint256', name: 'amount' },
-        { type: 'uint256', name: 'sharesOut' },
-        { type: 'uint256', name: 'sharePrice' },
-        { type: 'uint256', name: 'totalSharesMap' }
+        { type: 'address', name: 'subaccount' },
+        { type: 'bytes32', name: 'subaccountName' },
+        { type: 'address', name: 'token' },
+        { type: 'uint256', name: 'amount' }
       ]
     },
     ExecuteAllocate: {
@@ -23,17 +21,17 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'bytes32', name: 'key' },
         { type: 'address', name: 'account' },
         { type: 'address', name: 'subaccount' },
+        { type: 'bytes32', name: 'subaccountName' },
         { type: 'address', name: 'token' },
         { type: 'uint256', name: 'amount' },
-        { type: 'uint256', name: 'acceptableNetValue' },
         { type: 'address[]', name: 'puppetList' },
         { type: 'uint256[]', name: 'amountList' },
-        { type: 'uint256', name: 'totalAllocated' },
-        { type: 'uint256', name: 'sharePrice' },
         { type: 'uint256', name: 'allocation' },
         { type: 'uint256', name: 'positionValue' },
         { type: 'uint256', name: 'positions' },
-        { type: 'uint256', name: 'totalSharesMap' }
+        { type: 'uint256', name: 'allocated' },
+        { type: 'uint256', name: 'sharePrice' },
+        { type: 'uint256', name: 'totalShares' }
       ]
     },
     ExecuteAllocateFailed: {
@@ -45,39 +43,19 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'bytes', name: 'errorValue' }
       ]
     },
-    ExecuteMasterDeposit: {
-      hash: '0xc09b54e9e91c8d3b47792ff326c25a035639604ecc545cc1017ce275b7722a5e',
-      args: [
-        { type: 'bytes32', name: 'key' },
-        { type: 'address', name: 'account' },
-        { type: 'address', name: 'subaccount' },
-        { type: 'address', name: 'token' },
-        { type: 'uint256', name: 'amount' },
-        { type: 'uint256', name: 'acceptableNetValue' },
-        { type: 'uint256', name: 'sharesOut' },
-        { type: 'uint256', name: 'sharePrice' },
-        { type: 'uint256', name: 'allocation' },
-        { type: 'uint256', name: 'positionValue' },
-        { type: 'uint256', name: 'positions' },
-        { type: 'uint256', name: 'totalSharesMap' }
-      ]
-    },
     ExecuteOrder: {
       hash: '0x8ed4dfaad885776d6924f1ff8b354c36a605f24a988d21cccbf5b9133dc2a2ad',
       args: [
         { type: 'bytes32', name: 'key' },
         { type: 'address', name: 'account' },
         { type: 'address', name: 'subaccount' },
+        { type: 'bytes32', name: 'subaccountName' },
         { type: 'address', name: 'token' },
         { type: 'uint256', name: 'amount' },
-        { type: 'uint256', name: 'acceptableNetValue' },
         { type: 'address', name: 'target' },
-        { type: 'bytes', name: 'callData' },
+        { type: 'tuple', name: 'venue', components: [{ type: 'bytes32' }, { type: 'address' }] },
         { type: 'bytes32', name: 'positionKey' },
-        { type: 'uint256', name: 'netValue' },
-        { type: 'uint256', name: 'allocation' },
         { type: 'uint256', name: 'positionValue' },
-        { type: 'uint256', name: 'positions' },
         { type: 'bytes', name: 'result' },
         { type: 'bytes', name: 'errorValue' }
       ]
@@ -88,16 +66,40 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'bytes32', name: 'key' },
         { type: 'address', name: 'account' },
         { type: 'address', name: 'subaccount' },
+        { type: 'bytes32', name: 'subaccountName' },
         { type: 'address', name: 'token' },
         { type: 'uint256', name: 'amount' },
-        { type: 'uint256', name: 'acceptableNetValue' },
-        { type: 'uint256', name: 'amountOut' },
-        { type: 'uint256', name: 'sharePrice' },
         { type: 'uint256', name: 'allocation' },
         { type: 'uint256', name: 'positionValue' },
         { type: 'uint256', name: 'positions' },
-        { type: 'uint256', name: 'totalSharesMap' },
-        { type: 'uint256', name: 'shareBalanceMap' }
+        { type: 'uint256', name: 'amountOut' },
+        { type: 'uint256', name: 'sharesBurnt' },
+        { type: 'uint256', name: 'sharePrice' },
+        { type: 'uint256', name: 'userShares' },
+        { type: 'uint256', name: 'totalShares' }
+      ]
+    },
+    SetSessionSigner: {
+      hash: '0xfbae7595cb474efdbe01e50c4a8c51ca2e552f7f0306f6d6f58a39ebb94db0b5',
+      args: [
+        { type: 'address', name: 'account' },
+        { type: 'address', name: 'signer' }
+      ]
+    },
+    SetTokenCap: {
+      hash: '0x0eed9dd37bbcb01292183ae212328bd52aab55ce6eb475eb4fb6350de9286029',
+      args: [
+        { type: 'address', name: 'token' },
+        { type: 'uint256', name: 'cap' }
+      ]
+    },
+    Uninstall: {
+      hash: '0xcf0fb4af6fa71203bf8ca49a15d730b9e9a0385a52961e75ded30718d69a944e',
+      args: [
+        { type: 'bytes32', name: 'key' },
+        { type: 'address', name: 'subaccount' },
+        { type: 'address', name: 'token' },
+        { type: 'bytes32', name: 'subaccountName' }
       ]
     }
   },

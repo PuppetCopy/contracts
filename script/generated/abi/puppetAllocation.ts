@@ -1,4 +1,4 @@
-// This file is auto-generated from forge-artifacts/Execute.sol/Execute.json
+// This file is auto-generated from forge-artifacts/Allocation.sol/Allocation.json
 // Do not edit manually.
 
 export default [
@@ -13,25 +13,25 @@ export default [
       {
         name: '_config',
         type: 'tuple',
-        internalType: 'struct Execute.Config',
+        internalType: 'struct Allocation.Config',
         components: [
           {
-            name: 'allocate',
+            name: 'position',
             type: 'address',
-            internalType: 'contract Allocate'
-          },
-          {
-            name: 'callGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'transferGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
+            internalType: 'contract Position'
           },
           {
             name: 'maxPuppetList',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'gasLimit',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'virtualShareOffset',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -42,7 +42,7 @@ export default [
   },
   {
     type: 'function',
-    name: 'INTENT_TYPEHASH',
+    name: 'CALL_INTENT_TYPEHASH',
     inputs: [],
     outputs: [
       {
@@ -96,22 +96,22 @@ export default [
     inputs: [],
     outputs: [
       {
-        name: 'allocate',
+        name: 'position',
         type: 'address',
-        internalType: 'contract Allocate'
-      },
-      {
-        name: 'callGasLimit',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'transferGasLimit',
-        type: 'uint256',
-        internalType: 'uint256'
+        internalType: 'contract Position'
       },
       {
         name: 'maxPuppetList',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'gasLimit',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'virtualShareOffset',
         type: 'uint256',
         internalType: 'uint256'
       }
@@ -120,64 +120,37 @@ export default [
   },
   {
     type: 'function',
-    name: 'createSubaccount',
+    name: 'createMasterSubaccount',
     inputs: [
       {
-        name: '_intent',
-        type: 'tuple',
-        internalType: 'struct Execute.Intent',
-        components: [
-          {
-            name: 'intentType',
-            type: 'uint8',
-            internalType: 'enum Execute.IntentType'
-          },
-          {
-            name: 'account',
-            type: 'address',
-            internalType: 'address'
-          },
-          {
-            name: 'subaccount',
-            type: 'address',
-            internalType: 'contract IERC7579Account'
-          },
-          {
-            name: 'token',
-            type: 'address',
-            internalType: 'contract IERC20'
-          },
-          {
-            name: 'amount',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'acceptableNetValue',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'deadline',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'nonce',
-            type: 'uint256',
-            internalType: 'uint256'
-          }
-        ]
-      },
-      {
-        name: '_signature',
-        type: 'bytes',
-        internalType: 'bytes'
+        name: '_account',
+        type: 'address',
+        internalType: 'address'
       },
       {
         name: '_signer',
         type: 'address',
         internalType: 'address'
+      },
+      {
+        name: '_subaccount',
+        type: 'address',
+        internalType: 'contract IERC7579Account'
+      },
+      {
+        name: '_token',
+        type: 'address',
+        internalType: 'contract IERC20'
+      },
+      {
+        name: '_amount',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: '_subaccountName',
+        type: 'bytes32',
+        internalType: 'bytes32'
       }
     ],
     outputs: [],
@@ -233,13 +206,8 @@ export default [
       {
         name: '_intent',
         type: 'tuple',
-        internalType: 'struct Execute.Intent',
+        internalType: 'struct Allocation.CallIntent',
         components: [
-          {
-            name: 'intentType',
-            type: 'uint8',
-            internalType: 'enum Execute.IntentType'
-          },
           {
             name: 'account',
             type: 'address',
@@ -251,17 +219,17 @@ export default [
             internalType: 'contract IERC7579Account'
           },
           {
+            name: 'subaccountName',
+            type: 'bytes32',
+            internalType: 'bytes32'
+          },
+          {
             name: 'token',
             type: 'address',
             internalType: 'contract IERC20'
           },
           {
             name: 'amount',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'acceptableNetValue',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -298,78 +266,13 @@ export default [
   },
   {
     type: 'function',
-    name: 'executeMasterDeposit',
-    inputs: [
-      {
-        name: '_intent',
-        type: 'tuple',
-        internalType: 'struct Execute.Intent',
-        components: [
-          {
-            name: 'intentType',
-            type: 'uint8',
-            internalType: 'enum Execute.IntentType'
-          },
-          {
-            name: 'account',
-            type: 'address',
-            internalType: 'address'
-          },
-          {
-            name: 'subaccount',
-            type: 'address',
-            internalType: 'contract IERC7579Account'
-          },
-          {
-            name: 'token',
-            type: 'address',
-            internalType: 'contract IERC20'
-          },
-          {
-            name: 'amount',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'acceptableNetValue',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'deadline',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'nonce',
-            type: 'uint256',
-            internalType: 'uint256'
-          }
-        ]
-      },
-      {
-        name: '_signature',
-        type: 'bytes',
-        internalType: 'bytes'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
     name: 'executeOrder',
     inputs: [
       {
         name: '_intent',
         type: 'tuple',
-        internalType: 'struct Execute.Intent',
+        internalType: 'struct Allocation.CallIntent',
         components: [
-          {
-            name: 'intentType',
-            type: 'uint8',
-            internalType: 'enum Execute.IntentType'
-          },
           {
             name: 'account',
             type: 'address',
@@ -381,17 +284,17 @@ export default [
             internalType: 'contract IERC7579Account'
           },
           {
+            name: 'subaccountName',
+            type: 'bytes32',
+            internalType: 'bytes32'
+          },
+          {
             name: 'token',
             type: 'address',
             internalType: 'contract IERC20'
           },
           {
             name: 'amount',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'acceptableNetValue',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -433,13 +336,8 @@ export default [
       {
         name: '_intent',
         type: 'tuple',
-        internalType: 'struct Execute.Intent',
+        internalType: 'struct Allocation.CallIntent',
         components: [
-          {
-            name: 'intentType',
-            type: 'uint8',
-            internalType: 'enum Execute.IntentType'
-          },
           {
             name: 'account',
             type: 'address',
@@ -451,17 +349,17 @@ export default [
             internalType: 'contract IERC7579Account'
           },
           {
+            name: 'subaccountName',
+            type: 'bytes32',
+            internalType: 'bytes32'
+          },
+          {
             name: 'token',
             type: 'address',
             internalType: 'contract IERC20'
           },
           {
             name: 'amount',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'acceptableNetValue',
             type: 'uint256',
             internalType: 'uint256'
           },
@@ -488,31 +386,50 @@ export default [
   },
   {
     type: 'function',
+    name: 'frozenMap',
+    inputs: [
+      {
+        name: 'matchingKey',
+        type: 'bytes32',
+        internalType: 'bytes32'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'bool',
+        internalType: 'bool'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
     name: 'getConfig',
     inputs: [],
     outputs: [
       {
         name: '',
         type: 'tuple',
-        internalType: 'struct Execute.Config',
+        internalType: 'struct Allocation.Config',
         components: [
           {
-            name: 'allocate',
+            name: 'position',
             type: 'address',
-            internalType: 'contract Allocate'
-          },
-          {
-            name: 'callGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'transferGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
+            internalType: 'contract Position'
           },
           {
             name: 'maxPuppetList',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'gasLimit',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'virtualShareOffset',
             type: 'uint256',
             internalType: 'uint256'
           }
@@ -523,10 +440,68 @@ export default [
   },
   {
     type: 'function',
+    name: 'getSharePrice',
+    inputs: [
+      {
+        name: '_key',
+        type: 'bytes32',
+        internalType: 'bytes32'
+      },
+      {
+        name: '_totalAssets',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'getUserShares',
+    inputs: [
+      {
+        name: '_token',
+        type: 'address',
+        internalType: 'contract IERC20'
+      },
+      {
+        name: '_subaccount',
+        type: 'address',
+        internalType: 'contract IERC7579Account'
+      },
+      {
+        name: '_name',
+        type: 'bytes32',
+        internalType: 'bytes32'
+      },
+      {
+        name: '_account',
+        type: 'address',
+        internalType: 'address'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
     name: 'isInitialized',
     inputs: [
       {
-        name: '_subaccount',
+        name: '',
         type: 'address',
         internalType: 'address'
       }
@@ -538,7 +513,7 @@ export default [
         internalType: 'bool'
       }
     ],
-    stateMutability: 'view'
+    stateMutability: 'pure'
   },
   {
     type: 'function',
@@ -558,6 +533,25 @@ export default [
       }
     ],
     stateMutability: 'pure'
+  },
+  {
+    type: 'function',
+    name: 'masterSubaccountMap',
+    inputs: [
+      {
+        name: 'matchingKey',
+        type: 'bytes32',
+        internalType: 'bytes32'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'contract IERC7579Account'
+      }
+    ],
+    stateMutability: 'view'
   },
   {
     type: 'function',
@@ -596,13 +590,32 @@ export default [
     name: 'onUninstall',
     inputs: [
       {
-        name: '',
+        name: '_data',
         type: 'bytes',
         internalType: 'bytes'
       }
     ],
     outputs: [],
     stateMutability: 'nonpayable'
+  },
+  {
+    type: 'function',
+    name: 'sessionSignerMap',
+    inputs: [
+      {
+        name: 'account',
+        type: 'address',
+        internalType: 'address'
+      }
+    ],
+    outputs: [
+      {
+        name: 'signer',
+        type: 'address',
+        internalType: 'address'
+      }
+    ],
+    stateMutability: 'view'
   },
   {
     type: 'function',
@@ -642,6 +655,66 @@ export default [
   },
   {
     type: 'function',
+    name: 'setSessionSigner',
+    inputs: [
+      {
+        name: '_account',
+        type: 'address',
+        internalType: 'address'
+      },
+      {
+        name: '_signer',
+        type: 'address',
+        internalType: 'address'
+      }
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable'
+  },
+  {
+    type: 'function',
+    name: 'setTokenCap',
+    inputs: [
+      {
+        name: '_token',
+        type: 'address',
+        internalType: 'contract IERC20'
+      },
+      {
+        name: '_cap',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable'
+  },
+  {
+    type: 'function',
+    name: 'shareBalanceMap',
+    inputs: [
+      {
+        name: 'matchingKey',
+        type: 'bytes32',
+        internalType: 'bytes32'
+      },
+      {
+        name: 'account',
+        type: 'address',
+        internalType: 'address'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
     name: 'supportsInterface',
     inputs: [
       {
@@ -660,10 +733,194 @@ export default [
     stateMutability: 'pure'
   },
   {
+    type: 'function',
+    name: 'tokenCapMap',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'contract IERC20'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'totalSharesMap',
+    inputs: [
+      {
+        name: 'matchingKey',
+        type: 'bytes32',
+        internalType: 'bytes32'
+      }
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
     type: 'event',
     name: 'EIP712DomainChanged',
     inputs: [],
     anonymous: false
+  },
+  {
+    type: 'error',
+    name: 'Allocation__AlreadyRegistered',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__ArrayLengthMismatch',
+    inputs: [
+      {
+        name: 'puppetCount',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'allocationCount',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Allocation__DepositExceedsCap',
+    inputs: [
+      {
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'cap',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Allocation__InsufficientBalance',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__IntentExpired',
+    inputs: [
+      {
+        name: 'deadline',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'currentTime',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Allocation__InvalidGasLimit',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__InvalidMaxPuppetList',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__InvalidNonce',
+    inputs: [
+      {
+        name: 'expected',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'provided',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Allocation__InvalidPosition',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__InvalidSignature',
+    inputs: [
+      {
+        name: 'expected',
+        type: 'address',
+        internalType: 'address'
+      },
+      {
+        name: 'recovered',
+        type: 'address',
+        internalType: 'address'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Allocation__PuppetListTooLarge',
+    inputs: [
+      {
+        name: 'provided',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'maximum',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Allocation__SubaccountFrozen',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__TokenNotAllowed',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__TransferFailed',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__UnregisteredSubaccount',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__ZeroAmount',
+    inputs: []
   },
   {
     type: 'error',
@@ -691,121 +948,6 @@ export default [
         internalType: 'bytes32'
       }
     ]
-  },
-  {
-    type: 'error',
-    name: 'Execute__ArrayLengthMismatch',
-    inputs: [
-      {
-        name: 'puppetCount',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'allocationCount',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Execute__IntentExpired',
-    inputs: [
-      {
-        name: 'deadline',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'currentTime',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Execute__InvalidAllocate',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Execute__InvalidCallGasLimit',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Execute__InvalidIntentType',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Execute__InvalidMaxPuppetList',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Execute__InvalidNonce',
-    inputs: [
-      {
-        name: 'expected',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'provided',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Execute__InvalidSignature',
-    inputs: [
-      {
-        name: 'expected',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: 'recovered',
-        type: 'address',
-        internalType: 'address'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Execute__InvalidTransferGasLimit',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Execute__ModuleNotInstalled',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Execute__PuppetListTooLarge',
-    inputs: [
-      {
-        name: 'provided',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'maximum',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Execute__TransferFailed',
-    inputs: []
   },
   {
     type: 'error',

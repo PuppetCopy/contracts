@@ -63,6 +63,7 @@ library Error {
     error Allocation__TokenNotAllowed();
     error Allocation__DepositExceedsCap(uint amount, uint cap);
     error Allocation__SubaccountFrozen();
+    error Allocation__ZeroAmount();
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();

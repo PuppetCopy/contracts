@@ -1,16 +1,14 @@
 // This file is auto-generated from Puppet deployments.json and forge-artifacts
 // Do not edit manually.
 
-import allocateAbi from './abi/puppetAllocate.js'
+import allocationAbi from './abi/puppetAllocation.js'
 import dictatorshipAbi from './abi/puppetDictatorship.js'
-import executeAbi from './abi/puppetExecute.js'
 import feemarketplaceAbi from './abi/puppetFeeMarketplace.js'
 import feemarketplacestoreAbi from './abi/puppetFeeMarketplaceStore.js'
+import positionAbi from './abi/puppetPosition.js'
 import puppettokenAbi from './abi/puppetPuppetToken.js'
 import puppetvotetokenAbi from './abi/puppetPuppetVoteToken.js'
 import throttlepolicyAbi from './abi/puppetThrottlePolicy.js'
-import userrouterAbi from './abi/puppetUserRouter.js'
-import userrouterproxyAbi from './abi/puppetUserRouterProxy.js'
 
 export const PUPPET_CONTRACT_MAP = {
   Dictatorship: {
@@ -23,6 +21,11 @@ export const PUPPET_CONTRACT_MAP = {
     chainId: 42161,
     abi: puppettokenAbi
   },
+  PuppetVoteToken: {
+    address: '0x95718B4EEC9316E3a61ef75A2BBD3951cF465Bff',
+    chainId: 42161,
+    abi: puppetvotetokenAbi
+  },
   FeeMarketplaceStore: {
     address: '0xaF5798725AFA764748f9Dc85E8418510B459F722',
     chainId: 42161,
@@ -33,42 +36,15 @@ export const PUPPET_CONTRACT_MAP = {
     chainId: 42161,
     abi: feemarketplaceAbi
   },
-  PuppetVoteToken: {
-    address: '0x95718B4EEC9316E3a61ef75A2BBD3951cF465Bff',
+  Allocation: {
+    address: '0x0000000000000000000000000000000000000000',
     chainId: 42161,
-    abi: puppetvotetokenAbi
+    abi: allocationAbi
   },
-  UserRouterProxy: {
-    address: '0x0000000000000000000000000000000000000001',
+  Position: {
+    address: '0x0000000000000000000000000000000000000000',
     chainId: 42161,
-    abi: userrouterproxyAbi
-  },
-  UserRouter: {
-    address: '0x0000000000000000000000000000000000000002',
-    chainId: 42161,
-    abi: userrouterAbi
-  },
-  PuppetModule: {
-    address: '0x0000000000000000000000000000000000000003',
-    chainId: 42161
-  },
-  Allocate: {
-    address: '0x0000000000000000000000000000000000000004',
-    chainId: 42161,
-    abi: allocateAbi
-  },
-  Execute: {
-    address: '0x0000000000000000000000000000000000000008',
-    chainId: 42161,
-    abi: executeAbi
-  },
-  AllowedRecipientPolicy: {
-    address: '0x0000000000000000000000000000000000000005',
-    chainId: 42161
-  },
-  AllowanceRatePolicy: {
-    address: '0x0000000000000000000000000000000000000006',
-    chainId: 42161
+    abi: positionAbi
   },
   ThrottlePolicy: {
     address: '0x0000000000000000000000000000000000000007',

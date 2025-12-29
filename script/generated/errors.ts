@@ -292,18 +292,7 @@ export const puppetErrorAbi = [
   {
     type: 'error',
     name: 'Allocation__InsufficientBalance',
-    inputs: [
-      {
-        name: 'available',
-        internalType: 'uint256',
-        type: 'uint256'
-      },
-      {
-        name: 'required',
-        internalType: 'uint256',
-        type: 'uint256'
-      }
-    ]
+    inputs: []
   },
   {
     type: 'error',
@@ -330,22 +319,6 @@ export const puppetErrorAbi = [
     type: 'error',
     name: 'Allocation__TransferFailed',
     inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Allocation__NetValueBelowAcceptable',
-    inputs: [
-      {
-        name: 'netValue',
-        internalType: 'uint256',
-        type: 'uint256'
-      },
-      {
-        name: 'acceptable',
-        internalType: 'uint256',
-        type: 'uint256'
-      }
-    ]
   },
   {
     type: 'error',
@@ -378,22 +351,6 @@ export const puppetErrorAbi = [
         type: 'uint256'
       }
     ]
-  },
-  {
-    type: 'error',
-    name: 'Allocation__TargetNotWhitelisted',
-    inputs: [
-      {
-        name: 'target',
-        internalType: 'address',
-        type: 'address'
-      }
-    ]
-  },
-  {
-    type: 'error',
-    name: 'Allocation__InvalidCallType',
-    inputs: []
   },
   {
     type: 'error',
@@ -445,17 +402,48 @@ export const puppetErrorAbi = [
   },
   {
     type: 'error',
+    name: 'Allocation__InvalidPosition',
+    inputs: []
+  },
+  {
+    type: 'error',
     name: 'Allocation__InvalidMaxPuppetList',
     inputs: []
   },
   {
     type: 'error',
-    name: 'Allocation__InvalidTransferGasLimit',
+    name: 'Allocation__InvalidGasLimit',
     inputs: []
   },
   {
     type: 'error',
-    name: 'Allocation__InvalidCallGasLimit',
+    name: 'Allocation__TokenNotAllowed',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__DepositExceedsCap',
+    inputs: [
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256'
+      },
+      {
+        name: 'cap',
+        internalType: 'uint256',
+        type: 'uint256'
+      }
+    ]
+  },
+  {
+    type: 'error',
+    name: 'Allocation__SubaccountFrozen',
+    inputs: []
+  },
+  {
+    type: 'error',
+    name: 'Allocation__ZeroAmount',
     inputs: []
   },
   {
