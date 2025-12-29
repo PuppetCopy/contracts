@@ -41,12 +41,12 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
 
     Config public config;
 
-    mapping(address account => uint256) public nonceMap;
-    mapping(address account => address signer) public sessionSignerMap;
+    mapping(IERC20 token => uint) public tokenCapMap;
 
+    mapping(bytes32 matchingKey => uint256) public nonceMap;
+    mapping(bytes32 matchingKey => address signer) public sessionSignerMap;
     mapping(bytes32 matchingKey => IERC7579Account) public masterSubaccountMap;
     mapping(bytes32 matchingKey => bool) public frozenMap;
-    mapping(IERC20 token => uint) public tokenCapMap;
 
     mapping(bytes32 matchingKey => uint) public totalSharesMap;
     mapping(bytes32 matchingKey => mapping(address account => uint)) public shareBalanceMap;
@@ -76,39 +76,28 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         _logEvent("SetTokenCap", abi.encode(_token, _cap));
     }
 
-    function setSessionSigner(address _account, address _signer) external auth {
-        sessionSignerMap[_account] = _signer;
-        _logEvent("SetSessionSigner", abi.encode(_account, _signer));
-    }
-
     function createMasterSubaccount(
         address _account,
         address _signer,
         IERC7579Account _subaccount,
         IERC20 _token,
-        uint _amount,
         bytes32 _subaccountName
     ) external auth {
-        if (_amount == 0) revert Error.Allocation__ZeroAmount();
+        if (!_subaccount.isModuleInstalled(MODULE_TYPE_EXECUTOR, address(this), "")) revert Error.Allocation__UnregisteredSubaccount();
         uint _cap = tokenCapMap[_token];
         if (_cap == 0) revert Error.Allocation__TokenNotAllowed();
-        if (_amount > _cap) revert Error.Allocation__DepositExceedsCap(_amount, _cap);
+
+        uint _balance = _token.balanceOf(address(_subaccount));
+        if (_balance == 0) revert Error.Allocation__ZeroAmount();
+        if (_balance > _cap) revert Error.Allocation__DepositExceedsCap(_balance, _cap);
 
         bytes32 _key = PositionUtils.getMatchingKey(_token, _subaccount, _subaccountName);
         if (address(masterSubaccountMap[_key]) != address(0)) revert Error.Allocation__AlreadyRegistered();
-        if (!_subaccount.isModuleInstalled(MODULE_TYPE_EXECUTOR, address(this), "")) {
-            revert Error.Allocation__UnregisteredSubaccount();
-        }
 
-        sessionSignerMap[_account] = _signer;
+        sessionSignerMap[_key] = _signer;
         masterSubaccountMap[_key] = _subaccount;
-
-        if (!_token.transferFrom(_account, address(_subaccount), _amount)) {
-            revert Error.Allocation__TransferFailed();
-        }
-
-        shareBalanceMap[_key][_account] = _amount;
-        totalSharesMap[_key] = _amount;
+        shareBalanceMap[_key][_account] = _balance;
+        totalSharesMap[_key] = _balance;
 
         _logEvent("CreateMasterSubaccount", abi.encode(
             _key,
@@ -117,7 +106,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             _subaccount,
             _subaccountName,
             _token,
-            _amount
+            _balance
         ));
     }
 
@@ -128,29 +117,21 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         uint256[] calldata _amountList
     ) external auth {
         bytes32 _key = _verifyIntent(_intent, _signature);
+        uint _cap = tokenCapMap[_intent.token];
         if (frozenMap[_key]) revert Error.Allocation__SubaccountFrozen();
+        if (_cap == 0) revert Error.Allocation__TokenNotAllowed();
+        if (_puppetList.length != _amountList.length) revert Error.Allocation__ArrayLengthMismatch(_puppetList.length, _amountList.length);
+        if (_puppetList.length > config.maxPuppetList) revert Error.Allocation__PuppetListTooLarge(_puppetList.length, config.maxPuppetList);
 
         uint _allocation = _intent.token.balanceOf(address(_intent.subaccount));
         (uint _positionValue, Position.PositionInfo[] memory _positions) = config.position.snapshotNetValue(_key);
-        uint _netValue = _allocation + _positionValue;
-        if (_puppetList.length != _amountList.length) {
-            revert Error.Allocation__ArrayLengthMismatch(_puppetList.length, _amountList.length);
-        }
-        if (_puppetList.length > config.maxPuppetList) {
-            revert Error.Allocation__PuppetListTooLarge(_puppetList.length, config.maxPuppetList);
-        }
-
-        uint _sharePrice = getSharePrice(_key, _netValue);
+        uint _sharePrice = getSharePrice(_key, _allocation + _positionValue);
         uint _totalShares = totalSharesMap[_key];
 
         if (_intent.amount > 0) {
-            uint _cap = tokenCapMap[_intent.token];
-            if (_intent.amount > _cap) revert Error.Allocation__DepositExceedsCap(_intent.amount, _cap);
-
-            if (!_intent.token.transferFrom(_intent.account, address(_intent.subaccount), _intent.amount)) {
-                revert Error.Allocation__TransferFailed();
-            }
+            if (!_intent.token.transferFrom(_intent.account, address(_intent.subaccount), _intent.amount)) revert Error.Allocation__TransferFailed();
             uint _shares = Precision.toFactor(_intent.amount, _sharePrice);
+            if (_shares == 0) revert Error.Allocation__ZeroShares();
             shareBalanceMap[_key][_intent.account] += _shares;
             _totalShares += _shares;
         }
@@ -160,27 +141,23 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         for (uint _i = 0; _i < _puppetList.length; ++_i) {
             IERC7579Account _puppet = _puppetList[_i];
             if (address(_puppet) == address(_intent.subaccount)) continue;
-
             uint _amount = _amountList[_i];
 
-            (bytes memory _result, bytes memory _error) = _executeFromExecutor(
-                _puppet,
-                address(_intent.token),
-                _gasLimit,
-                abi.encodeCall(IERC20.transfer, (address(_intent.subaccount), _amount))
-            );
-
+            (bytes memory _result, bytes memory _error) = _executeFromExecutor(_puppet, address(_intent.token), _gasLimit, abi.encodeCall(IERC20.transfer, (address(_intent.subaccount), _amount)));
             if (_error.length > 0 || _result.length == 0 || !abi.decode(_result, (bool))) {
                 _logEvent("ExecuteAllocateFailed", abi.encode(_key, _puppet, _amount, _error));
                 continue;
             }
 
             uint _shares = Precision.toFactor(_amount, _sharePrice);
+            if (_shares == 0) revert Error.Allocation__ZeroShares();
             shareBalanceMap[_key][address(_puppet)] += _shares;
             _totalShares += _shares;
             _allocated += _amount;
         }
 
+        uint _finalTotal = _allocation + _intent.amount + _allocated;
+        if (_finalTotal > _cap) revert Error.Allocation__DepositExceedsCap(_finalTotal, _cap);
         totalSharesMap[_key] = _totalShares;
 
         _logEvent("ExecuteAllocate", abi.encode(
@@ -305,16 +282,16 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             _intent.deadline,
             _intent.nonce
         )));
-        address _signer = ECDSA.recover(_hash, _signature);
-        if (_signer != _intent.account && _signer != sessionSignerMap[_intent.account]) {
-            revert Error.Allocation__InvalidSignature(_intent.account, _signer);
-        }
-
-        uint256 _expectedNonce = nonceMap[_intent.account]++;
-        if (_expectedNonce != _intent.nonce) revert Error.Allocation__InvalidNonce(_expectedNonce, _intent.nonce);
-
         _key = PositionUtils.getMatchingKey(_intent.token, _intent.subaccount, _intent.subaccountName);
         if (address(masterSubaccountMap[_key]) == address(0)) revert Error.Allocation__UnregisteredSubaccount();
+
+        uint256 _expectedNonce = nonceMap[_key]++;
+        if (_expectedNonce != _intent.nonce) revert Error.Allocation__InvalidNonce(_expectedNonce, _intent.nonce);
+
+        address _signer = ECDSA.recover(_hash, _signature);
+        if (_signer != _intent.account && _signer != sessionSignerMap[_key]) {
+            revert Error.Allocation__InvalidSignature(_intent.account, _signer);
+        }
     }
 
     function _executeFromExecutor(IERC7579Account _from, address _to, uint _gasLimit, bytes memory _data) internal returns (bytes memory _result, bytes memory _error) {

@@ -28,7 +28,7 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'uint256[]', name: 'amountList' },
         { type: 'uint256', name: 'allocation' },
         { type: 'uint256', name: 'positionValue' },
-        { type: 'uint256', name: 'positions' },
+        { type: 'tuple[]', name: 'positions', components: [{ type: 'tuple', name: 'venue', components: [{ type: 'bytes32', name: 'venueKey' }, { type: 'address', name: 'validator' }] }, { type: 'uint256', name: 'value' }, { type: 'bytes32', name: 'positionKey' }] },
         { type: 'uint256', name: 'allocated' },
         { type: 'uint256', name: 'sharePrice' },
         { type: 'uint256', name: 'totalShares' }
@@ -71,19 +71,12 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'uint256', name: 'amount' },
         { type: 'uint256', name: 'allocation' },
         { type: 'uint256', name: 'positionValue' },
-        { type: 'uint256', name: 'positions' },
+        { type: 'tuple[]', name: 'positions', components: [{ type: 'tuple', name: 'venue', components: [{ type: 'bytes32', name: 'venueKey' }, { type: 'address', name: 'validator' }] }, { type: 'uint256', name: 'value' }, { type: 'bytes32', name: 'positionKey' }] },
         { type: 'uint256', name: 'amountOut' },
         { type: 'uint256', name: 'sharesBurnt' },
         { type: 'uint256', name: 'sharePrice' },
         { type: 'uint256', name: 'userShares' },
         { type: 'uint256', name: 'totalShares' }
-      ]
-    },
-    SetSessionSigner: {
-      hash: '0xfbae7595cb474efdbe01e50c4a8c51ca2e552f7f0306f6d6f58a39ebb94db0b5',
-      args: [
-        { type: 'address', name: 'account' },
-        { type: 'address', name: 'signer' }
       ]
     },
     SetTokenCap: {
