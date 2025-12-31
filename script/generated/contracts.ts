@@ -10,7 +10,6 @@ import positionAbi from './abi/puppetPosition.js'
 import puppettokenAbi from './abi/puppetPuppetToken.js'
 import puppetvotetokenAbi from './abi/puppetPuppetVoteToken.js'
 import subscriptionpolicyAbi from './abi/puppetSubscriptionPolicy.js'
-import throttlepolicyAbi from './abi/puppetThrottlePolicy.js'
 
 export const PUPPET_CONTRACT_MAP = {
   Dictatorship: {
@@ -39,7 +38,7 @@ export const PUPPET_CONTRACT_MAP = {
     abi: feemarketplaceAbi
   },
   Allocation: {
-    address: '0x710aaBFe9E1ac86f7F93BF29ef547d0CF959B809',
+    address: '0xb1293c11821a924C29abd72FE16C71ee9E18B76F',
     chainId: 42161,
     abi: allocationAbi
   },
@@ -55,11 +54,10 @@ export const PUPPET_CONTRACT_MAP = {
   },
   ThrottlePolicy: {
     address: '0x9951b027Cb58E04897348f576dc71248d3f890bb',
-    chainId: 42161,
-    abi: throttlepolicyAbi
+    chainId: 42161
   },
   GmxVenueValidator: {
-    address: '0xC7Bd3A18bDE18CDDCe2925a0971404758F6c2eD5',
+    address: '0x354E5b839D23507BF60B36550e9dCf1d5A0070fD',
     chainId: 42161,
     abi: gmxvenuevalidatorAbi
   }

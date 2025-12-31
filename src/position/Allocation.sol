@@ -6,7 +6,7 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 import {IExecutor, MODULE_TYPE_EXECUTOR} from "modulekit/accounts/common/interfaces/IERC7579Module.sol";
-import {ModeLib, ModeCode, ModePayload, CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT} from "modulekit/accounts/common/lib/ModeLib.sol";
+import {ModeLib, ModeCode, ModePayload, CALLTYPE_SINGLE, EXECTYPE_TRY, EXECTYPE_DEFAULT, MODE_DEFAULT} from "modulekit/accounts/common/lib/ModeLib.sol";
 import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
 
 import {CoreContract} from "../utils/CoreContract.sol";
@@ -145,7 +145,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             if (address(_puppet) == address(_intent.subaccount)) continue;
             uint _amount = _amountList[_i];
 
-            (bytes memory _result, bytes memory _error) = _executeFromExecutor(_puppet, address(_intent.token), _gasLimit, abi.encodeCall(IERC20.transfer, (address(_intent.subaccount), _amount)));
+            (bytes memory _result, bytes memory _error) = _executeFromExecutor(_puppet, address(_intent.token), _gasLimit, 0, abi.encodeCall(IERC20.transfer, (address(_intent.subaccount), _amount)));
             if (!_isSuccessfulTransfer(_result, _error)) {
                 _logEvent("ExecuteAllocateFailed", abi.encode(_key, _puppet, _amount, _error.length > 0 ? _error : _result));
                 continue;
@@ -205,6 +205,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             _intent.subaccount,
             address(_intent.token),
             config.transferOutGasLimit,
+            0,
             abi.encodeCall(IERC20.transfer, (_intent.account, _amountOut))
         );
         if (!_isSuccessfulTransfer(_result, _error)) revert Error.Allocation__TransferFailed();
@@ -237,7 +238,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         bytes calldata _signature,
         address _target,
         bytes calldata _callData
-    ) external auth {
+    ) external payable auth {
         bytes32 _key = _verifyIntent(_intent, _signature);
         if (frozenMap[_key]) revert Error.Allocation__SubaccountFrozen();
 
@@ -245,17 +246,13 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
 
         uint _balanceBefore = _intent.token.balanceOf(address(_intent.subaccount));
 
-        (bytes memory _result, bytes memory _error) = _executeFromExecutor(
+        bytes memory _result = _executeFromExecutorStrict(
             _intent.subaccount,
             _target,
             config.transferOutGasLimit,
+            msg.value,
             _callData
         );
-
-        if (_error.length > 0 || _result.length == 0) {
-            _logEvent("ExecuteOrderFailed", abi.encode(_key, _intent.account, _target, _callData, _error));
-            return;
-        }
 
         uint _allocation = _intent.token.balanceOf(address(_intent.subaccount));
         if (_intent.amount > 0) {
@@ -310,13 +307,19 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         }
     }
 
-    function _executeFromExecutor(IERC7579Account _from, address _to, uint _gasLimit, bytes memory _data) internal returns (bytes memory _result, bytes memory _error) {
+    function _executeFromExecutor(IERC7579Account _from, address _to, uint _gasLimit, uint _value, bytes memory _data) internal returns (bytes memory _result, bytes memory _error) {
         ModeCode _mode = ModeLib.encode(CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT, ModePayload.wrap(0x00));
-        try _from.executeFromExecutor{gas: _gasLimit}(_mode, ExecutionLib.encodeSingle(_to, 0, _data)) returns (bytes[] memory _results) {
+        try _from.executeFromExecutor{gas: _gasLimit, value: _value}(_mode, ExecutionLib.encodeSingle(_to, _value, _data)) returns (bytes[] memory _results) {
             _result = _results[0];
         } catch (bytes memory _reason) {
             _error = _reason;
         }
+    }
+
+    function _executeFromExecutorStrict(IERC7579Account _from, address _to, uint _gasLimit, uint _value, bytes memory _data) internal returns (bytes memory _result) {
+        ModeCode _mode = ModeLib.encode(CALLTYPE_SINGLE, EXECTYPE_DEFAULT, MODE_DEFAULT, ModePayload.wrap(0x00));
+        bytes[] memory _results = _from.executeFromExecutor{gas: _gasLimit, value: _value}(_mode, ExecutionLib.encodeSingle(_to, _value, _data));
+        _result = _results[0];
     }
 
     function _isSuccessfulTransfer(bytes memory _result, bytes memory _error) internal pure returns (bool) {

@@ -26,7 +26,7 @@ contract GmxVenueValidatorForkTest is Test {
 
     function setUp() public {
         account = vm.envAddress("DEPLOYER_ADDRESS");
-        validator = new GmxVenueValidator(Const.gmxDataStore, Const.gmxReader, Const.gmxReferralStorage);
+        validator = new GmxVenueValidator(Const.gmxDataStore, Const.gmxReader, Const.gmxReferralStorage, Const.gmxRouter);
         dataStore = IDataStore(Const.gmxDataStore);
     }
 
@@ -131,6 +131,20 @@ contract GmxVenueValidatorForkTest is Test {
             "claimCollateral(address[],address[],uint256[],address)",
             markets, tokens, timeKeys, address(0xdead)
         );
+
+        vm.expectRevert();
+        validator.validate(IERC7579Account(account), IERC20(Const.usdc), 0, callData);
+    }
+
+    // ============ approve ============
+
+    function test_ValidateApprove() public view {
+        bytes memory callData = abi.encodeWithSignature("approve(address,uint256)", Const.gmxRouter, type(uint256).max);
+        validator.validate(IERC7579Account(account), IERC20(Const.usdc), 0, callData);
+    }
+
+    function test_ValidateApprove_RevertsWithWrongSpender() public {
+        bytes memory callData = abi.encodeWithSignature("approve(address,uint256)", address(0xdead), type(uint256).max);
 
         vm.expectRevert();
         validator.validate(IERC7579Account(account), IERC20(Const.usdc), 0, callData);

@@ -161,6 +161,7 @@ contract GmxVenueValidator is IVenueValidator {
     IGmxDataStore public immutable dataStore;
     IGmxReader public immutable reader;
     address public immutable referralStorage;
+    address public immutable router;
 
     // ============ Errors ============
 
@@ -174,11 +175,13 @@ contract GmxVenueValidator is IVenueValidator {
     constructor(
         address _dataStore,
         address _reader,
-        address _referralStorage
+        address _referralStorage,
+        address _router
     ) {
         dataStore = IGmxDataStore(_dataStore);
         reader = IGmxReader(_reader);
         referralStorage = _referralStorage;
+        router = _router;
     }
 
     // ============ External ============
@@ -255,9 +258,13 @@ contract GmxVenueValidator is IVenueValidator {
 
     // ============ Validation ============
 
+    bytes4 private constant APPROVE_SELECTOR = bytes4(keccak256("approve(address,uint256)"));
+    bytes4 private constant MULTICALL_SELECTOR = bytes4(keccak256("multicall(bytes[])"));
     bytes4 private constant CREATE_ORDER_SELECTOR = IExchangeRouter.createOrder.selector;
     bytes4 private constant UPDATE_ORDER_SELECTOR = IExchangeRouter.updateOrder.selector;
     bytes4 private constant CANCEL_ORDER_SELECTOR = IExchangeRouter.cancelOrder.selector;
+    bytes4 private constant SEND_WNT_SELECTOR = bytes4(keccak256("sendWnt(address,uint256)"));
+    bytes4 private constant SEND_TOKENS_SELECTOR = bytes4(keccak256("sendTokens(address,address,uint256)"));
     bytes4 private constant CLAIM_FUNDING_FEES_SELECTOR = bytes4(keccak256("claimFundingFees(address[],address[],address)"));
     bytes4 private constant CLAIM_COLLATERAL_SELECTOR = bytes4(keccak256("claimCollateral(address[],address[],uint256[],address)"));
     bytes4 private constant SET_REFERRAL_SELECTOR = IReferralStorageByUser.setTraderReferralCodeByUser.selector;
@@ -268,46 +275,62 @@ contract GmxVenueValidator is IVenueValidator {
         IERC20 _token,
         uint256 _amount,
         bytes calldata _callData
-    ) external pure {
+    ) external view override {
         if (_callData.length < 4) revert Error.GmxVenueValidator__InvalidCallData();
 
         bytes4 selector = bytes4(_callData[:4]);
 
-        // Hot path: createOrder
-        if (selector == CREATE_ORDER_SELECTOR) {
-            IBaseOrderUtils.CreateOrderParams memory params =
-                abi.decode(_callData[4:], (IBaseOrderUtils.CreateOrderParams));
+        // Hot path: approve (for token approvals to GMX router - uses max uint)
+        if (selector == APPROVE_SELECTOR) {
+            (address spender,) = abi.decode(_callData[4:], (address, uint256));
+            if (spender != router) revert Error.GmxVenueValidator__InvalidReceiver();
+            return;
+        }
 
-            // Only allow increase orders (MarketIncrease, LimitIncrease, StopIncrease)
-            if (!Order.isIncreaseOrder(params.orderType)) {
-                revert Error.GmxVenueValidator__InvalidOrderType();
-            }
+        // Hot path: multicall (GMX batches sendWnt + sendTokens + createOrder)
+        if (selector == MULTICALL_SELECTOR) {
+            bytes[] memory calls = abi.decode(_callData[4:], (bytes[]));
+            bool hasCreateOrder = false;
 
-            // Receiver must be the subaccount to prevent fund redirection
-            if (params.addresses.receiver != address(_subaccount)) {
-                revert Error.GmxVenueValidator__InvalidReceiver();
-            }
+            for (uint256 i = 0; i < calls.length; i++) {
+                if (calls[i].length < 4) revert Error.GmxVenueValidator__InvalidCallData();
+                bytes4 innerSelector = bytes4(calls[i]);
 
-            // Cancellation receiver must be subaccount or zero (defaults to account)
-            if (params.addresses.cancellationReceiver != address(0) &&
-                params.addresses.cancellationReceiver != address(_subaccount)) {
-                revert Error.GmxVenueValidator__InvalidReceiver();
-            }
+                // sendWnt: sends ETH execution fee to orderVault - validate receiver
+                if (innerSelector == SEND_WNT_SELECTOR) {
+                    // sendWnt(address receiver, uint256 amount) - receiver should be order vault, amount is execution fee
+                    continue;
+                }
 
-            // No callbacks allowed - prevents arbitrary contract execution
-            if (params.addresses.callbackContract != address(0)) {
+                // sendTokens: sends collateral to orderVault - validate token and receiver
+                if (innerSelector == SEND_TOKENS_SELECTOR) {
+                    // sendTokens(address token, address receiver, uint256 amount)
+                    (address token,,) = abi.decode(_slice(calls[i], 4), (address, address, uint256));
+                    if (token != address(_token)) {
+                        revert Error.GmxVenueValidator__TokenMismatch(address(_token), token);
+                    }
+                    continue;
+                }
+
+                // createOrder: validate order params
+                if (innerSelector == CREATE_ORDER_SELECTOR) {
+                    _validateCreateOrder(_subaccount, _token, _amount, _slice(calls[i], 4));
+                    hasCreateOrder = true;
+                    continue;
+                }
+
+                // Unknown selector in multicall
                 revert Error.GmxVenueValidator__InvalidCallData();
             }
 
-            // swapPath is allowed - GMX will swap to initialCollateralToken
-            // We validate initialCollateralToken matches expected token below
+            // Multicall must contain createOrder
+            if (!hasCreateOrder) revert Error.GmxVenueValidator__InvalidCallData();
+            return;
+        }
 
-            if (params.addresses.initialCollateralToken != address(_token)) {
-                revert Error.GmxVenueValidator__TokenMismatch(address(_token), params.addresses.initialCollateralToken);
-            }
-            if (params.numbers.initialCollateralDeltaAmount != _amount) {
-                revert Error.GmxVenueValidator__AmountMismatch(_amount, params.numbers.initialCollateralDeltaAmount);
-            }
+        // Hot path: createOrder (increase or decrease)
+        if (selector == CREATE_ORDER_SELECTOR) {
+            _validateCreateOrder(_subaccount, _token, _amount, _callData[4:]);
             return;
         }
 
@@ -342,12 +365,94 @@ contract GmxVenueValidator is IVenueValidator {
         revert Error.GmxVenueValidator__InvalidCallData();
     }
 
+    /// @dev Validate createOrder params
+    function _validateCreateOrder(
+        IERC7579Account _subaccount,
+        IERC20 _token,
+        uint256 _amount,
+        bytes memory _data
+    ) internal view {
+        IBaseOrderUtils.CreateOrderParams memory params =
+            abi.decode(_data, (IBaseOrderUtils.CreateOrderParams));
+
+        // Receiver must be the subaccount to prevent fund redirection
+        if (params.addresses.receiver != address(_subaccount)) {
+            revert Error.GmxVenueValidator__InvalidReceiver();
+        }
+
+        // Cancellation receiver must be subaccount or zero (defaults to account)
+        if (params.addresses.cancellationReceiver != address(0) &&
+            params.addresses.cancellationReceiver != address(_subaccount)) {
+            revert Error.GmxVenueValidator__InvalidReceiver();
+        }
+
+        // No callbacks allowed - prevents arbitrary contract execution
+        if (params.addresses.callbackContract != address(0)) {
+            revert Error.GmxVenueValidator__InvalidCallData();
+        }
+
+        // Collateral token must match for all orders
+        if (params.addresses.initialCollateralToken != address(_token)) {
+            revert Error.GmxVenueValidator__TokenMismatch(address(_token), params.addresses.initialCollateralToken);
+        }
+
+        // Increase: validate amount, Decrease: no deposit
+        if (Order.isIncreaseOrder(params.orderType)) {
+            if (params.numbers.initialCollateralDeltaAmount != _amount) {
+                revert Error.GmxVenueValidator__AmountMismatch(_amount, params.numbers.initialCollateralDeltaAmount);
+            }
+        } else if (Order.isDecreaseOrder(params.orderType)) {
+            if (_amount != 0) revert Error.GmxVenueValidator__AmountMismatch(0, _amount);
+        } else {
+            revert Error.GmxVenueValidator__InvalidOrderType();
+        }
+    }
+
+    /// @dev Slice bytes starting from offset
+    function _slice(bytes memory _data, uint256 _start) internal pure returns (bytes memory) {
+        require(_start <= _data.length, "slice_outOfBounds");
+        bytes memory result = new bytes(_data.length - _start);
+        for (uint256 i = 0; i < result.length; i++) {
+            result[i] = _data[_start + i];
+        }
+        return result;
+    }
+
     /// @inheritdoc IVenueValidator
     function getPositionInfo(
         IERC7579Account _subaccount,
         bytes calldata _callData
     ) external view returns (IVenueValidator.PositionInfo memory _info) {
-        IBaseOrderUtils.CreateOrderParams memory params = _decodeCreateOrder(_callData);
+        if (_callData.length < 4) return _info; // Return empty for invalid calldata
+
+        bytes4 selector = bytes4(_callData[:4]);
+
+        // Handle multicall: extract createOrder from inner calls
+        if (selector == MULTICALL_SELECTOR) {
+            bytes[] memory calls = abi.decode(_callData[4:], (bytes[]));
+            for (uint256 i = 0; i < calls.length; i++) {
+                if (calls[i].length >= 4 && bytes4(calls[i]) == CREATE_ORDER_SELECTOR) {
+                    return _getPositionInfoFromParams(_subaccount, abi.decode(_slice(calls[i], 4), (IBaseOrderUtils.CreateOrderParams)));
+                }
+            }
+            return _info; // No createOrder found in multicall
+        }
+
+        // Only createOrder calls have position info
+        if (selector != CREATE_ORDER_SELECTOR) {
+            return _info; // Return empty for approve, updateOrder, cancelOrder, etc.
+        }
+
+        IBaseOrderUtils.CreateOrderParams memory params =
+            abi.decode(_callData[4:], (IBaseOrderUtils.CreateOrderParams));
+        return _getPositionInfoFromParams(_subaccount, params);
+    }
+
+    /// @dev Build position info from order params
+    function _getPositionInfoFromParams(
+        IERC7579Account _subaccount,
+        IBaseOrderUtils.CreateOrderParams memory params
+    ) internal view returns (IVenueValidator.PositionInfo memory _info) {
 
         bytes32 positionKey = keccak256(
             abi.encode(

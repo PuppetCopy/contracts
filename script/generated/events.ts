@@ -157,16 +157,5 @@ export const CONTRACT_EVENT_MAP = {
         { type: 'bytes32', name: 'key' }
       ]
     }
-  },
-  ThrottlePolicy: {
-    PolicySet: {
-      hash: '0x10a5a35de07bd472b98b6688a9a3781b329b6c62b3e933bcac704f94e16607c2',
-      args: [
-        { type: 'bytes32', name: 'configId' },
-        { type: 'address', name: 'sender' },
-        { type: 'address', name: 'account' },
-        { type: 'uint32', name: 'throttlePeriod' }
-      ]
-    }
   }
 } as const

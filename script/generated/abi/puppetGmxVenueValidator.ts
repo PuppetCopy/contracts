@@ -19,6 +19,11 @@ export default [
         name: '_referralStorage',
         type: 'address',
         internalType: 'address'
+      },
+      {
+        name: '_router',
+        type: 'address',
+        internalType: 'address'
       }
     ],
     stateMutability: 'nonpayable'
@@ -138,6 +143,19 @@ export default [
   },
   {
     type: 'function',
+    name: 'router',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address'
+      }
+    ],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
     name: 'validate',
     inputs: [
       {
@@ -162,7 +180,7 @@ export default [
       }
     ],
     outputs: [],
-    stateMutability: 'pure'
+    stateMutability: 'view'
   },
   {
     type: 'error',

@@ -68,4 +68,3 @@ console.log(`Updated deployments.json for chain ${chainKey}`)
 console.log('Regenerating TypeScript...')
 await $`bun run generate && bun run build:ts`
 console.log('Done!')
-
