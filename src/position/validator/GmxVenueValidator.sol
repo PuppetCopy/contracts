@@ -295,12 +295,11 @@ contract GmxVenueValidator is IVenueValidator {
     }
 
     /// @inheritdoc IVenueValidator
-    function validatePostCall(
+    function processPostCall(
         address,
         bytes calldata
-    ) external pure override {
-        // No post-validation needed for GMX
-        // Future: could verify order was created, balance changes, etc.
+    ) external override {
+        // TODO: Track pending order state for GMX 2-step order flow
     }
 
     /// @dev Core validation logic for a single callData

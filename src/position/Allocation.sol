@@ -240,55 +240,6 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         ));
     }
 
-    function executeOrder(
-        CallIntent calldata _intent,
-        bytes calldata _signature,
-        address _target,
-        bytes calldata _callData
-    ) external payable auth {
-        bytes32 _key = _verifyIntent(_intent, _signature);
-        if (frozenMap[_key]) revert Error.Allocation__SubaccountFrozen();
-
-        VenueRegistry.Venue memory _venue = config.venueRegistry.getVenueByTarget(_target);
-
-        uint _balanceBefore = _intent.token.balanceOf(address(_intent.subaccount));
-
-        bytes memory _result = _executeFromExecutor(
-            _intent.subaccount,
-            _target,
-            config.transferOutGasLimit,
-            msg.value,
-            _callData,
-            MODE_STRICT
-        );
-
-        uint _allocation = _intent.token.balanceOf(address(_intent.subaccount));
-        if (_intent.amount > 0) {
-            uint _spent = _balanceBefore - _allocation;
-            if (_spent != _intent.amount) revert Error.Allocation__AmountMismatch(_intent.amount, _spent);
-        }
-
-        IVenueValidator.PositionInfo memory _posInfo = _venue.validator.getPositionInfo(_intent.subaccount, _callData);
-        bytes32 _positionKey = _posInfo.positionKey;
-        uint _positionValue = _posInfo.netValue;
-
-        config.venueRegistry.updatePosition(_key, _positionKey, _venue, _positionValue);
-
-        _logEvent("ExecuteOrder", abi.encode(
-            _key,
-            _intent.account,
-            _intent.subaccount,
-            _intent.token,
-            _intent.amount,
-            _allocation,
-            _target,
-            _venue,
-            _positionKey,
-            _positionValue,
-            _result
-        ));
-    }
-
     function _verifyIntent(CallIntent calldata _intent, bytes calldata _signature) internal returns (bytes32 _key) {
         if (block.timestamp > _intent.deadline) revert Error.Allocation__IntentExpired(_intent.deadline, block.timestamp);
 

@@ -42,10 +42,10 @@ contract MockVenueValidator is IVenueValidator {
         return "";
     }
 
-    function validatePostCall(
+    function processPostCall(
         address,
         bytes calldata
-    ) external pure override {}
+    ) external override {}
 
     function getPositionNetValue(bytes32 _positionKey) external view returns (uint256) {
         return positionValues[_positionKey];
@@ -75,10 +75,10 @@ contract PassthroughValidator is IVenueValidator {
         return "";
     }
 
-    function validatePostCall(
+    function processPostCall(
         address,
         bytes calldata
-    ) external pure override {}
+    ) external override {}
 
     function getPositionNetValue(bytes32) external pure returns (uint256) {
         return 0;

@@ -16,6 +16,8 @@ import {VenueRegistry} from "./position/VenueRegistry.sol";
  * @dev DAO can update underlying contracts. Deployed behind RouterProxy.
  */
 contract UserRouter is IUserRouter, CoreContract {
+    error UserRouter__OnlyMasterHook();
+
     struct Config {
         Allocation allocation;
         VenueRegistry venueRegistry;
@@ -24,6 +26,11 @@ contract UserRouter is IUserRouter, CoreContract {
     Config public config;
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
+
+    modifier onlyMasterHook() {
+        if (msg.sender != config.allocation.getConfig().masterHook) revert UserRouter__OnlyMasterHook();
+        _;
+    }
 
     function _setConfig(bytes memory _data) internal override {
         Config memory _config = abi.decode(_data, (Config));
@@ -38,7 +45,7 @@ contract UserRouter is IUserRouter, CoreContract {
         address _signer,
         IERC7579Account _subaccount,
         IERC20 _token
-    ) external {
+    ) external onlyMasterHook {
         config.allocation.registerMasterSubaccount(_account, _signer, _subaccount, _token);
     }
 
@@ -53,11 +60,11 @@ contract UserRouter is IUserRouter, CoreContract {
     }
 
     /// @inheritdoc IUserRouter
-    function validatePostCall(
+    function processPostCall(
         address _subaccount,
         bytes calldata _hookData
-    ) external view {
-        config.venueRegistry.validatePostCall(_subaccount, _hookData);
+    ) external onlyMasterHook {
+        config.venueRegistry.processPostCall(_subaccount, _hookData);
     }
 
     /// @inheritdoc IUserRouter

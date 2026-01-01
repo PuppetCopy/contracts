@@ -27,11 +27,11 @@ interface IVenueValidator {
         Execution[] calldata executions
     ) external view returns (bytes memory hookData);
 
-    /// @notice Validate after execution using hookData from preCheck
-    function validatePostCall(
+    /// @notice Process after execution using hookData from preCheck (can mutate state)
+    function processPostCall(
         address subaccount,
         bytes calldata hookData
-    ) external view;
+    ) external;
 
 
     // ============ Position Info ============

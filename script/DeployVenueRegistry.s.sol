@@ -71,7 +71,6 @@ contract DeployVenueRegistry is BaseScript {
 
         dictatorship.setPermission(Permission(address(allocation)), Allocation.executeAllocate.selector, DEPLOYER_ADDRESS);
         dictatorship.setPermission(Permission(address(allocation)), Allocation.executeWithdraw.selector, DEPLOYER_ADDRESS);
-        dictatorship.setPermission(Permission(address(allocation)), Allocation.executeOrder.selector, DEPLOYER_ADDRESS);
 
         // Permission for UserRouter to call registerMasterSubaccount
         dictatorship.setPermission(Permission(address(allocation)), allocation.registerMasterSubaccount.selector, address(userRouter));

@@ -87,17 +87,27 @@ contract VenueRegistry is CoreContract {
         revert Error.VenueRegistry__InvalidCallType();
     }
 
-    /// @notice Validate after execution using hookData from preCheck
-    function validatePostCall(
+    /// @notice Process after execution using hookData from preCheck (can mutate state)
+    function processPostCall(
         address _subaccount,
         bytes calldata _hookData
-    ) external view {
+    ) external {
         if (_hookData.length == 0) return;
 
         // hookData contains venue address + venue-specific data
         (address venueTarget, bytes memory venueHookData) = abi.decode(_hookData, (address, bytes));
-        IVenueValidator validator = _getValidator(venueTarget);
-        validator.validatePostCall(_subaccount, venueHookData);
+        bytes32 venueKey = venueKeyMap[venueTarget];
+        IVenueValidator validator = venueValidatorMap[venueKey];
+        if (address(validator) == address(0)) revert Error.VenueRegistry__VenueNotRegistered(venueKey);
+
+        validator.processPostCall(_subaccount, venueHookData);
+
+        _logEvent("ProcessPostCall", abi.encode(
+            _subaccount,
+            venueTarget,
+            venueKey,
+            venueHookData
+        ));
     }
 
     function _getValidator(address _target) internal view returns (IVenueValidator validator) {

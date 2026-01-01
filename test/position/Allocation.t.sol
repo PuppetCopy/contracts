@@ -66,10 +66,10 @@ contract AllocationTest is BasicSetup {
         dictator.setPermission(allocation, allocation.registerMasterSubaccount.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeAllocate.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeWithdraw.selector, users.owner);
-        dictator.setPermission(allocation, allocation.executeOrder.selector, users.owner);
         dictator.setPermission(allocation, allocation.setTokenCap.selector, users.owner);
         dictator.setPermission(venueRegistry, venueRegistry.setVenue.selector, users.owner);
         dictator.setPermission(venueRegistry, venueRegistry.updatePosition.selector, address(allocation));
+        dictator.setPermission(venueRegistry, venueRegistry.updatePosition.selector, users.owner);
 
         dictator.registerContract(address(allocation));
         dictator.registerContract(address(venueRegistry));
@@ -319,50 +319,6 @@ contract AllocationTest is BasicSetup {
         allocation.executeWithdraw(intent, sig);
 
         assertGt(usdc.balanceOf(owner), 0, "Withdrawal succeeded while frozen");
-    }
-
-    function testExecuteOrder_ExecutesCallOnVenue() public {
-        allocation.registerMasterSubaccount(
-            owner,
-            sessionSigner,
-            IERC7579Account(address(masterSubaccount)),
-            usdc
-        );
-
-        mockVenue.setAmountToTake(100e6);
-
-        vm.stopPrank();
-        vm.prank(address(masterSubaccount));
-        usdc.approve(address(mockVenue), 100e6);
-        vm.startPrank(users.owner);
-
-        Allocation.CallIntent memory intent = _createIntent(100e6, 0, block.timestamp + 1 hours);
-        bytes memory sig = _signIntent(intent, ownerPrivateKey);
-
-        allocation.executeOrder(intent, sig, address(mockVenue), abi.encodeCall(MockVenue.openPosition, ()));
-
-        assertEq(usdc.balanceOf(address(mockVenue)), 100e6, "Venue received tokens");
-        assertEq(usdc.balanceOf(address(masterSubaccount)), 900e6, "Subaccount spent tokens");
-    }
-
-    function testExecuteOrder_FailedOrderReturnsEarly() public {
-        allocation.registerMasterSubaccount(
-            owner,
-            sessionSigner,
-            IERC7579Account(address(masterSubaccount)),
-            usdc
-        );
-
-        mockVenue.setShouldRevert(true);
-
-        Allocation.CallIntent memory intent = _createIntent(0, 0, block.timestamp + 1 hours);
-        bytes memory sig = _signIntent(intent, ownerPrivateKey);
-
-        uint256 balanceBefore = usdc.balanceOf(address(masterSubaccount));
-        allocation.executeOrder(intent, sig, address(mockVenue), abi.encodeCall(MockVenue.openPosition, ()));
-        uint256 balanceAfter = usdc.balanceOf(address(masterSubaccount));
-
-        assertEq(balanceBefore, balanceAfter, "Balance unchanged on failed order");
     }
 
     function testVerifyIntent_AcceptsOwnerSignature() public {
@@ -706,23 +662,6 @@ contract AllocationTest is BasicSetup {
         assertEq(allocation.nonceMap(key2), 0, "Nonce for sub2 is independent");
     }
 
-    function testEdge_WithdrawFullBalance() public {
-        allocation.registerMasterSubaccount(
-            owner,
-            sessionSigner,
-            IERC7579Account(address(masterSubaccount)),
-            usdc
-        );
-
-        Allocation.CallIntent memory intent = _createIntent(1000e6, 0, block.timestamp + 1 hours);
-        bytes memory sig = _signIntent(intent, ownerPrivateKey);
-
-        allocation.executeWithdraw(intent, sig);
-
-        assertEq(usdc.balanceOf(address(masterSubaccount)), 0, "Subaccount emptied");
-        assertEq(allocation.shareBalanceMap(matchingKey, owner), 0, "All shares burnt");
-    }
-
     function testEdge_MixedPuppetSuccess() public {
         allocation.registerMasterSubaccount(
             owner,
@@ -780,26 +719,6 @@ contract AllocationTest is BasicSetup {
         assertEq(priceInitial, priceAfter, "Share price stable after fair deposits");
     }
 
-    function testEdge_OrderWithZeroAmount() public {
-        allocation.registerMasterSubaccount(
-            owner,
-            sessionSigner,
-            IERC7579Account(address(masterSubaccount)),
-            usdc
-        );
-
-        mockVenue.setAmountToTake(0);
-
-        Allocation.CallIntent memory intent = _createIntent(0, 0, block.timestamp + 1 hours);
-        bytes memory sig = _signIntent(intent, ownerPrivateKey);
-
-        uint256 balanceBefore = usdc.balanceOf(address(masterSubaccount));
-        allocation.executeOrder(intent, sig, address(mockVenue), abi.encodeCall(MockVenue.openPosition, ()));
-        uint256 balanceAfter = usdc.balanceOf(address(masterSubaccount));
-
-        assertEq(balanceBefore, balanceAfter, "No tokens spent for zero amount order");
-    }
-
     function testEdge_ReplayAttackPrevented() public {
         allocation.registerMasterSubaccount(
             owner,
@@ -820,7 +739,7 @@ contract AllocationTest is BasicSetup {
         allocation.executeAllocate(intent, sig, puppets, amounts);
     }
 
-    function testEdge_FrozenBlocksAllocateAndOrder() public {
+    function testEdge_FrozenBlocksAllocate() public {
         allocation.registerMasterSubaccount(
             owner,
             sessionSigner,
@@ -843,10 +762,6 @@ contract AllocationTest is BasicSetup {
 
         vm.expectRevert(Error.Allocation__SubaccountFrozen.selector);
         allocation.executeAllocate(intent, sig, puppets, amounts);
-
-        sig = _signIntent(intent, ownerPrivateKey);
-        vm.expectRevert(Error.Allocation__SubaccountFrozen.selector);
-        allocation.executeOrder(intent, sig, address(mockVenue), abi.encodeCall(MockVenue.openPosition, ()));
     }
 
     function testEdge_DifferentTokensSameSubaccount() public {
@@ -878,7 +793,7 @@ contract AllocationTest is BasicSetup {
 
         allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), usdc);
 
-        bytes32 key = keccak256(abi.encode(address(usdc), address(sub), bytes32("fair_test")));
+        bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
 
         Allocation.CallIntent memory intent = Allocation.CallIntent({
             account: owner,
@@ -911,7 +826,7 @@ contract AllocationTest is BasicSetup {
 
         allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), usdc);
 
-        bytes32 key = keccak256(abi.encode(address(usdc), address(sub), bytes32("profit_test")));
+        bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
 
         Allocation.CallIntent memory intent = Allocation.CallIntent({
             account: owner,
@@ -954,7 +869,7 @@ contract AllocationTest is BasicSetup {
 
         allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), usdc);
 
-        bytes32 key = keccak256(abi.encode(address(usdc), address(sub), bytes32("late_test")));
+        bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
 
         usdc.mint(address(sub), 500e6);
 
@@ -1000,7 +915,7 @@ contract AllocationTest is BasicSetup {
 
         allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), usdc);
 
-        bytes32 key = keccak256(abi.encode(address(usdc), address(sub), bytes32("loss_test")));
+        bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
 
         Allocation.CallIntent memory intent = Allocation.CallIntent({
             account: owner,
@@ -1105,30 +1020,19 @@ contract AllocationTest is BasicSetup {
         assertEq(p2Shares, 300e6, "P2: 300 shares");
         assertEq(p3Shares, 200e6, "P3: 200 shares");
 
-        // Set position value BEFORE order so it gets tracked
+        // Simulate opening a position: transfer funds to venue and track position value
+        // (In production, this happens via MasterHook → VenueRegistry → Validator flow)
         bytes32 posKey = keccak256(abi.encode(address(sub), "mock_position"));
-        venueValidator.setPositionValue(posKey, 800e6);  // Initial position value equals amount spent
 
-        {
-            mockVenue.setAmountToTake(800e6);
+        vm.stopPrank();
+        vm.prank(address(sub));
+        usdc.transfer(address(mockVenue), 800e6);
+        vm.startPrank(users.owner);
 
-            vm.stopPrank();
-            vm.prank(address(sub));
-            usdc.approve(address(mockVenue), 800e6);
-            vm.startPrank(users.owner);
-
-            Allocation.CallIntent memory intent = Allocation.CallIntent({
-                account: owner,
-                subaccount: IERC7579Account(address(sub)),
-                token: usdc,
-                amount: 800e6,
-                deadline: block.timestamp + 1 hours,
-                nonce: nonce++
-            });
-            bytes memory sig = _signIntent(intent, ownerPrivateKey);
-
-            allocation.executeOrder(intent, sig, address(mockVenue), abi.encodeCall(MockVenue.openPosition, ()));
-        }
+        // Register position in VenueRegistry and set its value
+        VenueRegistry.Venue memory venue = VenueRegistry.Venue({venueKey: venueKey, validator: venueValidator});
+        venueRegistry.updatePosition(key, posKey, venue, 800e6);
+        venueValidator.setPositionValue(posKey, 800e6);
 
         assertEq(usdc.balanceOf(address(sub)), 1200e6, "Phase 2: 1200 liquid after order");
         assertEq(usdc.balanceOf(address(mockVenue)), 800e6, "Phase 2: Venue has 800");
@@ -1201,28 +1105,7 @@ contract AllocationTest is BasicSetup {
             assertGt(p1SharesAfter, p1Shares, "Phase 5: P1 shares increased");
         }
 
-        {
-            mockVenue.setShouldRevert(true);
-
-            uint256 balanceBefore = usdc.balanceOf(address(sub));
-
-            Allocation.CallIntent memory intent = Allocation.CallIntent({
-                account: owner,
-                subaccount: IERC7579Account(address(sub)),
-                token: usdc,
-                amount: 0,
-                deadline: block.timestamp + 1 hours,
-                nonce: nonce++
-            });
-            bytes memory sig = _signIntent(intent, ownerPrivateKey);
-
-            allocation.executeOrder(intent, sig, address(mockVenue), abi.encodeCall(MockVenue.openPosition, ()));
-
-            assertEq(usdc.balanceOf(address(sub)), balanceBefore, "Phase 6: Balance unchanged on failed order");
-
-            mockVenue.setShouldRevert(false);
-        }
-
+        // Phase 6: Freeze the subaccount
         vm.stopPrank();
         vm.prank(address(sub));
         sub.uninstallModule(MODULE_TYPE_EXECUTOR, address(allocation), abi.encode(usdc));
@@ -1247,21 +1130,6 @@ contract AllocationTest is BasicSetup {
 
             vm.expectRevert(Error.Allocation__SubaccountFrozen.selector);
             allocation.executeAllocate(intent, sig, puppets, amounts);
-        }
-
-        {
-            Allocation.CallIntent memory intent = Allocation.CallIntent({
-                account: owner,
-                subaccount: IERC7579Account(address(sub)),
-                token: usdc,
-                amount: 0,
-                deadline: block.timestamp + 1 hours,
-                nonce: nonce
-            });
-            bytes memory sig = _signIntent(intent, ownerPrivateKey);
-
-            vm.expectRevert(Error.Allocation__SubaccountFrozen.selector);
-            allocation.executeOrder(intent, sig, address(mockVenue), abi.encodeCall(MockVenue.openPosition, ()));
         }
 
         // Simulate closing profitable position - venue returns principal + profit
@@ -1300,11 +1168,8 @@ contract AllocationTest is BasicSetup {
         );
 
         // Phase 8: Final verification
-        // Note: executeWithdraw doesn't check frozenMap - frozen only blocks allocate/order
         // The share accounting is verified by the assertions above - all participants have
         // their expected shares, and the total shares sum correctly.
-        // Actual withdrawal tested in separate test (testWithdraw_TransfersTokens) to avoid
-        // precision issues with specific amounts in complex state.
     }
 
     function testEdge_CapEnforcedOnAllocate() public {

@@ -68,7 +68,6 @@ contract AllocationSecurityTest is BasicSetup {
         dictator.setPermission(allocation, allocation.registerMasterSubaccount.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeAllocate.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeWithdraw.selector, users.owner);
-        dictator.setPermission(allocation, allocation.executeOrder.selector, users.owner);
         dictator.setPermission(allocation, allocation.setTokenCap.selector, users.owner);
         dictator.setPermission(venueRegistry, venueRegistry.setVenue.selector, users.owner);
 

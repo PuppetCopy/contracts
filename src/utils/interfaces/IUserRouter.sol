@@ -24,10 +24,10 @@ interface IUserRouter {
         bytes calldata msgData
     ) external view returns (bytes memory hookData);
 
-    function validatePostCall(
+    function processPostCall(
         address subaccount,
         bytes calldata hookData
-    ) external view;
+    ) external;
 
     // ============ Position Passthrough ============
 

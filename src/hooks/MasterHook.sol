@@ -42,8 +42,8 @@ contract MasterHook is IHook {
         return router.validatePreCall(msg.sender, msgSender, msgValue, msgData);
     }
 
-    function postCheck(bytes calldata hookData) external view {
-        router.validatePostCall(msg.sender, hookData);
+    function postCheck(bytes calldata hookData) external {
+        router.processPostCall(msg.sender, hookData);
     }
 
     /// @notice Install hook and register as master subaccount
