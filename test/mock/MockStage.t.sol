@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.33;
 
-import {IStage} from "src/position/interface/IStage.sol";
+import {IStage, Order} from "src/position/interface/IStage.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract MockStage is IStage {
@@ -19,30 +19,27 @@ contract MockStage is IStage {
         revertReason = _reason;
     }
 
-    function open(address _subaccount, bytes calldata)
+    function processOrder(address, IERC20, Order calldata order)
         external
         view
         override
-        returns (bytes32 positionKey, bytes memory hookData)
+        returns (bytes memory hookData)
     {
         if (shouldRevertValidation) revert(revertReason);
-        positionKey = keccak256(abi.encode(_subaccount, "mock_position"));
-        if (positionValues[positionKey] == type(uint).max) revert("MockStage: validation failed");
+        if (positionValues[order.positionKey] == type(uint).max) revert("MockStage: validation failed");
         hookData = "";
     }
 
-    function close(address _subaccount, bytes calldata)
-        external
-        view
-        override
-        returns (bytes32 positionKey, bytes memory hookData)
-    {
-        if (shouldRevertValidation) revert(revertReason);
-        positionKey = keccak256(abi.encode(_subaccount, "mock_position"));
-        hookData = "";
-    }
+    function processPostOrder(
+        address,
+        IERC20,
+        Order calldata,
+        uint,
+        uint,
+        bytes calldata
+    ) external pure override {}
 
-    function settle(address, bytes32, bytes calldata) external override {}
+    function settle(address, Order calldata, bytes calldata) external override {}
 
     function getValue(bytes32 _positionKey) external view override returns (uint) {
         return positionValues[_positionKey];

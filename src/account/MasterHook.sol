@@ -33,20 +33,25 @@ import {IUserRouter} from "../utils/interfaces/IUserRouter.sol";
 contract MasterHook is IHook {
     error MasterHook__InvalidExecution();
     error MasterHook__PositionsNotClosed();
+    error MasterHook__NotInitialized();
 
     IUserRouter public immutable router;
+
+    /// @notice Token registered per subaccount
+    mapping(address subaccount => IERC20) public tokens;
 
     constructor(IUserRouter _router) {
         router = _router;
     }
 
-    function preCheck(address msgSender, uint msgValue, bytes calldata msgData) external view returns (bytes memory) {
-        if (msgData.length < 4) revert MasterHook__InvalidExecution();
-        return router.validatePreCall(msg.sender, msgSender, msgValue, msgData);
+    function preCheck(address msgSender, uint msgValue, bytes calldata msgData) external returns (bytes memory) {
+        IERC20 token = tokens[msg.sender];
+        if (address(token) == address(0)) revert MasterHook__NotInitialized();
+        return router.processPreCall(msg.sender, token, msgSender, msgValue, msgData);
     }
 
-    function postCheck(bytes calldata hookData) external {
-        router.settle(msg.sender, hookData);
+    function postCheck(bytes calldata hookData) external view {
+        router.processPostCall(msg.sender, hookData);
     }
 
     /// @notice Install hook and register as master subaccount
@@ -57,16 +62,17 @@ contract MasterHook is IHook {
         // Decode install parameters
         (address account, address signer, IERC20 token) = abi.decode(_data, (address, address, IERC20));
 
+        // Store token for this subaccount
+        tokens[msg.sender] = token;
+
         // Register as master subaccount - enables fund raising
         router.registerMasterSubaccount(account, signer, subaccount, token);
     }
 
     /// @notice Uninstall hook - requires positions closed, freezes matching key
-    /// @param _data Encoded (token)
-    function onUninstall(bytes calldata _data) external view {
+    function onUninstall(bytes calldata) external view {
         IERC7579Account subaccount = IERC7579Account(msg.sender);
-
-        IERC20 token = abi.decode(_data, (IERC20));
+        IERC20 token = tokens[msg.sender];
 
         // Verify all positions are closed
         bytes32 matchingKey = _getMatchingKey(token, subaccount);

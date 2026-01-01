@@ -56,7 +56,7 @@ library Error {
     error Allocation__IntentExpired(uint deadline, uint currentTime);
     error Allocation__InvalidSignature(address expected, address recovered);
     error Allocation__InvalidNonce(uint expected, uint provided);
-    error Allocation__InvalidStageRegistry();
+    error Allocation__InvalidPosition();
     error Allocation__InvalidMasterHook();
     error Allocation__InvalidMaxPuppetList();
     error Allocation__InvalidGasLimit();
@@ -74,13 +74,16 @@ library Error {
     error FeeMarketplace__ZeroDeposit();
     error FeeMarketplace__InvalidConfig();
 
-    // StageRegistry errors
-    error StageRegistry__UnknownStage(bytes32 stage);
-    error StageRegistry__InvalidAction(bytes32 action);
-    error StageRegistry__DelegateCallBlocked();
+    // Position errors
+    error Position__UnknownStage(bytes32 stage);
+    error Position__InvalidAction(bytes32 action);
+    error Position__DelegateCallBlocked();
+    error Position__InvalidBalanceChange();
 
     // GmxStage errors
     error GmxStage__InvalidCallData();
     error GmxStage__InvalidOrderType();
     error GmxStage__InvalidReceiver();
+    error GmxStage__InvalidAction();
+    error GmxStage__InvalidBalanceChange();
 }

@@ -26,11 +26,11 @@ import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "../utils/Precision.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
-import {StageRegistry} from "./StageRegistry.sol";
+import {Position} from "./Position.sol";
 
 contract Allocation is CoreContract, IExecutor, EIP712 {
     struct Config {
-        StageRegistry stageRegistry;
+        Position position;
         address masterHook;
         uint maxPuppetList;
         uint transferOutGasLimit;
@@ -102,9 +102,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         external
     {
         if (!_isValidAccount(address(_subaccount))) revert Error.Allocation__InvalidAccountCodeHash();
-        if (!_subaccount.isModuleInstalled(MODULE_TYPE_HOOK, config.masterHook, "")) {
-            revert Error.Allocation__MasterHookNotInstalled();
-        }
+        if (!_subaccount.isModuleInstalled(MODULE_TYPE_HOOK, config.masterHook, "")) revert Error.Allocation__MasterHookNotInstalled();
         uint _cap = tokenCapMap[_token];
         if (_cap == 0) revert Error.Allocation__TokenNotAllowed();
 
@@ -133,15 +131,11 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         uint _cap = tokenCapMap[_intent.token];
         if (disposedMap[_key]) revert Error.Allocation__SubaccountFrozen();
         if (_cap == 0) revert Error.Allocation__TokenNotAllowed();
-        if (_puppetList.length != _amountList.length) {
-            revert Error.Allocation__ArrayLengthMismatch(_puppetList.length, _amountList.length);
-        }
-        if (_puppetList.length > config.maxPuppetList) {
-            revert Error.Allocation__PuppetListTooLarge(_puppetList.length, config.maxPuppetList);
-        }
+        if (_puppetList.length != _amountList.length) revert Error.Allocation__ArrayLengthMismatch(_puppetList.length, _amountList.length);
+        if (_puppetList.length > config.maxPuppetList) revert Error.Allocation__PuppetListTooLarge(_puppetList.length, config.maxPuppetList);
 
         uint _allocation = _intent.token.balanceOf(address(_intent.subaccount));
-        uint _positionValue = config.stageRegistry.getNetValue(_intent.token, _intent.subaccount) - _allocation;
+        uint _positionValue = config.position.getNetValue(_intent.token, _intent.subaccount) - _allocation;
         uint _sharePrice = getSharePrice(_key, _allocation + _positionValue);
         uint _totalShares = totalSharesMap[_key];
         uint _userShares = shareBalanceMap[_key][_intent.account];
@@ -164,16 +158,8 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             if (address(_puppet) == address(_intent.subaccount)) continue;
             uint _amount = _amountList[_i];
 
-            bytes memory _result = _executeFromExecutor(
-                _puppet,
-                address(_intent.token),
-                _gasLimit,
-                0,
-                abi.encodeCall(IERC20.transfer, (address(_intent.subaccount), _amount)),
-                MODE_TRY
-            );
-            if (!_isSuccessfulTransfer(_result)) {
-                _logEvent("ExecuteAllocateFailed", abi.encode(_key, _puppet, _amount, _result));
+            if (!_safeTransferFrom(_intent.token, address(_puppet), address(_intent.subaccount), _amount, _gasLimit)) {
+                _logEvent("ExecuteAllocateFailed", abi.encode(_key, _puppet, _amount));
                 continue;
             }
 
@@ -212,7 +198,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         bytes32 _key = _verifyIntent(_intent, _signature);
 
         uint _allocation = _intent.token.balanceOf(address(_intent.subaccount));
-        uint _positionValue = config.stageRegistry.getNetValue(_intent.token, _intent.subaccount) - _allocation;
+        uint _positionValue = config.position.getNetValue(_intent.token, _intent.subaccount) - _allocation;
         uint _netValue = _allocation + _positionValue;
 
         uint _sharePrice = getSharePrice(_key, _netValue);
@@ -309,6 +295,15 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         return abi.decode(_result, (bool));
     }
 
+    function _safeTransferFrom(IERC20 _token, address _from, address _to, uint _amount, uint _gasLimit)
+        internal
+        returns (bool)
+    {
+        (bool success, bytes memory result) =
+            address(_token).call{gas: _gasLimit}(abi.encodeCall(IERC20.transferFrom, (_from, _to, _amount)));
+        return success && _isSuccessfulTransfer(result);
+    }
+
     function _isValidAccount(address _account) internal view returns (bool) {
         bytes32 codeHash;
         assembly {
@@ -319,7 +314,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
 
     function _setConfig(bytes memory _data) internal override {
         Config memory _config = abi.decode(_data, (Config));
-        if (address(_config.stageRegistry) == address(0)) revert Error.Allocation__InvalidStageRegistry();
+        if (address(_config.position) == address(0)) revert Error.Allocation__InvalidPosition();
         if (_config.masterHook == address(0)) revert Error.Allocation__InvalidMasterHook();
         if (_config.maxPuppetList == 0) revert Error.Allocation__InvalidMaxPuppetList();
         if (_config.transferOutGasLimit == 0) revert Error.Allocation__InvalidGasLimit();

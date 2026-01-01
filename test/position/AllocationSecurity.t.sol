@@ -6,7 +6,7 @@ import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Acco
 import {MODULE_TYPE_EXECUTOR, MODULE_TYPE_HOOK} from "modulekit/module-bases/utils/ERC7579Constants.sol";
 
 import {Allocation} from "src/position/Allocation.sol";
-import {StageRegistry} from "src/position/StageRegistry.sol";
+import {Position} from "src/position/Position.sol";
 import {IStage} from "src/position/interface/IStage.sol";
 import {Error} from "src/utils/Error.sol";
 
@@ -19,7 +19,7 @@ import {MockERC20} from "../mock/MockERC20.t.sol";
 /// @notice Penetration tests for share inflation attacks, rounding exploits, and other security vectors
 contract AllocationSecurityTest is BasicSetup {
     Allocation allocation;
-    StageRegistry stageRegistry;
+    Position position;
     MockStage mockStage;
     MockVenue mockVenue;
 
@@ -45,11 +45,11 @@ contract AllocationSecurityTest is BasicSetup {
         owner = vm.addr(ownerPrivateKey);
         sessionSigner = vm.addr(signerPrivateKey);
 
-        stageRegistry = new StageRegistry(dictator);
+        position = new Position(dictator);
         allocation = new Allocation(
             dictator,
             Allocation.Config({
-                stageRegistry: stageRegistry,
+                position: position,
                 masterHook: address(1),
                 maxPuppetList: MAX_PUPPET_LIST,
                 transferOutGasLimit: GAS_LIMIT
@@ -69,9 +69,9 @@ contract AllocationSecurityTest is BasicSetup {
         dictator.setPermission(allocation, allocation.executeAllocate.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeWithdraw.selector, users.owner);
         dictator.setPermission(allocation, allocation.setTokenCap.selector, users.owner);
-        dictator.setPermission(stageRegistry, stageRegistry.setHandler.selector, users.owner);
+        dictator.setPermission(position, position.setHandler.selector, users.owner);
 
-        stageRegistry.setHandler(stageKey, IStage(address(mockStage)));
+        position.setHandler(stageKey, IStage(address(mockStage)));
 
         allocation.setTokenCap(usdc, TOKEN_CAP);
 
@@ -87,6 +87,14 @@ contract AllocationSecurityTest is BasicSetup {
         usdc.mint(address(masterSubaccount), 500e6);
         usdc.mint(address(puppet1), 500e6);
         usdc.mint(address(puppet2), 500e6);
+
+        // Puppets approve Allocation for transferFrom
+        vm.stopPrank();
+        vm.prank(address(puppet1));
+        usdc.approve(address(allocation), type(uint).max);
+        vm.prank(address(puppet2));
+        usdc.approve(address(allocation), type(uint).max);
+        vm.startPrank(users.owner);
 
         matchingKey = keccak256(abi.encode(address(usdc), address(masterSubaccount)));
     }

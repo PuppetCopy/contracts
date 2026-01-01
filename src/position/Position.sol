@@ -9,18 +9,13 @@ import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
-import {IStage} from "./interface/IStage.sol";
+import {IStage, Order} from "./interface/IStage.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
-/// @title StageRegistry
+/// @title Position
 /// @notice Lean passthrough that routes actions to stage handlers
 /// @dev Complexity lives in handlers (GmxStage, HyperliquidStage, etc.)
-contract StageRegistry is CoreContract {
-    // ============ Constants ============
-
-    bytes32 public constant OPEN = keccak256("OPEN");
-    bytes32 public constant CLOSE = keccak256("CLOSE");
-
+contract Position is CoreContract {
     // ============ State ============
 
     /// @notice Stage to handler mapping
@@ -38,7 +33,8 @@ contract StageRegistry is CoreContract {
 
     /// @notice Validate action before execution
     /// @dev Called by MasterHook.preCheck via UserRouter
-    function validatePreCall(address _subaccount, address, uint, bytes calldata _msgData)
+    /// @return hookData Encoded (order, token, preBalance, handlerData) for postCheck
+    function processPreCall(address _subaccount, IERC20 _token, address, uint, bytes calldata _msgData)
         external
         view
         returns (bytes memory hookData)
@@ -52,7 +48,7 @@ contract StageRegistry is CoreContract {
         CallType callType = ModeLib.getCallType(mode);
 
         // Block delegatecall
-        if (callType == CALLTYPE_DELEGATECALL) revert Error.StageRegistry__DelegateCallBlocked();
+        if (callType == CALLTYPE_DELEGATECALL) revert Error.Position__DelegateCallBlocked();
 
         // Only validate single execution (stages use explicit action format)
         if (callType != CALLTYPE_SINGLE) return "";
@@ -60,43 +56,50 @@ contract StageRegistry is CoreContract {
         bytes calldata execData = _msgData[36:];
         (, , bytes calldata callData) = ExecutionLib.decodeSingle(execData);
 
-        // Decode: action, stage, data
-        if (callData.length < 64) return "";
-        bytes32 action = bytes32(callData[:32]);
-        bytes32 stage = bytes32(callData[32:64]);
-        bytes calldata data = callData[64:];
+        // Decode Order struct
+        if (callData.length < 32) return "";
+        Order memory order = abi.decode(callData, (Order));
 
-        // Route to handler
-        IStage handler = handlers[stage];
-        if (address(handler) == address(0)) revert Error.StageRegistry__UnknownStage(stage);
+        // Route to handler for pre-validation
+        IStage handler = handlers[order.stage];
+        if (address(handler) == address(0)) revert Error.Position__UnknownStage(order.stage);
 
-        bytes32 positionKey;
-        bytes memory handlerData;
-        if (action == OPEN) {
-            (positionKey, handlerData) = handler.open(_subaccount, data);
-        } else if (action == CLOSE) {
-            (positionKey, handlerData) = handler.close(_subaccount, data);
-        } else {
-            revert Error.StageRegistry__InvalidAction(action);
-        }
+        bytes memory handlerData = handler.processOrder(_subaccount, _token, order);
 
-        if (handlerData.length == 0) return "";
-        return abi.encode(action, stage, positionKey, handlerData);
+        // Capture pre-balance for post-check validation
+        uint preBalance = _token.balanceOf(_subaccount);
+
+        return abi.encode(order, _token, preBalance, handlerData);
     }
 
-    /// @notice Settle after execution
-    function settle(address _subaccount, bytes calldata _hookData) external {
+    /// @notice Process action after execution
+    /// @dev Called by MasterHook.postCheck via UserRouter
+    /// @param _subaccount The subaccount that executed
+    /// @param _hookData Encoded (order, token, preBalance, handlerData) from preCheck
+    function processPostCall(address _subaccount, bytes calldata _hookData) external view {
         if (_hookData.length == 0) return;
 
-        (bytes32 action, bytes32 stage, bytes32 positionKey, bytes memory hookData) =
-            abi.decode(_hookData, (bytes32, bytes32, bytes32, bytes));
+        (Order memory order, IERC20 token, uint preBalance, bytes memory handlerData) =
+            abi.decode(_hookData, (Order, IERC20, uint, bytes));
 
-        IStage handler = handlers[stage];
-        if (address(handler) == address(0)) revert Error.StageRegistry__UnknownStage(stage);
+        uint postBalance = token.balanceOf(_subaccount);
 
-        handler.settle(_subaccount, positionKey, hookData);
+        // Route to handler for post-validation
+        IStage handler = handlers[order.stage];
+        if (address(handler) != address(0)) {
+            handler.processPostOrder(_subaccount, token, order, preBalance, postBalance, handlerData);
+        }
+    }
 
-        _logEvent("Settle", abi.encode(_subaccount, action, stage, positionKey));
+    /// @notice Settle position (called separately, not by hook)
+    /// @dev Settlement happens via callbacks or explicit calls
+    function settle(address _subaccount, Order calldata _order, bytes calldata _handlerData) external auth {
+        IStage handler = handlers[_order.stage];
+        if (address(handler) == address(0)) revert Error.Position__UnknownStage(_order.stage);
+
+        handler.settle(_subaccount, _order, _handlerData);
+
+        _logEvent("Settle", abi.encode(_subaccount, _order.stage, _order.positionKey, _order.action));
     }
 
     // ============ Position Tracking ============

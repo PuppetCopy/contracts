@@ -13,12 +13,11 @@ interface IUserRouter {
 
     // ============ Hook Validation ============
 
-    function validatePreCall(address subaccount, address msgSender, uint msgValue, bytes calldata msgData)
+    function processPreCall(address subaccount, IERC20 token, address msgSender, uint msgValue, bytes calldata msgData)
         external
-        view
         returns (bytes memory hookData);
 
-    function settle(address subaccount, bytes calldata hookData) external;
+    function processPostCall(address subaccount, bytes calldata hookData) external view;
 
     // ============ Position Passthrough ============
 

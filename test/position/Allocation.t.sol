@@ -6,7 +6,7 @@ import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Acco
 import {MODULE_TYPE_EXECUTOR, MODULE_TYPE_HOOK} from "modulekit/module-bases/utils/ERC7579Constants.sol";
 
 import {Allocation} from "src/position/Allocation.sol";
-import {StageRegistry} from "src/position/StageRegistry.sol";
+import {Position} from "src/position/Position.sol";
 import {IStage} from "src/position/interface/IStage.sol";
 import {Error} from "src/utils/Error.sol";
 
@@ -17,7 +17,7 @@ import {MockERC20} from "../mock/MockERC20.t.sol";
 
 contract AllocationTest is BasicSetup {
     Allocation allocation;
-    StageRegistry stageRegistry;
+    Position position;
     MockStage mockStage;
     MockVenue mockVenue;
 
@@ -44,11 +44,11 @@ contract AllocationTest is BasicSetup {
         owner = vm.addr(ownerPrivateKey);
         sessionSigner = vm.addr(signerPrivateKey);
 
-        stageRegistry = new StageRegistry(dictator);
+        position = new Position(dictator);
         allocation = new Allocation(
             dictator,
             Allocation.Config({
-                stageRegistry: stageRegistry,
+                position: position,
                 masterHook: address(1),
                 maxPuppetList: MAX_PUPPET_LIST,
                 transferOutGasLimit: GAS_LIMIT
@@ -68,12 +68,12 @@ contract AllocationTest is BasicSetup {
         dictator.setPermission(allocation, allocation.executeAllocate.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeWithdraw.selector, users.owner);
         dictator.setPermission(allocation, allocation.setTokenCap.selector, users.owner);
-        dictator.setPermission(stageRegistry, stageRegistry.setHandler.selector, users.owner);
-        dictator.setPermission(stageRegistry, stageRegistry.updatePosition.selector, address(allocation));
-        dictator.setPermission(stageRegistry, stageRegistry.updatePosition.selector, users.owner);
+        dictator.setPermission(position, position.setHandler.selector, users.owner);
+        dictator.setPermission(position, position.updatePosition.selector, address(allocation));
+        dictator.setPermission(position, position.updatePosition.selector, users.owner);
 
         dictator.registerContract(address(allocation));
-        dictator.registerContract(address(stageRegistry));
+        dictator.registerContract(address(position));
 
         masterSubaccount = new TestSmartAccount();
         puppet1 = new TestSmartAccount();
@@ -86,7 +86,7 @@ contract AllocationTest is BasicSetup {
 
         allocation.setTokenCap(usdc, TOKEN_CAP);
 
-        stageRegistry.setHandler(stageKey, IStage(address(mockStage)));
+        position.setHandler(stageKey, IStage(address(mockStage)));
 
         matchingKey = keccak256(abi.encode(address(usdc), address(masterSubaccount)));
 
@@ -98,6 +98,13 @@ contract AllocationTest is BasicSetup {
         vm.stopPrank();
         vm.prank(owner);
         usdc.approve(address(masterSubaccount), type(uint).max);
+
+        // Puppets approve Allocation for transferFrom
+        vm.prank(address(puppet1));
+        usdc.approve(address(allocation), type(uint).max);
+        vm.prank(address(puppet2));
+        usdc.approve(address(allocation), type(uint).max);
+
         vm.startPrank(users.owner);
     }
 
@@ -561,6 +568,110 @@ contract AllocationTest is BasicSetup {
         assertEq(usdc.balanceOf(address(masterSubaccount)), 1300e6, "Only successful transfers counted");
     }
 
+    function testEdge_PuppetWithBalanceButNoAllowance() public {
+        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(masterSubaccount)), usdc);
+
+        // Create puppet with balance but NO allowance
+        TestSmartAccount noAllowancePuppet = new TestSmartAccount();
+        noAllowancePuppet.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
+        usdc.mint(address(noAllowancePuppet), 500e6);
+        // Note: deliberately NOT approving allocation
+
+        Allocation.CallIntent memory intent = _createIntent(0, 0, block.timestamp + 1 hours);
+        bytes memory sig = _signIntent(intent, ownerPrivateKey);
+
+        IERC7579Account[] memory puppets = new IERC7579Account[](2);
+        puppets[0] = IERC7579Account(address(noAllowancePuppet));
+        puppets[1] = IERC7579Account(address(puppet1)); // has approval from setUp
+
+        uint[] memory amounts = new uint[](2);
+        amounts[0] = 100e6;
+        amounts[1] = 100e6;
+
+        uint noAllowanceBalanceBefore = usdc.balanceOf(address(noAllowancePuppet));
+
+        allocation.executeAllocate(intent, sig, puppets, amounts);
+
+        // No allowance puppet should be skipped (no shares, balance unchanged)
+        assertEq(allocation.shareBalanceMap(matchingKey, address(noAllowancePuppet)), 0, "No allowance puppet has no shares");
+        assertEq(usdc.balanceOf(address(noAllowancePuppet)), noAllowanceBalanceBefore, "No allowance puppet balance unchanged");
+
+        // Approved puppet should succeed
+        assertGt(allocation.shareBalanceMap(matchingKey, address(puppet1)), 0, "Approved puppet has shares");
+    }
+
+    function testEdge_PuppetWithInsufficientAllowance() public {
+        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(masterSubaccount)), usdc);
+
+        // Create puppet with balance but INSUFFICIENT allowance
+        TestSmartAccount lowAllowancePuppet = new TestSmartAccount();
+        lowAllowancePuppet.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
+        usdc.mint(address(lowAllowancePuppet), 500e6);
+
+        // Approve only 50e6, but we'll try to allocate 100e6
+        vm.stopPrank();
+        vm.prank(address(lowAllowancePuppet));
+        usdc.approve(address(allocation), 50e6);
+        vm.startPrank(users.owner);
+
+        Allocation.CallIntent memory intent = _createIntent(0, 0, block.timestamp + 1 hours);
+        bytes memory sig = _signIntent(intent, ownerPrivateKey);
+
+        IERC7579Account[] memory puppets = new IERC7579Account[](2);
+        puppets[0] = IERC7579Account(address(lowAllowancePuppet));
+        puppets[1] = IERC7579Account(address(puppet1));
+
+        uint[] memory amounts = new uint[](2);
+        amounts[0] = 100e6; // More than approved
+        amounts[1] = 100e6;
+
+        uint lowAllowanceBalanceBefore = usdc.balanceOf(address(lowAllowancePuppet));
+
+        allocation.executeAllocate(intent, sig, puppets, amounts);
+
+        // Insufficient allowance puppet should be skipped
+        assertEq(allocation.shareBalanceMap(matchingKey, address(lowAllowancePuppet)), 0, "Insufficient allowance puppet has no shares");
+        assertEq(usdc.balanceOf(address(lowAllowancePuppet)), lowAllowanceBalanceBefore, "Insufficient allowance puppet balance unchanged");
+
+        // Approved puppet should succeed
+        assertGt(allocation.shareBalanceMap(matchingKey, address(puppet1)), 0, "Approved puppet has shares");
+    }
+
+    function testEdge_PuppetRevokesAllowance() public {
+        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(masterSubaccount)), usdc);
+
+        // First allocation with puppet1 (has approval)
+        Allocation.CallIntent memory intent1 = _createIntent(0, 0, block.timestamp + 1 hours);
+        bytes memory sig1 = _signIntent(intent1, ownerPrivateKey);
+
+        IERC7579Account[] memory puppets = new IERC7579Account[](1);
+        puppets[0] = IERC7579Account(address(puppet1));
+        uint[] memory amounts = new uint[](1);
+        amounts[0] = 100e6;
+
+        allocation.executeAllocate(intent1, sig1, puppets, amounts);
+        uint sharesAfterFirst = allocation.shareBalanceMap(matchingKey, address(puppet1));
+        assertGt(sharesAfterFirst, 0, "First allocation succeeded");
+
+        // Puppet revokes allowance
+        vm.stopPrank();
+        vm.prank(address(puppet1));
+        usdc.approve(address(allocation), 0);
+        vm.startPrank(users.owner);
+
+        // Second allocation attempt should fail for puppet1
+        Allocation.CallIntent memory intent2 = _createIntent(0, 1, block.timestamp + 1 hours);
+        bytes memory sig2 = _signIntent(intent2, ownerPrivateKey);
+
+        uint puppet1BalanceBefore = usdc.balanceOf(address(puppet1));
+
+        allocation.executeAllocate(intent2, sig2, puppets, amounts);
+
+        // Puppet1 shares should be unchanged (second allocation skipped)
+        assertEq(allocation.shareBalanceMap(matchingKey, address(puppet1)), sharesAfterFirst, "Shares unchanged after revoke");
+        assertEq(usdc.balanceOf(address(puppet1)), puppet1BalanceBefore, "Balance unchanged after revoke");
+    }
+
     function testEdge_SharePriceAfterDeposits() public {
         allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(masterSubaccount)), usdc);
 
@@ -828,6 +939,18 @@ contract AllocationTest is BasicSetup {
         usdc.mint(address(p3), 200e6);
         usdc.mint(address(p4), 400e6);
 
+        // Puppets approve Allocation for transferFrom
+        vm.stopPrank();
+        vm.prank(address(p1));
+        usdc.approve(address(allocation), type(uint).max);
+        vm.prank(address(p2));
+        usdc.approve(address(allocation), type(uint).max);
+        vm.prank(address(p3));
+        usdc.approve(address(allocation), type(uint).max);
+        vm.prank(address(p4));
+        usdc.approve(address(allocation), type(uint).max);
+        vm.startPrank(users.owner);
+
         bytes32 name = bytes32("lifecycle_test");
         bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
 
@@ -873,7 +996,7 @@ contract AllocationTest is BasicSetup {
         assertEq(p3Shares, 200e6, "P3: 200 shares");
 
         // Simulate opening a position: transfer funds to venue and track position value
-        // (In production, this happens via MasterHook → StageRegistry → Stage flow)
+        // (In production, this happens via MasterHook → Position → Stage flow)
         bytes32 posKey = keccak256(abi.encode(address(sub), "mock_position"));
 
         vm.stopPrank();
@@ -881,8 +1004,8 @@ contract AllocationTest is BasicSetup {
         usdc.transfer(address(mockVenue), 800e6);
         vm.startPrank(users.owner);
 
-        // Register position in StageRegistry and set its value
-        stageRegistry.updatePosition(key, posKey, stageKey, 800e6);
+        // Register position in Position and set its value
+        position.updatePosition(key, posKey, stageKey, 800e6);
         mockStage.setPositionValue(posKey, 800e6);
 
         assertEq(usdc.balanceOf(address(sub)), 1200e6, "Phase 2: 1200 liquid after order");

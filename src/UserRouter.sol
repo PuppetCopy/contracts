@@ -8,7 +8,7 @@ import {CoreContract} from "./utils/CoreContract.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 import {IUserRouter} from "./utils/interfaces/IUserRouter.sol";
 import {Allocation} from "./position/Allocation.sol";
-import {StageRegistry} from "./position/StageRegistry.sol";
+import {Position} from "./position/Position.sol";
 
 /**
  * @title UserRouter
@@ -18,7 +18,7 @@ import {StageRegistry} from "./position/StageRegistry.sol";
 contract UserRouter is IUserRouter, CoreContract {
     struct Config {
         Allocation allocation;
-        StageRegistry stageRegistry;
+        Position position;
     }
 
     Config public config;
@@ -33,28 +33,28 @@ contract UserRouter is IUserRouter, CoreContract {
     }
 
     /// @inheritdoc IUserRouter
-    function validatePreCall(address _subaccount, address _msgSender, uint _msgValue, bytes calldata _msgData)
+    function processPreCall(address _subaccount, IERC20 _token, address _msgSender, uint _msgValue, bytes calldata _msgData)
         external
         view
         returns (bytes memory hookData)
     {
-        return config.stageRegistry.validatePreCall(_subaccount, _msgSender, _msgValue, _msgData);
+        return config.position.processPreCall(_subaccount, _token, _msgSender, _msgValue, _msgData);
     }
 
     /// @inheritdoc IUserRouter
-    function settle(address _subaccount, bytes calldata _hookData) external {
-        config.stageRegistry.settle(_subaccount, _hookData);
+    function processPostCall(address _subaccount, bytes calldata _hookData) external view {
+        config.position.processPostCall(_subaccount, _hookData);
     }
 
     /// @inheritdoc IUserRouter
     function getPositionKeyList(bytes32 _matchingKey) external view returns (bytes32[] memory) {
-        return config.stageRegistry.getPositionKeyList(_matchingKey);
+        return config.position.getPositionKeyList(_matchingKey);
     }
 
     function _setConfig(bytes memory _data) internal override {
         Config memory _config = abi.decode(_data, (Config));
         require(address(_config.allocation) != address(0), "UserRouter: invalid allocation");
-        require(address(_config.stageRegistry) != address(0), "UserRouter: invalid stageRegistry");
+        require(address(_config.position) != address(0), "UserRouter: invalid position");
         config = _config;
     }
 }

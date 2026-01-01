@@ -48,4 +48,8 @@ interface IGmxReferralStorage {
     function tiers(uint _tierLevel) external view returns (uint, uint);
 
     function setCodeOwner(bytes32 _codeHash, address _owner) external;
+
+    // @dev set the referral code for the caller
+    // @param _code the referral code
+    function setTraderReferralCodeByUser(bytes32 _code) external;
 }

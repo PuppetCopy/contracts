@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {IAuthority} from "src/utils/interfaces/IAuthority.sol";
 import {Allocation} from "src/position/Allocation.sol";
-import {StageRegistry} from "src/position/StageRegistry.sol";
+import {Position} from "src/position/Position.sol";
 import {UserRouter} from "src/UserRouter.sol";
 import {ProxyUserRouter} from "src/utils/ProxyUserRouter.sol";
 
@@ -16,11 +16,11 @@ contract DeployUserRouter is BaseScript {
 
         Dictatorship dictatorship = Dictatorship(getDeployedAddress("Dictatorship"));
         Allocation allocation = Allocation(getDeployedAddress("Allocation"));
-        StageRegistry stageRegistry = StageRegistry(getDeployedAddress("StageRegistry"));
+        Position position = Position(getDeployedAddress("Position"));
         ProxyUserRouter proxyUserRouter = ProxyUserRouter(payable(getDeployedAddress("ProxyUserRouter")));
 
         UserRouter userRouter = new UserRouter(
-            IAuthority(address(dictatorship)), UserRouter.Config({allocation: allocation, stageRegistry: stageRegistry})
+            IAuthority(address(dictatorship)), UserRouter.Config({allocation: allocation, position: position})
         );
         proxyUserRouter.update(address(userRouter));
 
