@@ -8,7 +8,7 @@ import {CoreContract} from "./utils/CoreContract.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 import {IUserRouter} from "./utils/interfaces/IUserRouter.sol";
 import {Allocation} from "./position/Allocation.sol";
-import {VenueRegistry} from "./position/VenueRegistry.sol";
+import {StageRegistry} from "./position/StageRegistry.sol";
 
 /**
  * @title UserRouter
@@ -18,7 +18,7 @@ import {VenueRegistry} from "./position/VenueRegistry.sol";
 contract UserRouter is IUserRouter, CoreContract {
     struct Config {
         Allocation allocation;
-        VenueRegistry venueRegistry;
+        StageRegistry stageRegistry;
     }
 
     Config public config;
@@ -38,23 +38,23 @@ contract UserRouter is IUserRouter, CoreContract {
         view
         returns (bytes memory hookData)
     {
-        return config.venueRegistry.validatePreCall(_subaccount, _msgSender, _msgValue, _msgData);
+        return config.stageRegistry.validatePreCall(_subaccount, _msgSender, _msgValue, _msgData);
     }
 
     /// @inheritdoc IUserRouter
-    function processPostCall(address _subaccount, bytes calldata _hookData) external {
-        config.venueRegistry.processPostCall(_subaccount, _hookData);
+    function settle(address _subaccount, bytes calldata _hookData) external {
+        config.stageRegistry.settle(_subaccount, _hookData);
     }
 
     /// @inheritdoc IUserRouter
     function getPositionKeyList(bytes32 _matchingKey) external view returns (bytes32[] memory) {
-        return config.venueRegistry.getPositionKeyList(_matchingKey);
+        return config.stageRegistry.getPositionKeyList(_matchingKey);
     }
 
     function _setConfig(bytes memory _data) internal override {
         Config memory _config = abi.decode(_data, (Config));
         require(address(_config.allocation) != address(0), "UserRouter: invalid allocation");
-        require(address(_config.venueRegistry) != address(0), "UserRouter: invalid venueRegistry");
+        require(address(_config.stageRegistry) != address(0), "UserRouter: invalid stageRegistry");
         config = _config;
     }
 }

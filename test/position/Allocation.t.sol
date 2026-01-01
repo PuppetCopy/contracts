@@ -6,18 +6,19 @@ import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Acco
 import {MODULE_TYPE_EXECUTOR, MODULE_TYPE_HOOK} from "modulekit/module-bases/utils/ERC7579Constants.sol";
 
 import {Allocation} from "src/position/Allocation.sol";
-import {VenueRegistry} from "src/position/VenueRegistry.sol";
+import {StageRegistry} from "src/position/StageRegistry.sol";
+import {IStage} from "src/position/interface/IStage.sol";
 import {Error} from "src/utils/Error.sol";
 
 import {BasicSetup} from "../base/BasicSetup.t.sol";
 import {TestSmartAccount} from "../mock/TestSmartAccount.t.sol";
-import {MockVenueValidator, MockVenue} from "../mock/MockVenueValidator.t.sol";
+import {MockStage, MockVenue} from "../mock/MockStage.t.sol";
 import {MockERC20} from "../mock/MockERC20.t.sol";
 
 contract AllocationTest is BasicSetup {
     Allocation allocation;
-    VenueRegistry venueRegistry;
-    MockVenueValidator venueValidator;
+    StageRegistry stageRegistry;
+    MockStage mockStage;
     MockVenue mockVenue;
 
     TestSmartAccount masterSubaccount;
@@ -29,7 +30,7 @@ contract AllocationTest is BasicSetup {
     uint constant GAS_LIMIT = 500_000;
 
     bytes32 constant SUBACCOUNT_NAME = bytes32("main");
-    bytes32 venueKey;
+    bytes32 stageKey;
     bytes32 matchingKey;
 
     uint ownerPrivateKey = 0x1234;
@@ -43,11 +44,11 @@ contract AllocationTest is BasicSetup {
         owner = vm.addr(ownerPrivateKey);
         sessionSigner = vm.addr(signerPrivateKey);
 
-        venueRegistry = new VenueRegistry(dictator);
+        stageRegistry = new StageRegistry(dictator);
         allocation = new Allocation(
             dictator,
             Allocation.Config({
-                venueRegistry: venueRegistry,
+                stageRegistry: stageRegistry,
                 masterHook: address(1),
                 maxPuppetList: MAX_PUPPET_LIST,
                 transferOutGasLimit: GAS_LIMIT
@@ -57,22 +58,22 @@ contract AllocationTest is BasicSetup {
         dictator.setPermission(allocation, allocation.setCodeHash.selector, users.owner);
         allocation.setCodeHash(keccak256(type(TestSmartAccount).runtimeCode), true);
 
-        venueValidator = new MockVenueValidator();
+        mockStage = new MockStage();
         mockVenue = new MockVenue();
         mockVenue.setToken(usdc);
 
-        venueKey = keccak256("mock_venue");
+        stageKey = keccak256("mock_stage");
 
         dictator.setPermission(allocation, allocation.registerMasterSubaccount.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeAllocate.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeWithdraw.selector, users.owner);
         dictator.setPermission(allocation, allocation.setTokenCap.selector, users.owner);
-        dictator.setPermission(venueRegistry, venueRegistry.setVenue.selector, users.owner);
-        dictator.setPermission(venueRegistry, venueRegistry.updatePosition.selector, address(allocation));
-        dictator.setPermission(venueRegistry, venueRegistry.updatePosition.selector, users.owner);
+        dictator.setPermission(stageRegistry, stageRegistry.setHandler.selector, users.owner);
+        dictator.setPermission(stageRegistry, stageRegistry.updatePosition.selector, address(allocation));
+        dictator.setPermission(stageRegistry, stageRegistry.updatePosition.selector, users.owner);
 
         dictator.registerContract(address(allocation));
-        dictator.registerContract(address(venueRegistry));
+        dictator.registerContract(address(stageRegistry));
 
         masterSubaccount = new TestSmartAccount();
         puppet1 = new TestSmartAccount();
@@ -85,9 +86,7 @@ contract AllocationTest is BasicSetup {
 
         allocation.setTokenCap(usdc, TOKEN_CAP);
 
-        address[] memory entrypoints = new address[](1);
-        entrypoints[0] = address(mockVenue);
-        venueRegistry.setVenue(venueKey, venueValidator, entrypoints);
+        stageRegistry.setHandler(stageKey, IStage(address(mockStage)));
 
         matchingKey = keccak256(abi.encode(address(usdc), address(masterSubaccount)));
 
@@ -350,7 +349,7 @@ contract AllocationTest is BasicSetup {
         uint priceWithoutPosition = allocation.getSharePrice(matchingKey, 1000e6);
 
         bytes32 posKey = keccak256(abi.encode(address(masterSubaccount), "mock_position"));
-        venueValidator.setPositionValue(posKey, 500e6);
+        mockStage.setPositionValue(posKey, 500e6);
 
         uint priceWithPosition = allocation.getSharePrice(matchingKey, 1500e6);
 
@@ -874,7 +873,7 @@ contract AllocationTest is BasicSetup {
         assertEq(p3Shares, 200e6, "P3: 200 shares");
 
         // Simulate opening a position: transfer funds to venue and track position value
-        // (In production, this happens via MasterHook → VenueRegistry → Validator flow)
+        // (In production, this happens via MasterHook → StageRegistry → Stage flow)
         bytes32 posKey = keccak256(abi.encode(address(sub), "mock_position"));
 
         vm.stopPrank();
@@ -882,16 +881,15 @@ contract AllocationTest is BasicSetup {
         usdc.transfer(address(mockVenue), 800e6);
         vm.startPrank(users.owner);
 
-        // Register position in VenueRegistry and set its value
-        VenueRegistry.Venue memory venue = VenueRegistry.Venue({venueKey: venueKey, validator: venueValidator});
-        venueRegistry.updatePosition(key, posKey, venue, 800e6);
-        venueValidator.setPositionValue(posKey, 800e6);
+        // Register position in StageRegistry and set its value
+        stageRegistry.updatePosition(key, posKey, stageKey, 800e6);
+        mockStage.setPositionValue(posKey, 800e6);
 
         assertEq(usdc.balanceOf(address(sub)), 1200e6, "Phase 2: 1200 liquid after order");
         assertEq(usdc.balanceOf(address(mockVenue)), 800e6, "Phase 2: Venue has 800");
 
         // Simulate position profit: 800 spent -> 1200 value (50% profit)
-        venueValidator.setPositionValue(posKey, 1200e6);
+        mockStage.setPositionValue(posKey, 1200e6);
 
         uint sharePriceAfterProfit = allocation.getSharePrice(key, 1200e6 + 1200e6);
         assertGt(sharePriceAfterProfit, 1e30, "Phase 3: Share price increased");
@@ -986,7 +984,7 @@ contract AllocationTest is BasicSetup {
         }
 
         // Simulate closing profitable position - venue returns principal + profit
-        venueValidator.setPositionValue(posKey, 0);
+        mockStage.setPositionValue(posKey, 0);
         usdc.mint(address(mockVenue), 400e6); // Mint the 400 USDC profit (800 -> 1200)
 
         vm.stopPrank();

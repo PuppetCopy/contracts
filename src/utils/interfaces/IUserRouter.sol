@@ -18,7 +18,7 @@ interface IUserRouter {
         view
         returns (bytes memory hookData);
 
-    function processPostCall(address subaccount, bytes calldata hookData) external;
+    function settle(address subaccount, bytes calldata hookData) external;
 
     // ============ Position Passthrough ============
 

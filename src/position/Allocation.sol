@@ -26,12 +26,11 @@ import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "../utils/Precision.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
-import {IVenueValidator} from "./interface/IVenueValidator.sol";
-import {VenueRegistry} from "./VenueRegistry.sol";
+import {StageRegistry} from "./StageRegistry.sol";
 
 contract Allocation is CoreContract, IExecutor, EIP712 {
     struct Config {
-        VenueRegistry venueRegistry;
+        StageRegistry stageRegistry;
         address masterHook;
         uint maxPuppetList;
         uint transferOutGasLimit;
@@ -142,8 +141,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         }
 
         uint _allocation = _intent.token.balanceOf(address(_intent.subaccount));
-        (uint _positionValue, VenueRegistry.PositionInfo[] memory _positions) =
-            config.venueRegistry.snapshotNetValue(_key);
+        uint _positionValue = config.stageRegistry.getNetValue(_intent.token, _intent.subaccount) - _allocation;
         uint _sharePrice = getSharePrice(_key, _allocation + _positionValue);
         uint _totalShares = totalSharesMap[_key];
         uint _userShares = shareBalanceMap[_key][_intent.account];
@@ -202,7 +200,6 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
                 _amountList,
                 _allocation,
                 _positionValue,
-                _positions,
                 _allocated,
                 _sharePrice,
                 _userShares,
@@ -215,8 +212,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         bytes32 _key = _verifyIntent(_intent, _signature);
 
         uint _allocation = _intent.token.balanceOf(address(_intent.subaccount));
-        (uint _positionValue, VenueRegistry.PositionInfo[] memory _positions) =
-            config.venueRegistry.snapshotNetValue(_key);
+        uint _positionValue = config.stageRegistry.getNetValue(_intent.token, _intent.subaccount) - _allocation;
         uint _netValue = _allocation + _positionValue;
 
         uint _sharePrice = getSharePrice(_key, _netValue);
@@ -254,7 +250,6 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
                 _intent.amount,
                 _allocation - _amountOut,
                 _positionValue,
-                _positions,
                 _amountOut,
                 _sharesBurnt,
                 _sharePrice,
@@ -324,7 +319,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
 
     function _setConfig(bytes memory _data) internal override {
         Config memory _config = abi.decode(_data, (Config));
-        if (address(_config.venueRegistry) == address(0)) revert Error.Allocation__InvalidVenueRegistry();
+        if (address(_config.stageRegistry) == address(0)) revert Error.Allocation__InvalidStageRegistry();
         if (_config.masterHook == address(0)) revert Error.Allocation__InvalidMasterHook();
         if (_config.maxPuppetList == 0) revert Error.Allocation__InvalidMaxPuppetList();
         if (_config.transferOutGasLimit == 0) revert Error.Allocation__InvalidGasLimit();

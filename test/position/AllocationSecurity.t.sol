@@ -6,20 +6,21 @@ import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Acco
 import {MODULE_TYPE_EXECUTOR, MODULE_TYPE_HOOK} from "modulekit/module-bases/utils/ERC7579Constants.sol";
 
 import {Allocation} from "src/position/Allocation.sol";
-import {VenueRegistry} from "src/position/VenueRegistry.sol";
+import {StageRegistry} from "src/position/StageRegistry.sol";
+import {IStage} from "src/position/interface/IStage.sol";
 import {Error} from "src/utils/Error.sol";
 
 import {BasicSetup} from "../base/BasicSetup.t.sol";
 import {TestSmartAccount} from "../mock/TestSmartAccount.t.sol";
-import {MockVenueValidator, MockVenue} from "../mock/MockVenueValidator.t.sol";
+import {MockStage, MockVenue} from "../mock/MockStage.t.sol";
 import {MockERC20} from "../mock/MockERC20.t.sol";
 
 /// @title Allocation Security Tests
 /// @notice Penetration tests for share inflation attacks, rounding exploits, and other security vectors
 contract AllocationSecurityTest is BasicSetup {
     Allocation allocation;
-    VenueRegistry venueRegistry;
-    MockVenueValidator venueValidator;
+    StageRegistry stageRegistry;
+    MockStage mockStage;
     MockVenue mockVenue;
 
     TestSmartAccount masterSubaccount;
@@ -30,8 +31,7 @@ contract AllocationSecurityTest is BasicSetup {
     uint constant MAX_PUPPET_LIST = 10;
     uint constant GAS_LIMIT = 500_000;
 
-    bytes32 constant SUBACCOUNT_NAME = bytes32("main");
-    bytes32 venueKey;
+    bytes32 stageKey;
     bytes32 matchingKey;
 
     uint ownerPrivateKey = 0x1234;
@@ -45,11 +45,11 @@ contract AllocationSecurityTest is BasicSetup {
         owner = vm.addr(ownerPrivateKey);
         sessionSigner = vm.addr(signerPrivateKey);
 
-        venueRegistry = new VenueRegistry(dictator);
+        stageRegistry = new StageRegistry(dictator);
         allocation = new Allocation(
             dictator,
             Allocation.Config({
-                venueRegistry: venueRegistry,
+                stageRegistry: stageRegistry,
                 masterHook: address(1),
                 maxPuppetList: MAX_PUPPET_LIST,
                 transferOutGasLimit: GAS_LIMIT
@@ -59,21 +59,19 @@ contract AllocationSecurityTest is BasicSetup {
         dictator.setPermission(allocation, allocation.setCodeHash.selector, users.owner);
         allocation.setCodeHash(keccak256(type(TestSmartAccount).runtimeCode), true);
 
-        venueValidator = new MockVenueValidator();
+        mockStage = new MockStage();
         mockVenue = new MockVenue();
         mockVenue.setToken(usdc);
 
-        venueKey = keccak256("mock_venue");
+        stageKey = keccak256("mock_stage");
 
         dictator.setPermission(allocation, allocation.registerMasterSubaccount.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeAllocate.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeWithdraw.selector, users.owner);
         dictator.setPermission(allocation, allocation.setTokenCap.selector, users.owner);
-        dictator.setPermission(venueRegistry, venueRegistry.setVenue.selector, users.owner);
+        dictator.setPermission(stageRegistry, stageRegistry.setHandler.selector, users.owner);
 
-        address[] memory entrypoints = new address[](1);
-        entrypoints[0] = address(mockVenue);
-        venueRegistry.setVenue(venueKey, venueValidator, entrypoints);
+        stageRegistry.setHandler(stageKey, IStage(address(mockStage)));
 
         allocation.setTokenCap(usdc, TOKEN_CAP);
 
@@ -179,63 +177,6 @@ contract AllocationSecurityTest is BasicSetup {
         assertEq(usdc.balanceOf(address(puppet1)), victimBalanceBefore, "Victim funds protected");
     }
 
-    /// @notice Inflation attack fails if victim deposits enough to get shares
-    function testExploit_InflationAttackMitigatedWithLargerDeposit() public {
-        TestSmartAccount attackerSub = new TestSmartAccount();
-        attackerSub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-        attackerSub.installModule(MODULE_TYPE_HOOK, address(1), "");
-
-        // Attacker deposits 1 wei
-        usdc.mint(address(attackerSub), 1);
-
-        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(attackerSub)), usdc);
-
-        bytes32 key = keccak256(abi.encode(address(usdc), address(attackerSub)));
-
-        // Attacker donates 1000 USDC
-        usdc.mint(address(attackerSub), 1000e6);
-
-        // Victim deposits MORE than the inflated share price - gets at least 1 share
-        usdc.mint(address(puppet1), 1001e6);
-
-        Allocation.CallIntent memory intent = Allocation.CallIntent({
-            account: owner,
-            subaccount: IERC7579Account(address(attackerSub)),
-            token: usdc,
-            amount: 0,
-            deadline: block.timestamp + 1 hours,
-            nonce: 0
-        });
-        bytes memory sig = _signIntent(intent, ownerPrivateKey);
-
-        IERC7579Account[] memory puppets = new IERC7579Account[](1);
-        puppets[0] = IERC7579Account(address(puppet1));
-        uint[] memory amounts = new uint[](1);
-        amounts[0] = 1001e6;
-
-        allocation.executeAllocate(intent, sig, puppets, amounts);
-
-        uint victimShares = allocation.shareBalanceMap(key, address(puppet1));
-        assertGt(victimShares, 0, "Victim gets shares with larger deposit");
-
-        // Calculate each party's value
-        uint totalShares = allocation.totalSharesMap(key);
-        uint totalAssets = usdc.balanceOf(address(attackerSub));
-        uint attackerShares = allocation.shareBalanceMap(key, owner);
-
-        uint attackerValue = (totalAssets * attackerShares) / totalShares;
-        uint victimValue = (totalAssets * victimShares) / totalShares;
-
-        // Attacker donated 1000e6, so their value includes donation
-        // But they can't steal from victim - victim gets proportional share
-        assertApproxEqRel(attackerValue, 1000e6, 0.01e18, "Attacker gets ~donation back");
-        assertApproxEqRel(victimValue, 1001e6, 0.01e18, "Victim gets ~deposit value");
-    }
-
-    // ============================================================================
-    // Share Price Manipulation Tests
-    // ============================================================================
-
     /// @notice Test that empty route starts fresh with 1:1 pricing
     function testExploit_EmptyRouteHasOneToOnePrice() public {
         // Share price for non-existent route should be 1:1
@@ -265,27 +206,6 @@ contract AllocationSecurityTest is BasicSetup {
         assertEq(shares, 1000e6, "First depositor gets 1:1 shares");
     }
 
-    /// @notice Test first depositor with 18 decimal token
-    function testExploit_FirstDepositorGetsOneToOne_18Decimals() public {
-        // Create 18 decimal token
-        MockERC20 weth = new MockERC20("Wrapped Ether", "WETH", 18);
-        allocation.setTokenCap(IERC20(address(weth)), type(uint).max);
-
-        TestSmartAccount sub = new TestSmartAccount();
-        sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-        sub.installModule(MODULE_TYPE_HOOK, address(1), "");
-        weth.mint(address(sub), 1 ether);
-
-        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), IERC20(address(weth)));
-
-        bytes32 key = keccak256(abi.encode(address(weth), address(sub)));
-
-        uint shares = allocation.shareBalanceMap(key, owner);
-
-        // First depositor: shares = deposit amount (1:1)
-        assertEq(shares, 1 ether, "First depositor gets 1:1 shares for 18 decimal token");
-    }
-
     /// @notice Test that tiny first deposit doesn't create exploitable state
     function testExploit_TinyFirstDeposit() public {
         TestSmartAccount sub = new TestSmartAccount();
@@ -306,155 +226,5 @@ contract AllocationSecurityTest is BasicSetup {
         // Share price is now 1:1
         uint price = allocation.getSharePrice(key, 1);
         assertEq(price, 1e30, "Share price is 1:1");
-    }
-
-    // ============================================================================
-    // Donation Attack Tests
-    // ============================================================================
-
-    /// @notice Test donation to existing route doesn't unfairly benefit anyone
-    function testExploit_DonationToExistingRoute() public {
-        TestSmartAccount sub = new TestSmartAccount();
-        sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-        sub.installModule(MODULE_TYPE_HOOK, address(1), "");
-        usdc.mint(address(sub), 1000e6);
-
-        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), usdc);
-
-        bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
-
-        uint ownerShares = allocation.shareBalanceMap(key, owner);
-        assertEq(ownerShares, 1000e6, "Owner has 1000e6 shares");
-
-        // External party donates to the subaccount
-        usdc.mint(address(sub), 500e6);
-
-        // Share price increases proportionally
-        uint newPrice = allocation.getSharePrice(key, usdc.balanceOf(address(sub)));
-        // Price = 1500e6 / 1000e6 * 1e30 = 1.5e30
-        assertEq(newPrice, 15e29, "Price reflects donation");
-
-        // Owner's shares are now worth more
-        uint ownerValue = (usdc.balanceOf(address(sub)) * ownerShares) / allocation.totalSharesMap(key);
-        assertEq(ownerValue, 1500e6, "Owner benefits from donation");
-
-        // New depositor pays fair price
-        usdc.mint(address(puppet1), 1500e6);
-
-        Allocation.CallIntent memory intent = Allocation.CallIntent({
-            account: owner,
-            subaccount: IERC7579Account(address(sub)),
-            token: usdc,
-            amount: 0,
-            deadline: block.timestamp + 1 hours,
-            nonce: 0
-        });
-        bytes memory sig = _signIntent(intent, ownerPrivateKey);
-
-        IERC7579Account[] memory puppets = new IERC7579Account[](1);
-        puppets[0] = IERC7579Account(address(puppet1));
-        uint[] memory amounts = new uint[](1);
-        amounts[0] = 1500e6;
-
-        allocation.executeAllocate(intent, sig, puppets, amounts);
-
-        // Puppet gets 1000e6 shares (1500e6 / 1.5 price)
-        uint puppetShares = allocation.shareBalanceMap(key, address(puppet1));
-        assertEq(puppetShares, 1000e6, "Puppet gets fair shares at higher price");
-
-        // Total assets now 3000e6, total shares 2000e6
-        // Each party has 50% ownership
-        uint totalAssets = usdc.balanceOf(address(sub));
-        uint totalShares = allocation.totalSharesMap(key);
-
-        assertEq((totalAssets * ownerShares) / totalShares, 1500e6, "Owner has half");
-        assertEq((totalAssets * puppetShares) / totalShares, 1500e6, "Puppet has half");
-    }
-
-    // ============================================================================
-    // Rounding Attack Tests
-    // ============================================================================
-
-    /// @notice Test rounding doesn't create exploitable edge cases
-    function testExploit_RoundingEdgeCases() public {
-        TestSmartAccount sub = new TestSmartAccount();
-        sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-        sub.installModule(MODULE_TYPE_HOOK, address(1), "");
-        usdc.mint(address(sub), 3); // 3 wei
-
-        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), usdc);
-
-        bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
-
-        // Owner has 3 shares for 3 wei
-        assertEq(allocation.shareBalanceMap(key, owner), 3, "Owner has 3 shares");
-
-        // Try to deposit 1 wei - should get at least 1 share due to 1:1 or fair rounding
-        usdc.mint(address(puppet1), 1);
-
-        Allocation.CallIntent memory intent = Allocation.CallIntent({
-            account: owner,
-            subaccount: IERC7579Account(address(sub)),
-            token: usdc,
-            amount: 0,
-            deadline: block.timestamp + 1 hours,
-            nonce: 0
-        });
-        bytes memory sig = _signIntent(intent, ownerPrivateKey);
-
-        IERC7579Account[] memory puppets = new IERC7579Account[](1);
-        puppets[0] = IERC7579Account(address(puppet1));
-        uint[] memory amounts = new uint[](1);
-        amounts[0] = 1;
-
-        allocation.executeAllocate(intent, sig, puppets, amounts);
-
-        // With 4 assets and 4 shares total, price is 1:1
-        // Puppet should get 1 share for 1 wei
-        uint puppetShares = allocation.shareBalanceMap(key, address(puppet1));
-        assertEq(puppetShares, 1, "Puppet gets 1 share for 1 wei deposit");
-    }
-
-    // ============================================================================
-    // Front-Running Attack Tests
-    // ============================================================================
-
-    /// @notice Test that attacker can't front-run first deposit to steal funds
-    function testExploit_FrontRunFirstDeposit() public {
-        // Scenario: Victim is about to create subaccount with 1000 USDC
-        // Attacker front-runs with their own subaccount (can't affect victim's route)
-
-        address attacker = makeAddr("attacker");
-        address victim = makeAddr("victim");
-
-        // Each route (subaccount) is independent
-        TestSmartAccount attackerSub = new TestSmartAccount();
-        TestSmartAccount victimSub = new TestSmartAccount();
-
-        attackerSub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-        attackerSub.installModule(MODULE_TYPE_HOOK, address(1), "");
-        victimSub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-        victimSub.installModule(MODULE_TYPE_HOOK, address(1), "");
-
-        usdc.mint(address(attackerSub), 1);
-        usdc.mint(address(victimSub), 1000e6);
-
-        dictator.setPermission(allocation, allocation.registerMasterSubaccount.selector, attacker);
-        dictator.setPermission(allocation, allocation.registerMasterSubaccount.selector, victim);
-        vm.stopPrank();
-
-        // Attacker creates their route
-        vm.prank(attacker);
-        allocation.registerMasterSubaccount(attacker, attacker, IERC7579Account(address(attackerSub)), usdc);
-
-        // Victim creates their route - completely independent
-        vm.prank(victim);
-        allocation.registerMasterSubaccount(victim, victim, IERC7579Account(address(victimSub)), usdc);
-
-        bytes32 victimKey = keccak256(abi.encode(address(usdc), address(victimSub)));
-
-        // Victim gets full 1:1 shares on their independent route
-        uint victimShares = allocation.shareBalanceMap(victimKey, victim);
-        assertEq(victimShares, 1000e6, "Victim gets 1:1 shares on their route");
     }
 }

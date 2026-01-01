@@ -46,7 +46,7 @@ contract MasterHook is IHook {
     }
 
     function postCheck(bytes calldata hookData) external {
-        router.processPostCall(msg.sender, hookData);
+        router.settle(msg.sender, hookData);
     }
 
     /// @notice Install hook and register as master subaccount
