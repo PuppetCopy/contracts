@@ -2,7 +2,9 @@
 pragma solidity ^0.8.33;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
+import {IERC7579Account, Execution} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
+import {ModeLib, ModeCode, CallType, CALLTYPE_SINGLE, CALLTYPE_BATCH, CALLTYPE_STATIC} from "modulekit/accounts/common/lib/ModeLib.sol";
+import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
 
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
@@ -10,7 +12,7 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {IVenueValidator} from "./interface/IVenueValidator.sol";
 import {PositionUtils} from "./utils/PositionUtils.sol";
 
-contract Position is CoreContract {
+contract VenueRegistry is CoreContract {
     struct Venue {
         bytes32 venueKey;
         IVenueValidator validator;
@@ -35,17 +37,73 @@ contract Position is CoreContract {
         _venue.validator = venueValidatorMap[_venue.venueKey];
     }
 
-    function validateCall(
-        IERC7579Account _subaccount,
-        IERC20 _token,
-        uint256 _amount,
-        address _target,
-        bytes calldata _callData
-    ) external view returns (Venue memory _venue) {
+    function getVenueByTarget(address _target) external view returns (Venue memory _venue) {
         _venue.venueKey = venueKeyMap[_target];
         _venue.validator = venueValidatorMap[_venue.venueKey];
-        if (address(_venue.validator) == address(0)) revert Error.Position__VenueNotRegistered(_venue.venueKey);
-        _venue.validator.validate(_subaccount, _token, _amount, _callData);
+        if (address(_venue.validator) == address(0)) revert Error.VenueRegistry__VenueNotRegistered(_venue.venueKey);
+    }
+
+    // ============ Hook Validation ============
+
+    /// @notice Validate before execution, parse msgData and route to venue validator
+    function validatePreCall(
+        address _subaccount,
+        address,
+        uint256,
+        bytes calldata _msgData
+    ) external view returns (bytes memory hookData) {
+        if (_msgData.length < 4) return "";
+
+        // Only validate execute() calls
+        if (bytes4(_msgData[:4]) != IERC7579Account.execute.selector) return "";
+
+        ModeCode mode = ModeCode.wrap(bytes32(_msgData[4:36]));
+        CallType callType = ModeLib.getCallType(mode);
+        bytes calldata executionData = _msgData[36:];
+
+        // Static calls are read-only, allow
+        if (callType == CALLTYPE_STATIC) return "";
+
+        if (callType == CALLTYPE_SINGLE) {
+            (address target, uint256 value, bytes calldata callData) = ExecutionLib.decodeSingle(executionData);
+            IVenueValidator validator = _getValidator(target);
+            bytes memory venueHookData = validator.validatePreCallSingle(_subaccount, target, value, callData);
+            if (venueHookData.length == 0) return "";
+            return abi.encode(target, venueHookData);
+        }
+
+        if (callType == CALLTYPE_BATCH) {
+            Execution[] calldata executions = ExecutionLib.decodeBatch(executionData);
+            if (executions.length == 0) return "";
+            // Route to venue based on first execution's target (batch goes to same venue)
+            address target = executions[0].target;
+            IVenueValidator validator = _getValidator(target);
+            bytes memory venueHookData = validator.validatePreCallBatch(_subaccount, executions);
+            if (venueHookData.length == 0) return "";
+            return abi.encode(target, venueHookData);
+        }
+
+        // Block DELEGATECALL and unknown call types
+        revert Error.VenueRegistry__InvalidCallType();
+    }
+
+    /// @notice Validate after execution using hookData from preCheck
+    function validatePostCall(
+        address _subaccount,
+        bytes calldata _hookData
+    ) external view {
+        if (_hookData.length == 0) return;
+
+        // hookData contains venue address + venue-specific data
+        (address venueTarget, bytes memory venueHookData) = abi.decode(_hookData, (address, bytes));
+        IVenueValidator validator = _getValidator(venueTarget);
+        validator.validatePostCall(_subaccount, venueHookData);
+    }
+
+    function _getValidator(address _target) internal view returns (IVenueValidator validator) {
+        bytes32 venueKey = venueKeyMap[_target];
+        validator = venueValidatorMap[venueKey];
+        if (address(validator) == address(0)) revert Error.VenueRegistry__VenueNotRegistered(venueKey);
     }
 
     function getValidator(bytes32 _venueKey) external view returns (IVenueValidator) {
@@ -86,8 +144,8 @@ contract Position is CoreContract {
         }
     }
 
-    function getNetValue(IERC20 _token, IERC7579Account _subaccount, bytes32 _name) external view returns (uint256) {
-        bytes32 _matchingKey = PositionUtils.getMatchingKey(_token, _subaccount, _name);
+    function getNetValue(IERC20 _token, IERC7579Account _subaccount) external view returns (uint256) {
+        bytes32 _matchingKey = PositionUtils.getMatchingKey(_token, _subaccount);
         uint256 _netValue = _token.balanceOf(address(_subaccount));
 
         bytes32[] storage _keys = positionKeyListMap[_matchingKey];
@@ -105,7 +163,7 @@ contract Position is CoreContract {
         for (uint _i = 0; _i < _keys.length; ++_i) {
             bytes32 _positionKey = _keys[_i];
             Venue storage _venue = positionVenueMap[_positionKey];
-            if (address(_venue.validator) == address(0)) revert Error.Position__VenueNotRegistered(_venue.venueKey);
+            if (address(_venue.validator) == address(0)) revert Error.VenueRegistry__VenueNotRegistered(_venue.venueKey);
 
             uint256 _npv = _venue.validator.getPositionNetValue(_positionKey);
             _positionValue += _npv;

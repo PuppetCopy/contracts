@@ -57,7 +57,8 @@ library Error {
     error Allocation__IntentExpired(uint deadline, uint currentTime);
     error Allocation__InvalidSignature(address expected, address recovered);
     error Allocation__InvalidNonce(uint expected, uint provided);
-    error Allocation__InvalidPosition();
+    error Allocation__InvalidVenueRegistry();
+    error Allocation__InvalidMasterHook();
     error Allocation__InvalidMaxPuppetList();
     error Allocation__InvalidGasLimit();
     error Allocation__TokenNotAllowed();
@@ -67,6 +68,8 @@ library Error {
     error Allocation__ZeroShares();
     error Allocation__InsufficientLiquidity();
     error Allocation__AmountMismatch(uint expected, uint actual);
+    error Allocation__InvalidAccountCodeHash();
+    error Allocation__MasterHookNotInstalled();
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();
@@ -74,7 +77,8 @@ library Error {
 
     error VenueRegistry__ContractNotWhitelisted(address venue);
 
-    error Position__VenueNotRegistered(bytes32 venueKey);
+    error VenueRegistry__VenueNotRegistered(bytes32 venueKey);
+    error VenueRegistry__InvalidCallType();
 
     error GmxVenueValidator__InvalidCallData();
     error GmxVenueValidator__InvalidOrderType();

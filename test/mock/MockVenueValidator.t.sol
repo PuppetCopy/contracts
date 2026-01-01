@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.33;
 
-import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
+import {IERC7579Account, Execution} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 import {IVenueValidator} from "src/position/interface/IVenueValidator.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -20,16 +20,32 @@ contract MockVenueValidator is IVenueValidator {
         revertReason = _reason;
     }
 
-    function validate(
-        IERC7579Account _subaccount,
-        IERC20,
+    function validatePreCallSingle(
+        address _subaccount,
+        address,
         uint256,
         bytes calldata
-    ) external view {
+    ) external view override returns (bytes memory) {
         if (shouldRevertValidation) revert(revertReason);
-        bytes32 posKey = keccak256(abi.encode(address(_subaccount), "mock_position"));
+        bytes32 posKey = keccak256(abi.encode(_subaccount, "mock_position"));
         if (positionValues[posKey] == type(uint256).max) revert("MockVenueValidator: validation failed");
+        return "";
     }
+
+    function validatePreCallBatch(
+        address _subaccount,
+        Execution[] calldata
+    ) external view override returns (bytes memory) {
+        if (shouldRevertValidation) revert(revertReason);
+        bytes32 posKey = keccak256(abi.encode(_subaccount, "mock_position"));
+        if (positionValues[posKey] == type(uint256).max) revert("MockVenueValidator: validation failed");
+        return "";
+    }
+
+    function validatePostCall(
+        address,
+        bytes calldata
+    ) external pure override {}
 
     function getPositionNetValue(bytes32 _positionKey) external view returns (uint256) {
         return positionValues[_positionKey];
@@ -43,7 +59,26 @@ contract MockVenueValidator is IVenueValidator {
 
 /// @dev Passthrough validator that returns bytes32(0) for all calls - used for whitelisting non-venue contracts like tokens
 contract PassthroughValidator is IVenueValidator {
-    function validate(IERC7579Account, IERC20, uint256, bytes calldata) external pure {}
+    function validatePreCallSingle(
+        address,
+        address,
+        uint256,
+        bytes calldata
+    ) external pure override returns (bytes memory) {
+        return "";
+    }
+
+    function validatePreCallBatch(
+        address,
+        Execution[] calldata
+    ) external pure override returns (bytes memory) {
+        return "";
+    }
+
+    function validatePostCall(
+        address,
+        bytes calldata
+    ) external pure override {}
 
     function getPositionNetValue(bytes32) external pure returns (uint256) {
         return 0;

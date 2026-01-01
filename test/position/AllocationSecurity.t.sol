@@ -3,10 +3,10 @@ pragma solidity ^0.8.33;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
-import {MODULE_TYPE_EXECUTOR} from "modulekit/module-bases/utils/ERC7579Constants.sol";
+import {MODULE_TYPE_EXECUTOR, MODULE_TYPE_HOOK} from "modulekit/module-bases/utils/ERC7579Constants.sol";
 
 import {Allocation} from "src/position/Allocation.sol";
-import {Position} from "src/position/Position.sol";
+import {VenueRegistry} from "src/position/VenueRegistry.sol";
 import {Error} from "src/utils/Error.sol";
 
 import {BasicSetup} from "../base/BasicSetup.t.sol";
@@ -18,7 +18,7 @@ import {MockERC20} from "../mock/MockERC20.t.sol";
 /// @notice Penetration tests for share inflation attacks, rounding exploits, and other security vectors
 contract AllocationSecurityTest is BasicSetup {
     Allocation allocation;
-    Position position;
+    VenueRegistry venueRegistry;
     MockVenueValidator venueValidator;
     MockVenue mockVenue;
 
@@ -45,15 +45,19 @@ contract AllocationSecurityTest is BasicSetup {
         owner = vm.addr(ownerPrivateKey);
         sessionSigner = vm.addr(signerPrivateKey);
 
-        position = new Position(dictator);
+        venueRegistry = new VenueRegistry(dictator);
         allocation = new Allocation(
             dictator,
             Allocation.Config({
-                position: position,
+                venueRegistry: venueRegistry,
+                masterHook: address(1),
                 maxPuppetList: MAX_PUPPET_LIST,
                 transferOutGasLimit: GAS_LIMIT
             })
         );
+
+        dictator.setPermission(allocation, allocation.setCodeHash.selector, users.owner);
+        allocation.setCodeHash(keccak256(type(TestSmartAccount).runtimeCode), true);
 
         venueValidator = new MockVenueValidator();
         mockVenue = new MockVenue();
@@ -61,16 +65,16 @@ contract AllocationSecurityTest is BasicSetup {
 
         venueKey = keccak256("mock_venue");
 
-        dictator.setPermission(allocation, allocation.createMasterSubaccount.selector, users.owner);
+        dictator.setPermission(allocation, allocation.registerMasterSubaccount.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeAllocate.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeWithdraw.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeOrder.selector, users.owner);
         dictator.setPermission(allocation, allocation.setTokenCap.selector, users.owner);
-        dictator.setPermission(position, position.setVenue.selector, users.owner);
+        dictator.setPermission(venueRegistry, venueRegistry.setVenue.selector, users.owner);
 
         address[] memory entrypoints = new address[](1);
         entrypoints[0] = address(mockVenue);
-        position.setVenue(venueKey, venueValidator, entrypoints);
+        venueRegistry.setVenue(venueKey, venueValidator, entrypoints);
 
         allocation.setTokenCap(usdc, TOKEN_CAP);
 
@@ -79,6 +83,7 @@ contract AllocationSecurityTest is BasicSetup {
         puppet2 = new TestSmartAccount();
 
         masterSubaccount.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
+        masterSubaccount.installModule(MODULE_TYPE_HOOK, address(1), "");
         puppet1.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
         puppet2.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
 
@@ -86,7 +91,7 @@ contract AllocationSecurityTest is BasicSetup {
         usdc.mint(address(puppet1), 500e6);
         usdc.mint(address(puppet2), 500e6);
 
-        matchingKey = keccak256(abi.encode(address(usdc), address(masterSubaccount), SUBACCOUNT_NAME));
+        matchingKey = keccak256(abi.encode(address(usdc), address(masterSubaccount)));
     }
 
     function _signIntent(Allocation.CallIntent memory intent, uint256 privateKey) internal view returns (bytes memory) {
@@ -94,7 +99,6 @@ contract AllocationSecurityTest is BasicSetup {
             allocation.CALL_INTENT_TYPEHASH(),
             intent.account,
             intent.subaccount,
-            intent.subaccountName,
             intent.token,
             intent.amount,
             intent.deadline,
@@ -124,19 +128,18 @@ contract AllocationSecurityTest is BasicSetup {
         // Setup: use owner as attacker with a new subaccount
         TestSmartAccount attackerSub = new TestSmartAccount();
         attackerSub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
+        attackerSub.installModule(MODULE_TYPE_HOOK, address(1), "");
 
         // Attacker deposits just 1 wei
         usdc.mint(address(attackerSub), 1);
 
-        allocation.createMasterSubaccount(
+        allocation.registerMasterSubaccount(
             owner,
             sessionSigner,
             IERC7579Account(address(attackerSub)),
-            usdc,
-            bytes32("attack")
-        );
+            usdc);
 
-        bytes32 key = keccak256(abi.encode(address(usdc), address(attackerSub), bytes32("attack")));
+        bytes32 key = keccak256(abi.encode(address(usdc), address(attackerSub)));
 
         // Attacker gets 1 share for 1 wei (1:1 ratio)
         uint256 attackerShares = allocation.shareBalanceMap(key, owner);
@@ -155,7 +158,6 @@ contract AllocationSecurityTest is BasicSetup {
         Allocation.CallIntent memory intent = Allocation.CallIntent({
             account: owner,
             subaccount: IERC7579Account(address(attackerSub)),
-            subaccountName: bytes32("attack"),
             token: usdc,
             amount: 0,
             deadline: block.timestamp + 1 hours,
@@ -182,19 +184,19 @@ contract AllocationSecurityTest is BasicSetup {
     function testExploit_InflationAttackMitigatedWithLargerDeposit() public {
         TestSmartAccount attackerSub = new TestSmartAccount();
         attackerSub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
+        attackerSub.installModule(MODULE_TYPE_HOOK, address(1), "");
 
         // Attacker deposits 1 wei
         usdc.mint(address(attackerSub), 1);
 
-        allocation.createMasterSubaccount(
+        allocation.registerMasterSubaccount(
             owner,
             sessionSigner,
             IERC7579Account(address(attackerSub)),
-            usdc,
-            bytes32("attack2")
-        );
+            usdc);
 
-        bytes32 key = keccak256(abi.encode(address(usdc), address(attackerSub), bytes32("attack2")));
+
+        bytes32 key = keccak256(abi.encode(address(usdc), address(attackerSub)));
 
         // Attacker donates 1000 USDC
         usdc.mint(address(attackerSub), 1000e6);
@@ -205,7 +207,6 @@ contract AllocationSecurityTest is BasicSetup {
         Allocation.CallIntent memory intent = Allocation.CallIntent({
             account: owner,
             subaccount: IERC7579Account(address(attackerSub)),
-            subaccountName: bytes32("attack2"),
             token: usdc,
             amount: 0,
             deadline: block.timestamp + 1 hours,
@@ -258,17 +259,16 @@ contract AllocationSecurityTest is BasicSetup {
         // USDC has 6 decimals
         TestSmartAccount sub = new TestSmartAccount();
         sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
+        sub.installModule(MODULE_TYPE_HOOK, address(1), "");
         usdc.mint(address(sub), 1000e6);
 
-        allocation.createMasterSubaccount(
+        allocation.registerMasterSubaccount(
             owner,
             sessionSigner,
             IERC7579Account(address(sub)),
-            usdc,
-            bytes32("decimals6")
-        );
+            usdc);
 
-        bytes32 key = keccak256(abi.encode(address(usdc), address(sub), bytes32("decimals6")));
+        bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
         uint256 shares = allocation.shareBalanceMap(key, owner);
 
         // First depositor: shares = deposit amount (1:1)
@@ -283,17 +283,17 @@ contract AllocationSecurityTest is BasicSetup {
 
         TestSmartAccount sub = new TestSmartAccount();
         sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
+        sub.installModule(MODULE_TYPE_HOOK, address(1), "");
         weth.mint(address(sub), 1 ether);
 
-        allocation.createMasterSubaccount(
+        allocation.registerMasterSubaccount(
             owner,
             sessionSigner,
             IERC7579Account(address(sub)),
-            IERC20(address(weth)),
-            bytes32("decimals18")
-        );
+            IERC20(address(weth)));
 
-        bytes32 key = keccak256(abi.encode(address(weth), address(sub), bytes32("decimals18")));
+        bytes32 key = keccak256(abi.encode(address(weth), address(sub)));
+
         uint256 shares = allocation.shareBalanceMap(key, owner);
 
         // First depositor: shares = deposit amount (1:1)
@@ -304,19 +304,18 @@ contract AllocationSecurityTest is BasicSetup {
     function testExploit_TinyFirstDeposit() public {
         TestSmartAccount sub = new TestSmartAccount();
         sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
+        sub.installModule(MODULE_TYPE_HOOK, address(1), "");
 
         // Minimum possible deposit: 1 wei
         usdc.mint(address(sub), 1);
 
-        allocation.createMasterSubaccount(
+        allocation.registerMasterSubaccount(
             owner,
             sessionSigner,
             IERC7579Account(address(sub)),
-            usdc,
-            bytes32("tiny")
-        );
+            usdc);
 
-        bytes32 key = keccak256(abi.encode(address(usdc), address(sub), bytes32("tiny")));
+        bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
 
         // First depositor gets 1 share
         assertEq(allocation.shareBalanceMap(key, owner), 1, "Gets 1 share for 1 wei");
@@ -335,17 +334,16 @@ contract AllocationSecurityTest is BasicSetup {
     function testExploit_DonationToExistingRoute() public {
         TestSmartAccount sub = new TestSmartAccount();
         sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
+        sub.installModule(MODULE_TYPE_HOOK, address(1), "");
         usdc.mint(address(sub), 1000e6);
 
-        allocation.createMasterSubaccount(
+        allocation.registerMasterSubaccount(
             owner,
             sessionSigner,
             IERC7579Account(address(sub)),
-            usdc,
-            bytes32("donation")
-        );
+            usdc);
 
-        bytes32 key = keccak256(abi.encode(address(usdc), address(sub), bytes32("donation")));
+        bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
 
         uint256 ownerShares = allocation.shareBalanceMap(key, owner);
         assertEq(ownerShares, 1000e6, "Owner has 1000e6 shares");
@@ -368,7 +366,6 @@ contract AllocationSecurityTest is BasicSetup {
         Allocation.CallIntent memory intent = Allocation.CallIntent({
             account: owner,
             subaccount: IERC7579Account(address(sub)),
-            subaccountName: bytes32("donation"),
             token: usdc,
             amount: 0,
             deadline: block.timestamp + 1 hours,
@@ -404,17 +401,16 @@ contract AllocationSecurityTest is BasicSetup {
     function testExploit_RoundingEdgeCases() public {
         TestSmartAccount sub = new TestSmartAccount();
         sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
+        sub.installModule(MODULE_TYPE_HOOK, address(1), "");
         usdc.mint(address(sub), 3);  // 3 wei
 
-        allocation.createMasterSubaccount(
+        allocation.registerMasterSubaccount(
             owner,
             sessionSigner,
             IERC7579Account(address(sub)),
-            usdc,
-            bytes32("rounding")
-        );
+            usdc);
 
-        bytes32 key = keccak256(abi.encode(address(usdc), address(sub), bytes32("rounding")));
+        bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
 
         // Owner has 3 shares for 3 wei
         assertEq(allocation.shareBalanceMap(key, owner), 3, "Owner has 3 shares");
@@ -425,7 +421,6 @@ contract AllocationSecurityTest is BasicSetup {
         Allocation.CallIntent memory intent = Allocation.CallIntent({
             account: owner,
             subaccount: IERC7579Account(address(sub)),
-            subaccountName: bytes32("rounding"),
             token: usdc,
             amount: 0,
             deadline: block.timestamp + 1 hours,
@@ -463,36 +458,34 @@ contract AllocationSecurityTest is BasicSetup {
         TestSmartAccount victimSub = new TestSmartAccount();
 
         attackerSub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
+        attackerSub.installModule(MODULE_TYPE_HOOK, address(1), "");
         victimSub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
+        victimSub.installModule(MODULE_TYPE_HOOK, address(1), "");
 
         usdc.mint(address(attackerSub), 1);
         usdc.mint(address(victimSub), 1000e6);
 
-        dictator.setPermission(allocation, allocation.createMasterSubaccount.selector, attacker);
-        dictator.setPermission(allocation, allocation.createMasterSubaccount.selector, victim);
+        dictator.setPermission(allocation, allocation.registerMasterSubaccount.selector, attacker);
+        dictator.setPermission(allocation, allocation.registerMasterSubaccount.selector, victim);
         vm.stopPrank();
 
         // Attacker creates their route
         vm.prank(attacker);
-        allocation.createMasterSubaccount(
+        allocation.registerMasterSubaccount(
             attacker,
             attacker,
             IERC7579Account(address(attackerSub)),
-            usdc,
-            bytes32("attacker_route")
-        );
+            usdc);
 
         // Victim creates their route - completely independent
         vm.prank(victim);
-        allocation.createMasterSubaccount(
+        allocation.registerMasterSubaccount(
             victim,
             victim,
             IERC7579Account(address(victimSub)),
-            usdc,
-            bytes32("victim_route")
-        );
+            usdc);
 
-        bytes32 victimKey = keccak256(abi.encode(address(usdc), address(victimSub), bytes32("victim_route")));
+        bytes32 victimKey = keccak256(abi.encode(address(usdc), address(victimSub)));
 
         // Victim gets full 1:1 shares on their independent route
         uint256 victimShares = allocation.shareBalanceMap(victimKey, victim);

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.33;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
+import {IERC7579Account, Execution} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 
 interface IVenueValidator {
     struct PositionInfo {
@@ -10,12 +10,31 @@ interface IVenueValidator {
         uint256 netValue;
     }
 
-    function validate(
-        IERC7579Account subaccount,
-        IERC20 token,
-        uint256 amount,
+    // ============ Hook Validation ============
+
+    /// @notice Validate single execution, return hookData for postCheck
+    function validatePreCallSingle(
+        address subaccount,
+        address target,
+        uint256 value,
         bytes calldata callData
+    ) external view returns (bytes memory hookData);
+
+    /// @notice Validate batch execution, return hookData for postCheck
+    /// @dev Venue can validate order of operations (e.g., approve before createOrder)
+    function validatePreCallBatch(
+        address subaccount,
+        Execution[] calldata executions
+    ) external view returns (bytes memory hookData);
+
+    /// @notice Validate after execution using hookData from preCheck
+    function validatePostCall(
+        address subaccount,
+        bytes calldata hookData
     ) external view;
+
+
+    // ============ Position Info ============
 
     function getPositionNetValue(bytes32 positionKey) external view returns (uint256);
 

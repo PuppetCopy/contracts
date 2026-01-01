@@ -4,6 +4,10 @@ pragma solidity ^0.8.33;
 library Const {
     address constant dao = 0x145E9Ee481Bb885A49E1fF4c1166222587D61916;
 
+    // ERC-7579 Account Code Hash (ZeroDev Kernel v3.3 proxy bytecode hash)
+    // Compute via: keccak256(address(kernelProxy).code) on any deployed Kernel account
+    bytes32 constant account7579CodeHash = 0x0000000000000000000000000000000000000000000000000000000000000000;
+
     // Liquidity Pools
     address constant BasePool = 0x19da41A2ccd0792b9b674777E72447903FE29074;
 
