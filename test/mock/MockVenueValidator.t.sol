@@ -20,38 +20,41 @@ contract MockVenueValidator is IVenueValidator {
         revertReason = _reason;
     }
 
-    function validatePreCallSingle(
-        address _subaccount,
-        address,
-        uint,
-        bytes calldata
-    ) external view override returns (bytes memory) {
+    function validatePreCallSingle(address _subaccount, address, uint, bytes calldata)
+        external
+        view
+        override
+        returns (bytes memory)
+    {
         if (shouldRevertValidation) revert(revertReason);
         bytes32 posKey = keccak256(abi.encode(_subaccount, "mock_position"));
         if (positionValues[posKey] == type(uint).max) revert("MockVenueValidator: validation failed");
         return "";
     }
 
-    function validatePreCallBatch(
-        address _subaccount,
-        Execution[] calldata
-    ) external view override returns (bytes memory) {
+    function validatePreCallBatch(address _subaccount, Execution[] calldata)
+        external
+        view
+        override
+        returns (bytes memory)
+    {
         if (shouldRevertValidation) revert(revertReason);
         bytes32 posKey = keccak256(abi.encode(_subaccount, "mock_position"));
         if (positionValues[posKey] == type(uint).max) revert("MockVenueValidator: validation failed");
         return "";
     }
 
-    function processPostCall(
-        address,
-        bytes calldata
-    ) external override {}
+    function processPostCall(address, bytes calldata) external override {}
 
     function getPositionNetValue(bytes32 _positionKey) external view returns (uint) {
         return positionValues[_positionKey];
     }
 
-    function getPositionInfo(IERC7579Account _subaccount, bytes calldata) external view returns (PositionInfo memory _info) {
+    function getPositionInfo(IERC7579Account _subaccount, bytes calldata)
+        external
+        view
+        returns (PositionInfo memory _info)
+    {
         _info.positionKey = keccak256(abi.encode(address(_subaccount), "mock_position"));
         _info.netValue = positionValues[_info.positionKey];
     }
@@ -59,26 +62,20 @@ contract MockVenueValidator is IVenueValidator {
 
 /// @dev Passthrough validator that returns bytes32(0) for all calls - used for whitelisting non-venue contracts like tokens
 contract PassthroughValidator is IVenueValidator {
-    function validatePreCallSingle(
-        address,
-        address,
-        uint,
-        bytes calldata
-    ) external pure override returns (bytes memory) {
+    function validatePreCallSingle(address, address, uint, bytes calldata)
+        external
+        pure
+        override
+        returns (bytes memory)
+    {
         return "";
     }
 
-    function validatePreCallBatch(
-        address,
-        Execution[] calldata
-    ) external pure override returns (bytes memory) {
+    function validatePreCallBatch(address, Execution[] calldata) external pure override returns (bytes memory) {
         return "";
     }
 
-    function processPostCall(
-        address,
-        bytes calldata
-    ) external override {}
+    function processPostCall(address, bytes calldata) external override {}
 
     function getPositionNetValue(bytes32) external pure returns (uint) {
         return 0;

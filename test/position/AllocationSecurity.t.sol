@@ -34,8 +34,8 @@ contract AllocationSecurityTest is BasicSetup {
     bytes32 venueKey;
     bytes32 matchingKey;
 
-    uint256 ownerPrivateKey = 0x1234;
-    uint256 signerPrivateKey = 0x5678;
+    uint ownerPrivateKey = 0x1234;
+    uint signerPrivateKey = 0x5678;
     address owner;
     address sessionSigner;
 
@@ -93,24 +93,28 @@ contract AllocationSecurityTest is BasicSetup {
         matchingKey = keccak256(abi.encode(address(usdc), address(masterSubaccount)));
     }
 
-    function _signIntent(Allocation.CallIntent memory intent, uint256 privateKey) internal view returns (bytes memory) {
-        bytes32 structHash = keccak256(abi.encode(
-            allocation.CALL_INTENT_TYPEHASH(),
-            intent.account,
-            intent.subaccount,
-            intent.token,
-            intent.amount,
-            intent.deadline,
-            intent.nonce
-        ));
+    function _signIntent(Allocation.CallIntent memory intent, uint privateKey) internal view returns (bytes memory) {
+        bytes32 structHash = keccak256(
+            abi.encode(
+                allocation.CALL_INTENT_TYPEHASH(),
+                intent.account,
+                intent.subaccount,
+                intent.token,
+                intent.amount,
+                intent.deadline,
+                intent.nonce
+            )
+        );
 
-        bytes32 domainSeparator = keccak256(abi.encode(
-            keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-            keccak256("Puppet Allocation"),
-            keccak256("1"),
-            block.chainid,
-            address(allocation)
-        ));
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256("Puppet Allocation"),
+                keccak256("1"),
+                block.chainid,
+                address(allocation)
+            )
+        );
 
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
@@ -132,23 +136,19 @@ contract AllocationSecurityTest is BasicSetup {
         // Attacker deposits just 1 wei
         usdc.mint(address(attackerSub), 1);
 
-        allocation.registerMasterSubaccount(
-            owner,
-            sessionSigner,
-            IERC7579Account(address(attackerSub)),
-            usdc);
+        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(attackerSub)), usdc);
 
         bytes32 key = keccak256(abi.encode(address(usdc), address(attackerSub)));
 
         // Attacker gets 1 share for 1 wei (1:1 ratio)
-        uint256 attackerShares = allocation.shareBalanceMap(key, owner);
+        uint attackerShares = allocation.shareBalanceMap(key, owner);
         assertEq(attackerShares, 1, "Attacker should get 1 share for 1 wei");
 
         // Attacker donates 1000 USDC directly to inflate share price
         usdc.mint(address(attackerSub), 1000e6);
 
         // Now share price is inflated: (1000e6 + 1) assets / 1 share
-        uint256 inflatedPrice = allocation.getSharePrice(key, usdc.balanceOf(address(attackerSub)));
+        uint inflatedPrice = allocation.getSharePrice(key, usdc.balanceOf(address(attackerSub)));
         assertGt(inflatedPrice, 1e30, "Price is inflated after donation");
 
         // Victim tries to deposit 999 USDC - this would result in 0 shares
@@ -166,10 +166,10 @@ contract AllocationSecurityTest is BasicSetup {
 
         IERC7579Account[] memory puppets = new IERC7579Account[](1);
         puppets[0] = IERC7579Account(address(puppet1));
-        uint256[] memory amounts = new uint256[](1);
+        uint[] memory amounts = new uint[](1);
         amounts[0] = 999e6;
 
-        uint256 victimBalanceBefore = usdc.balanceOf(address(puppet1));
+        uint victimBalanceBefore = usdc.balanceOf(address(puppet1));
 
         // Contract protects victim by reverting - can't steal with zero shares
         vm.expectRevert(Error.Allocation__ZeroShares.selector);
@@ -188,12 +188,7 @@ contract AllocationSecurityTest is BasicSetup {
         // Attacker deposits 1 wei
         usdc.mint(address(attackerSub), 1);
 
-        allocation.registerMasterSubaccount(
-            owner,
-            sessionSigner,
-            IERC7579Account(address(attackerSub)),
-            usdc);
-
+        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(attackerSub)), usdc);
 
         bytes32 key = keccak256(abi.encode(address(usdc), address(attackerSub)));
 
@@ -215,21 +210,21 @@ contract AllocationSecurityTest is BasicSetup {
 
         IERC7579Account[] memory puppets = new IERC7579Account[](1);
         puppets[0] = IERC7579Account(address(puppet1));
-        uint256[] memory amounts = new uint256[](1);
+        uint[] memory amounts = new uint[](1);
         amounts[0] = 1001e6;
 
         allocation.executeAllocate(intent, sig, puppets, amounts);
 
-        uint256 victimShares = allocation.shareBalanceMap(key, address(puppet1));
+        uint victimShares = allocation.shareBalanceMap(key, address(puppet1));
         assertGt(victimShares, 0, "Victim gets shares with larger deposit");
 
         // Calculate each party's value
-        uint256 totalShares = allocation.totalSharesMap(key);
-        uint256 totalAssets = usdc.balanceOf(address(attackerSub));
-        uint256 attackerShares = allocation.shareBalanceMap(key, owner);
+        uint totalShares = allocation.totalSharesMap(key);
+        uint totalAssets = usdc.balanceOf(address(attackerSub));
+        uint attackerShares = allocation.shareBalanceMap(key, owner);
 
-        uint256 attackerValue = (totalAssets * attackerShares) / totalShares;
-        uint256 victimValue = (totalAssets * victimShares) / totalShares;
+        uint attackerValue = (totalAssets * attackerShares) / totalShares;
+        uint victimValue = (totalAssets * victimShares) / totalShares;
 
         // Attacker donated 1000e6, so their value includes donation
         // But they can't steal from victim - victim gets proportional share
@@ -245,7 +240,7 @@ contract AllocationSecurityTest is BasicSetup {
     function testExploit_EmptyRouteHasOneToOnePrice() public {
         // Share price for non-existent route should be 1:1
         bytes32 emptyKey = keccak256("nonexistent");
-        uint256 price = allocation.getSharePrice(emptyKey, 0);
+        uint price = allocation.getSharePrice(emptyKey, 0);
         assertEq(price, 1e30, "Empty route should have 1:1 share price");
 
         // Even with assets passed, empty shares means 1:1
@@ -261,14 +256,10 @@ contract AllocationSecurityTest is BasicSetup {
         sub.installModule(MODULE_TYPE_HOOK, address(1), "");
         usdc.mint(address(sub), 1000e6);
 
-        allocation.registerMasterSubaccount(
-            owner,
-            sessionSigner,
-            IERC7579Account(address(sub)),
-            usdc);
+        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), usdc);
 
         bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
-        uint256 shares = allocation.shareBalanceMap(key, owner);
+        uint shares = allocation.shareBalanceMap(key, owner);
 
         // First depositor: shares = deposit amount (1:1)
         assertEq(shares, 1000e6, "First depositor gets 1:1 shares");
@@ -278,22 +269,18 @@ contract AllocationSecurityTest is BasicSetup {
     function testExploit_FirstDepositorGetsOneToOne_18Decimals() public {
         // Create 18 decimal token
         MockERC20 weth = new MockERC20("Wrapped Ether", "WETH", 18);
-        allocation.setTokenCap(IERC20(address(weth)), type(uint256).max);
+        allocation.setTokenCap(IERC20(address(weth)), type(uint).max);
 
         TestSmartAccount sub = new TestSmartAccount();
         sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
         sub.installModule(MODULE_TYPE_HOOK, address(1), "");
         weth.mint(address(sub), 1 ether);
 
-        allocation.registerMasterSubaccount(
-            owner,
-            sessionSigner,
-            IERC7579Account(address(sub)),
-            IERC20(address(weth)));
+        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), IERC20(address(weth)));
 
         bytes32 key = keccak256(abi.encode(address(weth), address(sub)));
 
-        uint256 shares = allocation.shareBalanceMap(key, owner);
+        uint shares = allocation.shareBalanceMap(key, owner);
 
         // First depositor: shares = deposit amount (1:1)
         assertEq(shares, 1 ether, "First depositor gets 1:1 shares for 18 decimal token");
@@ -308,11 +295,7 @@ contract AllocationSecurityTest is BasicSetup {
         // Minimum possible deposit: 1 wei
         usdc.mint(address(sub), 1);
 
-        allocation.registerMasterSubaccount(
-            owner,
-            sessionSigner,
-            IERC7579Account(address(sub)),
-            usdc);
+        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), usdc);
 
         bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
 
@@ -321,7 +304,7 @@ contract AllocationSecurityTest is BasicSetup {
         assertEq(allocation.totalSharesMap(key), 1, "Total shares is 1");
 
         // Share price is now 1:1
-        uint256 price = allocation.getSharePrice(key, 1);
+        uint price = allocation.getSharePrice(key, 1);
         assertEq(price, 1e30, "Share price is 1:1");
     }
 
@@ -336,27 +319,23 @@ contract AllocationSecurityTest is BasicSetup {
         sub.installModule(MODULE_TYPE_HOOK, address(1), "");
         usdc.mint(address(sub), 1000e6);
 
-        allocation.registerMasterSubaccount(
-            owner,
-            sessionSigner,
-            IERC7579Account(address(sub)),
-            usdc);
+        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), usdc);
 
         bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
 
-        uint256 ownerShares = allocation.shareBalanceMap(key, owner);
+        uint ownerShares = allocation.shareBalanceMap(key, owner);
         assertEq(ownerShares, 1000e6, "Owner has 1000e6 shares");
 
         // External party donates to the subaccount
         usdc.mint(address(sub), 500e6);
 
         // Share price increases proportionally
-        uint256 newPrice = allocation.getSharePrice(key, usdc.balanceOf(address(sub)));
+        uint newPrice = allocation.getSharePrice(key, usdc.balanceOf(address(sub)));
         // Price = 1500e6 / 1000e6 * 1e30 = 1.5e30
         assertEq(newPrice, 15e29, "Price reflects donation");
 
         // Owner's shares are now worth more
-        uint256 ownerValue = (usdc.balanceOf(address(sub)) * ownerShares) / allocation.totalSharesMap(key);
+        uint ownerValue = (usdc.balanceOf(address(sub)) * ownerShares) / allocation.totalSharesMap(key);
         assertEq(ownerValue, 1500e6, "Owner benefits from donation");
 
         // New depositor pays fair price
@@ -374,19 +353,19 @@ contract AllocationSecurityTest is BasicSetup {
 
         IERC7579Account[] memory puppets = new IERC7579Account[](1);
         puppets[0] = IERC7579Account(address(puppet1));
-        uint256[] memory amounts = new uint256[](1);
+        uint[] memory amounts = new uint[](1);
         amounts[0] = 1500e6;
 
         allocation.executeAllocate(intent, sig, puppets, amounts);
 
         // Puppet gets 1000e6 shares (1500e6 / 1.5 price)
-        uint256 puppetShares = allocation.shareBalanceMap(key, address(puppet1));
+        uint puppetShares = allocation.shareBalanceMap(key, address(puppet1));
         assertEq(puppetShares, 1000e6, "Puppet gets fair shares at higher price");
 
         // Total assets now 3000e6, total shares 2000e6
         // Each party has 50% ownership
-        uint256 totalAssets = usdc.balanceOf(address(sub));
-        uint256 totalShares = allocation.totalSharesMap(key);
+        uint totalAssets = usdc.balanceOf(address(sub));
+        uint totalShares = allocation.totalSharesMap(key);
 
         assertEq((totalAssets * ownerShares) / totalShares, 1500e6, "Owner has half");
         assertEq((totalAssets * puppetShares) / totalShares, 1500e6, "Puppet has half");
@@ -401,13 +380,9 @@ contract AllocationSecurityTest is BasicSetup {
         TestSmartAccount sub = new TestSmartAccount();
         sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
         sub.installModule(MODULE_TYPE_HOOK, address(1), "");
-        usdc.mint(address(sub), 3);  // 3 wei
+        usdc.mint(address(sub), 3); // 3 wei
 
-        allocation.registerMasterSubaccount(
-            owner,
-            sessionSigner,
-            IERC7579Account(address(sub)),
-            usdc);
+        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), usdc);
 
         bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
 
@@ -429,14 +404,14 @@ contract AllocationSecurityTest is BasicSetup {
 
         IERC7579Account[] memory puppets = new IERC7579Account[](1);
         puppets[0] = IERC7579Account(address(puppet1));
-        uint256[] memory amounts = new uint256[](1);
+        uint[] memory amounts = new uint[](1);
         amounts[0] = 1;
 
         allocation.executeAllocate(intent, sig, puppets, amounts);
 
         // With 4 assets and 4 shares total, price is 1:1
         // Puppet should get 1 share for 1 wei
-        uint256 puppetShares = allocation.shareBalanceMap(key, address(puppet1));
+        uint puppetShares = allocation.shareBalanceMap(key, address(puppet1));
         assertEq(puppetShares, 1, "Puppet gets 1 share for 1 wei deposit");
     }
 
@@ -470,24 +445,16 @@ contract AllocationSecurityTest is BasicSetup {
 
         // Attacker creates their route
         vm.prank(attacker);
-        allocation.registerMasterSubaccount(
-            attacker,
-            attacker,
-            IERC7579Account(address(attackerSub)),
-            usdc);
+        allocation.registerMasterSubaccount(attacker, attacker, IERC7579Account(address(attackerSub)), usdc);
 
         // Victim creates their route - completely independent
         vm.prank(victim);
-        allocation.registerMasterSubaccount(
-            victim,
-            victim,
-            IERC7579Account(address(victimSub)),
-            usdc);
+        allocation.registerMasterSubaccount(victim, victim, IERC7579Account(address(victimSub)), usdc);
 
         bytes32 victimKey = keccak256(abi.encode(address(usdc), address(victimSub)));
 
         // Victim gets full 1:1 shares on their independent route
-        uint256 victimShares = allocation.shareBalanceMap(victimKey, victim);
+        uint victimShares = allocation.shareBalanceMap(victimKey, victim);
         assertEq(victimShares, 1000e6, "Victim gets 1:1 shares on their route");
     }
 }

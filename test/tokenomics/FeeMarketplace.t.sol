@@ -218,10 +218,7 @@ contract FeeMarketplaceTest is BasicSetup {
             puppetToken,
             feeMarketplaceStore,
             FeeMarketplace.Config({
-                transferOutGasLimit: 200_000,
-                unlockTimeframe: 2 days,
-                askDecayTimeframe: 1 days,
-                askStart: 100e18
+                transferOutGasLimit: 200_000, unlockTimeframe: 2 days, askDecayTimeframe: 1 days, askStart: 100e18
             })
         );
     }

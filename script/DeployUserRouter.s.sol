@@ -20,8 +20,7 @@ contract DeployUserRouter is BaseScript {
         ProxyUserRouter proxyUserRouter = ProxyUserRouter(payable(getDeployedAddress("ProxyUserRouter")));
 
         UserRouter userRouter = new UserRouter(
-            IAuthority(address(dictatorship)),
-            UserRouter.Config({allocation: allocation, venueRegistry: venueRegistry})
+            IAuthority(address(dictatorship)), UserRouter.Config({allocation: allocation, venueRegistry: venueRegistry})
         );
         proxyUserRouter.update(address(userRouter));
 

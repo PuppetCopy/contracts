@@ -51,16 +51,12 @@ contract BasicSetup is Test {
         return vm.computeCreateAddress(users.owner, vm.getNonce(users.owner) + 1);
     }
 
-    function _getNextContractAddress(
-        uint count
-    ) internal view returns (address) {
+    function _getNextContractAddress(uint count) internal view returns (address) {
         return vm.computeCreateAddress(users.owner, vm.getNonce(users.owner) + count);
     }
 
     /// @dev Generates a user, labels its address, and funds it with test assets
-    function _createUser(
-        string memory _name
-    ) internal virtual returns (address payable) {
+    function _createUser(string memory _name) internal virtual returns (address payable) {
         address payable _user = payable(makeAddr(_name));
 
         vm.deal(_user, 100 ether);

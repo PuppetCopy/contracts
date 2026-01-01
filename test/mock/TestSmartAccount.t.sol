@@ -3,9 +3,23 @@ pragma solidity ^0.8.23;
 
 import {IERC7579Account, Execution} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 import {IModule, IHook} from "modulekit/accounts/common/interfaces/IERC7579Module.sol";
-import {ModeCode, ModeLib, CallType, ExecType, CALLTYPE_SINGLE, CALLTYPE_BATCH, EXECTYPE_DEFAULT, EXECTYPE_TRY} from "modulekit/accounts/common/lib/ModeLib.sol";
+import {
+    ModeCode,
+    ModeLib,
+    CallType,
+    ExecType,
+    CALLTYPE_SINGLE,
+    CALLTYPE_BATCH,
+    EXECTYPE_DEFAULT,
+    EXECTYPE_TRY
+} from "modulekit/accounts/common/lib/ModeLib.sol";
 import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
-import {MODULE_TYPE_VALIDATOR, MODULE_TYPE_EXECUTOR, MODULE_TYPE_FALLBACK, MODULE_TYPE_HOOK} from "modulekit/module-bases/utils/ERC7579Constants.sol";
+import {
+    MODULE_TYPE_VALIDATOR,
+    MODULE_TYPE_EXECUTOR,
+    MODULE_TYPE_FALLBACK,
+    MODULE_TYPE_HOOK
+} from "modulekit/module-bases/utils/ERC7579Constants.sol";
 
 /**
  * @title TestSmartAccount
@@ -17,7 +31,7 @@ contract TestSmartAccount is IERC7579Account {
     using ExecutionLib for bytes;
 
     // Module storage
-    mapping(uint256 => mapping(address => bool)) internal _modules;
+    mapping(uint => mapping(address => bool)) internal _modules;
     address public installedHook;
 
     error UnsupportedCallType(CallType callType);
@@ -40,7 +54,7 @@ contract TestSmartAccount is IERC7579Account {
         }
 
         if (callType == CALLTYPE_SINGLE) {
-            (address target, uint256 value, bytes calldata data) = executionCalldata.decodeSingle();
+            (address target, uint value, bytes calldata data) = executionCalldata.decodeSingle();
             if (execType == EXECTYPE_DEFAULT) {
                 _execute(target, value, data);
             } else if (execType == EXECTYPE_TRY) {
@@ -67,17 +81,18 @@ contract TestSmartAccount is IERC7579Account {
         }
     }
 
-    function executeFromExecutor(
-        ModeCode mode,
-        bytes calldata executionCalldata
-    ) external payable returns (bytes[] memory returnData) {
+    function executeFromExecutor(ModeCode mode, bytes calldata executionCalldata)
+        external
+        payable
+        returns (bytes[] memory returnData)
+    {
         // Caller must be installed as executor
         if (!_modules[MODULE_TYPE_EXECUTOR][msg.sender]) revert CallerNotAuthorized();
 
         (CallType callType, ExecType execType,,) = mode.decode();
 
         if (callType == CALLTYPE_SINGLE) {
-            (address target, uint256 value, bytes calldata data) = executionCalldata.decodeSingle();
+            (address target, uint value, bytes calldata data) = executionCalldata.decodeSingle();
             returnData = new bytes[](1);
             if (execType == EXECTYPE_DEFAULT) {
                 returnData[0] = _execute(target, value, data);
@@ -103,7 +118,7 @@ contract TestSmartAccount is IERC7579Account {
 
     // ============ Module Management ============
 
-    function installModule(uint256 moduleTypeId, address module, bytes calldata initData) external payable {
+    function installModule(uint moduleTypeId, address module, bytes calldata initData) external payable {
         _modules[moduleTypeId][module] = true;
         if (moduleTypeId == MODULE_TYPE_HOOK) {
             installedHook = module;
@@ -122,18 +137,14 @@ contract TestSmartAccount is IERC7579Account {
         emit ModuleInstalled(moduleTypeId, module);
     }
 
-    function uninstallModule(uint256 moduleTypeId, address module, bytes calldata deInitData) external payable {
+    function uninstallModule(uint moduleTypeId, address module, bytes calldata deInitData) external payable {
         // Call onUninstall - this should revert if module doesn't allow it
         IModule(module).onUninstall(deInitData);
         _modules[moduleTypeId][module] = false;
         emit ModuleUninstalled(moduleTypeId, module);
     }
 
-    function isModuleInstalled(
-        uint256 moduleTypeId,
-        address module,
-        bytes calldata
-    ) external view returns (bool) {
+    function isModuleInstalled(uint moduleTypeId, address module, bytes calldata) external view returns (bool) {
         return _modules[moduleTypeId][module];
     }
 
@@ -147,11 +158,9 @@ contract TestSmartAccount is IERC7579Account {
         return true;
     }
 
-    function supportsModule(uint256 moduleTypeId) external pure returns (bool) {
-        return moduleTypeId == MODULE_TYPE_VALIDATOR
-            || moduleTypeId == MODULE_TYPE_EXECUTOR
-            || moduleTypeId == MODULE_TYPE_FALLBACK
-            || moduleTypeId == MODULE_TYPE_HOOK;
+    function supportsModule(uint moduleTypeId) external pure returns (bool) {
+        return moduleTypeId == MODULE_TYPE_VALIDATOR || moduleTypeId == MODULE_TYPE_EXECUTOR
+            || moduleTypeId == MODULE_TYPE_FALLBACK || moduleTypeId == MODULE_TYPE_HOOK;
     }
 
     // ============ ERC-1271 ============
@@ -162,7 +171,7 @@ contract TestSmartAccount is IERC7579Account {
 
     // ============ Internal Execution ============
 
-    function _execute(address target, uint256 value, bytes calldata data) internal returns (bytes memory) {
+    function _execute(address target, uint value, bytes calldata data) internal returns (bytes memory) {
         (bool success, bytes memory result) = target.call{value: value}(data);
         if (!success) {
             assembly {
@@ -172,25 +181,22 @@ contract TestSmartAccount is IERC7579Account {
         return result;
     }
 
-    function _tryExecute(address target, uint256 value, bytes calldata data) internal returns (bool, bytes memory) {
+    function _tryExecute(address target, uint value, bytes calldata data) internal returns (bool, bytes memory) {
         return target.call{value: value}(data);
     }
 
     function _executeBatch(Execution[] calldata executions) internal returns (bytes[] memory results) {
         results = new bytes[](executions.length);
-        for (uint256 i; i < executions.length; i++) {
+        for (uint i; i < executions.length; i++) {
             results[i] = _execute(executions[i].target, executions[i].value, executions[i].callData);
         }
     }
 
     function _tryExecuteBatch(Execution[] calldata executions) internal returns (bytes[] memory results) {
         results = new bytes[](executions.length);
-        for (uint256 i; i < executions.length; i++) {
-            (bool success, bytes memory result) = _tryExecute(
-                executions[i].target,
-                executions[i].value,
-                executions[i].callData
-            );
+        for (uint i; i < executions.length; i++) {
+            (bool success, bytes memory result) =
+                _tryExecute(executions[i].target, executions[i].value, executions[i].callData);
             if (!success) revert ExecutionFailed();
             results[i] = result;
         }
@@ -201,9 +207,8 @@ contract TestSmartAccount is IERC7579Account {
     // ============ Test Helpers ============
 
     /// @dev Helper for testing - allows direct token transfers from account
-    function transfer(address token, address to, uint256 amount) external {
+    function transfer(address token, address to, uint amount) external {
         (bool success,) = token.call(abi.encodeWithSignature("transfer(address,uint256)", to, amount));
         require(success, "Transfer failed");
     }
-
 }

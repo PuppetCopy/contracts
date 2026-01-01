@@ -29,51 +29,64 @@ contract DeployVenueRegistry is BaseScript {
         // Deploy Allocation with placeholder masterHook (will update after MasterHook deployment)
         Allocation allocation = new Allocation(
             dictatorship,
-            Allocation.Config({venueRegistry: venueRegistry, masterHook: address(1), maxPuppetList: 100, transferOutGasLimit: 200_000})
+            Allocation.Config({
+                venueRegistry: venueRegistry, masterHook: address(1), maxPuppetList: 100, transferOutGasLimit: 200_000
+            })
         );
 
         // Deploy UserRouter and MasterHook
-        UserRouter userRouter = new UserRouter(
-            dictatorship,
-            UserRouter.Config({allocation: allocation, venueRegistry: venueRegistry})
-        );
+        UserRouter userRouter =
+            new UserRouter(dictatorship, UserRouter.Config({allocation: allocation, venueRegistry: venueRegistry}));
         MasterHook masterHook = new MasterHook(IUserRouter(address(userRouter)));
 
         // Update Allocation config with actual MasterHook address
         dictatorship.setPermission(Permission(address(allocation)), allocation.setConfig.selector, DEPLOYER_ADDRESS);
-        allocation.setConfig(abi.encode(Allocation.Config({
-            venueRegistry: venueRegistry,
-            masterHook: address(masterHook),
-            maxPuppetList: 100,
-            transferOutGasLimit: 200_000
-        })));
+        allocation.setConfig(
+            abi.encode(
+                Allocation.Config({
+                    venueRegistry: venueRegistry,
+                    masterHook: address(masterHook),
+                    maxPuppetList: 100,
+                    transferOutGasLimit: 200_000
+                })
+            )
+        );
 
         // Set allowed account code hash (Kernel v3.3 proxy bytecode hash)
         dictatorship.setPermission(Permission(address(allocation)), allocation.setCodeHash.selector, DEPLOYER_ADDRESS);
         allocation.setCodeHash(Const.account7579CodeHash, true);
 
         SubscriptionPolicy subscriptionPolicy = new SubscriptionPolicy(
-            IAuthority(address(dictatorship)),
-            abi.encode(SubscriptionPolicy.Config({version: 1}))
+            IAuthority(address(dictatorship)), abi.encode(SubscriptionPolicy.Config({version: 1}))
         );
         GmxVenueValidator gmxValidator =
             new GmxVenueValidator(Const.gmxDataStore, Const.gmxReader, Const.gmxReferralStorage, Const.gmxRouter);
 
-        dictatorship.setPermission(Permission(address(venueRegistry)), VenueRegistry.setVenue.selector, DEPLOYER_ADDRESS);
+        dictatorship.setPermission(
+            Permission(address(venueRegistry)), VenueRegistry.setVenue.selector, DEPLOYER_ADDRESS
+        );
         address[] memory gmxEntrypoints = new address[](2);
         gmxEntrypoints[0] = Const.gmxExchangeRouter;
         gmxEntrypoints[1] = Const.usdc;
         venueRegistry.setVenue(GMX_VENUE_KEY, gmxValidator, gmxEntrypoints);
 
-        dictatorship.setPermission(Permission(address(venueRegistry)), VenueRegistry.updatePosition.selector, address(allocation));
+        dictatorship.setPermission(
+            Permission(address(venueRegistry)), VenueRegistry.updatePosition.selector, address(allocation)
+        );
         dictatorship.setPermission(Permission(address(allocation)), Allocation.setTokenCap.selector, DEPLOYER_ADDRESS);
         allocation.setTokenCap(IERC20(Const.usdc), 100e6);
 
-        dictatorship.setPermission(Permission(address(allocation)), Allocation.executeAllocate.selector, DEPLOYER_ADDRESS);
-        dictatorship.setPermission(Permission(address(allocation)), Allocation.executeWithdraw.selector, DEPLOYER_ADDRESS);
+        dictatorship.setPermission(
+            Permission(address(allocation)), Allocation.executeAllocate.selector, DEPLOYER_ADDRESS
+        );
+        dictatorship.setPermission(
+            Permission(address(allocation)), Allocation.executeWithdraw.selector, DEPLOYER_ADDRESS
+        );
 
         // Permission for UserRouter to call registerMasterSubaccount
-        dictatorship.setPermission(Permission(address(allocation)), allocation.registerMasterSubaccount.selector, address(userRouter));
+        dictatorship.setPermission(
+            Permission(address(allocation)), allocation.registerMasterSubaccount.selector, address(userRouter)
+        );
 
         vm.stopBroadcast();
     }

@@ -12,9 +12,12 @@ contract MockGmxExchangeRouter is IGmxExchangeRouter {
     // Other functions from the interface can be left unimplemented for brevity
     // ...
 
-    function createOrder(
-        IBaseOrderUtils.CreateOrderParams calldata params
-    ) external payable override returns (bytes32) {
+    function createOrder(IBaseOrderUtils.CreateOrderParams calldata params)
+        external
+        payable
+        override
+        returns (bytes32)
+    {
         // Increment the order count to simulate a unique order ID
         orderCount++;
 
@@ -40,7 +43,12 @@ contract MockGmxExchangeRouter is IGmxExchangeRouter {
     // The following functions are not relevant for the mock and can be left unimplemented
     function multicall(
         bytes[] calldata /* data */
-    ) external payable override returns (bytes[] memory results) {
+    )
+        external
+        payable
+        override
+        returns (bytes[] memory results)
+    {
         // Left unimplemented for brevity
         results = new bytes[](0);
     }
@@ -57,9 +65,7 @@ contract MockGmxExchangeRouter is IGmxExchangeRouter {
         // Left unimplemented for brevity
     }
 
-    function cancelOrder(
-        bytes32 key
-    ) external payable override {
+    function cancelOrder(bytes32 key) external payable override {
         // Left unimplemented for brevity
     }
 
@@ -67,7 +73,12 @@ contract MockGmxExchangeRouter is IGmxExchangeRouter {
         address[] memory, /* markets */
         address[] memory, /* tokens */
         address /* receiver */
-    ) external payable override returns (uint[] memory) {
+    )
+        external
+        payable
+        override
+        returns (uint[] memory)
+    {
         // Left unimplemented for brevity
         return new uint[](0);
     }
@@ -76,7 +87,12 @@ contract MockGmxExchangeRouter is IGmxExchangeRouter {
         address[] memory, /* markets */
         address[] memory, /* tokens */
         address /* receiver */
-    ) external payable override returns (uint[] memory) {
+    )
+        external
+        payable
+        override
+        returns (uint[] memory)
+    {
         // Left unimplemented for brevity
         return new uint[](0);
     }

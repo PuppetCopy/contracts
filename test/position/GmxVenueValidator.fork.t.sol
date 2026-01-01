@@ -10,8 +10,8 @@ import {Const} from "../../script/Const.sol";
 import {Error} from "../../src/utils/Error.sol";
 
 interface IDataStore {
-    function getBytes32ValuesAt(bytes32 setKey, uint256 start, uint256 end) external view returns (bytes32[] memory);
-    function getBytes32Count(bytes32 setKey) external view returns (uint256);
+    function getBytes32ValuesAt(bytes32 setKey, uint start, uint end) external view returns (bytes32[] memory);
+    function getBytes32Count(bytes32 setKey) external view returns (uint);
 }
 
 /**
@@ -27,7 +27,8 @@ contract GmxVenueValidatorForkTest is Test {
 
     function setUp() public {
         account = vm.envAddress("DEPLOYER_ADDRESS");
-        validator = new GmxVenueValidator(Const.gmxDataStore, Const.gmxReader, Const.gmxReferralStorage, Const.gmxRouter);
+        validator =
+            new GmxVenueValidator(Const.gmxDataStore, Const.gmxReader, Const.gmxReferralStorage, Const.gmxRouter);
         dataStore = IDataStore(Const.gmxDataStore);
     }
 
@@ -35,7 +36,7 @@ contract GmxVenueValidatorForkTest is Test {
 
     function test_GetPositionNetValue() public view {
         bytes32 listKey = keccak256(abi.encode(keccak256(abi.encode("ACCOUNT_POSITION_LIST")), account));
-        uint256 positionCount = dataStore.getBytes32Count(listKey);
+        uint positionCount = dataStore.getBytes32Count(listKey);
 
         console2.log("Account:", account);
         console2.log("Position count:", positionCount);
@@ -43,8 +44,8 @@ contract GmxVenueValidatorForkTest is Test {
         if (positionCount == 0) return;
 
         bytes32[] memory positionKeys = dataStore.getBytes32ValuesAt(listKey, 0, positionCount);
-        for (uint256 i = 0; i < positionKeys.length; i++) {
-            uint256 netValue = validator.getPositionNetValue(positionKeys[i]);
+        for (uint i = 0; i < positionKeys.length; i++) {
+            uint netValue = validator.getPositionNetValue(positionKeys[i]);
             console2.log("Position", i, "net value:", netValue);
         }
     }
@@ -53,7 +54,8 @@ contract GmxVenueValidatorForkTest is Test {
 
     function test_ValidateCreateOrder() public view {
         // This is a multicall containing createOrder - validate via validatePreCallSingle
-        bytes memory callData = hex"f59c48eb0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000005966208be4bb7f8cb56f91f36000000000000000000000000000000000000000000000000000000000000ad91be0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000aaa8aba07435c0000000000000000000000000000000000000000000000000000533ea3d939800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000145e9ee481bb885a49e1ff4c1166222587d6191600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ff0000000000000000000000000000000000000100000000000000000000000070d95587d40a2caf56bd97485ab3eec10bee6336000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e583100000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+        bytes memory callData =
+            hex"f59c48eb0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000005966208be4bb7f8cb56f91f36000000000000000000000000000000000000000000000000000000000000ad91be0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000aaa8aba07435c0000000000000000000000000000000000000000000000000000533ea3d939800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000145e9ee481bb885a49e1ff4c1166222587d6191600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ff0000000000000000000000000000000000000100000000000000000000000070d95587d40a2caf56bd97485ab3eec10bee6336000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e583100000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
         // Validate as single call to exchange router
         validator.validatePreCallSingle(account, Const.gmxExchangeRouter, 0, callData);
@@ -70,7 +72,13 @@ contract GmxVenueValidatorForkTest is Test {
     function test_ValidateUpdateOrder() public view {
         bytes memory callData = abi.encodeWithSignature(
             "updateOrder(bytes32,uint256,uint256,uint256,uint256,uint256,bool)",
-            keccak256("order"), 1000e30, 3000e30, 2900e30, 0, 0, false
+            keccak256("order"),
+            1000e30,
+            3000e30,
+            2900e30,
+            0,
+            0,
+            false
         );
         validator.validatePreCallSingle(account, Const.gmxExchangeRouter, 0, callData);
     }
@@ -83,7 +91,8 @@ contract GmxVenueValidatorForkTest is Test {
     // ============ claimFundingFees ============
 
     function test_ValidateClaimFundingFees() public view {
-        bytes memory callData = hex"c41b1ab3000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000145e9ee481bb885a49e1ff4c1166222587d6191600000000000000000000000000000000000000000000000000000000000000020000000000000000000000000ccb4faa6f1f1b30911619f1184082ab4e25813c000000000000000000000000fec8f404fbca3b11afd3b3f0c57507c2a06de6360000000000000000000000000000000000000000000000000000000000000002000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e5831000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e5831";
+        bytes memory callData =
+            hex"c41b1ab3000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000145e9ee481bb885a49e1ff4c1166222587d6191600000000000000000000000000000000000000000000000000000000000000020000000000000000000000000ccb4faa6f1f1b30911619f1184082ab4e25813c000000000000000000000000fec8f404fbca3b11afd3b3f0c57507c2a06de6360000000000000000000000000000000000000000000000000000000000000002000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e5831000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e5831";
         validator.validatePreCallSingle(account, Const.gmxExchangeRouter, 0, callData);
     }
 
@@ -93,10 +102,8 @@ contract GmxVenueValidatorForkTest is Test {
         address[] memory tokens = new address[](1);
         tokens[0] = Const.usdc;
 
-        bytes memory callData = abi.encodeWithSignature(
-            "claimFundingFees(address[],address[],address)",
-            markets, tokens, address(0xdead)
-        );
+        bytes memory callData =
+            abi.encodeWithSignature("claimFundingFees(address[],address[],address)", markets, tokens, address(0xdead));
 
         vm.expectRevert(Error.GmxVenueValidator__InvalidReceiver.selector);
         validator.validatePreCallSingle(account, Const.gmxExchangeRouter, 0, callData);
@@ -109,12 +116,11 @@ contract GmxVenueValidatorForkTest is Test {
         markets[0] = ETH_USD_MARKET;
         address[] memory tokens = new address[](1);
         tokens[0] = Const.usdc;
-        uint256[] memory timeKeys = new uint256[](1);
+        uint[] memory timeKeys = new uint[](1);
         timeKeys[0] = block.timestamp;
 
         bytes memory callData = abi.encodeWithSignature(
-            "claimCollateral(address[],address[],uint256[],address)",
-            markets, tokens, timeKeys, account
+            "claimCollateral(address[],address[],uint256[],address)", markets, tokens, timeKeys, account
         );
 
         validator.validatePreCallSingle(account, Const.gmxExchangeRouter, 0, callData);
@@ -125,12 +131,11 @@ contract GmxVenueValidatorForkTest is Test {
         markets[0] = ETH_USD_MARKET;
         address[] memory tokens = new address[](1);
         tokens[0] = Const.usdc;
-        uint256[] memory timeKeys = new uint256[](1);
+        uint[] memory timeKeys = new uint[](1);
         timeKeys[0] = block.timestamp;
 
         bytes memory callData = abi.encodeWithSignature(
-            "claimCollateral(address[],address[],uint256[],address)",
-            markets, tokens, timeKeys, address(0xdead)
+            "claimCollateral(address[],address[],uint256[],address)", markets, tokens, timeKeys, address(0xdead)
         );
 
         vm.expectRevert(Error.GmxVenueValidator__InvalidReceiver.selector);
@@ -140,13 +145,13 @@ contract GmxVenueValidatorForkTest is Test {
     // ============ approve ============
 
     function test_ValidateApprove() public view {
-        bytes memory callData = abi.encodeWithSignature("approve(address,uint256)", Const.gmxRouter, type(uint256).max);
+        bytes memory callData = abi.encodeWithSignature("approve(address,uint256)", Const.gmxRouter, type(uint).max);
         // approve is called on the token contract, not the exchange router
         validator.validatePreCallSingle(account, Const.usdc, 0, callData);
     }
 
     function test_ValidateApprove_RevertsWithWrongSpender() public {
-        bytes memory callData = abi.encodeWithSignature("approve(address,uint256)", address(0xdead), type(uint256).max);
+        bytes memory callData = abi.encodeWithSignature("approve(address,uint256)", address(0xdead), type(uint).max);
 
         vm.expectRevert(Error.GmxVenueValidator__InvalidReceiver.selector);
         validator.validatePreCallSingle(account, Const.usdc, 0, callData);
@@ -169,7 +174,7 @@ contract GmxVenueValidatorForkTest is Test {
         executions[0] = Execution({
             target: Const.usdc,
             value: 0,
-            callData: abi.encodeWithSignature("approve(address,uint256)", Const.gmxRouter, type(uint256).max)
+            callData: abi.encodeWithSignature("approve(address,uint256)", Const.gmxRouter, type(uint).max)
         });
 
         // Second execution: multicall with createOrder
