@@ -16,7 +16,6 @@ import {IAuthority} from "../../utils/interfaces/IAuthority.sol";
 import {IVenueValidator} from "../interface/IVenueValidator.sol";
 import {Error} from "../../utils/Error.sol";
 
-
 interface IReferralStorageByUser {
     function setTraderReferralCodeByUser(bytes32 _code) external;
 }
@@ -25,7 +24,7 @@ interface IReferralStorageByUser {
 
 interface IGmxDataStore {
     function getAddress(bytes32 key) external view returns (address);
-    function getUint(bytes32 key) external view returns (uint256);
+    function getUint(bytes32 key) external view returns (uint);
 }
 
 interface IGmxReader {
@@ -36,14 +35,14 @@ interface IGmxReader {
         address referralStorage,
         bytes32 positionKey,
         MarketPrices memory prices,
-        uint256 sizeDeltaUsd,
+        uint sizeDeltaUsd,
         address uiFeeReceiver,
         bool usePositionSizeAsSizeDeltaUsd
     ) external view returns (GmxPositionInfo memory);
 }
 
 interface IPriceFeed {
-    function latestRoundData() external view returns (uint80, int256, uint256, uint256, uint80);
+    function latestRoundData() external view returns (uint80, int, uint, uint, uint80);
 }
 
 // ============ GMX Structs ============
@@ -59,9 +58,9 @@ struct GmxPositionInfo {
     Position.Props position;
     PositionFees fees;
     ExecutionPriceResult executionPriceResult;
-    int256 basePnlUsd;
-    int256 uncappedBasePnlUsd;
-    int256 pnlAfterPriceImpactUsd;
+    int basePnlUsd;
+    int uncappedBasePnlUsd;
+    int pnlAfterPriceImpactUsd;
 }
 
 struct PositionFees {
@@ -72,73 +71,73 @@ struct PositionFees {
     PositionUiFees ui;
     PositionLiquidationFees liquidation;
     Price.Props collateralTokenPrice;
-    uint256 positionFeeFactor;
-    uint256 protocolFeeAmount;
-    uint256 positionFeeReceiverFactor;
-    uint256 feeReceiverAmount;
-    uint256 feeAmountForPool;
-    uint256 positionFeeAmountForPool;
-    uint256 positionFeeAmount;
-    uint256 totalCostAmountExcludingFunding;
-    uint256 totalCostAmount;
-    uint256 totalDiscountAmount;
+    uint positionFeeFactor;
+    uint protocolFeeAmount;
+    uint positionFeeReceiverFactor;
+    uint feeReceiverAmount;
+    uint feeAmountForPool;
+    uint positionFeeAmountForPool;
+    uint positionFeeAmount;
+    uint totalCostAmountExcludingFunding;
+    uint totalCostAmount;
+    uint totalDiscountAmount;
 }
 
 struct PositionReferralFees {
     bytes32 referralCode;
     address affiliate;
     address trader;
-    uint256 totalRebateFactor;
-    uint256 affiliateRewardFactor;
-    uint256 adjustedAffiliateRewardFactor;
-    uint256 traderDiscountFactor;
-    uint256 totalRebateAmount;
-    uint256 traderDiscountAmount;
-    uint256 affiliateRewardAmount;
+    uint totalRebateFactor;
+    uint affiliateRewardFactor;
+    uint adjustedAffiliateRewardFactor;
+    uint traderDiscountFactor;
+    uint totalRebateAmount;
+    uint traderDiscountAmount;
+    uint affiliateRewardAmount;
 }
 
 struct PositionProFees {
-    uint256 traderTier;
-    uint256 traderDiscountFactor;
-    uint256 traderDiscountAmount;
+    uint traderTier;
+    uint traderDiscountFactor;
+    uint traderDiscountAmount;
 }
 
 struct PositionFundingFees {
-    uint256 fundingFeeAmount;
-    uint256 claimableLongTokenAmount;
-    uint256 claimableShortTokenAmount;
-    uint256 latestFundingFeeAmountPerSize;
-    uint256 latestLongTokenClaimableFundingAmountPerSize;
-    uint256 latestShortTokenClaimableFundingAmountPerSize;
+    uint fundingFeeAmount;
+    uint claimableLongTokenAmount;
+    uint claimableShortTokenAmount;
+    uint latestFundingFeeAmountPerSize;
+    uint latestLongTokenClaimableFundingAmountPerSize;
+    uint latestShortTokenClaimableFundingAmountPerSize;
 }
 
 struct PositionBorrowingFees {
-    uint256 borrowingFeeUsd;
-    uint256 borrowingFeeAmount;
-    uint256 borrowingFeeReceiverFactor;
-    uint256 borrowingFeeAmountForFeeReceiver;
+    uint borrowingFeeUsd;
+    uint borrowingFeeAmount;
+    uint borrowingFeeReceiverFactor;
+    uint borrowingFeeAmountForFeeReceiver;
 }
 
 struct PositionUiFees {
     address uiFeeReceiver;
-    uint256 uiFeeReceiverFactor;
-    uint256 uiFeeAmount;
+    uint uiFeeReceiverFactor;
+    uint uiFeeAmount;
 }
 
 struct PositionLiquidationFees {
-    uint256 liquidationFeeUsd;
-    uint256 liquidationFeeAmount;
-    uint256 liquidationFeeReceiverFactor;
-    uint256 liquidationFeeAmountForFeeReceiver;
+    uint liquidationFeeUsd;
+    uint liquidationFeeAmount;
+    uint liquidationFeeReceiverFactor;
+    uint liquidationFeeAmountForFeeReceiver;
 }
 
 struct ExecutionPriceResult {
-    int256 priceImpactUsd;
-    uint256 executionPrice;
+    int priceImpactUsd;
+    uint executionPrice;
     bool balanceWasImproved;
-    int256 proportionalPendingImpactUsd;
-    int256 totalImpactUsd;
-    uint256 priceImpactDiffUsd;
+    int proportionalPendingImpactUsd;
+    int totalImpactUsd;
+    uint priceImpactDiffUsd;
 }
 
 /**
@@ -149,7 +148,7 @@ struct ExecutionPriceResult {
 contract GmxVenueValidator is IVenueValidator {
     // ============ Constants ============
 
-    uint256 private constant FLOAT_PRECISION = 1e30;
+    uint private constant FLOAT_PRECISION = 1e30;
 
     // GMX DataStore keys
     bytes32 private constant PRICE_FEED = keccak256(abi.encode("PRICE_FEED"));
@@ -165,19 +164,14 @@ contract GmxVenueValidator is IVenueValidator {
 
     // ============ Errors ============
 
-    error InvalidFeedPrice(address token, int256 price);
-    error ChainlinkPriceFeedNotUpdated(address token, uint256 timestamp, uint256 heartbeatDuration);
+    error InvalidFeedPrice(address token, int price);
+    error ChainlinkPriceFeedNotUpdated(address token, uint timestamp, uint heartbeatDuration);
     error EmptyPriceFeedMultiplier(address token);
     error NoPriceFeed(address token);
 
     // ============ Constructor ============
 
-    constructor(
-        address _dataStore,
-        address _reader,
-        address _referralStorage,
-        address _router
-    ) {
+    constructor(address _dataStore, address _reader, address _referralStorage, address _router) {
         dataStore = IGmxDataStore(_dataStore);
         reader = IGmxReader(_reader);
         referralStorage = _referralStorage;
@@ -187,28 +181,26 @@ contract GmxVenueValidator is IVenueValidator {
     // ============ External ============
 
     /// @inheritdoc IVenueValidator
-    function getPositionNetValue(bytes32 _positionKey) external view returns (uint256 netValue) {
+    function getPositionNetValue(bytes32 _positionKey) external view returns (uint netValue) {
         Position.Props memory pos = reader.getPosition(address(dataStore), _positionKey);
         if (pos.numbers.sizeInUsd == 0) return 0;
 
         Market.Props memory market = reader.getMarket(address(dataStore), pos.addresses.market);
         MarketPrices memory prices = _buildMarketPrices(market);
 
-        GmxPositionInfo memory info = reader.getPositionInfo(
-            address(dataStore), referralStorage, _positionKey, prices, 0, address(0), true
-        );
+        GmxPositionInfo memory info =
+            reader.getPositionInfo(address(dataStore), referralStorage, _positionKey, prices, 0, address(0), true);
 
         Price.Props memory collateralPrice =
             pos.addresses.collateralToken == market.longToken ? prices.longTokenPrice : prices.shortTokenPrice;
 
-        int256 pnlInTokens = 0;
+        int pnlInTokens = 0;
         if (collateralPrice.min > 0) {
-            pnlInTokens =
-                (info.basePnlUsd * int256(FLOAT_PRECISION)) / int256(collateralPrice.min) / int256(FLOAT_PRECISION);
+            pnlInTokens = (info.basePnlUsd * int(FLOAT_PRECISION)) / int(collateralPrice.min) / int(FLOAT_PRECISION);
         }
 
-        int256 _value = int256(pos.numbers.collateralAmount) + pnlInTokens - int256(info.fees.totalCostAmount);
-        netValue = _value > 0 ? uint256(_value) : 0;
+        int _value = int(pos.numbers.collateralAmount) + pnlInTokens - int(info.fees.totalCostAmount);
+        netValue = _value > 0 ? uint(_value) : 0;
     }
 
     // ============ Internal: Price Building ============
@@ -231,29 +223,29 @@ contract GmxVenueValidator is IVenueValidator {
         }
     }
 
-    function _toMarketPrice(uint256 _price) internal pure returns (Price.Props memory) {
+    function _toMarketPrice(uint _price) internal pure returns (Price.Props memory) {
         return Price.Props(_price, _price);
     }
 
     // ============ Internal: Chainlink ============
 
     /// @dev Replicates ChainlinkPriceFeedUtils.getPriceFeedPrice
-    function _getPriceFeedPrice(address _token) internal view returns (uint256) {
+    function _getPriceFeedPrice(address _token) internal view returns (uint) {
         address feed = dataStore.getAddress(keccak256(abi.encode(PRICE_FEED, _token)));
         if (feed == address(0)) revert NoPriceFeed(_token);
 
-        (, int256 price,, uint256 timestamp,) = IPriceFeed(feed).latestRoundData();
+        (, int price,, uint timestamp,) = IPriceFeed(feed).latestRoundData();
         if (price <= 0) revert InvalidFeedPrice(_token, price);
 
-        uint256 heartbeat = dataStore.getUint(keccak256(abi.encode(PRICE_FEED_HEARTBEAT_DURATION, _token)));
+        uint heartbeat = dataStore.getUint(keccak256(abi.encode(PRICE_FEED_HEARTBEAT_DURATION, _token)));
         if (block.timestamp > timestamp && block.timestamp - timestamp > heartbeat) {
             revert ChainlinkPriceFeedNotUpdated(_token, timestamp, heartbeat);
         }
 
-        uint256 multiplier = dataStore.getUint(keccak256(abi.encode(PRICE_FEED_MULTIPLIER, _token)));
+        uint multiplier = dataStore.getUint(keccak256(abi.encode(PRICE_FEED_MULTIPLIER, _token)));
         if (multiplier == 0) revert EmptyPriceFeedMultiplier(_token);
 
-        return (uint256(price) * multiplier) / FLOAT_PRECISION;
+        return (uint(price) * multiplier) / FLOAT_PRECISION;
     }
 
     // ============ Validation ============
@@ -265,40 +257,41 @@ contract GmxVenueValidator is IVenueValidator {
     bytes4 private constant CANCEL_ORDER_SELECTOR = IExchangeRouter.cancelOrder.selector;
     bytes4 private constant SEND_WNT_SELECTOR = bytes4(keccak256("sendWnt(address,uint256)"));
     bytes4 private constant SEND_TOKENS_SELECTOR = bytes4(keccak256("sendTokens(address,address,uint256)"));
-    bytes4 private constant CLAIM_FUNDING_FEES_SELECTOR = bytes4(keccak256("claimFundingFees(address[],address[],address)"));
-    bytes4 private constant CLAIM_COLLATERAL_SELECTOR = bytes4(keccak256("claimCollateral(address[],address[],uint256[],address)"));
+    bytes4 private constant CLAIM_FUNDING_FEES_SELECTOR =
+        bytes4(keccak256("claimFundingFees(address[],address[],address)"));
+    bytes4 private constant CLAIM_COLLATERAL_SELECTOR =
+        bytes4(keccak256("claimCollateral(address[],address[],uint256[],address)"));
     bytes4 private constant SET_REFERRAL_SELECTOR = IReferralStorageByUser.setTraderReferralCodeByUser.selector;
 
     // ============ Hook Validation ============
 
     /// @inheritdoc IVenueValidator
-    function validatePreCallSingle(
-        address _subaccount,
-        address,
-        uint256,
-        bytes calldata _callData
-    ) external view override returns (bytes memory) {
+    function validatePreCallSingle(address _subaccount, address, uint, bytes calldata _callData)
+        external
+        view
+        override
+        returns (bytes memory)
+    {
         _validateCallData(_subaccount, _callData);
         return "";
     }
 
     /// @inheritdoc IVenueValidator
-    function validatePreCallBatch(
-        address _subaccount,
-        Execution[] calldata _executions
-    ) external view override returns (bytes memory) {
+    function validatePreCallBatch(address _subaccount, Execution[] calldata _executions)
+        external
+        view
+        override
+        returns (bytes memory)
+    {
         // Validate each execution in order - venue can enforce ordering rules
-        for (uint256 i = 0; i < _executions.length; i++) {
+        for (uint i = 0; i < _executions.length; i++) {
             _validateCallData(_subaccount, _executions[i].callData);
         }
         return "";
     }
 
     /// @inheritdoc IVenueValidator
-    function processPostCall(
-        address,
-        bytes calldata
-    ) external override {
+    function processPostCall(address, bytes calldata) external override {
         // TODO: Track pending order state for GMX 2-step order flow
     }
 
@@ -310,7 +303,7 @@ contract GmxVenueValidator is IVenueValidator {
 
         // Approve: validate spender is GMX router
         if (selector == APPROVE_SELECTOR) {
-            (address spender,) = abi.decode(_callData[4:], (address, uint256));
+            (address spender,) = abi.decode(_callData[4:], (address, uint));
             if (spender != router) revert Error.GmxVenueValidator__InvalidReceiver();
             return;
         }
@@ -318,7 +311,7 @@ contract GmxVenueValidator is IVenueValidator {
         // Multicall: validate all inner calls
         if (selector == MULTICALL_SELECTOR) {
             bytes[] memory calls = abi.decode(_callData[4:], (bytes[]));
-            for (uint256 i = 0; i < calls.length; i++) {
+            for (uint i = 0; i < calls.length; i++) {
                 if (calls[i].length < 4) revert Error.GmxVenueValidator__InvalidCallData();
                 bytes4 innerSelector = bytes4(calls[i]);
 
@@ -355,7 +348,7 @@ contract GmxVenueValidator is IVenueValidator {
         }
 
         if (selector == CLAIM_COLLATERAL_SELECTOR) {
-            (,,, address receiver) = abi.decode(_callData[4:], (address[], address[], uint256[], address));
+            (,,, address receiver) = abi.decode(_callData[4:], (address[], address[], uint[], address));
             if (receiver != _subaccount) revert Error.GmxVenueValidator__InvalidReceiver();
             return;
         }
@@ -369,12 +362,8 @@ contract GmxVenueValidator is IVenueValidator {
     }
 
     /// @dev Validate createOrder for hook-based flow (no token/amount binding)
-    function _validateCreateOrderHook(
-        address _subaccount,
-        bytes memory _data
-    ) internal pure {
-        IBaseOrderUtils.CreateOrderParams memory params =
-            abi.decode(_data, (IBaseOrderUtils.CreateOrderParams));
+    function _validateCreateOrderHook(address _subaccount, bytes memory _data) internal pure {
+        IBaseOrderUtils.CreateOrderParams memory params = abi.decode(_data, (IBaseOrderUtils.CreateOrderParams));
 
         // Receiver must be the subaccount
         if (params.addresses.receiver != _subaccount) {
@@ -382,8 +371,8 @@ contract GmxVenueValidator is IVenueValidator {
         }
 
         // Cancellation receiver must be subaccount or zero
-        if (params.addresses.cancellationReceiver != address(0) &&
-            params.addresses.cancellationReceiver != _subaccount) {
+        if (params.addresses.cancellationReceiver != address(0) && params.addresses.cancellationReceiver != _subaccount)
+        {
             revert Error.GmxVenueValidator__InvalidReceiver();
         }
 
@@ -399,20 +388,21 @@ contract GmxVenueValidator is IVenueValidator {
     }
 
     /// @dev Slice bytes starting from offset
-    function _slice(bytes memory _data, uint256 _start) internal pure returns (bytes memory) {
+    function _slice(bytes memory _data, uint _start) internal pure returns (bytes memory) {
         require(_start <= _data.length, "slice_outOfBounds");
         bytes memory result = new bytes(_data.length - _start);
-        for (uint256 i = 0; i < result.length; i++) {
+        for (uint i = 0; i < result.length; i++) {
             result[i] = _data[_start + i];
         }
         return result;
     }
 
     /// @inheritdoc IVenueValidator
-    function getPositionInfo(
-        IERC7579Account _subaccount,
-        bytes calldata _callData
-    ) external view returns (IVenueValidator.PositionInfo memory _info) {
+    function getPositionInfo(IERC7579Account _subaccount, bytes calldata _callData)
+        external
+        view
+        returns (IVenueValidator.PositionInfo memory _info)
+    {
         if (_callData.length < 4) return _info; // Return empty for invalid calldata
 
         bytes4 selector = bytes4(_callData[:4]);
@@ -420,9 +410,11 @@ contract GmxVenueValidator is IVenueValidator {
         // Handle multicall: extract createOrder from inner calls
         if (selector == MULTICALL_SELECTOR) {
             bytes[] memory calls = abi.decode(_callData[4:], (bytes[]));
-            for (uint256 i = 0; i < calls.length; i++) {
+            for (uint i = 0; i < calls.length; i++) {
                 if (calls[i].length >= 4 && bytes4(calls[i]) == CREATE_ORDER_SELECTOR) {
-                    return _getPositionInfoFromParams(_subaccount, abi.decode(_slice(calls[i], 4), (IBaseOrderUtils.CreateOrderParams)));
+                    return _getPositionInfoFromParams(
+                        _subaccount, abi.decode(_slice(calls[i], 4), (IBaseOrderUtils.CreateOrderParams))
+                    );
                 }
             }
             return _info; // No createOrder found in multicall
@@ -433,23 +425,19 @@ contract GmxVenueValidator is IVenueValidator {
             return _info; // Return empty for approve, updateOrder, cancelOrder, etc.
         }
 
-        IBaseOrderUtils.CreateOrderParams memory params =
-            abi.decode(_callData[4:], (IBaseOrderUtils.CreateOrderParams));
+        IBaseOrderUtils.CreateOrderParams memory params = abi.decode(_callData[4:], (IBaseOrderUtils.CreateOrderParams));
         return _getPositionInfoFromParams(_subaccount, params);
     }
 
     /// @dev Build position info from order params
-    function _getPositionInfoFromParams(
-        IERC7579Account _subaccount,
-        IBaseOrderUtils.CreateOrderParams memory params
-    ) internal view returns (IVenueValidator.PositionInfo memory _info) {
-
+    function _getPositionInfoFromParams(IERC7579Account _subaccount, IBaseOrderUtils.CreateOrderParams memory params)
+        internal
+        view
+        returns (IVenueValidator.PositionInfo memory _info)
+    {
         bytes32 positionKey = keccak256(
             abi.encode(
-                address(_subaccount),
-                params.addresses.market,
-                params.addresses.initialCollateralToken,
-                params.isLong
+                address(_subaccount), params.addresses.market, params.addresses.initialCollateralToken, params.isLong
             )
         );
 
@@ -458,9 +446,11 @@ contract GmxVenueValidator is IVenueValidator {
     }
 
     /// @notice Decode createOrder calldata into CreateOrderParams
-    function _decodeCreateOrder(
-        bytes calldata _callData
-    ) internal pure returns (IBaseOrderUtils.CreateOrderParams memory params) {
+    function _decodeCreateOrder(bytes calldata _callData)
+        internal
+        pure
+        returns (IBaseOrderUtils.CreateOrderParams memory params)
+    {
         if (_callData.length < 4) revert Error.GmxVenueValidator__InvalidCallData();
         bytes4 selector = bytes4(_callData[:4]);
         if (selector != CREATE_ORDER_SELECTOR) revert Error.GmxVenueValidator__InvalidCallData();

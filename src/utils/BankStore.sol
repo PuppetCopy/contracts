@@ -24,9 +24,7 @@ abstract contract BankStore is Access {
     /**
      * @notice Get tracked balance for a token
      */
-    function getTokenBalance(
-        IERC20 _token
-    ) external view returns (uint) {
+    function getTokenBalance(IERC20 _token) external view returns (uint) {
         return tokenBalanceMap[_token];
     }
 
@@ -34,9 +32,7 @@ abstract contract BankStore is Access {
      * @notice Account for tokens transferred directly to contract
      * @return Amount of new tokens detected
      */
-    function recordTransferIn(
-        IERC20 _token
-    ) external auth returns (uint) {
+    function recordTransferIn(IERC20 _token) external auth returns (uint) {
         uint _prevBalance = tokenBalanceMap[_token];
         uint _currentBalance = _token.balanceOf(address(this));
 
@@ -70,9 +66,7 @@ abstract contract BankStore is Access {
     /**
      * @notice Reset tracked balance to actual balance
      */
-    function syncTokenBalance(
-        IERC20 _token
-    ) external auth {
+    function syncTokenBalance(IERC20 _token) external auth {
         tokenBalanceMap[_token] = _token.balanceOf(address(this));
     }
 }

@@ -20,13 +20,9 @@ abstract contract CoreContract is Permission {
     /// @notice  Sets the configuration parameters via governance
     /// @param _data The encoded configuration data
     /// @dev Emits a SetConfig event upon successful execution
-    function _setConfig(
-        bytes memory _data
-    ) internal virtual;
+    function _setConfig(bytes memory _data) internal virtual;
 
-    function setConfig(
-        bytes calldata _data
-    ) external virtual onlyAuthority {
+    function setConfig(bytes calldata _data) external virtual onlyAuthority {
         _setConfig(_data);
     }
 
@@ -37,9 +33,7 @@ abstract contract CoreContract is Permission {
         authority.logEvent(method, data);
     }
 
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public pure virtual returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public pure virtual returns (bool) {
         return interfaceId == type(CoreContract).interfaceId;
     }
 }

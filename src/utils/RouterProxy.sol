@@ -14,13 +14,9 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
  *         to manage the implementation address.
  */
 contract RouterProxy is Proxy, Access {
-    constructor(
-        IAuthority _authority
-    ) Access(_authority) {}
+    constructor(IAuthority _authority) Access(_authority) {}
 
-    function update(
-        address _impl
-    ) external auth {
+    function update(address _impl) external auth {
         ERC1967Utils.upgradeToAndCall(_impl, "");
     }
 

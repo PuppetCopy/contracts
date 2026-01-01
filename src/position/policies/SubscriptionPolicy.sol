@@ -32,7 +32,8 @@ contract SubscriptionPolicy is ERC7579ActionPolicy, CoreContract {
 
     Config public config;
 
-    mapping(ConfigId => mapping(address => mapping(address => mapping(bytes32 => Subscription)))) internal subscriptionMap;
+    mapping(ConfigId => mapping(address => mapping(address => mapping(bytes32 => Subscription)))) internal
+        subscriptionMap;
     mapping(ConfigId => mapping(address => mapping(address => mapping(bytes32 => uint64)))) internal lastActivityMap;
 
     constructor(IAuthority _authority, bytes memory _config) CoreContract(_authority, _config) {}
@@ -49,7 +50,7 @@ contract SubscriptionPolicy is ERC7579ActionPolicy, CoreContract {
 
     function onUninstall(bytes calldata) external override {}
 
-    function isModuleType(uint256 moduleTypeId) external pure override returns (bool) {
+    function isModuleType(uint moduleTypeId) external pure override returns (bool) {
         return moduleTypeId == TYPE_POLICY;
     }
 
@@ -66,8 +67,7 @@ contract SubscriptionPolicy is ERC7579ActionPolicy, CoreContract {
     }
 
     function supportsInterface(bytes4 interfaceId) public pure override(CoreContract, IERC165) returns (bool) {
-        return interfaceId == type(IActionPolicy).interfaceId
-            || interfaceId == type(CoreContract).interfaceId
+        return interfaceId == type(IActionPolicy).interfaceId || interfaceId == type(CoreContract).interfaceId
             || interfaceId == 0x01ffc9a7;
     }
 
@@ -83,21 +83,17 @@ contract SubscriptionPolicy is ERC7579ActionPolicy, CoreContract {
      * @param configId The session configuration ID
      * @param initData Encoded (bytes32 key, uint16 allowanceRate, uint32 throttlePeriod, uint64 expiry)
      */
-    function initializeWithMultiplexer(
-        address account,
-        ConfigId configId,
-        bytes calldata initData
-    ) external override(ERC7579PolicyBase, IPolicy) {
+    function initializeWithMultiplexer(address account, ConfigId configId, bytes calldata initData)
+        external
+        override(ERC7579PolicyBase, IPolicy)
+    {
         (bytes32 key, uint16 allowanceRate, uint32 throttlePeriod, uint64 expiry) =
             abi.decode(initData, (bytes32, uint16, uint32, uint64));
 
         require(allowanceRate <= 10000, "Invalid allowance rate");
 
-        subscriptionMap[configId][msg.sender][account][key] = Subscription({
-            allowanceRate: allowanceRate,
-            throttlePeriod: throttlePeriod,
-            expiry: expiry
-        });
+        subscriptionMap[configId][msg.sender][account][key] =
+            Subscription({allowanceRate: allowanceRate, throttlePeriod: throttlePeriod, expiry: expiry});
 
         _logEvent("Subscribe", abi.encode(configId, account, key, allowanceRate, throttlePeriod, expiry));
     }
@@ -121,24 +117,22 @@ contract SubscriptionPolicy is ERC7579ActionPolicy, CoreContract {
     /**
      * @notice Get subscription details
      */
-    function getSubscription(
-        ConfigId configId,
-        address multiplexer,
-        address puppet,
-        bytes32 key
-    ) external view returns (Subscription memory) {
+    function getSubscription(ConfigId configId, address multiplexer, address puppet, bytes32 key)
+        external
+        view
+        returns (Subscription memory)
+    {
         return subscriptionMap[configId][multiplexer][puppet][key];
     }
 
     /**
      * @notice Get last activity timestamp for a subscription
      */
-    function getLastActivity(
-        ConfigId configId,
-        address multiplexer,
-        address puppet,
-        bytes32 key
-    ) external view returns (uint64) {
+    function getLastActivity(ConfigId configId, address multiplexer, address puppet, bytes32 key)
+        external
+        view
+        returns (uint64)
+    {
         return lastActivityMap[configId][multiplexer][puppet][key];
     }
 
@@ -173,13 +167,11 @@ contract SubscriptionPolicy is ERC7579ActionPolicy, CoreContract {
      * @param data The transfer calldata
      * @return VALIDATION_SUCCESS or VALIDATION_FAILED
      */
-    function checkAction(
-        ConfigId id,
-        address puppet,
-        address token,
-        uint256 value,
-        bytes calldata data
-    ) external override returns (uint256) {
+    function checkAction(ConfigId id, address puppet, address token, uint value, bytes calldata data)
+        external
+        override
+        returns (uint)
+    {
         // Rule 1: No ETH transfers
         if (value != 0) return VALIDATION_FAILED;
 
@@ -215,9 +207,9 @@ contract SubscriptionPolicy is ERC7579ActionPolicy, CoreContract {
         }
 
         // Rule 6: Check allowance rate
-        uint256 amount = uint256(bytes32(data[36:68]));
-        uint256 puppetBalance = IERC20(token).balanceOf(puppet);
-        uint256 maxAllowed = Precision.applyBasisPoints(sub.allowanceRate, puppetBalance);
+        uint amount = uint(bytes32(data[36:68]));
+        uint puppetBalance = IERC20(token).balanceOf(puppet);
+        uint maxAllowed = Precision.applyBasisPoints(sub.allowanceRate, puppetBalance);
         if (amount > maxAllowed) return VALIDATION_FAILED;
 
         // Update throttle timestamp (state change)

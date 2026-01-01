@@ -13,9 +13,11 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 
 /// @title PuppetVoteToken
 contract PuppetVoteToken is Permission, ERC20Votes, ERC165 {
-    constructor(
-        IAuthority _authority
-    ) Permission(_authority) ERC20("Puppet Voting Power", "vPUPPET") EIP712("PuppetVoteToken", "1") {}
+    constructor(IAuthority _authority)
+        Permission(_authority)
+        ERC20("Puppet Voting Power", "vPUPPET")
+        EIP712("PuppetVoteToken", "1")
+    {}
 
     function burn(address user, uint amount) external auth {
         _burn(user, amount);
@@ -36,9 +38,7 @@ contract PuppetVoteToken is Permission, ERC20Votes, ERC165 {
     }
 
     // Modify the supportsInterface function
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view virtual override(ERC165) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165) returns (bool) {
         return interfaceId == type(IVotes).interfaceId || super.supportsInterface(interfaceId);
     }
 }

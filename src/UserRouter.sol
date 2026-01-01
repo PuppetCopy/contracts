@@ -16,8 +16,6 @@ import {VenueRegistry} from "./position/VenueRegistry.sol";
  * @dev DAO can update underlying contracts. Deployed behind RouterProxy.
  */
 contract UserRouter is IUserRouter, CoreContract {
-    error UserRouter__OnlyMasterHook();
-
     struct Config {
         Allocation allocation;
         VenueRegistry venueRegistry;
@@ -27,9 +25,30 @@ contract UserRouter is IUserRouter, CoreContract {
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
-    modifier onlyMasterHook() {
-        if (msg.sender != config.allocation.getConfig().masterHook) revert UserRouter__OnlyMasterHook();
-        _;
+    /// @inheritdoc IUserRouter
+    function registerMasterSubaccount(address _account, address _signer, IERC7579Account _subaccount, IERC20 _token)
+        external
+    {
+        config.allocation.registerMasterSubaccount(_account, _signer, _subaccount, _token);
+    }
+
+    /// @inheritdoc IUserRouter
+    function validatePreCall(address _subaccount, address _msgSender, uint _msgValue, bytes calldata _msgData)
+        external
+        view
+        returns (bytes memory hookData)
+    {
+        return config.venueRegistry.validatePreCall(_subaccount, _msgSender, _msgValue, _msgData);
+    }
+
+    /// @inheritdoc IUserRouter
+    function processPostCall(address _subaccount, bytes calldata _hookData) external {
+        config.venueRegistry.processPostCall(_subaccount, _hookData);
+    }
+
+    /// @inheritdoc IUserRouter
+    function getPositionKeyList(bytes32 _matchingKey) external view returns (bytes32[] memory) {
+        return config.venueRegistry.getPositionKeyList(_matchingKey);
     }
 
     function _setConfig(bytes memory _data) internal override {
@@ -37,38 +56,5 @@ contract UserRouter is IUserRouter, CoreContract {
         require(address(_config.allocation) != address(0), "UserRouter: invalid allocation");
         require(address(_config.venueRegistry) != address(0), "UserRouter: invalid venueRegistry");
         config = _config;
-    }
-
-    /// @inheritdoc IUserRouter
-    function registerMasterSubaccount(
-        address _account,
-        address _signer,
-        IERC7579Account _subaccount,
-        IERC20 _token
-    ) external onlyMasterHook {
-        config.allocation.registerMasterSubaccount(_account, _signer, _subaccount, _token);
-    }
-
-    /// @inheritdoc IUserRouter
-    function validatePreCall(
-        address _subaccount,
-        address _msgSender,
-        uint256 _msgValue,
-        bytes calldata _msgData
-    ) external view returns (bytes memory hookData) {
-        return config.venueRegistry.validatePreCall(_subaccount, _msgSender, _msgValue, _msgData);
-    }
-
-    /// @inheritdoc IUserRouter
-    function processPostCall(
-        address _subaccount,
-        bytes calldata _hookData
-    ) external onlyMasterHook {
-        config.venueRegistry.processPostCall(_subaccount, _hookData);
-    }
-
-    /// @inheritdoc IUserRouter
-    function getPositionKeyList(bytes32 _matchingKey) external view returns (bytes32[] memory) {
-        return config.venueRegistry.getPositionKeyList(_matchingKey);
     }
 }

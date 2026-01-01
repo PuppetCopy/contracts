@@ -33,16 +33,15 @@ library TransferUtils {
         // input mem[in…(in+insize)]
         // output area mem[out…(out+outsize))]
         assembly {
-            success :=
-                call(
-                    gasLimit, // gas limit
-                    receiver, // receiver
-                    amount, // value
-                    0, // in
-                    0, // insize
-                    0, // out
-                    0 // outsize
-                )
+            success := call(
+                gasLimit, // gas limit
+                receiver, // receiver
+                amount, // value
+                0, // in
+                0, // insize
+                0, // out
+                0 // outsize
+            )
         }
 
         if (success) return;
@@ -62,13 +61,9 @@ library TransferUtils {
      * @param receiver Primary recipient of wrapped tokens
      * @param amount Amount to deposit and transfer
      */
-    function depositAndSendWnt(
-        IWNT wnt,
-        address holdingAddress,
-        uint gasLimit,
-        address receiver,
-        uint amount
-    ) internal {
+    function depositAndSendWnt(IWNT wnt, address holdingAddress, uint gasLimit, address receiver, uint amount)
+        internal
+    {
         if (amount == 0) return;
         if (receiver == address(0)) revert Error.TransferUtils__InvalidReceiver();
 
@@ -89,13 +84,9 @@ library TransferUtils {
      * @param receiver Primary recipient of native tokens
      * @param amount Amount to withdraw and send
      */
-    function withdrawAndSendNativeToken(
-        IWNT wnt,
-        uint gasLimit,
-        address holdingAddress,
-        address receiver,
-        uint amount
-    ) internal {
+    function withdrawAndSendNativeToken(IWNT wnt, uint gasLimit, address holdingAddress, address receiver, uint amount)
+        internal
+    {
         if (amount == 0) return;
         if (receiver == address(0)) revert Error.TransferUtils__InvalidReceiver();
 
@@ -106,16 +97,15 @@ library TransferUtils {
         // input mem[in…(in+insize)]
         // output area mem[out…(out+outsize))]
         assembly {
-            success :=
-                call(
-                    gasLimit, // gas limit
-                    receiver, // receiver
-                    amount, // value
-                    0, // in
-                    0, // insize
-                    0, // out
-                    0 // outsize
-                )
+            success := call(
+                gasLimit, // gas limit
+                receiver, // receiver
+                amount, // value
+                0, // in
+                0, // insize
+                0, // out
+                0 // outsize
+            )
         }
 
         if (success) return;
@@ -136,13 +126,9 @@ library TransferUtils {
      * @param receiver Primary recipient of tokens
      * @param amount Amount of tokens to transfer
      */
-    function transferWithFallback(
-        uint gasLimit,
-        address holdingAddress,
-        IERC20 token,
-        address receiver,
-        uint amount
-    ) internal {
+    function transferWithFallback(uint gasLimit, address holdingAddress, IERC20 token, address receiver, uint amount)
+        internal
+    {
         if (amount == 0) return;
         if (receiver == address(0)) revert Error.TransferUtils__InvalidReceiver();
         if (gasLimit == 0) revert Error.TransferUtils__EmptyTokenTransferGasLimit(token);

@@ -4,7 +4,14 @@ pragma solidity ^0.8.33;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC7579Account, Execution} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 import {IHook, MODULE_TYPE_HOOK} from "modulekit/accounts/common/interfaces/IERC7579Module.sol";
-import {ModeLib, ModeCode, CallType, CALLTYPE_SINGLE, CALLTYPE_BATCH, CALLTYPE_STATIC} from "modulekit/accounts/common/lib/ModeLib.sol";
+import {
+    ModeLib,
+    ModeCode,
+    CallType,
+    CALLTYPE_SINGLE,
+    CALLTYPE_BATCH,
+    CALLTYPE_STATIC
+} from "modulekit/accounts/common/lib/ModeLib.sol";
 
 import {IUserRouter} from "../utils/interfaces/IUserRouter.sol";
 
@@ -33,11 +40,7 @@ contract MasterHook is IHook {
         router = _router;
     }
 
-    function preCheck(
-        address msgSender,
-        uint256 msgValue,
-        bytes calldata msgData
-    ) external view returns (bytes memory) {
+    function preCheck(address msgSender, uint msgValue, bytes calldata msgData) external view returns (bytes memory) {
         if (msgData.length < 4) revert MasterHook__InvalidExecution();
         return router.validatePreCall(msg.sender, msgSender, msgValue, msgData);
     }
@@ -52,8 +55,7 @@ contract MasterHook is IHook {
         IERC7579Account subaccount = IERC7579Account(msg.sender);
 
         // Decode install parameters
-        (address account, address signer, IERC20 token) =
-            abi.decode(_data, (address, address, IERC20));
+        (address account, address signer, IERC20 token) = abi.decode(_data, (address, address, IERC20));
 
         // Register as master subaccount - enables fund raising
         router.registerMasterSubaccount(account, signer, subaccount, token);
@@ -75,7 +77,7 @@ contract MasterHook is IHook {
         // The hook uninstall just validates conditions are met
     }
 
-    function isModuleType(uint256 _moduleTypeId) external pure returns (bool) {
+    function isModuleType(uint _moduleTypeId) external pure returns (bool) {
         return _moduleTypeId == MODULE_TYPE_HOOK;
     }
 

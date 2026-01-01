@@ -32,12 +32,9 @@ contract FeeMarketplace is CoreContract {
 
     Config public config;
 
-    constructor(
-        IAuthority _authority,
-        PuppetToken _protocolToken,
-        FeeMarketplaceStore _store,
-        Config memory _config
-    ) CoreContract(_authority, abi.encode(_config)) {
+    constructor(IAuthority _authority, PuppetToken _protocolToken, FeeMarketplaceStore _store, Config memory _config)
+        CoreContract(_authority, abi.encode(_config))
+    {
         protocolToken = _protocolToken;
         store = _store;
     }

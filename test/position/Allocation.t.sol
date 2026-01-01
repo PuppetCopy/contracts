@@ -308,7 +308,7 @@ contract AllocationTest is BasicSetup {
         vm.prank(address(masterSubaccount));
         masterSubaccount.uninstallModule(MODULE_TYPE_EXECUTOR, address(allocation), abi.encode(usdc));
 
-        assertTrue(allocation.frozenMap(matchingKey), "Subaccount frozen");
+        assertTrue(allocation.disposedMap(matchingKey), "Subaccount frozen");
 
         masterSubaccount.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
 
@@ -388,13 +388,13 @@ contract AllocationTest is BasicSetup {
             usdc
         );
 
-        assertFalse(allocation.frozenMap(matchingKey), "Not frozen initially");
+        assertFalse(allocation.disposedMap(matchingKey), "Not frozen initially");
 
         vm.stopPrank();
         vm.prank(address(masterSubaccount));
         masterSubaccount.uninstallModule(MODULE_TYPE_EXECUTOR, address(allocation), abi.encode(usdc));
 
-        assertTrue(allocation.frozenMap(matchingKey), "Frozen after uninstall");
+        assertTrue(allocation.disposedMap(matchingKey), "Frozen after uninstall");
     }
 
     function testShareAccounting_VirtualOffsetProtectsFirstDeposit() public {
@@ -1112,7 +1112,7 @@ contract AllocationTest is BasicSetup {
         sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
         vm.startPrank(users.owner);
 
-        assertTrue(allocation.frozenMap(key), "Phase 7: Subaccount frozen");
+        assertTrue(allocation.disposedMap(key), "Phase 7: Subaccount frozen");
 
         {
             Allocation.CallIntent memory intent = Allocation.CallIntent({

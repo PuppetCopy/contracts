@@ -12,7 +12,7 @@ abstract contract Access {
     // Reentrancy guard using transient storage - uses OpenZeppelin's standard slot
     // keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.ReentrancyGuard")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant REENTRANCY_GUARD_SLOT = 0x9b779b17422d0df92223018b32b4d1fa46e071723d6817e2486d003becc55f00;
-    
+
     error ReentrancyGuardReentrantCall();
     /// @notice The central Authority contract responsible for managing access.
     IAuthority public immutable authority;
@@ -23,16 +23,12 @@ abstract contract Access {
     /// @notice Checks if a user is authorized (has general access).
     /// @param user The address to check.
     /// @return True if the user is authorized, false otherwise.
-    function canCall(
-        address user
-    ) public view virtual returns (bool) {
+    function canCall(address user) public view virtual returns (bool) {
         return authMap[user];
     }
 
     /// @param _authority The address of the central Authority (Dictatorship).
-    constructor(
-        IAuthority _authority
-    ) {
+    constructor(IAuthority _authority) {
         if (address(_authority) == address(0)) revert("Access: Zero authority address");
         authority = _authority;
     }

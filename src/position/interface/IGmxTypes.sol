@@ -35,14 +35,14 @@ interface IBaseOrderUtils {
     }
 
     struct CreateOrderParamsNumbers {
-        uint256 sizeDeltaUsd;
-        uint256 initialCollateralDeltaAmount;
-        uint256 triggerPrice;
-        uint256 acceptablePrice;
-        uint256 executionFee;
-        uint256 callbackGasLimit;
-        uint256 minOutputAmount;
-        uint256 validFromTime;
+        uint sizeDeltaUsd;
+        uint initialCollateralDeltaAmount;
+        uint triggerPrice;
+        uint acceptablePrice;
+        uint executionFee;
+        uint callbackGasLimit;
+        uint minOutputAmount;
+        uint validFromTime;
     }
 
     struct CreateOrderParams {

@@ -49,15 +49,7 @@
   runs = 256
 
 [fmt]
-  bracket_spacing = false
   int_types = "short"
-  number_underscore = "preserve"
-  quote_style = "double"
-  multiline_func_header = "params_first"
-  sort_imports = true
-  tab_width = 4
-  wrap_comments = true
-  func_attrs_with_params_multiline = true
 
 [rpc_endpoints]
   arbitrum = { url = "${RPC_URL}", chain_id = 42161 }

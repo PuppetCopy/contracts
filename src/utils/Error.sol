@@ -20,7 +20,6 @@ library Error {
 
     error PuppetVoteToken__Unsupported();
 
-
     error VotingEscrow__ZeroAmount();
     error VotingEscrow__ExceedMaxTime();
     error VotingEscrow__ExceedingAccruedAmount(uint accured);

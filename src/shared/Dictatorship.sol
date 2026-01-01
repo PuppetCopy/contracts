@@ -13,9 +13,7 @@ import {EventEmitter} from "./EventEmitter.sol";
 contract Dictatorship is Ownable, IAuthority, EventEmitter {
     mapping(address => bool) public registeredContractMap;
 
-    constructor(
-        address _initialOwner
-    ) Ownable(_initialOwner) {
+    constructor(address _initialOwner) Ownable(_initialOwner) {
         registeredContractMap[address(this)] = true;
     }
 
@@ -47,9 +45,7 @@ contract Dictatorship is Ownable, IAuthority, EventEmitter {
         emit PuppetEventLog(address(this), "UpdatePermission", abi.encode(address(_target), _user, _functionSig, false));
     }
 
-    function registerContract(
-        address _contract
-    ) external onlyOwner {
+    function registerContract(address _contract) external onlyOwner {
         if (registeredContractMap[_contract]) revert Error.Dictatorship__ContractAlreadyInitialized();
 
         registeredContractMap[_contract] = true;
@@ -58,7 +54,9 @@ contract Dictatorship is Ownable, IAuthority, EventEmitter {
 
     function setConfig(CoreContract _contract, bytes calldata _config) external onlyOwner {
         if (!registeredContractMap[address(_contract)]) revert Error.Dictatorship__ContractNotRegistered();
-        if (!_contract.supportsInterface(type(CoreContract).interfaceId)) revert Error.Dictatorship__InvalidCoreContract();
+        if (!_contract.supportsInterface(type(CoreContract).interfaceId)) {
+            revert Error.Dictatorship__InvalidCoreContract();
+        }
 
         try _contract.setConfig(_config) {}
         catch (bytes memory reason) {
@@ -71,9 +69,7 @@ contract Dictatorship is Ownable, IAuthority, EventEmitter {
         emit PuppetEventLog(address(_contract), "SetConfig", _config);
     }
 
-    function removeContract(
-        address _contract
-    ) external onlyOwner {
+    function removeContract(address _contract) external onlyOwner {
         if (!registeredContractMap[_contract]) revert Error.Dictatorship__ContractNotRegistered();
 
         registeredContractMap[_contract] = false;

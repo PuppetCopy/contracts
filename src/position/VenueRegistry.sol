@@ -3,7 +3,14 @@ pragma solidity ^0.8.33;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC7579Account, Execution} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
-import {ModeLib, ModeCode, CallType, CALLTYPE_SINGLE, CALLTYPE_BATCH, CALLTYPE_STATIC} from "modulekit/accounts/common/lib/ModeLib.sol";
+import {
+    ModeLib,
+    ModeCode,
+    CallType,
+    CALLTYPE_SINGLE,
+    CALLTYPE_BATCH,
+    CALLTYPE_STATIC
+} from "modulekit/accounts/common/lib/ModeLib.sol";
 import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
 
 import {CoreContract} from "../utils/CoreContract.sol";
@@ -20,7 +27,7 @@ contract VenueRegistry is CoreContract {
 
     struct PositionInfo {
         Venue venue;
-        uint256 value;
+        uint value;
         bytes32 positionKey;
     }
 
@@ -46,12 +53,11 @@ contract VenueRegistry is CoreContract {
     // ============ Hook Validation ============
 
     /// @notice Validate before execution, parse msgData and route to venue validator
-    function validatePreCall(
-        address _subaccount,
-        address,
-        uint256,
-        bytes calldata _msgData
-    ) external view returns (bytes memory hookData) {
+    function validatePreCall(address _subaccount, address, uint, bytes calldata _msgData)
+        external
+        view
+        returns (bytes memory hookData)
+    {
         if (_msgData.length < 4) return "";
 
         // Only validate execute() calls
@@ -65,7 +71,7 @@ contract VenueRegistry is CoreContract {
         if (callType == CALLTYPE_STATIC) return "";
 
         if (callType == CALLTYPE_SINGLE) {
-            (address target, uint256 value, bytes calldata callData) = ExecutionLib.decodeSingle(executionData);
+            (address target, uint value, bytes calldata callData) = ExecutionLib.decodeSingle(executionData);
             IVenueValidator validator = _getValidator(target);
             bytes memory venueHookData = validator.validatePreCallSingle(_subaccount, target, value, callData);
             if (venueHookData.length == 0) return "";
@@ -88,10 +94,7 @@ contract VenueRegistry is CoreContract {
     }
 
     /// @notice Process after execution using hookData from preCheck (can mutate state)
-    function processPostCall(
-        address _subaccount,
-        bytes calldata _hookData
-    ) external {
+    function processPostCall(address _subaccount, bytes calldata _hookData) external {
         if (_hookData.length == 0) return;
 
         // hookData contains venue address + venue-specific data
@@ -102,12 +105,7 @@ contract VenueRegistry is CoreContract {
 
         validator.processPostCall(_subaccount, venueHookData);
 
-        _logEvent("ProcessPostCall", abi.encode(
-            _subaccount,
-            venueTarget,
-            venueKey,
-            venueHookData
-        ));
+        _logEvent("ProcessPostCall", abi.encode(_subaccount, venueTarget, venueKey, venueHookData));
     }
 
     function _getValidator(address _target) internal view returns (IVenueValidator validator) {
@@ -132,12 +130,10 @@ contract VenueRegistry is CoreContract {
         _logEvent("SetVenue", abi.encode(_venueKey, _validator, _entrypoints));
     }
 
-    function updatePosition(
-        bytes32 _matchingKey,
-        bytes32 _positionKey,
-        Venue calldata _venue,
-        uint256 _netValue
-    ) external auth {
+    function updatePosition(bytes32 _matchingKey, bytes32 _positionKey, Venue calldata _venue, uint _netValue)
+        external
+        auth
+    {
         if (_netValue > 0 && positionVenueMap[_positionKey].venueKey == bytes32(0)) {
             positionKeyListMap[_matchingKey].push(_positionKey);
             positionVenueMap[_positionKey] = _venue;
@@ -154,9 +150,9 @@ contract VenueRegistry is CoreContract {
         }
     }
 
-    function getNetValue(IERC20 _token, IERC7579Account _subaccount) external view returns (uint256) {
+    function getNetValue(IERC20 _token, IERC7579Account _subaccount) external view returns (uint) {
         bytes32 _matchingKey = PositionUtils.getMatchingKey(_token, _subaccount);
-        uint256 _netValue = _token.balanceOf(address(_subaccount));
+        uint _netValue = _token.balanceOf(address(_subaccount));
 
         bytes32[] storage _keys = positionKeyListMap[_matchingKey];
         for (uint _i = 0; _i < _keys.length; ++_i) {
@@ -166,23 +162,25 @@ contract VenueRegistry is CoreContract {
         return _netValue;
     }
 
-    function snapshotNetValue(bytes32 _matchingKey) external view returns (uint256 _positionValue, PositionInfo[] memory _positions) {
+    function snapshotNetValue(bytes32 _matchingKey)
+        external
+        view
+        returns (uint _positionValue, PositionInfo[] memory _positions)
+    {
         bytes32[] storage _keys = positionKeyListMap[_matchingKey];
         _positions = new PositionInfo[](_keys.length);
 
         for (uint _i = 0; _i < _keys.length; ++_i) {
             bytes32 _positionKey = _keys[_i];
             Venue storage _venue = positionVenueMap[_positionKey];
-            if (address(_venue.validator) == address(0)) revert Error.VenueRegistry__VenueNotRegistered(_venue.venueKey);
+            if (address(_venue.validator) == address(0)) {
+                revert Error.VenueRegistry__VenueNotRegistered(_venue.venueKey);
+            }
 
-            uint256 _npv = _venue.validator.getPositionNetValue(_positionKey);
+            uint _npv = _venue.validator.getPositionNetValue(_positionKey);
             _positionValue += _npv;
 
-            _positions[_i] = PositionInfo({
-                venue: _venue,
-                value: _npv,
-                positionKey: _positionKey
-            });
+            _positions[_i] = PositionInfo({venue: _venue, value: _npv, positionKey: _positionKey});
         }
     }
 

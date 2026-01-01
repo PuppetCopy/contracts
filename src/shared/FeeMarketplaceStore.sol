@@ -14,19 +14,14 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 contract FeeMarketplaceStore is BankStore {
     PuppetToken public immutable protocolToken;
 
-    constructor(
-        IAuthority _authority,
-        PuppetToken _protocolToken
-    ) BankStore(_authority) {
+    constructor(IAuthority _authority, PuppetToken _protocolToken) BankStore(_authority) {
         protocolToken = _protocolToken;
     }
 
     /**
      * @notice Burn protocol tokens held by the store
      */
-    function burn(
-        uint _amount
-    ) external auth {
+    function burn(uint _amount) external auth {
         IERC20 _token = IERC20(address(protocolToken));
         if (tokenBalanceMap[_token] < _amount) revert Error.BankStore__InsufficientBalance();
         tokenBalanceMap[_token] -= _amount;

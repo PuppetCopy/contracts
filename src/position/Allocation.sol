@@ -5,8 +5,20 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
-import {IExecutor, MODULE_TYPE_EXECUTOR, MODULE_TYPE_HOOK} from "modulekit/accounts/common/interfaces/IERC7579Module.sol";
-import {ModeLib, ModeCode, ModePayload, CALLTYPE_SINGLE, EXECTYPE_TRY, EXECTYPE_DEFAULT, MODE_DEFAULT} from "modulekit/accounts/common/lib/ModeLib.sol";
+import {
+    IExecutor,
+    MODULE_TYPE_EXECUTOR,
+    MODULE_TYPE_HOOK
+} from "modulekit/accounts/common/interfaces/IERC7579Module.sol";
+import {
+    ModeLib,
+    ModeCode,
+    ModePayload,
+    CALLTYPE_SINGLE,
+    EXECTYPE_TRY,
+    EXECTYPE_DEFAULT,
+    MODE_DEFAULT
+} from "modulekit/accounts/common/lib/ModeLib.sol";
 import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
 
 import {CoreContract} from "../utils/CoreContract.sol";
@@ -18,7 +30,6 @@ import {IVenueValidator} from "./interface/IVenueValidator.sol";
 import {VenueRegistry} from "./VenueRegistry.sol";
 
 contract Allocation is CoreContract, IExecutor, EIP712 {
-
     struct Config {
         VenueRegistry venueRegistry;
         address masterHook;
@@ -30,27 +41,30 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         address account;
         IERC7579Account subaccount;
         IERC20 token;
-        uint256 amount;
-        uint256 deadline;
-        uint256 nonce;
+        uint amount;
+        uint deadline;
+        uint nonce;
     }
 
     bytes32 public constant CALL_INTENT_TYPEHASH = keccak256(
         "CallIntent(address account,address subaccount,address token,uint256 amount,uint256 deadline,uint256 nonce)"
     );
 
-    ModeCode internal constant MODE_TRY = ModeCode.wrap(bytes32(abi.encodePacked(CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT, ModePayload.wrap(0x00))));
-    ModeCode internal constant MODE_STRICT = ModeCode.wrap(bytes32(abi.encodePacked(CALLTYPE_SINGLE, EXECTYPE_DEFAULT, MODE_DEFAULT, ModePayload.wrap(0x00))));
+    ModeCode internal constant MODE_TRY =
+        ModeCode.wrap(bytes32(abi.encodePacked(CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT, ModePayload.wrap(0x00))));
+    ModeCode internal constant MODE_STRICT = ModeCode.wrap(
+        bytes32(abi.encodePacked(CALLTYPE_SINGLE, EXECTYPE_DEFAULT, MODE_DEFAULT, ModePayload.wrap(0x00)))
+    );
 
     Config public config;
 
     mapping(IERC20 token => uint) public tokenCapMap;
     mapping(bytes32 codeHash => bool) public account7579CodeHashMap;
 
-    mapping(bytes32 matchingKey => uint256) public nonceMap;
+    mapping(bytes32 matchingKey => uint) public nonceMap;
     mapping(bytes32 matchingKey => address) public sessionSignerMap;
     mapping(bytes32 matchingKey => IERC7579Account) public masterSubaccountMap;
-    mapping(bytes32 matchingKey => bool) public frozenMap;
+    mapping(bytes32 matchingKey => bool) public disposedMap;
 
     mapping(bytes32 matchingKey => uint) public totalSharesMap;
     mapping(bytes32 matchingKey => mapping(address account => uint)) public shareBalanceMap;
@@ -85,14 +99,13 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         _logEvent("SetCodeHash", abi.encode(_codeHash, _allowed));
     }
 
-    function registerMasterSubaccount(
-        address _account,
-        address _signer,
-        IERC7579Account _subaccount,
-        IERC20 _token
-    ) external {
+    function registerMasterSubaccount(address _account, address _signer, IERC7579Account _subaccount, IERC20 _token)
+        external
+    {
         if (!_isValidAccount(address(_subaccount))) revert Error.Allocation__InvalidAccountCodeHash();
-        if (!_subaccount.isModuleInstalled(MODULE_TYPE_HOOK, config.masterHook, "")) revert Error.Allocation__MasterHookNotInstalled();
+        if (!_subaccount.isModuleInstalled(MODULE_TYPE_HOOK, config.masterHook, "")) {
+            revert Error.Allocation__MasterHookNotInstalled();
+        }
         uint _cap = tokenCapMap[_token];
         if (_cap == 0) revert Error.Allocation__TokenNotAllowed();
 
@@ -108,37 +121,37 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         shareBalanceMap[_key][_account] = _balance;
         totalSharesMap[_key] = _balance;
 
-        _logEvent("RegisterMasterSubaccount", abi.encode(
-            _key,
-            _account,
-            _signer,
-            _subaccount,
-            _token,
-            _balance
-        ));
+        _logEvent("RegisterMasterSubaccount", abi.encode(_key, _account, _signer, _subaccount, _token, _balance));
     }
 
     function executeAllocate(
         CallIntent calldata _intent,
         bytes calldata _signature,
         IERC7579Account[] calldata _puppetList,
-        uint256[] calldata _amountList
+        uint[] calldata _amountList
     ) external auth {
         bytes32 _key = _verifyIntent(_intent, _signature);
         uint _cap = tokenCapMap[_intent.token];
-        if (frozenMap[_key]) revert Error.Allocation__SubaccountFrozen();
+        if (disposedMap[_key]) revert Error.Allocation__SubaccountFrozen();
         if (_cap == 0) revert Error.Allocation__TokenNotAllowed();
-        if (_puppetList.length != _amountList.length) revert Error.Allocation__ArrayLengthMismatch(_puppetList.length, _amountList.length);
-        if (_puppetList.length > config.maxPuppetList) revert Error.Allocation__PuppetListTooLarge(_puppetList.length, config.maxPuppetList);
+        if (_puppetList.length != _amountList.length) {
+            revert Error.Allocation__ArrayLengthMismatch(_puppetList.length, _amountList.length);
+        }
+        if (_puppetList.length > config.maxPuppetList) {
+            revert Error.Allocation__PuppetListTooLarge(_puppetList.length, config.maxPuppetList);
+        }
 
         uint _allocation = _intent.token.balanceOf(address(_intent.subaccount));
-        (uint _positionValue, VenueRegistry.PositionInfo[] memory _positions) = config.venueRegistry.snapshotNetValue(_key);
+        (uint _positionValue, VenueRegistry.PositionInfo[] memory _positions) =
+            config.venueRegistry.snapshotNetValue(_key);
         uint _sharePrice = getSharePrice(_key, _allocation + _positionValue);
         uint _totalShares = totalSharesMap[_key];
         uint _userShares = shareBalanceMap[_key][_intent.account];
 
         if (_intent.amount > 0) {
-            if (!_intent.token.transferFrom(_intent.account, address(_intent.subaccount), _intent.amount)) revert Error.Allocation__TransferFailed();
+            if (!_intent.token.transferFrom(_intent.account, address(_intent.subaccount), _intent.amount)) {
+                revert Error.Allocation__TransferFailed();
+            }
             uint _shares = Precision.toFactor(_intent.amount, _sharePrice);
             if (_shares == 0) revert Error.Allocation__ZeroShares();
             _userShares += _shares;
@@ -153,7 +166,14 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             if (address(_puppet) == address(_intent.subaccount)) continue;
             uint _amount = _amountList[_i];
 
-            bytes memory _result = _executeFromExecutor(_puppet, address(_intent.token), _gasLimit, 0, abi.encodeCall(IERC20.transfer, (address(_intent.subaccount), _amount)), MODE_TRY);
+            bytes memory _result = _executeFromExecutor(
+                _puppet,
+                address(_intent.token),
+                _gasLimit,
+                0,
+                abi.encodeCall(IERC20.transfer, (address(_intent.subaccount), _amount)),
+                MODE_TRY
+            );
             if (!_isSuccessfulTransfer(_result)) {
                 _logEvent("ExecuteAllocateFailed", abi.encode(_key, _puppet, _amount, _result));
                 continue;
@@ -170,32 +190,33 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         if (_allocation > _cap) revert Error.Allocation__DepositExceedsCap(_allocation, _cap);
         totalSharesMap[_key] = _totalShares;
 
-        _logEvent("ExecuteAllocate", abi.encode(
-            _key,
-            _intent.account,
-            _intent.subaccount,
-            _intent.token,
-            _intent.amount,
-            _puppetList,
-            _amountList,
-            _allocation,
-            _positionValue,
-            _positions,
-            _allocated,
-            _sharePrice,
-            _userShares,
-            _totalShares
-        ));
+        _logEvent(
+            "ExecuteAllocate",
+            abi.encode(
+                _key,
+                _intent.account,
+                _intent.subaccount,
+                _intent.token,
+                _intent.amount,
+                _puppetList,
+                _amountList,
+                _allocation,
+                _positionValue,
+                _positions,
+                _allocated,
+                _sharePrice,
+                _userShares,
+                _totalShares
+            )
+        );
     }
 
-    function executeWithdraw(
-        CallIntent calldata _intent,
-        bytes calldata _signature
-    ) external auth {
+    function executeWithdraw(CallIntent calldata _intent, bytes calldata _signature) external auth {
         bytes32 _key = _verifyIntent(_intent, _signature);
 
         uint _allocation = _intent.token.balanceOf(address(_intent.subaccount));
-        (uint _positionValue, VenueRegistry.PositionInfo[] memory _positions) = config.venueRegistry.snapshotNetValue(_key);
+        (uint _positionValue, VenueRegistry.PositionInfo[] memory _positions) =
+            config.venueRegistry.snapshotNetValue(_key);
         uint _netValue = _allocation + _positionValue;
 
         uint _sharePrice = getSharePrice(_key, _netValue);
@@ -223,39 +244,48 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         shareBalanceMap[_key][_intent.account] = _userShares;
         totalSharesMap[_key] = _totalShares;
 
-        _logEvent("ExecuteWithdraw", abi.encode(
-            _key,
-            _intent.account,
-            _intent.subaccount,
-            _intent.token,
-            _intent.amount,
-            _allocation - _amountOut,
-            _positionValue,
-            _positions,
-            _amountOut,
-            _sharesBurnt,
-            _sharePrice,
-            _userShares,
-            _totalShares
-        ));
+        _logEvent(
+            "ExecuteWithdraw",
+            abi.encode(
+                _key,
+                _intent.account,
+                _intent.subaccount,
+                _intent.token,
+                _intent.amount,
+                _allocation - _amountOut,
+                _positionValue,
+                _positions,
+                _amountOut,
+                _sharesBurnt,
+                _sharePrice,
+                _userShares,
+                _totalShares
+            )
+        );
     }
 
     function _verifyIntent(CallIntent calldata _intent, bytes calldata _signature) internal returns (bytes32 _key) {
-        if (block.timestamp > _intent.deadline) revert Error.Allocation__IntentExpired(_intent.deadline, block.timestamp);
+        if (block.timestamp > _intent.deadline) {
+            revert Error.Allocation__IntentExpired(_intent.deadline, block.timestamp);
+        }
 
-        bytes32 _hash = _hashTypedDataV4(keccak256(abi.encode(
-            CALL_INTENT_TYPEHASH,
-            _intent.account,
-            _intent.subaccount,
-            _intent.token,
-            _intent.amount,
-            _intent.deadline,
-            _intent.nonce
-        )));
+        bytes32 _hash = _hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    CALL_INTENT_TYPEHASH,
+                    _intent.account,
+                    _intent.subaccount,
+                    _intent.token,
+                    _intent.amount,
+                    _intent.deadline,
+                    _intent.nonce
+                )
+            )
+        );
         _key = PositionUtils.getMatchingKey(_intent.token, _intent.subaccount);
         if (address(masterSubaccountMap[_key]) == address(0)) revert Error.Allocation__UnregisteredSubaccount();
 
-        uint256 _expectedNonce = nonceMap[_key]++;
+        uint _expectedNonce = nonceMap[_key]++;
         if (_expectedNonce != _intent.nonce) revert Error.Allocation__InvalidNonce(_expectedNonce, _intent.nonce);
 
         address _signer = ECDSA.recover(_hash, _signature);
@@ -264,8 +294,17 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         }
     }
 
-    function _executeFromExecutor(IERC7579Account _from, address _to, uint _gasLimit, uint _value, bytes memory _data, ModeCode _mode) internal returns (bytes memory _result) {
-        bytes[] memory _results = _from.executeFromExecutor{gas: _gasLimit, value: _value}(_mode, ExecutionLib.encodeSingle(_to, _value, _data));
+    function _executeFromExecutor(
+        IERC7579Account _from,
+        address _to,
+        uint _gasLimit,
+        uint _value,
+        bytes memory _data,
+        ModeCode _mode
+    ) internal returns (bytes memory _result) {
+        bytes[] memory _results = _from.executeFromExecutor{gas: _gasLimit, value: _value}(
+            _mode, ExecutionLib.encodeSingle(_to, _value, _data)
+        );
         _result = _results.length > 0 ? _results[0] : bytes("");
     }
 
@@ -292,7 +331,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         config = _config;
     }
 
-    function isModuleType(uint256 _moduleTypeId) external pure returns (bool) {
+    function isModuleType(uint _moduleTypeId) external pure returns (bool) {
         return _moduleTypeId == MODULE_TYPE_EXECUTOR;
     }
 
@@ -308,7 +347,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         bytes32 _key = PositionUtils.getMatchingKey(_token, _subaccount);
         if (address(masterSubaccountMap[_key]) == address(0)) return;
 
-        frozenMap[_key] = true;
+        disposedMap[_key] = true;
 
         _logEvent("Uninstall", abi.encode(_key, _subaccount, _token));
     }

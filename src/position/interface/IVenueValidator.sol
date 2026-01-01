@@ -7,36 +7,33 @@ import {IERC7579Account, Execution} from "modulekit/accounts/common/interfaces/I
 interface IVenueValidator {
     struct PositionInfo {
         bytes32 positionKey;
-        uint256 netValue;
+        uint netValue;
     }
 
     // ============ Hook Validation ============
 
     /// @notice Validate single execution, return hookData for postCheck
-    function validatePreCallSingle(
-        address subaccount,
-        address target,
-        uint256 value,
-        bytes calldata callData
-    ) external view returns (bytes memory hookData);
+    function validatePreCallSingle(address subaccount, address target, uint value, bytes calldata callData)
+        external
+        view
+        returns (bytes memory hookData);
 
     /// @notice Validate batch execution, return hookData for postCheck
     /// @dev Venue can validate order of operations (e.g., approve before createOrder)
-    function validatePreCallBatch(
-        address subaccount,
-        Execution[] calldata executions
-    ) external view returns (bytes memory hookData);
+    function validatePreCallBatch(address subaccount, Execution[] calldata executions)
+        external
+        view
+        returns (bytes memory hookData);
 
     /// @notice Process after execution using hookData from preCheck (can mutate state)
-    function processPostCall(
-        address subaccount,
-        bytes calldata hookData
-    ) external;
-
+    function processPostCall(address subaccount, bytes calldata hookData) external;
 
     // ============ Position Info ============
 
-    function getPositionNetValue(bytes32 positionKey) external view returns (uint256);
+    function getPositionNetValue(bytes32 positionKey) external view returns (uint);
 
-    function getPositionInfo(IERC7579Account subaccount, bytes calldata callData) external view returns (PositionInfo memory);
+    function getPositionInfo(IERC7579Account subaccount, bytes calldata callData)
+        external
+        view
+        returns (PositionInfo memory);
 }

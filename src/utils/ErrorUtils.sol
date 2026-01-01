@@ -3,9 +3,7 @@ pragma solidity ^0.8.33;
 
 library ErrorUtils {
     // To get the revert reason, referenced from https://ethereum.stackexchange.com/a/83577
-    function getRevertMessage(
-        bytes memory result
-    ) internal pure returns (string memory, bool) {
+    function getRevertMessage(bytes memory result) internal pure returns (string memory, bool) {
         // If the result length is less than 68, then the transaction either panicked or failed silently
         if (result.length < 68) {
             return ("", false);
@@ -27,9 +25,7 @@ library ErrorUtils {
         return ("", false);
     }
 
-    function getErrorSelectorFromData(
-        bytes memory data
-    ) internal pure returns (bytes4) {
+    function getErrorSelectorFromData(bytes memory data) internal pure returns (bytes4) {
         bytes4 errorSelector;
 
         assembly {
@@ -39,9 +35,7 @@ library ErrorUtils {
         return errorSelector;
     }
 
-    function revertWithParsedMessage(
-        bytes memory result
-    ) internal pure {
+    function revertWithParsedMessage(bytes memory result) internal pure {
         (string memory revertMessage, bool hasRevertMessage) = getRevertMessage(result);
 
         if (hasRevertMessage) {
@@ -51,9 +45,7 @@ library ErrorUtils {
         }
     }
 
-    function revertWithCustomError(
-        bytes memory result
-    ) internal pure {
+    function revertWithCustomError(bytes memory result) internal pure {
         // referenced from https://ethereum.stackexchange.com/a/123588
         uint length = result.length;
         assembly {

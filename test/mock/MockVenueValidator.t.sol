@@ -6,12 +6,12 @@ import {IVenueValidator} from "src/position/interface/IVenueValidator.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract MockVenueValidator is IVenueValidator {
-    mapping(bytes32 => uint256) public positionValues;
+    mapping(bytes32 => uint) public positionValues;
 
     bool public shouldRevertValidation;
     string public revertReason;
 
-    function setPositionValue(bytes32 _posKey, uint256 _value) external {
+    function setPositionValue(bytes32 _posKey, uint _value) external {
         positionValues[_posKey] = _value;
     }
 
@@ -23,12 +23,12 @@ contract MockVenueValidator is IVenueValidator {
     function validatePreCallSingle(
         address _subaccount,
         address,
-        uint256,
+        uint,
         bytes calldata
     ) external view override returns (bytes memory) {
         if (shouldRevertValidation) revert(revertReason);
         bytes32 posKey = keccak256(abi.encode(_subaccount, "mock_position"));
-        if (positionValues[posKey] == type(uint256).max) revert("MockVenueValidator: validation failed");
+        if (positionValues[posKey] == type(uint).max) revert("MockVenueValidator: validation failed");
         return "";
     }
 
@@ -38,7 +38,7 @@ contract MockVenueValidator is IVenueValidator {
     ) external view override returns (bytes memory) {
         if (shouldRevertValidation) revert(revertReason);
         bytes32 posKey = keccak256(abi.encode(_subaccount, "mock_position"));
-        if (positionValues[posKey] == type(uint256).max) revert("MockVenueValidator: validation failed");
+        if (positionValues[posKey] == type(uint).max) revert("MockVenueValidator: validation failed");
         return "";
     }
 
@@ -47,7 +47,7 @@ contract MockVenueValidator is IVenueValidator {
         bytes calldata
     ) external override {}
 
-    function getPositionNetValue(bytes32 _positionKey) external view returns (uint256) {
+    function getPositionNetValue(bytes32 _positionKey) external view returns (uint) {
         return positionValues[_positionKey];
     }
 
@@ -62,7 +62,7 @@ contract PassthroughValidator is IVenueValidator {
     function validatePreCallSingle(
         address,
         address,
-        uint256,
+        uint,
         bytes calldata
     ) external pure override returns (bytes memory) {
         return "";
@@ -80,7 +80,7 @@ contract PassthroughValidator is IVenueValidator {
         bytes calldata
     ) external override {}
 
-    function getPositionNetValue(bytes32) external pure returns (uint256) {
+    function getPositionNetValue(bytes32) external pure returns (uint) {
         return 0;
     }
 
