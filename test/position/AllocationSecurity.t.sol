@@ -30,6 +30,7 @@ contract AllocationSecurityTest is BasicSetup {
     uint constant TOKEN_CAP = 1_000_000e6;
     uint constant MAX_PUPPET_LIST = 10;
     uint constant GAS_LIMIT = 500_000;
+    bytes32 constant SUBACCOUNT_NAME = bytes32("main");
 
     bytes32 stageKey;
     bytes32 matchingKey;
@@ -71,7 +72,7 @@ contract AllocationSecurityTest is BasicSetup {
         dictator.setPermission(allocation, allocation.setTokenCap.selector, users.owner);
         dictator.setPermission(position, position.setHandler.selector, users.owner);
 
-        position.setHandler(stageKey, IStage(address(mockStage)));
+        position.setHandler(address(mockVenue), IStage(address(mockStage)));
 
         allocation.setTokenCap(usdc, TOKEN_CAP);
 
@@ -139,12 +140,29 @@ contract AllocationSecurityTest is BasicSetup {
         attackerSub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
         attackerSub.installModule(MODULE_TYPE_HOOK, address(1), "");
 
-        // Attacker deposits just 1 wei
-        usdc.mint(address(attackerSub), 1);
-
-        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(attackerSub)), usdc);
+        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(attackerSub)), SUBACCOUNT_NAME);
 
         bytes32 key = keccak256(abi.encode(address(usdc), address(attackerSub)));
+
+        // Attacker makes first deposit of 1 wei
+        usdc.mint(owner, 1);
+        vm.stopPrank();
+        vm.prank(owner);
+        usdc.approve(address(allocation), type(uint).max);
+        vm.startPrank(users.owner);
+
+        Allocation.CallIntent memory attackerIntent = Allocation.CallIntent({
+            account: owner,
+            subaccount: IERC7579Account(address(attackerSub)),
+            token: usdc,
+            amount: 1,
+            deadline: block.timestamp + 1 hours,
+            nonce: 0
+        });
+        bytes memory attackerSig = _signIntent(attackerIntent, ownerPrivateKey);
+        IERC7579Account[] memory emptyPuppets = new IERC7579Account[](0);
+        uint[] memory emptyAmounts = new uint[](0);
+        allocation.executeAllocate(attackerIntent, attackerSig, emptyPuppets, emptyAmounts);
 
         // Attacker gets 1 share for 1 wei (1:1 ratio)
         uint attackerShares = allocation.shareBalanceMap(key, owner);
@@ -158,6 +176,7 @@ contract AllocationSecurityTest is BasicSetup {
         assertGt(inflatedPrice, 1e30, "Price is inflated after donation");
 
         // Victim tries to deposit 999 USDC - this would result in 0 shares
+        // Mint enough for victim to attempt the deposit
         usdc.mint(address(puppet1), 999e6);
 
         Allocation.CallIntent memory intent = Allocation.CallIntent({
@@ -166,7 +185,7 @@ contract AllocationSecurityTest is BasicSetup {
             token: usdc,
             amount: 0,
             deadline: block.timestamp + 1 hours,
-            nonce: 0
+            nonce: 1
         });
         bytes memory sig = _signIntent(intent, ownerPrivateKey);
 
@@ -203,9 +222,28 @@ contract AllocationSecurityTest is BasicSetup {
         TestSmartAccount sub = new TestSmartAccount();
         sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
         sub.installModule(MODULE_TYPE_HOOK, address(1), "");
-        usdc.mint(address(sub), 1000e6);
 
-        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), usdc);
+        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), SUBACCOUNT_NAME);
+
+        // First deposit via executeAllocate
+        usdc.mint(owner, 1000e6);
+        vm.stopPrank();
+        vm.prank(owner);
+        usdc.approve(address(allocation), type(uint).max);
+        vm.startPrank(users.owner);
+
+        Allocation.CallIntent memory intent = Allocation.CallIntent({
+            account: owner,
+            subaccount: IERC7579Account(address(sub)),
+            token: usdc,
+            amount: 1000e6,
+            deadline: block.timestamp + 1 hours,
+            nonce: 0
+        });
+        bytes memory sig = _signIntent(intent, ownerPrivateKey);
+        IERC7579Account[] memory emptyPuppets = new IERC7579Account[](0);
+        uint[] memory emptyAmounts = new uint[](0);
+        allocation.executeAllocate(intent, sig, emptyPuppets, emptyAmounts);
 
         bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
         uint shares = allocation.shareBalanceMap(key, owner);
@@ -220,10 +258,27 @@ contract AllocationSecurityTest is BasicSetup {
         sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
         sub.installModule(MODULE_TYPE_HOOK, address(1), "");
 
-        // Minimum possible deposit: 1 wei
-        usdc.mint(address(sub), 1);
+        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), SUBACCOUNT_NAME);
 
-        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), usdc);
+        // First deposit of 1 wei
+        usdc.mint(owner, 1);
+        vm.stopPrank();
+        vm.prank(owner);
+        usdc.approve(address(allocation), type(uint).max);
+        vm.startPrank(users.owner);
+
+        Allocation.CallIntent memory intent = Allocation.CallIntent({
+            account: owner,
+            subaccount: IERC7579Account(address(sub)),
+            token: usdc,
+            amount: 1,
+            deadline: block.timestamp + 1 hours,
+            nonce: 0
+        });
+        bytes memory sig = _signIntent(intent, ownerPrivateKey);
+        IERC7579Account[] memory emptyPuppets = new IERC7579Account[](0);
+        uint[] memory emptyAmounts = new uint[](0);
+        allocation.executeAllocate(intent, sig, emptyPuppets, emptyAmounts);
 
         bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
 

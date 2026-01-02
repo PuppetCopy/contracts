@@ -2,50 +2,48 @@
 pragma solidity ^0.8.33;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {CallType} from "modulekit/accounts/common/lib/ModeLib.sol";
 
-/// @notice Structured input for stage operations
-struct Order {
-    bytes32 stage;       // Stage handler key (GMX_V2, HYPERLIQUID, etc.)
-    bytes32 positionKey; // Position being modified
-    bytes32 action;      // Action type (stage-specific)
-    bytes callOrder;     // Encoded call (target, calldata)
+/// @notice Single call in a batch (matches extension output and ERC-7579 Execution)
+struct Call {
+    address target;
+    uint256 value;
+    bytes data;
 }
 
 /// @title IStage
-/// @notice Interface for stage handlers
-/// @dev Implementations: GmxStage, HyperliquidStage, AaveStage, etc.
+/// @notice Interface for stage handlers (GMX, Hyperliquid, etc.)
 interface IStage {
-    /// @notice Validate order before execution
+    /// @notice Validate execution before it runs
+    /// @param master The master account that controls the subaccount
     /// @param subaccount The subaccount executing
-    /// @param token The collateral token
-    /// @param order The order containing positionKey, action, callOrder
-    /// @return hookData Data for processPostOrder() after execution
-    function processOrder(address subaccount, IERC20 token, Order calldata order)
-        external
-        view
-        returns (bytes memory hookData);
+    /// @param value The ETH value sent with the execute() call
+    /// @param callType The ERC-7579 call type (single or batch)
+    /// @param execData The raw execution calldata
+    /// @return token The collateral token extracted from execution data (address(0) if N/A)
+    /// @return hookData Data for postCheck after execution
+    function validate(
+        address master,
+        address subaccount,
+        uint value,
+        CallType callType,
+        bytes calldata execData
+    ) external view returns (IERC20 token, bytes memory hookData);
 
-    /// @notice Validate order after execution
+    /// @notice Verify state after execution
     /// @param subaccount The subaccount that executed
     /// @param token The collateral token
-    /// @param order The order that was executed
     /// @param preBalance Token balance before execution
     /// @param postBalance Token balance after execution
-    /// @param hookData Data returned from processOrder
-    function processPostOrder(
-        address subaccount,
-        IERC20 token,
-        Order calldata order,
-        uint preBalance,
-        uint postBalance,
-        bytes calldata hookData
-    ) external view;
+    /// @param hookData Data from validate()
+    function verify(address subaccount, IERC20 token, uint preBalance, uint postBalance, bytes calldata hookData)
+        external
+        view;
 
-    /// @notice Settle after execution (update position tracking)
+    /// @notice Record position outcome after execution
     /// @param subaccount The subaccount that executed
-    /// @param order The order that was executed
-    /// @param hookData Data returned from processOrder
-    function settle(address subaccount, Order calldata order, bytes calldata hookData) external;
+    /// @param hookData Data from validate()
+    function settle(address subaccount, bytes calldata hookData) external;
 
     /// @notice Get current value of a position
     /// @param positionKey The position identifier

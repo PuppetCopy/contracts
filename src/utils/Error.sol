@@ -82,8 +82,11 @@ library Error {
 
     // GmxStage errors
     error GmxStage__InvalidCallData();
+    error GmxStage__InvalidCallType();
+    error GmxStage__InvalidTarget();
     error GmxStage__InvalidOrderType();
     error GmxStage__InvalidReceiver();
     error GmxStage__InvalidAction();
     error GmxStage__InvalidBalanceChange();
+    error GmxStage__InvalidExecutionSequence();
 }

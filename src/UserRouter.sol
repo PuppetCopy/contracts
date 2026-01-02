@@ -26,19 +26,22 @@ contract UserRouter is IUserRouter, CoreContract {
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
     /// @inheritdoc IUserRouter
-    function registerMasterSubaccount(address _account, address _signer, IERC7579Account _subaccount, IERC20 _token)
-        external
-    {
-        config.allocation.registerMasterSubaccount(_account, _signer, _subaccount, _token);
+    function registerMasterSubaccount(
+        address _account,
+        address _signer,
+        IERC7579Account _subaccount,
+        bytes32 _name
+    ) external {
+        config.allocation.registerMasterSubaccount(_account, _signer, _subaccount, _name);
     }
 
     /// @inheritdoc IUserRouter
-    function processPreCall(address _subaccount, IERC20 _token, address _msgSender, uint _msgValue, bytes calldata _msgData)
+    function processPreCall(address _master, address _subaccount, uint _msgValue, bytes calldata _msgData)
         external
         view
         returns (bytes memory hookData)
     {
-        return config.position.processPreCall(_subaccount, _token, _msgSender, _msgValue, _msgData);
+        return config.position.processPreCall(_master, _subaccount, _msgValue, _msgData);
     }
 
     /// @inheritdoc IUserRouter

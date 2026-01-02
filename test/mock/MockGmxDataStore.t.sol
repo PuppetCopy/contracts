@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.33;
 
-import {IGmxReadDataStore} from "src/position/interface/IGmxReadDataStore.sol";
+import {IGmxDataStore} from "src/position/interface/IGmxDataStore.sol";
 
-contract MockGmxDataStore is IGmxReadDataStore {
+contract MockGmxDataStore is IGmxDataStore {
     mapping(bytes32 => uint) public uintValues;
     mapping(bytes32 => int) public intValues;
     mapping(bytes32 => address) public addressValues;

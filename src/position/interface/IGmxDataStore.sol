@@ -2,10 +2,10 @@
 pragma solidity ^0.8.0;
 
 /**
- * @title IGmxReadDataStore
+ * @title IGmxDataStore
  * @dev Interface for reading data from the GMX data store.
  */
-interface IGmxReadDataStore {
+interface IGmxDataStore {
     // Read functions for basic types
     function getUint(bytes32 key) external view returns (uint);
     function getInt(bytes32 key) external view returns (int);

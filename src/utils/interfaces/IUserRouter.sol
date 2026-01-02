@@ -8,12 +8,17 @@ import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Acco
 interface IUserRouter {
     // ============ Allocation Passthrough ============
 
-    function registerMasterSubaccount(address account, address signer, IERC7579Account subaccount, IERC20 token)
-        external;
+    /// @notice Register a master subaccount (token chosen at deposit time)
+    function registerMasterSubaccount(
+        address account,
+        address signer,
+        IERC7579Account subaccount,
+        bytes32 name
+    ) external;
 
     // ============ Hook Validation ============
 
-    function processPreCall(address subaccount, IERC20 token, address msgSender, uint msgValue, bytes calldata msgData)
+    function processPreCall(address master, address subaccount, uint msgValue, bytes calldata msgData)
         external
         returns (bytes memory hookData);
 

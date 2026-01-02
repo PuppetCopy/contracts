@@ -60,11 +60,14 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
     mapping(IERC20 token => uint) public tokenCapMap;
     mapping(bytes32 codeHash => bool) public account7579CodeHashMap;
 
-    mapping(bytes32 matchingKey => uint) public nonceMap;
-    mapping(bytes32 matchingKey => address) public sessionSignerMap;
-    mapping(bytes32 matchingKey => IERC7579Account) public masterSubaccountMap;
-    mapping(bytes32 matchingKey => bool) public disposedMap;
+    // Registration state (per subaccount - token chosen at deposit time)
+    mapping(address subaccount => bool) public registeredMap;
+    mapping(address subaccount => address) public ownerMap;
+    mapping(address subaccount => address) public sessionSignerMap;
+    mapping(address subaccount => bool) public disposedMap;
+    mapping(address subaccount => uint) public nonceMap;
 
+    // Share tracking (per token+subaccount matchingKey)
     mapping(bytes32 matchingKey => uint) public totalSharesMap;
     mapping(bytes32 matchingKey => mapping(address account => uint)) public shareBalanceMap;
 
@@ -98,27 +101,23 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         _logEvent("SetCodeHash", abi.encode(_codeHash, _allowed));
     }
 
-    function registerMasterSubaccount(address _account, address _signer, IERC7579Account _subaccount, IERC20 _token)
-        external
-    {
+    /// @notice Register a master subaccount
+    /// @dev Token is not specified at registration - masters/puppets choose at deposit time
+    function registerMasterSubaccount(
+        address _account,
+        address _signer,
+        IERC7579Account _subaccount,
+        bytes32 _name
+    ) external {
         if (!_isValidAccount(address(_subaccount))) revert Error.Allocation__InvalidAccountCodeHash();
         if (!_subaccount.isModuleInstalled(MODULE_TYPE_HOOK, config.masterHook, "")) revert Error.Allocation__MasterHookNotInstalled();
-        uint _cap = tokenCapMap[_token];
-        if (_cap == 0) revert Error.Allocation__TokenNotAllowed();
+        if (registeredMap[address(_subaccount)]) revert Error.Allocation__AlreadyRegistered();
 
-        uint _balance = _token.balanceOf(address(_subaccount));
-        if (_balance == 0) revert Error.Allocation__ZeroAmount();
-        if (_balance > _cap) revert Error.Allocation__DepositExceedsCap(_balance, _cap);
+        registeredMap[address(_subaccount)] = true;
+        ownerMap[address(_subaccount)] = _account;
+        sessionSignerMap[address(_subaccount)] = _signer;
 
-        bytes32 _key = PositionUtils.getMatchingKey(_token, _subaccount);
-        if (address(masterSubaccountMap[_key]) != address(0)) revert Error.Allocation__AlreadyRegistered();
-
-        sessionSignerMap[_key] = _signer;
-        masterSubaccountMap[_key] = _subaccount;
-        shareBalanceMap[_key][_account] = _balance;
-        totalSharesMap[_key] = _balance;
-
-        _logEvent("RegisterMasterSubaccount", abi.encode(_key, _account, _signer, _subaccount, _token, _balance));
+        _logEvent("RegisterMasterSubaccount", abi.encode(_subaccount, _account, _signer, _name));
     }
 
     function executeAllocate(
@@ -129,8 +128,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
     ) external auth {
         bytes32 _key = _verifyIntent(_intent, _signature);
         uint _cap = tokenCapMap[_intent.token];
-        if (disposedMap[_key]) revert Error.Allocation__SubaccountFrozen();
-        if (_cap == 0) revert Error.Allocation__TokenNotAllowed();
+        if (disposedMap[address(_intent.subaccount)]) revert Error.Allocation__SubaccountFrozen();
         if (_puppetList.length != _amountList.length) revert Error.Allocation__ArrayLengthMismatch(_puppetList.length, _amountList.length);
         if (_puppetList.length > config.maxPuppetList) revert Error.Allocation__PuppetListTooLarge(_puppetList.length, config.maxPuppetList);
 
@@ -246,9 +244,14 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
     }
 
     function _verifyIntent(CallIntent calldata _intent, bytes calldata _signature) internal returns (bytes32 _key) {
+        if (tokenCapMap[_intent.token] == 0) revert Error.Allocation__TokenNotAllowed();
         if (block.timestamp > _intent.deadline) {
             revert Error.Allocation__IntentExpired(_intent.deadline, block.timestamp);
         }
+
+        // Check subaccount is registered
+        address _subaccountAddr = address(_intent.subaccount);
+        if (!registeredMap[_subaccountAddr]) revert Error.Allocation__UnregisteredSubaccount();
 
         bytes32 _hash = _hashTypedDataV4(
             keccak256(
@@ -263,16 +266,19 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
                 )
             )
         );
-        _key = PositionUtils.getMatchingKey(_intent.token, _intent.subaccount);
-        if (address(masterSubaccountMap[_key]) == address(0)) revert Error.Allocation__UnregisteredSubaccount();
 
-        uint _expectedNonce = nonceMap[_key]++;
+        // Nonce is per subaccount (not per token route)
+        uint _expectedNonce = nonceMap[_subaccountAddr]++;
         if (_expectedNonce != _intent.nonce) revert Error.Allocation__InvalidNonce(_expectedNonce, _intent.nonce);
 
+        // Signature verification: owner or session signer
         address _signer = ECDSA.recover(_hash, _signature);
-        if (_signer != _intent.account && _signer != sessionSignerMap[_key]) {
+        if (_signer != _intent.account && _signer != sessionSignerMap[_subaccountAddr]) {
             revert Error.Allocation__InvalidSignature(_intent.account, _signer);
         }
+
+        // Return matchingKey for share tracking
+        _key = PositionUtils.getMatchingKey(_intent.token, _intent.subaccount);
     }
 
     function _executeFromExecutor(
@@ -331,14 +337,14 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
 
     function onInstall(bytes calldata) external {}
 
-    function onUninstall(bytes calldata _data) external {
-        IERC20 _token = abi.decode(_data, (IERC20));
-        IERC7579Account _subaccount = IERC7579Account(msg.sender);
-        bytes32 _key = PositionUtils.getMatchingKey(_token, _subaccount);
-        if (address(masterSubaccountMap[_key]) == address(0)) return;
+    /// @notice Freeze subaccount when executor is uninstalled
+    /// @dev Token not needed - freezes all token routes for this subaccount
+    function onUninstall(bytes calldata) external {
+        address _subaccount = msg.sender;
+        if (!registeredMap[_subaccount]) return;
 
-        disposedMap[_key] = true;
+        disposedMap[_subaccount] = true;
 
-        _logEvent("Uninstall", abi.encode(_key, _subaccount, _token));
+        _logEvent("Uninstall", abi.encode(_subaccount));
     }
 }

@@ -1,17 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.33;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC7579Account, Execution} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
+import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 import {IHook, MODULE_TYPE_HOOK} from "modulekit/accounts/common/interfaces/IERC7579Module.sol";
-import {
-    ModeLib,
-    ModeCode,
-    CallType,
-    CALLTYPE_SINGLE,
-    CALLTYPE_BATCH,
-    CALLTYPE_STATIC
-} from "modulekit/accounts/common/lib/ModeLib.sol";
 
 import {IUserRouter} from "../utils/interfaces/IUserRouter.sol";
 
@@ -21,66 +12,61 @@ import {IUserRouter} from "../utils/interfaces/IUserRouter.sol";
  * @dev Permissionless hook that enables fund-raising through Allocation
  *
  * Lifecycle:
- * - onInstall: registers as master subaccount via Allocation.registerMasterSubaccount
+ * - onInstall: registers subaccount with Allocation (no token - chosen at deposit time)
  * - preCheck: validates all executions to whitelisted venues
- * - onUninstall: requires all positions closed, freezes matching key
+ * - onUninstall: freezing handled by Allocation.onUninstall
  *
  * A master can create many subaccounts, each registration is immutable.
- * Once configured, subaccount settings cannot be changed.
+ * Token choice happens at deposit time and is validated via tokenCapMap whitelist.
  *
  * References RouterProxy for upgradability - DAO can update underlying contracts.
  */
 contract MasterHook is IHook {
-    error MasterHook__InvalidExecution();
-    error MasterHook__PositionsNotClosed();
-    error MasterHook__NotInitialized();
+    struct InstallParams {
+        address account;    // master account that owns this subaccount
+        address signer;     // session signer for trading operations
+        bytes32 name;       // subaccount identifier (e.g. "main", "eth_long")
+    }
 
     IUserRouter public immutable router;
 
-    /// @notice Token registered per subaccount
-    mapping(address subaccount => IERC20) public tokens;
+    /// @notice Registered subaccounts (for isInitialized check)
+    mapping(address subaccount => bool) public registered;
 
     constructor(IUserRouter _router) {
         router = _router;
     }
 
     function preCheck(address msgSender, uint msgValue, bytes calldata msgData) external returns (bytes memory) {
-        IERC20 token = tokens[msg.sender];
-        if (address(token) == address(0)) revert MasterHook__NotInitialized();
-        return router.processPreCall(msg.sender, token, msgSender, msgValue, msgData);
+        // msgSender = master, msg.sender = subaccount
+        // Token is extracted from execution data by Position/Stage handlers
+        return router.processPreCall(msgSender, msg.sender, msgValue, msgData);
     }
 
     function postCheck(bytes calldata hookData) external view {
         router.processPostCall(msg.sender, hookData);
     }
 
-    /// @notice Install hook and register as master subaccount
-    /// @param _data Encoded (account, signer, token)
+    /// @notice Install hook and register subaccount
+    /// @dev Token is not specified here - masters/puppets choose token at deposit time
+    /// @param _data Encoded InstallParams struct
     function onInstall(bytes calldata _data) external {
         IERC7579Account subaccount = IERC7579Account(msg.sender);
 
         // Decode install parameters
-        (address account, address signer, IERC20 token) = abi.decode(_data, (address, address, IERC20));
+        InstallParams memory params = abi.decode(_data, (InstallParams));
 
-        // Store token for this subaccount
-        tokens[msg.sender] = token;
+        // Mark as registered
+        registered[msg.sender] = true;
 
-        // Register as master subaccount - enables fund raising
-        router.registerMasterSubaccount(account, signer, subaccount, token);
+        // Register with Allocation - token is not specified at this stage
+        router.registerMasterSubaccount(params.account, params.signer, subaccount, params.name);
     }
 
-    /// @notice Uninstall hook - requires positions closed, freezes matching key
-    function onUninstall(bytes calldata) external view {
-        IERC7579Account subaccount = IERC7579Account(msg.sender);
-        IERC20 token = tokens[msg.sender];
-
-        // Verify all positions are closed
-        bytes32 matchingKey = _getMatchingKey(token, subaccount);
-        bytes32[] memory positionKeys = router.getPositionKeyList(matchingKey);
-        if (positionKeys.length > 0) revert MasterHook__PositionsNotClosed();
-
-        // Freeze is handled by Allocation.onUninstall when executor is removed
-        // The hook uninstall just validates conditions are met
+    /// @notice Uninstall hook
+    /// @dev Position closing and freezing handled by Allocation.onUninstall
+    function onUninstall(bytes calldata) external {
+        registered[msg.sender] = false;
     }
 
     function isModuleType(uint _moduleTypeId) external pure returns (bool) {
@@ -88,12 +74,7 @@ contract MasterHook is IHook {
     }
 
     /// @notice Check if hook is initialized for account
-    /// @dev Returns true - actual registration state is in Allocation contract
-    function isInitialized(address) external pure returns (bool) {
-        return true;
-    }
-
-    function _getMatchingKey(IERC20 _token, IERC7579Account _subaccount) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_token, _subaccount));
+    function isInitialized(address _account) external view returns (bool) {
+        return registered[_account];
     }
 }

@@ -66,9 +66,10 @@ contract DeployPosition is BaseScript {
         // );
         // position.setHandler(GMX_STAGE_KEY, IStage(address(gmxStage)));
 
-        dictatorship.setPermission(
-            Permission(address(position)), position.updatePosition.selector, address(allocation)
-        );
+        // TODO: Add position tracking permissions when implemented
+        // dictatorship.setPermission(
+        //     Permission(address(position)), position.updatePosition.selector, address(allocation)
+        // );
         dictatorship.setPermission(Permission(address(allocation)), Allocation.setTokenCap.selector, DEPLOYER_ADDRESS);
         allocation.setTokenCap(IERC20(Const.usdc), 100e6);
 
