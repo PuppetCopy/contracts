@@ -3,465 +3,465 @@
 
 export default [
   {
-    type: 'constructor',
-    inputs: [
+    "type": "constructor",
+    "inputs": [
       {
-        name: '_authority',
-        type: 'address',
-        internalType: 'contract IAuthority'
+        "name": "_authority",
+        "type": "address",
+        "internalType": "contract IAuthority"
       },
       {
-        name: '_protocolToken',
-        type: 'address',
-        internalType: 'contract PuppetToken'
+        "name": "_protocolToken",
+        "type": "address",
+        "internalType": "contract PuppetToken"
       },
       {
-        name: '_store',
-        type: 'address',
-        internalType: 'contract FeeMarketplaceStore'
+        "name": "_store",
+        "type": "address",
+        "internalType": "contract FeeMarketplaceStore"
       },
       {
-        name: '_config',
-        type: 'tuple',
-        internalType: 'struct FeeMarketplace.Config',
-        components: [
+        "name": "_config",
+        "type": "tuple",
+        "internalType": "struct FeeMarketplace.Config",
+        "components": [
           {
-            name: 'transferOutGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
+            "name": "transferGasLimit",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
-            name: 'unlockTimeframe',
-            type: 'uint256',
-            internalType: 'uint256'
+            "name": "unlockTimeframe",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
-            name: 'askDecayTimeframe',
-            type: 'uint256',
-            internalType: 'uint256'
+            "name": "askDecayTimeframe",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
-            name: 'askStart',
-            type: 'uint256',
-            internalType: 'uint256'
+            "name": "askStart",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
     ],
-    stateMutability: 'nonpayable'
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'acceptOffer',
-    inputs: [
+    "type": "function",
+    "name": "acceptOffer",
+    "inputs": [
       {
-        name: '_feeToken',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "_feeToken",
+        "type": "address",
+        "internalType": "contract IERC20"
       },
       {
-        name: '_buyer',
-        type: 'address',
-        internalType: 'address'
+        "name": "_buyer",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: '_receiver',
-        type: 'address',
-        internalType: 'address'
+        "name": "_receiver",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: '_minOut',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "_minOut",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'accountedBalanceMap',
-    inputs: [
+    "type": "function",
+    "name": "accountedBalanceMap",
+    "inputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "",
+        "type": "address",
+        "internalType": "contract IERC20"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'authority',
-    inputs: [],
-    outputs: [
+    "type": "function",
+    "name": "authority",
+    "inputs": [],
+    "outputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'contract IAuthority'
+        "name": "",
+        "type": "address",
+        "internalType": "contract IAuthority"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'canCall',
-    inputs: [
+    "type": "function",
+    "name": "canCall",
+    "inputs": [
       {
-        name: 'signatureHash',
-        type: 'bytes4',
-        internalType: 'bytes4'
+        "name": "signatureHash",
+        "type": "bytes4",
+        "internalType": "bytes4"
       },
       {
-        name: 'user',
-        type: 'address',
-        internalType: 'address'
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'bool',
-        internalType: 'bool'
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'config',
-    inputs: [],
-    outputs: [
+    "type": "function",
+    "name": "config",
+    "inputs": [],
+    "outputs": [
       {
-        name: 'transferOutGasLimit',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "transferGasLimit",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        name: 'unlockTimeframe',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "unlockTimeframe",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        name: 'askDecayTimeframe',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "askDecayTimeframe",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        name: 'askStart',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "askStart",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'deposit',
-    inputs: [
+    "type": "function",
+    "name": "deposit",
+    "inputs": [
       {
-        name: '_feeToken',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "_feeToken",
+        "type": "address",
+        "internalType": "contract IERC20"
       },
       {
-        name: '_depositor',
-        type: 'address',
-        internalType: 'address'
+        "name": "_depositor",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: '_amount',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'getAskPrice',
-    inputs: [
+    "type": "function",
+    "name": "getAskPrice",
+    "inputs": [
       {
-        name: '_feeToken',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "_feeToken",
+        "type": "address",
+        "internalType": "contract IERC20"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'getConfig',
-    inputs: [],
-    outputs: [
+    "type": "function",
+    "name": "getConfig",
+    "inputs": [],
+    "outputs": [
       {
-        name: '',
-        type: 'tuple',
-        internalType: 'struct FeeMarketplace.Config',
-        components: [
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct FeeMarketplace.Config",
+        "components": [
           {
-            name: 'transferOutGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
+            "name": "transferGasLimit",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
-            name: 'unlockTimeframe',
-            type: 'uint256',
-            internalType: 'uint256'
+            "name": "unlockTimeframe",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
-            name: 'askDecayTimeframe',
-            type: 'uint256',
-            internalType: 'uint256'
+            "name": "askDecayTimeframe",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
-            name: 'askStart',
-            type: 'uint256',
-            internalType: 'uint256'
+            "name": "askStart",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'getPendingUnlock',
-    inputs: [
+    "type": "function",
+    "name": "getPendingUnlock",
+    "inputs": [
       {
-        name: '_feeToken',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "_feeToken",
+        "type": "address",
+        "internalType": "contract IERC20"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'getUnlockedBalance',
-    inputs: [
+    "type": "function",
+    "name": "getUnlockedBalance",
+    "inputs": [
       {
-        name: '_feeToken',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "_feeToken",
+        "type": "address",
+        "internalType": "contract IERC20"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'lastAskResetTimestampMap',
-    inputs: [
+    "type": "function",
+    "name": "lastAskResetTimestampMap",
+    "inputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "",
+        "type": "address",
+        "internalType": "contract IERC20"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'lastUnlockTimestampMap',
-    inputs: [
+    "type": "function",
+    "name": "lastUnlockTimestampMap",
+    "inputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "",
+        "type": "address",
+        "internalType": "contract IERC20"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'protocolToken',
-    inputs: [],
-    outputs: [
+    "type": "function",
+    "name": "protocolToken",
+    "inputs": [],
+    "outputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'contract PuppetToken'
+        "name": "",
+        "type": "address",
+        "internalType": "contract PuppetToken"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'recordTransferIn',
-    inputs: [
+    "type": "function",
+    "name": "recordTransferIn",
+    "inputs": [
       {
-        name: '_feeToken',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "_feeToken",
+        "type": "address",
+        "internalType": "contract IERC20"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'setConfig',
-    inputs: [
+    "type": "function",
+    "name": "setConfig",
+    "inputs": [
       {
-        name: '_data',
-        type: 'bytes',
-        internalType: 'bytes'
+        "name": "_data",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'setPermission',
-    inputs: [
+    "type": "function",
+    "name": "setPermission",
+    "inputs": [
       {
-        name: 'functionSig',
-        type: 'bytes4',
-        internalType: 'bytes4'
+        "name": "functionSig",
+        "type": "bytes4",
+        "internalType": "bytes4"
       },
       {
-        name: 'user',
-        type: 'address',
-        internalType: 'address'
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: 'isEnabled',
-        type: 'bool',
-        internalType: 'bool'
+        "name": "isEnabled",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'store',
-    inputs: [],
-    outputs: [
+    "type": "function",
+    "name": "store",
+    "inputs": [],
+    "outputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'contract FeeMarketplaceStore'
+        "name": "",
+        "type": "address",
+        "internalType": "contract FeeMarketplaceStore"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'supportsInterface',
-    inputs: [
+    "type": "function",
+    "name": "supportsInterface",
+    "inputs": [
       {
-        name: 'interfaceId',
-        type: 'bytes4',
-        internalType: 'bytes4'
+        "name": "interfaceId",
+        "type": "bytes4",
+        "internalType": "bytes4"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'bool',
-        internalType: 'bool'
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    stateMutability: 'pure'
+    "stateMutability": "pure"
   },
   {
-    type: 'function',
-    name: 'unlockedFeesMap',
-    inputs: [
+    "type": "function",
+    "name": "unlockedFeesMap",
+    "inputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "",
+        "type": "address",
+        "internalType": "contract IERC20"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'error',
-    name: 'FeeMarketplace__InsufficientUnlockedBalance',
-    inputs: [
+    "type": "error",
+    "name": "FeeMarketplace__InsufficientUnlockedBalance",
+    "inputs": [
       {
-        name: 'unlockedBalance',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "unlockedBalance",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },
   {
-    type: 'error',
-    name: 'FeeMarketplace__InvalidConfig',
-    inputs: []
+    "type": "error",
+    "name": "FeeMarketplace__InvalidConfig",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'FeeMarketplace__ZeroDeposit',
-    inputs: []
+    "type": "error",
+    "name": "FeeMarketplace__ZeroDeposit",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'Permission__CallerNotAuthority',
-    inputs: []
+    "type": "error",
+    "name": "Permission__CallerNotAuthority",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'Permission__Unauthorized',
-    inputs: []
+    "type": "error",
+    "name": "Permission__Unauthorized",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'ReentrancyGuardReentrantCall',
-    inputs: []
+    "type": "error",
+    "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
   }
 ] as const

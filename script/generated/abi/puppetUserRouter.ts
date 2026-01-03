@@ -1,4 +1,4 @@
-// This file is auto-generated from forge-artifacts/Position.sol/Position.json
+// This file is auto-generated from forge-artifacts/UserRouter.sol/UserRouter.json
 // Do not edit manually.
 
 export default [
@@ -9,35 +9,26 @@ export default [
         "name": "_authority",
         "type": "address",
         "internalType": "contract IAuthority"
+      },
+      {
+        "name": "_config",
+        "type": "tuple",
+        "internalType": "struct UserRouter.Config",
+        "components": [
+          {
+            "name": "allocation",
+            "type": "address",
+            "internalType": "contract Allocation"
+          },
+          {
+            "name": "position",
+            "type": "address",
+            "internalType": "contract Position"
+          }
+        ]
       }
     ],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "ACTION_NONE",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "uint8"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ACTION_ORDER_CREATED",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "uint8"
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -78,72 +69,69 @@ export default [
   },
   {
     "type": "function",
-    "name": "getNetValue",
+    "name": "config",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "allocation",
+        "type": "address",
+        "internalType": "contract Allocation"
+      },
+      {
+        "name": "position",
+        "type": "address",
+        "internalType": "contract Position"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "disposeSubaccount",
     "inputs": [
       {
         "name": "_subaccount",
         "type": "address",
-        "internalType": "address"
-      },
+        "internalType": "contract IERC7579Account"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "hasRemainingShares",
+    "inputs": [
       {
-        "name": "_baseToken",
+        "name": "_subaccount",
         "type": "address",
-        "internalType": "contract IERC20"
-      },
-      {
-        "name": "_stages",
-        "type": "address[]",
-        "internalType": "contract IStage[]"
-      },
-      {
-        "name": "_positionKeys",
-        "type": "bytes32[][]",
-        "internalType": "bytes32[][]"
+        "internalType": "contract IERC7579Account"
       }
     ],
     "outputs": [
       {
-        "name": "value",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "handlers",
+    "name": "isDisposed",
     "inputs": [
       {
-        "name": "target",
+        "name": "_subaccount",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC7579Account"
       }
     ],
     "outputs": [
       {
         "name": "",
-        "type": "address",
-        "internalType": "contract IStage"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "pendingOrderCount",
-    "inputs": [
-      {
-        "name": "subaccount",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
@@ -202,12 +190,32 @@ export default [
   },
   {
     "type": "function",
-    "name": "setConfig",
+    "name": "registerMasterSubaccount",
     "inputs": [
       {
-        "name": "_data",
-        "type": "bytes",
-        "internalType": "bytes"
+        "name": "_account",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_signer",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_subaccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
+      },
+      {
+        "name": "_baseToken",
+        "type": "address",
+        "internalType": "contract IERC20"
+      },
+      {
+        "name": "_name",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [],
@@ -215,17 +223,12 @@ export default [
   },
   {
     "type": "function",
-    "name": "setHandler",
+    "name": "setConfig",
     "inputs": [
       {
-        "name": "_target",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_handler",
-        "type": "address",
-        "internalType": "contract IStage"
+        "name": "_data",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
     "outputs": [],
@@ -256,29 +259,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "settleOrders",
-    "inputs": [
-      {
-        "name": "_subaccount",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_orderStages",
-        "type": "address[]",
-        "internalType": "contract IStage[]"
-      },
-      {
-        "name": "_orderKeys",
-        "type": "bytes32[]",
-        "internalType": "bytes32[]"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "supportsInterface",
     "inputs": [
       {
@@ -297,67 +277,8 @@ export default [
     "stateMutability": "pure"
   },
   {
-    "type": "function",
-    "name": "validStages",
-    "inputs": [
-      {
-        "name": "stage",
-        "type": "address",
-        "internalType": "contract IStage"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
     "type": "error",
     "name": "Permission__CallerNotAuthority",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Permission__Unauthorized",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__ArrayLengthMismatch",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__BatchOrderNotAllowed",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__DelegateCallBlocked",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__InvalidStage",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__NotPositionOwner",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__OrderStillPending",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__PendingOrdersExist",
     "inputs": []
   },
   {

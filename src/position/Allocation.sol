@@ -35,7 +35,7 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         Position position;
         address masterHook;
         uint maxPuppetList;
-        uint transferOutGasLimit;
+        uint transferGasLimit;
     }
 
     struct PositionParams {
@@ -120,7 +120,9 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         IERC20 _baseToken,
         bytes32 _name
     ) external {
-        if (!_isValidAccount(address(_subaccount))) revert Error.Allocation__InvalidAccountCodeHash();
+        bytes32 codeHash;
+        assembly { codeHash := extcodehash(_subaccount) }
+        if (!account7579CodeHashMap[codeHash]) revert Error.Allocation__InvalidAccountCodeHash();
         if (!_subaccount.isModuleInstalled(MODULE_TYPE_HOOK, config.masterHook, "")) revert Error.Allocation__MasterHookNotInstalled();
         if (registeredMap[_subaccount]) revert Error.Allocation__AlreadyRegistered();
         if (tokenCapMap[_baseToken] == 0) revert Error.Allocation__TokenNotAllowed();
@@ -142,14 +144,16 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
     ) external auth {
         IERC20 _baseToken = _verifyIntent(_intent, _signature, _positionParams);
         IERC7579Account _subaccount = _intent.subaccount;
-        uint _cap = tokenCapMap[_baseToken];
         if (disposedMap[_subaccount]) revert Error.Allocation__SubaccountFrozen();
-        if (_puppetList.length != _amountList.length) revert Error.Allocation__ArrayLengthMismatch(_puppetList.length, _amountList.length);
-        if (_puppetList.length > config.maxPuppetList) revert Error.Allocation__PuppetListTooLarge(_puppetList.length, config.maxPuppetList);
 
-        uint _allocation = _baseToken.balanceOf(address(_subaccount));
+        uint _len = _puppetList.length;
+        if (_len != _amountList.length) revert Error.Allocation__ArrayLengthMismatch(_len, _amountList.length);
+        if (_len > config.maxPuppetList) revert Error.Allocation__PuppetListTooLarge(_len, config.maxPuppetList);
+
+        address _subaccountAddr = address(_subaccount);
+        uint _allocation = _baseToken.balanceOf(_subaccountAddr);
         uint _positionValue = config.position.getNetValue(
-            address(_subaccount),
+            _subaccountAddr,
             _baseToken,
             _positionParams.stages,
             _positionParams.positionKeys
@@ -159,42 +163,56 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         if (_netValue > _intent.acceptableNetValue) {
             revert Error.Allocation__NetValueAboveMax(_netValue, _intent.acceptableNetValue);
         }
+
         uint _sharePrice = getSharePrice(_subaccount, _netValue);
         uint _totalShares = totalSharesMap[_subaccount];
-        uint _userShares = shareBalanceMap[_subaccount][_intent.account];
+        address _account = _intent.account;
+        uint _userShares = shareBalanceMap[_subaccount][_account];
+        uint _intentAmount = _intent.amount;
+        IERC20 _token = _intent.token;
 
-        if (_intent.amount > 0) {
-            if (!_intent.token.transferFrom(_intent.account, address(_subaccount), _intent.amount)) {
+        if (_intentAmount != 0) {
+            uint _balanceBefore = _token.balanceOf(_subaccountAddr);
+            if (!_token.transferFrom(_account, _subaccountAddr, _intentAmount)) {
                 revert Error.Allocation__TransferFailed();
             }
-            uint _shares = Precision.toFactor(_intent.amount, _sharePrice);
+            uint _recordedIn = _token.balanceOf(_subaccountAddr) - _balanceBefore;
+            if (_recordedIn != _intentAmount) revert Error.Allocation__AmountMismatch(_intentAmount, _recordedIn);
+            uint _shares = Precision.toFactor(_recordedIn, _sharePrice);
             if (_shares == 0) revert Error.Allocation__ZeroShares();
             _userShares += _shares;
-            shareBalanceMap[_subaccount][_intent.account] = _userShares;
+            shareBalanceMap[_subaccount][_account] = _userShares;
             _totalShares += _shares;
         }
 
-        uint _allocated = 0;
-        uint _gasLimit = config.transferOutGasLimit;
-        for (uint _i = 0; _i < _puppetList.length; ++_i) {
+        uint _allocated;
+        uint _gasLimit = config.transferGasLimit;
+        for (uint _i; _i < _len; ++_i) {
             IERC7579Account _puppet = _puppetList[_i];
-            if (_puppet == _subaccount) continue;
-            uint _amount = _amountList[_i];
+            if (address(_puppet) != _subaccountAddr) {
+                uint _amount = _amountList[_i];
+                uint _shares = Precision.toFactor(_amount, _sharePrice);
 
-            uint _shares = Precision.toFactor(_amount, _sharePrice);
-            if (_shares == 0) continue;
-
-            if (!_safeTransferFrom(_intent.token, address(_puppet), address(_subaccount), _amount, _gasLimit)) {
-                _logEvent("ExecuteAllocateFailed", abi.encode(_subaccount, _puppet, _amount));
-                continue;
+                if (_shares != 0) {
+                    uint _balanceBefore = _token.balanceOf(_subaccountAddr);
+                    (bool _success,) = address(_token).call{gas: _gasLimit}(
+                        abi.encodeCall(IERC20.transferFrom, (address(_puppet), _subaccountAddr, _amount))
+                    );
+                    if (_success) {
+                        uint _recordedIn = _token.balanceOf(_subaccountAddr) - _balanceBefore;
+                        if (_recordedIn != _amount) revert Error.Allocation__AmountMismatch(_amount, _recordedIn);
+                        shareBalanceMap[_subaccount][address(_puppet)] += _shares;
+                        _totalShares += _shares;
+                        _allocated += _recordedIn;
+                    } else {
+                        _logEvent("ExecuteAllocateFailed", abi.encode(_subaccount, _token, _puppet, _amount));
+                    }
+                }
             }
-
-            shareBalanceMap[_subaccount][address(_puppet)] += _shares;
-            _totalShares += _shares;
-            _allocated += _amount;
         }
 
-        _allocation += _intent.amount + _allocated;
+        _allocation += _intentAmount + _allocated;
+        uint _cap = tokenCapMap[_baseToken];
         if (_allocation > _cap) revert Error.Allocation__DepositExceedsCap(_allocation, _cap);
         totalSharesMap[_subaccount] = _totalShares;
 
@@ -202,9 +220,9 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
             "ExecuteAllocate",
             abi.encode(
                 _subaccount,
-                _intent.account,
-                _intent.token,
-                _intent.amount,
+                _account,
+                _token,
+                _intentAmount,
                 _puppetList,
                 _amountList,
                 _allocation,
@@ -212,7 +230,8 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
                 _allocated,
                 _sharePrice,
                 _userShares,
-                _totalShares
+                _totalShares,
+                _intent.nonce
             )
         );
     }
@@ -247,15 +266,14 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         if (_sharesBurnt > _prevUserShares) revert Error.Allocation__InsufficientBalance();
         if (_amountOut > _allocation) revert Error.Allocation__InsufficientLiquidity();
 
-        bytes memory _result = _executeFromExecutor(
-            _subaccount,
-            address(_intent.token),
-            config.transferOutGasLimit,
-            0,
-            abi.encodeCall(IERC20.transfer, (_intent.account, _amountOut)),
-            MODE_TRY
+        _subaccount.executeFromExecutor{gas: config.transferGasLimit}(
+            MODE_TRY,
+            ExecutionLib.encodeSingle(address(_baseToken), 0, abi.encodeCall(IERC20.transfer, (_intent.account, _amountOut)))
         );
-        if (!_isSuccessfulTransfer(_result)) revert Error.Allocation__TransferFailed();
+
+        uint _actualOut = _allocation - _baseToken.balanceOf(address(_subaccount));
+        if (_actualOut != _amountOut) revert Error.Allocation__AmountMismatch(_amountOut, _actualOut);
+        _allocation -= _actualOut;
 
         uint _userShares = _prevUserShares - _sharesBurnt;
         uint _totalShares = totalSharesMap[_subaccount] - _sharesBurnt;
@@ -269,13 +287,14 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
                 _intent.account,
                 _intent.token,
                 _intent.amount,
-                _allocation - _amountOut,
+                _allocation,
                 _positionValue,
                 _amountOut,
                 _sharesBurnt,
                 _sharePrice,
                 _userShares,
-                _totalShares
+                _totalShares,
+                _intent.nonce
             )
         );
     }
@@ -331,49 +350,13 @@ contract Allocation is CoreContract, IExecutor, EIP712 {
         }
     }
 
-    function _executeFromExecutor(
-        IERC7579Account _from,
-        address _to,
-        uint _gasLimit,
-        uint _value,
-        bytes memory _data,
-        ModeCode _mode
-    ) internal returns (bytes memory _result) {
-        bytes[] memory _results = _from.executeFromExecutor{gas: _gasLimit, value: _value}(
-            _mode, ExecutionLib.encodeSingle(_to, _value, _data)
-        );
-        _result = _results.length > 0 ? _results[0] : bytes("");
-    }
-
-    function _isSuccessfulTransfer(bytes memory _result) internal pure returns (bool) {
-        if (_result.length == 0) return false;
-        if (_result.length != 32) return false;
-        return abi.decode(_result, (bool));
-    }
-
-    function _safeTransferFrom(IERC20 _token, address _from, address _to, uint _amount, uint _gasLimit)
-        internal
-        returns (bool)
-    {
-        (bool success, bytes memory result) =
-            address(_token).call{gas: _gasLimit}(abi.encodeCall(IERC20.transferFrom, (_from, _to, _amount)));
-        return success && _isSuccessfulTransfer(result);
-    }
-
-    function _isValidAccount(address _account) internal view returns (bool) {
-        bytes32 codeHash;
-        assembly {
-            codeHash := extcodehash(_account)
-        }
-        return account7579CodeHashMap[codeHash];
-    }
 
     function _setConfig(bytes memory _data) internal override {
         Config memory _config = abi.decode(_data, (Config));
         if (address(_config.position) == address(0)) revert Error.Allocation__InvalidPosition();
         if (_config.masterHook == address(0)) revert Error.Allocation__InvalidMasterHook();
         if (_config.maxPuppetList == 0) revert Error.Allocation__InvalidMaxPuppetList();
-        if (_config.transferOutGasLimit == 0) revert Error.Allocation__InvalidGasLimit();
+        if (_config.transferGasLimit == 0) revert Error.Allocation__InvalidGasLimit();
         config = _config;
     }
 

@@ -3,990 +3,1102 @@
 
 export default [
   {
-    type: 'constructor',
-    inputs: [
+    "type": "constructor",
+    "inputs": [
       {
-        name: '_authority',
-        type: 'address',
-        internalType: 'contract IAuthority'
+        "name": "_authority",
+        "type": "address",
+        "internalType": "contract IAuthority"
       },
       {
-        name: '_config',
-        type: 'tuple',
-        internalType: 'struct Allocation.Config',
-        components: [
+        "name": "_config",
+        "type": "tuple",
+        "internalType": "struct Allocation.Config",
+        "components": [
           {
-            name: 'position',
-            type: 'address',
-            internalType: 'contract Position'
+            "name": "position",
+            "type": "address",
+            "internalType": "contract Position"
           },
           {
-            name: 'maxPuppetList',
-            type: 'uint256',
-            internalType: 'uint256'
+            "name": "masterHook",
+            "type": "address",
+            "internalType": "address"
           },
           {
-            name: 'transferOutGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
+            "name": "maxPuppetList",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "transferGasLimit",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
     ],
-    stateMutability: 'nonpayable'
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'CALL_INTENT_TYPEHASH',
-    inputs: [],
-    outputs: [
+    "type": "function",
+    "name": "CALL_INTENT_TYPEHASH",
+    "inputs": [],
+    "outputs": [
       {
-        name: '',
-        type: 'bytes32',
-        internalType: 'bytes32'
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'authority',
-    inputs: [],
-    outputs: [
+    "type": "function",
+    "name": "account7579CodeHashMap",
+    "inputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'contract IAuthority'
+        "name": "codeHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    stateMutability: 'view'
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'canCall',
-    inputs: [
+    "type": "function",
+    "name": "authority",
+    "inputs": [],
+    "outputs": [
       {
-        name: 'signatureHash',
-        type: 'bytes4',
-        internalType: 'bytes4'
-      },
-      {
-        name: 'user',
-        type: 'address',
-        internalType: 'address'
+        "name": "",
+        "type": "address",
+        "internalType": "contract IAuthority"
       }
     ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool'
-      }
-    ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'config',
-    inputs: [],
-    outputs: [
+    "type": "function",
+    "name": "baseTokenMap",
+    "inputs": [
       {
-        name: 'position',
-        type: 'address',
-        internalType: 'contract Position'
-      },
-      {
-        name: 'maxPuppetList',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'transferOutGasLimit',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "subaccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
       }
     ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'createMasterSubaccount',
-    inputs: [
+    "outputs": [
       {
-        name: '_account',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: '_signer',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: '_subaccount',
-        type: 'address',
-        internalType: 'contract IERC7579Account'
-      },
-      {
-        name: '_token',
-        type: 'address',
-        internalType: 'contract IERC20'
-      },
-      {
-        name: '_subaccountName',
-        type: 'bytes32',
-        internalType: 'bytes32'
+        "name": "",
+        "type": "address",
+        "internalType": "contract IERC20"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'eip712Domain',
-    inputs: [],
-    outputs: [
+    "type": "function",
+    "name": "canCall",
+    "inputs": [
       {
-        name: 'fields',
-        type: 'bytes1',
-        internalType: 'bytes1'
+        "name": "signatureHash",
+        "type": "bytes4",
+        "internalType": "bytes4"
       },
       {
-        name: 'name',
-        type: 'string',
-        internalType: 'string'
-      },
-      {
-        name: 'version',
-        type: 'string',
-        internalType: 'string'
-      },
-      {
-        name: 'chainId',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'verifyingContract',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: 'salt',
-        type: 'bytes32',
-        internalType: 'bytes32'
-      },
-      {
-        name: 'extensions',
-        type: 'uint256[]',
-        internalType: 'uint256[]'
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    stateMutability: 'view'
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'executeAllocate',
-    inputs: [
+    "type": "function",
+    "name": "config",
+    "inputs": [],
+    "outputs": [
       {
-        name: '_intent',
-        type: 'tuple',
-        internalType: 'struct Allocation.CallIntent',
-        components: [
+        "name": "position",
+        "type": "address",
+        "internalType": "contract Position"
+      },
+      {
+        "name": "masterHook",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "maxPuppetList",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "transferGasLimit",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "disposeSubaccount",
+    "inputs": [
+      {
+        "name": "_subaccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "disposedMap",
+    "inputs": [
+      {
+        "name": "subaccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "eip712Domain",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "fields",
+        "type": "bytes1",
+        "internalType": "bytes1"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "version",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "verifyingContract",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "salt",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "extensions",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "executeAllocate",
+    "inputs": [
+      {
+        "name": "_intent",
+        "type": "tuple",
+        "internalType": "struct Allocation.CallIntent",
+        "components": [
           {
-            name: 'account',
-            type: 'address',
-            internalType: 'address'
+            "name": "account",
+            "type": "address",
+            "internalType": "address"
           },
           {
-            name: 'subaccount',
-            type: 'address',
-            internalType: 'contract IERC7579Account'
+            "name": "subaccount",
+            "type": "address",
+            "internalType": "contract IERC7579Account"
           },
           {
-            name: 'subaccountName',
-            type: 'bytes32',
-            internalType: 'bytes32'
+            "name": "token",
+            "type": "address",
+            "internalType": "contract IERC20"
           },
           {
-            name: 'token',
-            type: 'address',
-            internalType: 'contract IERC20'
+            "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
-            name: 'amount',
-            type: 'uint256',
-            internalType: 'uint256'
+            "name": "triggerNetValue",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
-            name: 'deadline',
-            type: 'uint256',
-            internalType: 'uint256'
+            "name": "acceptableNetValue",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
-            name: 'nonce',
-            type: 'uint256',
-            internalType: 'uint256'
+            "name": "positionParamsHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "nonce",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       },
       {
-        name: '_signature',
-        type: 'bytes',
-        internalType: 'bytes'
+        "name": "_signature",
+        "type": "bytes",
+        "internalType": "bytes"
       },
       {
-        name: '_puppetList',
-        type: 'address[]',
-        internalType: 'contract IERC7579Account[]'
+        "name": "_puppetList",
+        "type": "address[]",
+        "internalType": "contract IERC7579Account[]"
       },
       {
-        name: '_amountList',
-        type: 'uint256[]',
-        internalType: 'uint256[]'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'executeOrder',
-    inputs: [
-      {
-        name: '_intent',
-        type: 'tuple',
-        internalType: 'struct Allocation.CallIntent',
-        components: [
-          {
-            name: 'account',
-            type: 'address',
-            internalType: 'address'
-          },
-          {
-            name: 'subaccount',
-            type: 'address',
-            internalType: 'contract IERC7579Account'
-          },
-          {
-            name: 'subaccountName',
-            type: 'bytes32',
-            internalType: 'bytes32'
-          },
-          {
-            name: 'token',
-            type: 'address',
-            internalType: 'contract IERC20'
-          },
-          {
-            name: 'amount',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'deadline',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'nonce',
-            type: 'uint256',
-            internalType: 'uint256'
-          }
-        ]
+        "name": "_amountList",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
       },
       {
-        name: '_signature',
-        type: 'bytes',
-        internalType: 'bytes'
-      },
-      {
-        name: '_target',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: '_callData',
-        type: 'bytes',
-        internalType: 'bytes'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'payable'
-  },
-  {
-    type: 'function',
-    name: 'executeWithdraw',
-    inputs: [
-      {
-        name: '_intent',
-        type: 'tuple',
-        internalType: 'struct Allocation.CallIntent',
-        components: [
+        "name": "_positionParams",
+        "type": "tuple",
+        "internalType": "struct Allocation.PositionParams",
+        "components": [
           {
-            name: 'account',
-            type: 'address',
-            internalType: 'address'
+            "name": "stages",
+            "type": "address[]",
+            "internalType": "contract IStage[]"
           },
           {
-            name: 'subaccount',
-            type: 'address',
-            internalType: 'contract IERC7579Account'
-          },
-          {
-            name: 'subaccountName',
-            type: 'bytes32',
-            internalType: 'bytes32'
-          },
-          {
-            name: 'token',
-            type: 'address',
-            internalType: 'contract IERC20'
-          },
-          {
-            name: 'amount',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'deadline',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'nonce',
-            type: 'uint256',
-            internalType: 'uint256'
-          }
-        ]
-      },
-      {
-        name: '_signature',
-        type: 'bytes',
-        internalType: 'bytes'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'frozenMap',
-    inputs: [
-      {
-        name: 'matchingKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
-      }
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'getConfig',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'tuple',
-        internalType: 'struct Allocation.Config',
-        components: [
-          {
-            name: 'position',
-            type: 'address',
-            internalType: 'contract Position'
-          },
-          {
-            name: 'maxPuppetList',
-            type: 'uint256',
-            internalType: 'uint256'
-          },
-          {
-            name: 'transferOutGasLimit',
-            type: 'uint256',
-            internalType: 'uint256'
+            "name": "positionKeys",
+            "type": "bytes32[][]",
+            "internalType": "bytes32[][]"
           }
         ]
       }
     ],
-    stateMutability: 'view'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'getSharePrice',
-    inputs: [
+    "type": "function",
+    "name": "executeWithdraw",
+    "inputs": [
       {
-        name: '_key',
-        type: 'bytes32',
-        internalType: 'bytes32'
+        "name": "_intent",
+        "type": "tuple",
+        "internalType": "struct Allocation.CallIntent",
+        "components": [
+          {
+            "name": "account",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "subaccount",
+            "type": "address",
+            "internalType": "contract IERC7579Account"
+          },
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "contract IERC20"
+          },
+          {
+            "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "triggerNetValue",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "acceptableNetValue",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "positionParamsHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "nonce",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
       },
       {
-        name: '_totalAssets',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'getUserShares',
-    inputs: [
-      {
-        name: '_token',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "_signature",
+        "type": "bytes",
+        "internalType": "bytes"
       },
       {
-        name: '_subaccount',
-        type: 'address',
-        internalType: 'contract IERC7579Account'
+        "name": "_positionParams",
+        "type": "tuple",
+        "internalType": "struct Allocation.PositionParams",
+        "components": [
+          {
+            "name": "stages",
+            "type": "address[]",
+            "internalType": "contract IStage[]"
+          },
+          {
+            "name": "positionKeys",
+            "type": "bytes32[][]",
+            "internalType": "bytes32[][]"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getConfig",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct Allocation.Config",
+        "components": [
+          {
+            "name": "position",
+            "type": "address",
+            "internalType": "contract Position"
+          },
+          {
+            "name": "masterHook",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "maxPuppetList",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "transferGasLimit",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getSharePrice",
+    "inputs": [
+      {
+        "name": "_subaccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
       },
       {
-        name: '_name',
-        type: 'bytes32',
-        internalType: 'bytes32'
+        "name": "_totalAssets",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getUserShares",
+    "inputs": [
+      {
+        "name": "_subaccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
       },
       {
-        name: '_account',
-        type: 'address',
-        internalType: 'address'
+        "name": "_account",
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'isInitialized',
-    inputs: [
+    "type": "function",
+    "name": "hasRemainingShares",
+    "inputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'address'
+        "name": "_subaccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'bool',
-        internalType: 'bool'
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    stateMutability: 'pure'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'isModuleType',
-    inputs: [
+    "type": "function",
+    "name": "isInitialized",
+    "inputs": [
       {
-        name: '_moduleTypeId',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'bool',
-        internalType: 'bool'
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    stateMutability: 'pure'
+    "stateMutability": "pure"
   },
   {
-    type: 'function',
-    name: 'masterSubaccountMap',
-    inputs: [
+    "type": "function",
+    "name": "isModuleType",
+    "inputs": [
       {
-        name: 'matchingKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
+        "name": "_moduleTypeId",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'contract IERC7579Account'
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "pure"
   },
   {
-    type: 'function',
-    name: 'nonceMap',
-    inputs: [
+    "type": "function",
+    "name": "nonceMap",
+    "inputs": [
       {
-        name: 'matchingKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
+        "name": "subaccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'onInstall',
-    inputs: [
+    "type": "function",
+    "name": "onInstall",
+    "inputs": [
       {
-        name: '',
-        type: 'bytes',
-        internalType: 'bytes'
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'onUninstall',
-    inputs: [
+    "type": "function",
+    "name": "onUninstall",
+    "inputs": [
       {
-        name: '_data',
-        type: 'bytes',
-        internalType: 'bytes'
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'sessionSignerMap',
-    inputs: [
+    "type": "function",
+    "name": "registerMasterSubaccount",
+    "inputs": [
       {
-        name: 'matchingKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
-      }
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'function',
-    name: 'setConfig',
-    inputs: [
-      {
-        name: '_data',
-        type: 'bytes',
-        internalType: 'bytes'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'setPermission',
-    inputs: [
-      {
-        name: 'functionSig',
-        type: 'bytes4',
-        internalType: 'bytes4'
+        "name": "_account",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: 'user',
-        type: 'address',
-        internalType: 'address'
+        "name": "_signer",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: 'isEnabled',
-        type: 'bool',
-        internalType: 'bool'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'setTokenCap',
-    inputs: [
-      {
-        name: '_token',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "_subaccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
       },
       {
-        name: '_cap',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'shareBalanceMap',
-    inputs: [
-      {
-        name: 'matchingKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
+        "name": "_baseToken",
+        "type": "address",
+        "internalType": "contract IERC20"
       },
       {
-        name: 'account',
-        type: 'address',
-        internalType: 'address'
+        "name": "_name",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    stateMutability: 'view'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'supportsInterface',
-    inputs: [
+    "type": "function",
+    "name": "registeredMap",
+    "inputs": [
       {
-        name: 'interfaceId',
-        type: 'bytes4',
-        internalType: 'bytes4'
+        "name": "subaccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'bool',
-        internalType: 'bool'
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    stateMutability: 'pure'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'tokenCapMap',
-    inputs: [
+    "type": "function",
+    "name": "sessionSignerMap",
+    "inputs": [
       {
-        name: 'token',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "subaccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'totalSharesMap',
-    inputs: [
+    "type": "function",
+    "name": "setCodeHash",
+    "inputs": [
       {
-        name: 'matchingKey',
-        type: 'bytes32',
-        internalType: 'bytes32'
-      }
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
-      }
-    ],
-    stateMutability: 'view'
-  },
-  {
-    type: 'event',
-    name: 'EIP712DomainChanged',
-    inputs: [],
-    anonymous: false
-  },
-  {
-    type: 'error',
-    name: 'Allocation__AlreadyRegistered',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Allocation__AmountMismatch',
-    inputs: [
-      {
-        name: 'expected',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "_codeHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
       {
-        name: 'actual',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "_allowed",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setConfig",
+    "inputs": [
+      {
+        "name": "_data",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setPermission",
+    "inputs": [
+      {
+        "name": "functionSig",
+        "type": "bytes4",
+        "internalType": "bytes4"
+      },
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "isEnabled",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setTokenCap",
+    "inputs": [
+      {
+        "name": "_token",
+        "type": "address",
+        "internalType": "contract IERC20"
+      },
+      {
+        "name": "_cap",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "shareBalanceMap",
+    "inputs": [
+      {
+        "name": "subaccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "supportsInterface",
+    "inputs": [
+      {
+        "name": "interfaceId",
+        "type": "bytes4",
+        "internalType": "bytes4"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "tokenCapMap",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "contract IERC20"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "totalSharesMap",
+    "inputs": [
+      {
+        "name": "subaccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "EIP712DomainChanged",
+    "inputs": [],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "Allocation__AlreadyRegistered",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Allocation__AmountMismatch",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "actual",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },
   {
-    type: 'error',
-    name: 'Allocation__ArrayLengthMismatch',
-    inputs: [
+    "type": "error",
+    "name": "Allocation__ArrayLengthMismatch",
+    "inputs": [
       {
-        name: 'puppetCount',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "puppetCount",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        name: 'allocationCount',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "allocationCount",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },
   {
-    type: 'error',
-    name: 'Allocation__DepositExceedsCap',
-    inputs: [
+    "type": "error",
+    "name": "Allocation__DepositExceedsCap",
+    "inputs": [
       {
-        name: 'amount',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        name: 'cap',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "cap",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },
   {
-    type: 'error',
-    name: 'Allocation__InsufficientBalance',
-    inputs: []
+    "type": "error",
+    "name": "Allocation__InsufficientBalance",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'Allocation__InsufficientLiquidity',
-    inputs: []
+    "type": "error",
+    "name": "Allocation__InsufficientLiquidity",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'Allocation__IntentExpired',
-    inputs: [
+    "type": "error",
+    "name": "Allocation__IntentExpired",
+    "inputs": [
       {
-        name: 'deadline',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "deadline",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        name: 'currentTime',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "currentTime",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },
   {
-    type: 'error',
-    name: 'Allocation__InvalidGasLimit',
-    inputs: []
+    "type": "error",
+    "name": "Allocation__InvalidAccountCodeHash",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'Allocation__InvalidMaxPuppetList',
-    inputs: []
+    "type": "error",
+    "name": "Allocation__InvalidGasLimit",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'Allocation__InvalidNonce',
-    inputs: [
+    "type": "error",
+    "name": "Allocation__InvalidMasterHook",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Allocation__InvalidMaxPuppetList",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Allocation__InvalidNonce",
+    "inputs": [
       {
-        name: 'expected',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "expected",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        name: 'provided',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "provided",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },
   {
-    type: 'error',
-    name: 'Allocation__InvalidPosition',
-    inputs: []
+    "type": "error",
+    "name": "Allocation__InvalidPosition",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'Allocation__InvalidSignature',
-    inputs: [
+    "type": "error",
+    "name": "Allocation__InvalidSignature",
+    "inputs": [
       {
-        name: 'expected',
-        type: 'address',
-        internalType: 'address'
+        "name": "expected",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: 'recovered',
-        type: 'address',
-        internalType: 'address'
+        "name": "recovered",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },
   {
-    type: 'error',
-    name: 'Allocation__PuppetListTooLarge',
-    inputs: [
+    "type": "error",
+    "name": "Allocation__MasterHookNotInstalled",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Allocation__NetValueAboveMax",
+    "inputs": [
       {
-        name: 'provided',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "netValue",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        name: 'maximum',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "acceptableNetValue",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },
   {
-    type: 'error',
-    name: 'Allocation__SubaccountFrozen',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Allocation__TokenNotAllowed',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Allocation__TransferFailed',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Allocation__UnregisteredSubaccount',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Allocation__ZeroAmount',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'Allocation__ZeroShares',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'ECDSAInvalidSignature',
-    inputs: []
-  },
-  {
-    type: 'error',
-    name: 'ECDSAInvalidSignatureLength',
-    inputs: [
+    "type": "error",
+    "name": "Allocation__NetValueBelowMin",
+    "inputs": [
       {
-        name: 'length',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "netValue",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "acceptableNetValue",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },
   {
-    type: 'error',
-    name: 'ECDSAInvalidSignatureS',
-    inputs: [
+    "type": "error",
+    "name": "Allocation__NetValueParamsMismatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Allocation__PuppetListTooLarge",
+    "inputs": [
       {
-        name: 's',
-        type: 'bytes32',
-        internalType: 'bytes32'
+        "name": "provided",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "maximum",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },
   {
-    type: 'error',
-    name: 'InvalidShortString',
-    inputs: []
+    "type": "error",
+    "name": "Allocation__SubaccountFrozen",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'ModuleAlreadyInitialized',
-    inputs: [
+    "type": "error",
+    "name": "Allocation__TokenMismatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Allocation__TokenNotAllowed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Allocation__TransferFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Allocation__UnregisteredSubaccount",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Allocation__ZeroAssets",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Allocation__ZeroShares",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidShortString",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ModuleAlreadyInitialized",
+    "inputs": [
       {
-        name: 'smartAccount',
-        type: 'address',
-        internalType: 'address'
+        "name": "smartAccount",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },
   {
-    type: 'error',
-    name: 'NotInitialized',
-    inputs: [
+    "type": "error",
+    "name": "NotInitialized",
+    "inputs": [
       {
-        name: 'smartAccount',
-        type: 'address',
-        internalType: 'address'
+        "name": "smartAccount",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },
   {
-    type: 'error',
-    name: 'Permission__CallerNotAuthority',
-    inputs: []
+    "type": "error",
+    "name": "Permission__CallerNotAuthority",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'Permission__Unauthorized',
-    inputs: []
+    "type": "error",
+    "name": "Permission__Unauthorized",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'ReentrancyGuardReentrantCall',
-    inputs: []
+    "type": "error",
+    "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'StringTooLong',
-    inputs: [
+    "type": "error",
+    "name": "StringTooLong",
+    "inputs": [
       {
-        name: 'str',
-        type: 'string',
-        internalType: 'string'
+        "name": "str",
+        "type": "string",
+        "internalType": "string"
       }
     ]
   }

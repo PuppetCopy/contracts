@@ -55,8 +55,6 @@ contract MockStage is IStage {
 
     function verify(address, IERC20, uint, uint, bytes calldata) external pure override {}
 
-    function settle(address, bytes calldata) external override {}
-
     function getPositionValue(bytes32 _positionKey, IERC20) external view override returns (uint) {
         return positionValues[_positionKey];
     }

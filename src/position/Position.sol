@@ -13,14 +13,22 @@ import {IStage} from "./interface/IStage.sol";
 /// @title Position
 /// @notice Routes execute() calls to stage handlers for validation and tracks pending orders
 contract Position is CoreContract {
+    // ============ Constants ============
+
     uint8 public constant ACTION_NONE = 0;
     uint8 public constant ACTION_ORDER_CREATED = 1;
 
+    // ============ State ============
+
     mapping(address target => IStage) public handlers;
     mapping(IStage stage => bool) public validStages;
-    mapping(address subaccount => uint256) public pendingOrderCount;
+    mapping(address subaccount => uint) public pendingOrderCount;
+
+    // ============ Constructor ============
 
     constructor(IAuthority _authority) CoreContract(_authority, "") {}
+
+    // ============ Views ============
 
     function processPreCall(address _master, address _subaccount, uint _msgValue, bytes calldata _msgData)
         external
@@ -56,6 +64,31 @@ contract Position is CoreContract {
         return abi.encode(token, preBalance, handlerData, handler);
     }
 
+    function getNetValue(
+        address _subaccount,
+        IERC20 _baseToken,
+        IStage[] calldata _stages,
+        bytes32[][] calldata _positionKeys
+    ) external view returns (uint value) {
+        if (pendingOrderCount[_subaccount] != 0) {
+            revert Error.Position__PendingOrdersExist();
+        }
+
+        for (uint i; i < _stages.length; i++) {
+            IStage stage = _stages[i];
+            bytes32[] calldata keys = _positionKeys[i];
+
+            for (uint j; j < keys.length; j++) {
+                if (!stage.verifyPositionOwner(keys[j], _subaccount)) {
+                    revert Error.Position__NotPositionOwner();
+                }
+                value += stage.getPositionValue(keys[j], _baseToken);
+            }
+        }
+    }
+
+    // ============ Auth ============
+
     function processPostCall(address _subaccount, bytes calldata _hookData) external auth {
         if (_hookData.length == 0) return;
 
@@ -77,11 +110,6 @@ contract Position is CoreContract {
         }
     }
 
-    function settle(address _subaccount, bytes calldata _handlerData) external auth {
-        (,, , IStage handler) = abi.decode(_handlerData, (IERC20, uint, bytes, IStage));
-        handler.settle(_subaccount, _handlerData);
-    }
-
     function setHandler(address _target, IStage _handler) external auth {
         IStage oldHandler = handlers[_target];
         if (address(oldHandler) != address(0)) {
@@ -91,29 +119,6 @@ contract Position is CoreContract {
         handlers[_target] = _handler;
         if (address(_handler) != address(0)) {
             validStages[_handler] = true;
-        }
-    }
-
-    function getNetValue(
-        address _subaccount,
-        IERC20 _baseToken,
-        IStage[] calldata _stages,
-        bytes32[][] calldata _positionKeys
-    ) external view returns (uint256 value) {
-        if (pendingOrderCount[_subaccount] != 0) {
-            revert Error.Position__PendingOrdersExist();
-        }
-
-        for (uint i; i < _stages.length; i++) {
-            IStage stage = _stages[i];
-            bytes32[] calldata keys = _positionKeys[i];
-
-            for (uint j; j < keys.length; j++) {
-                if (!stage.verifyPositionOwner(keys[j], _subaccount)) {
-                    revert Error.Position__NotPositionOwner();
-                }
-                value += stage.getPositionValue(keys[j], _baseToken);
-            }
         }
     }
 
@@ -140,6 +145,8 @@ contract Position is CoreContract {
 
         _logEvent("SettleOrders", abi.encode(_subaccount, _orderKeys));
     }
+
+    // ============ Internal ============
 
     function _setConfig(bytes memory) internal override {}
 }

@@ -117,9 +117,6 @@ contract GmxStage is IStage {
     /// @notice Verify state after execution
     function verify(address, IERC20, uint, uint, bytes calldata) external pure override {}
 
-    /// @notice Record position outcome
-    function settle(address, bytes calldata) external override {}
-
     /// @notice Get position value in base token units
     /// @dev All GMX values are in USD (30 decimals), convert to base token at end
     function getPositionValue(bytes32 positionKey, IERC20 baseToken) external view override returns (uint) {

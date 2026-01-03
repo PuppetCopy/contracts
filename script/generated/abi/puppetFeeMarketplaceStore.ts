@@ -3,267 +3,267 @@
 
 export default [
   {
-    type: 'constructor',
-    inputs: [
+    "type": "constructor",
+    "inputs": [
       {
-        name: '_authority',
-        type: 'address',
-        internalType: 'contract IAuthority'
+        "name": "_authority",
+        "type": "address",
+        "internalType": "contract IAuthority"
       },
       {
-        name: '_protocolToken',
-        type: 'address',
-        internalType: 'contract PuppetToken'
+        "name": "_protocolToken",
+        "type": "address",
+        "internalType": "contract PuppetToken"
       }
     ],
-    stateMutability: 'nonpayable'
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'authority',
-    inputs: [],
-    outputs: [
+    "type": "function",
+    "name": "authority",
+    "inputs": [],
+    "outputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'contract IAuthority'
+        "name": "",
+        "type": "address",
+        "internalType": "contract IAuthority"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'burn',
-    inputs: [
+    "type": "function",
+    "name": "burn",
+    "inputs": [
       {
-        name: '_amount',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'canCall',
-    inputs: [
+    "type": "function",
+    "name": "canCall",
+    "inputs": [
       {
-        name: 'user',
-        type: 'address',
-        internalType: 'address'
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'bool',
-        internalType: 'bool'
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'getTokenBalance',
-    inputs: [
+    "type": "function",
+    "name": "getTokenBalance",
+    "inputs": [
       {
-        name: '_token',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "_token",
+        "type": "address",
+        "internalType": "contract IERC20"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'protocolToken',
-    inputs: [],
-    outputs: [
+    "type": "function",
+    "name": "protocolToken",
+    "inputs": [],
+    "outputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'contract PuppetToken'
+        "name": "",
+        "type": "address",
+        "internalType": "contract PuppetToken"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'recordTransferIn',
-    inputs: [
+    "type": "function",
+    "name": "recordTransferIn",
+    "inputs": [
       {
-        name: '_token',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "_token",
+        "type": "address",
+        "internalType": "contract IERC20"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    stateMutability: 'nonpayable'
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'setAccess',
-    inputs: [
+    "type": "function",
+    "name": "setAccess",
+    "inputs": [
       {
-        name: 'user',
-        type: 'address',
-        internalType: 'address'
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: 'isEnabled',
-        type: 'bool',
-        internalType: 'bool'
+        "name": "isEnabled",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'syncTokenBalance',
-    inputs: [
+    "type": "function",
+    "name": "syncTokenBalance",
+    "inputs": [
       {
-        name: '_token',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "_token",
+        "type": "address",
+        "internalType": "contract IERC20"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'tokenBalanceMap',
-    inputs: [
+    "type": "function",
+    "name": "tokenBalanceMap",
+    "inputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "",
+        "type": "address",
+        "internalType": "contract IERC20"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'transferIn',
-    inputs: [
+    "type": "function",
+    "name": "transferIn",
+    "inputs": [
       {
-        name: '_token',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "_token",
+        "type": "address",
+        "internalType": "contract IERC20"
       },
       {
-        name: '_depositor',
-        type: 'address',
-        internalType: 'address'
+        "name": "_depositor",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: '_value',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "_value",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'transferOut',
-    inputs: [
+    "type": "function",
+    "name": "transferOut",
+    "inputs": [
       {
-        name: 'gasLimit',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "gasLimit",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        name: '_token',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "_token",
+        "type": "address",
+        "internalType": "contract IERC20"
       },
       {
-        name: '_receiver',
-        type: 'address',
-        internalType: 'address'
+        "name": "_receiver",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: '_value',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "_value",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'error',
-    name: 'Access__CallerNotAuthority',
-    inputs: []
+    "type": "error",
+    "name": "Access__CallerNotAuthority",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'Access__Unauthorized',
-    inputs: []
+    "type": "error",
+    "name": "Access__Unauthorized",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'BankStore__InsufficientBalance',
-    inputs: []
+    "type": "error",
+    "name": "BankStore__InsufficientBalance",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'ReentrancyGuardReentrantCall',
-    inputs: []
+    "type": "error",
+    "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'SafeERC20FailedOperation',
-    inputs: [
+    "type": "error",
+    "name": "SafeERC20FailedOperation",
+    "inputs": [
       {
-        name: 'token',
-        type: 'address',
-        internalType: 'address'
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },
   {
-    type: 'error',
-    name: 'TransferUtils__TokenTransferError',
-    inputs: [
+    "type": "error",
+    "name": "TransferUtils__TokenTransferError",
+    "inputs": [
       {
-        name: 'token',
-        type: 'address',
-        internalType: 'contract IERC20'
+        "name": "token",
+        "type": "address",
+        "internalType": "contract IERC20"
       },
       {
-        name: 'receiver',
-        type: 'address',
-        internalType: 'address'
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: 'amount',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   }

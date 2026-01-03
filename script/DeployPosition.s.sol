@@ -7,9 +7,11 @@ import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {Allocation} from "src/position/Allocation.sol";
 import {Position} from "src/position/Position.sol";
 import {SubscriptionPolicy} from "src/position/policies/SubscriptionPolicy.sol";
+import {GmxStage} from "src/position/stage/GmxStage.sol";
 import {MasterHook} from "src/account/MasterHook.sol";
 import {UserRouter} from "src/UserRouter.sol";
 import {IUserRouter} from "src/utils/interfaces/IUserRouter.sol";
+import {IStage} from "src/position/interface/IStage.sol";
 import {IAuthority} from "src/utils/interfaces/IAuthority.sol";
 import {Permission} from "src/utils/auth/Permission.sol";
 
@@ -17,7 +19,6 @@ import {BaseScript} from "./BaseScript.s.sol";
 import {Const} from "./Const.sol";
 
 contract DeployPosition is BaseScript {
-    bytes32 constant GMX_STAGE_KEY = keccak256("GMX_V2");
 
     function run() public {
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
@@ -29,7 +30,7 @@ contract DeployPosition is BaseScript {
         Allocation allocation = new Allocation(
             dictatorship,
             Allocation.Config({
-                position: position, masterHook: address(1), maxPuppetList: 100, transferOutGasLimit: 200_000
+                position: position, masterHook: address(1), maxPuppetList: 100, transferGasLimit: 200_000
             })
         );
 
@@ -46,7 +47,7 @@ contract DeployPosition is BaseScript {
                     position: position,
                     masterHook: address(masterHook),
                     maxPuppetList: 100,
-                    transferOutGasLimit: 200_000
+                    transferGasLimit: 200_000
                 })
             )
         );
@@ -59,17 +60,29 @@ contract DeployPosition is BaseScript {
             IAuthority(address(dictatorship)), abi.encode(SubscriptionPolicy.Config({version: 1}))
         );
 
-        // TODO: Deploy GmxStage handler
-        // GmxStage gmxStage = new GmxStage(...);
-        // dictatorship.setPermission(
-        //     Permission(address(position)), position.setHandler.selector, DEPLOYER_ADDRESS
-        // );
-        // position.setHandler(GMX_STAGE_KEY, IStage(address(gmxStage)));
+        // Deploy GmxStage handler
+        GmxStage gmxStage = new GmxStage(
+            Const.gmxDataStore,
+            Const.gmxExchangeRouter,
+            Const.gmxOrderVault,
+            Const.wnt
+        );
 
-        // TODO: Add position tracking permissions when implemented
-        // dictatorship.setPermission(
-        //     Permission(address(position)), position.updatePosition.selector, address(allocation)
-        // );
+        // Register GmxStage as handler for GMX ExchangeRouter
+        dictatorship.setPermission(
+            Permission(address(position)), position.setHandler.selector, DEPLOYER_ADDRESS
+        );
+        position.setHandler(Const.gmxExchangeRouter, IStage(address(gmxStage)));
+
+        // Permission for UserRouter to call Position.processPostCall (via MasterHook.postCheck)
+        dictatorship.setPermission(
+            Permission(address(position)), position.processPostCall.selector, address(userRouter)
+        );
+
+        // Permission to settle orders after they complete
+        dictatorship.setPermission(
+            Permission(address(position)), position.settleOrders.selector, DEPLOYER_ADDRESS
+        );
         dictatorship.setPermission(Permission(address(allocation)), Allocation.setTokenCap.selector, DEPLOYER_ADDRESS);
         allocation.setTokenCap(IERC20(Const.usdc), 100e6);
 
@@ -78,11 +91,6 @@ contract DeployPosition is BaseScript {
         );
         dictatorship.setPermission(
             Permission(address(allocation)), Allocation.executeWithdraw.selector, DEPLOYER_ADDRESS
-        );
-
-        // Permission for UserRouter to call registerMasterSubaccount
-        dictatorship.setPermission(
-            Permission(address(allocation)), allocation.registerMasterSubaccount.selector, address(userRouter)
         );
 
         vm.stopBroadcast();

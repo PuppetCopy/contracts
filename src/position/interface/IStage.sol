@@ -40,11 +40,6 @@ interface IStage {
         external
         view;
 
-    /// @notice Record position outcome after execution
-    /// @param subaccount The subaccount that executed
-    /// @param hookData Data from validate()
-    function settle(address subaccount, bytes calldata hookData) external;
-
     /// @notice Get position value in base token units
     /// @param positionKey The position identifier
     /// @param baseToken The token to denominate value in

@@ -1,15 +1,17 @@
 // This file is auto-generated from Puppet deployments.json and forge-artifacts
 // Do not edit manually.
 
-import allocationAbi from './abi/puppetAllocation.js'
 import dictatorshipAbi from './abi/puppetDictatorship.js'
-import feemarketplaceAbi from './abi/puppetFeeMarketplace.js'
-import feemarketplacestoreAbi from './abi/puppetFeeMarketplaceStore.js'
-import gmxvenuevalidatorAbi from './abi/puppetGmxVenueValidator.js'
-import positionAbi from './abi/puppetPosition.js'
 import puppettokenAbi from './abi/puppetPuppetToken.js'
 import puppetvotetokenAbi from './abi/puppetPuppetVoteToken.js'
+import feemarketplacestoreAbi from './abi/puppetFeeMarketplaceStore.js'
+import feemarketplaceAbi from './abi/puppetFeeMarketplace.js'
+import allocationAbi from './abi/puppetAllocation.js'
+import positionAbi from './abi/puppetPosition.js'
 import subscriptionpolicyAbi from './abi/puppetSubscriptionPolicy.js'
+import eventemitterAbi from './abi/puppetEventEmitter.js'
+import userrouterAbi from './abi/puppetUserRouter.js'
+import gmxstageAbi from './abi/puppetGmxStage.js'
 
 export const PUPPET_CONTRACT_MAP = {
   Dictatorship: {
@@ -52,13 +54,19 @@ export const PUPPET_CONTRACT_MAP = {
     chainId: 42161,
     abi: subscriptionpolicyAbi
   },
-  ThrottlePolicy: {
-    address: '0x9951b027Cb58E04897348f576dc71248d3f890bb',
-    chainId: 42161
-  },
-  GmxVenueValidator: {
-    address: '0x354E5b839D23507BF60B36550e9dCf1d5A0070fD',
+  EventEmitter: {
+    address: '0x0000000000000000000000000000000000000000',
     chainId: 42161,
-    abi: gmxvenuevalidatorAbi
+    abi: eventemitterAbi
+  },
+  UserRouter: {
+    address: '0x0000000000000000000000000000000000000000',
+    chainId: 42161,
+    abi: userrouterAbi
+  },
+  GmxStage: {
+    address: '0x0000000000000000000000000000000000000000',
+    chainId: 42161,
+    abi: gmxstageAbi
   }
 } as const

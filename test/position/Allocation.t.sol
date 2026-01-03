@@ -50,7 +50,7 @@ contract AllocationTest is BasicSetup {
                 position: position,
                 masterHook: address(1),
                 maxPuppetList: MAX_PUPPET_LIST,
-                transferOutGasLimit: GAS_LIMIT
+                transferGasLimit: GAS_LIMIT
             })
         );
 

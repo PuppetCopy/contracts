@@ -3,159 +3,67 @@
 
 export const CONTRACT_EVENT_MAP = {
   Allocation: {
-    CreateMasterSubaccount: {
-      hash: '0x748a7eae0a68f954dfe370eee70aa8f604494840a7be6d7b7a152edbb9ecaf65',
-      args: [
-        { type: 'bytes32', name: 'key' },
-        { type: 'address', name: 'account' },
-        { type: 'address', name: 'signer' },
-        { type: 'address', name: 'subaccount' },
-        { type: 'bytes32', name: 'subaccountName' },
-        { type: 'address', name: 'token' },
-        { type: 'uint256', name: 'balance' }
-      ]
+    DisposeSubaccount: {
+      hash: '0x848ff9c9196aa98cee682344c956ac8141a85c70adf39e7cb08955783b776849',
+      args: [{type:"address",name:"subaccount"}]
     },
     ExecuteAllocate: {
       hash: '0xc8e7f8df3ca4c122ae1fbf63eae5c258f59a8cee842870bab121051deca41d18',
-      args: [
-        { type: 'bytes32', name: 'key' },
-        { type: 'address', name: 'account' },
-        { type: 'address', name: 'subaccount' },
-        { type: 'bytes32', name: 'subaccountName' },
-        { type: 'address', name: 'token' },
-        { type: 'uint256', name: 'amount' },
-        { type: 'address[]', name: 'puppetList' },
-        { type: 'uint256[]', name: 'amountList' },
-        { type: 'uint256', name: 'allocation' },
-        { type: 'uint256', name: 'positionValue' },
-        { type: 'tuple[]', name: 'positions', components: [{ type: 'bytes32' }, { type: 'uint256' }] },
-        { type: 'uint256', name: 'allocated' },
-        { type: 'uint256', name: 'sharePrice' },
-        { type: 'uint256', name: 'userShares' },
-        { type: 'uint256', name: 'totalShares' }
-      ]
+      args: [{type:"address",name:"subaccount"},{type:"address",name:"account"},{type:"address",name:"token"},{type:"uint256",name:"intentAmount"},{type:"address[]",name:"puppetList"},{type:"uint256[]",name:"amountList"},{type:"uint256",name:"allocation"},{type:"uint256",name:"positionValue"},{type:"uint256",name:"allocated"},{type:"uint256",name:"sharePrice"},{type:"uint256",name:"userShares"},{type:"uint256",name:"totalShares"},{type:"uint256",name:"nonce"}]
     },
     ExecuteAllocateFailed: {
       hash: '0x4793193416ccb8eee5829a7187ac57810646f3b0584ded07ffa004dddd5fded2',
-      args: [
-        { type: 'bytes32', name: 'key' },
-        { type: 'address', name: 'puppet' },
-        { type: 'uint256', name: 'amount' },
-        { type: 'uint256', name: 'param' }
-      ]
-    },
-    ExecuteOrder: {
-      hash: '0x8ed4dfaad885776d6924f1ff8b354c36a605f24a988d21cccbf5b9133dc2a2ad',
-      args: [
-        { type: 'bytes32', name: 'key' },
-        { type: 'address', name: 'account' },
-        { type: 'address', name: 'subaccount' },
-        { type: 'bytes32', name: 'subaccountName' },
-        { type: 'address', name: 'token' },
-        { type: 'uint256', name: 'amount' },
-        { type: 'uint256', name: 'allocation' },
-        { type: 'address', name: 'target' },
-        { type: 'tuple', name: 'venue', components: [{ type: 'bytes32' }, { type: 'address' }] },
-        { type: 'bytes32', name: 'positionKey' },
-        { type: 'uint256', name: 'positionValue' },
-        { type: 'bytes', name: 'result' }
-      ]
-    },
-    ExecuteOrderFailed: {
-      hash: '0x931ea7ec58957193febd836dad1ff3f8f2d6cb9217c90ecbdccc96184669d63e',
-      args: [
-        { type: 'bytes32', name: 'key' },
-        { type: 'address', name: 'account' },
-        { type: 'address', name: 'target' },
-        { type: 'bytes', name: 'callData' },
-        { type: 'bytes', name: 'errorValue' }
-      ]
+      args: [{type:"address",name:"subaccount"},{type:"address",name:"token"},{type:"address",name:"puppet"},{type:"uint256",name:"amount"}]
     },
     ExecuteWithdraw: {
       hash: '0xcb64880bdc7e62dd4b02aedd4304adf2d6fbf5b649a653a21a9beadd95e24298',
-      args: [
-        { type: 'bytes32', name: 'key' },
-        { type: 'address', name: 'account' },
-        { type: 'address', name: 'subaccount' },
-        { type: 'bytes32', name: 'subaccountName' },
-        { type: 'address', name: 'token' },
-        { type: 'uint256', name: 'amount' },
-        { type: 'uint256', name: 'param' },
-        { type: 'uint256', name: 'positionValue' },
-        { type: 'tuple[]', name: 'positions', components: [{ type: 'bytes32' }, { type: 'uint256' }] },
-        { type: 'uint256', name: 'amountOut' },
-        { type: 'uint256', name: 'sharesBurnt' },
-        { type: 'uint256', name: 'sharePrice' },
-        { type: 'uint256', name: 'userShares' },
-        { type: 'uint256', name: 'totalShares' }
-      ]
+      args: [{type:"address",name:"subaccount"},{type:"address",name:"account"},{type:"address",name:"token"},{type:"uint256",name:"amount"},{type:"uint256",name:"allocation"},{type:"uint256",name:"positionValue"},{type:"uint256",name:"amountOut"},{type:"uint256",name:"sharesBurnt"},{type:"uint256",name:"sharePrice"},{type:"uint256",name:"userShares"},{type:"uint256",name:"totalShares"},{type:"uint256",name:"nonce"}]
+    },
+    RegisterMasterSubaccount: {
+      hash: '0x09e8c25fd8e4adbf9b7cf2e27e69f1b49bad3f478f4824b60796af819ceca2e0',
+      args: [{type:"address",name:"subaccount"},{type:"address",name:"account"},{type:"address",name:"signer"},{type:"address",name:"baseToken"},{type:"bytes32",name:"name"}]
+    },
+    SetCodeHash: {
+      hash: '0xf2e7974b4b30b0f3c8dea8c83c030f6d6fd38ebdbaecdce207549e1feea8b303',
+      args: [{type:"bytes32",name:"codeHash"},{type:"bool",name:"allowed"}]
     },
     SetTokenCap: {
       hash: '0x0eed9dd37bbcb01292183ae212328bd52aab55ce6eb475eb4fb6350de9286029',
-      args: [
-        { type: 'address', name: 'token' },
-        { type: 'uint256', name: 'cap' }
-      ]
+      args: [{type:"address",name:"token"},{type:"uint256",name:"cap"}]
     },
     Uninstall: {
       hash: '0xcf0fb4af6fa71203bf8ca49a15d730b9e9a0385a52961e75ded30718d69a944e',
-      args: [
-        { type: 'bytes32', name: 'key' },
-        { type: 'address', name: 'subaccount' },
-        { type: 'address', name: 'token' },
-        { type: 'bytes32', name: 'subaccountName' }
-      ]
+      args: [{type:"address",name:"subaccount"}]
     }
   },
   FeeMarketplace: {
     AcceptOffer: {
       hash: '0x7d778e14025c4611dae90acde3cdf239063797ccb4dc030ab8c78b43e4558e02',
-      args: [
-        { type: 'address', name: 'feeToken' },
-        { type: 'address', name: 'buyer' },
-        { type: 'address', name: 'receiver' },
-        { type: 'uint256', name: 'payout' },
-        { type: 'uint256', name: 'cost' }
-      ]
+      args: [{type:"address",name:"feeToken"},{type:"address",name:"buyer"},{type:"address",name:"receiver"},{type:"uint256",name:"payout"},{type:"uint256",name:"cost"}]
     },
     Deposit: {
       hash: '0xe09149d2123147c5f43d258257fef0b7b969db78269369ebcf5ebb9eef8592f2',
-      args: [
-        { type: 'address', name: 'feeToken' },
-        { type: 'address', name: 'depositor' },
-        { type: 'uint256', name: 'amount' }
-      ]
+      args: [{type:"address",name:"feeToken"},{type:"address",name:"depositor"},{type:"uint256",name:"amount"}]
     }
   },
   Position: {
-    SetVenue: {
-      hash: '0xa1fd29a836c9e0d9c0cda8c25b4b386b7e5a72917c047427d71a722e6b55cb6f',
-      args: [
-        { type: 'bytes32', name: 'venueKey' },
-        { type: 'address', name: 'validator' },
-        { type: 'address[]', name: 'entrypoints' }
-      ]
+    CreateOrder: {
+      hash: '0x955ac4f6e0bb2a94d08f77f71ab4b23bc953ceed54625cd77c25f38079079d19',
+      args: [{type:"address",name:"subaccount"},{type:"bytes32",name:"orderKey"},{type:"bytes32",name:"positionKey"},{type:"address",name:"handler"},{type:"address",name:"token"}]
+    },
+    SettleOrders: {
+      hash: '0x34e35d9c2270bbec97412cade1887c5ee3a88bb86c95a40f5b1e9ccbaffb4d2d',
+      args: [{type:"address",name:"subaccount"},{type:"bytes32[]",name:"orderKeys"}]
     }
   },
   SubscriptionPolicy: {
     Subscribe: {
       hash: '0x48d404d629614f23fea65a9948e14b556ebee2cdcec7eb97cad37db32d0f210e',
-      args: [
-        { type: 'bytes32', name: 'configId' },
-        { type: 'address', name: 'account' },
-        { type: 'bytes32', name: 'key' },
-        { type: 'uint16', name: 'allowanceRate' },
-        { type: 'uint32', name: 'throttlePeriod' },
-        { type: 'uint64', name: 'expiry' }
-      ]
+      args: [{type:"bytes32",name:"configId"},{type:"address",name:"account"},{type:"bytes32",name:"key"},{type:"uint16",name:"allowanceRate"},{type:"uint32",name:"throttlePeriod"},{type:"uint64",name:"expiry"}]
     },
     Unsubscribe: {
       hash: '0x2571bb224427972bee77ecd6edaf0e4ad91d8cc1dc37954a1e160515ca440a49',
-      args: [
-        { type: 'bytes32', name: 'configId' },
-        { type: 'address', name: 'sender' },
-        { type: 'bytes32', name: 'key' }
-      ]
+      args: [{type:"bytes32",name:"configId"},{type:"address",name:"sender"},{type:"bytes32",name:"key"}]
     }
   }
 } as const

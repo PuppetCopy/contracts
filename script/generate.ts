@@ -238,11 +238,6 @@ export { gmxErrorAbi } from './abi/gmxErrors.js'
   await Bun.write(`${OUTPUT_DIR}/gmx/index.ts`, gmxIndexContent)
 }
 
-async function formatGeneratedFiles(): Promise<void> {
-  console.log('Formatting generated files...')
-  await Bun.$`bunx @biomejs/biome check --fix --unsafe ${OUTPUT_DIR}`
-}
-
 async function cleanGeneratedFiles(): Promise<void> {
   console.log('Cleaning old generated files...')
 
@@ -299,11 +294,6 @@ async function main(): Promise<void> {
     } else {
       console.log('Skipping GMX generation (@gmx package not installed)')
     }
-  }
-
-  const skipFormat = Bun.env.SKIP_FORMAT === '1' || Bun.env.SKIP_FORMAT === 'true'
-  if (!skipFormat) {
-    await formatGeneratedFiles()
   }
 
   console.log('\n=== Generation complete ===')

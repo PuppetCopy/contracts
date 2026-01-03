@@ -3,481 +3,481 @@
 
 export default [
   {
-    type: 'constructor',
-    inputs: [
+    "type": "constructor",
+    "inputs": [
       {
-        name: '_authority',
-        type: 'address',
-        internalType: 'contract IAuthority'
+        "name": "_authority",
+        "type": "address",
+        "internalType": "contract IAuthority"
       },
       {
-        name: '_config',
-        type: 'bytes',
-        internalType: 'bytes'
+        "name": "_config",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
-    stateMutability: 'nonpayable'
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'authority',
-    inputs: [],
-    outputs: [
+    "type": "function",
+    "name": "authority",
+    "inputs": [],
+    "outputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'contract IAuthority'
+        "name": "",
+        "type": "address",
+        "internalType": "contract IAuthority"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'canCall',
-    inputs: [
+    "type": "function",
+    "name": "canCall",
+    "inputs": [
       {
-        name: 'signatureHash',
-        type: 'bytes4',
-        internalType: 'bytes4'
+        "name": "signatureHash",
+        "type": "bytes4",
+        "internalType": "bytes4"
       },
       {
-        name: 'user',
-        type: 'address',
-        internalType: 'address'
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'bool',
-        internalType: 'bool'
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'checkAction',
-    inputs: [
+    "type": "function",
+    "name": "checkAction",
+    "inputs": [
       {
-        name: 'id',
-        type: 'bytes32',
-        internalType: 'ConfigId'
+        "name": "id",
+        "type": "bytes32",
+        "internalType": "ConfigId"
       },
       {
-        name: 'puppet',
-        type: 'address',
-        internalType: 'address'
+        "name": "puppet",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: 'token',
-        type: 'address',
-        internalType: 'address'
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: 'value',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        name: 'data',
-        type: 'bytes',
-        internalType: 'bytes'
+        "name": "data",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    stateMutability: 'nonpayable'
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'config',
-    inputs: [],
-    outputs: [
+    "type": "function",
+    "name": "config",
+    "inputs": [],
+    "outputs": [
       {
-        name: 'version',
-        type: 'uint8',
-        internalType: 'uint8'
+        "name": "version",
+        "type": "uint8",
+        "internalType": "uint8"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'deriveSpecificKey',
-    inputs: [
+    "type": "function",
+    "name": "deriveSpecificKey",
+    "inputs": [
       {
-        name: 'token',
-        type: 'address',
-        internalType: 'address'
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: 'master',
-        type: 'address',
-        internalType: 'address'
+        "name": "master",
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'bytes32',
-        internalType: 'bytes32'
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'deriveWildcardKey',
-    inputs: [
+    "type": "function",
+    "name": "deriveWildcardKey",
+    "inputs": [
       {
-        name: 'token',
-        type: 'address',
-        internalType: 'address'
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'bytes32',
-        internalType: 'bytes32'
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'getLastActivity',
-    inputs: [
+    "type": "function",
+    "name": "getLastActivity",
+    "inputs": [
       {
-        name: 'configId',
-        type: 'bytes32',
-        internalType: 'ConfigId'
+        "name": "configId",
+        "type": "bytes32",
+        "internalType": "ConfigId"
       },
       {
-        name: 'multiplexer',
-        type: 'address',
-        internalType: 'address'
+        "name": "multiplexer",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: 'puppet',
-        type: 'address',
-        internalType: 'address'
+        "name": "puppet",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: 'key',
-        type: 'bytes32',
-        internalType: 'bytes32'
+        "name": "key",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'uint64',
-        internalType: 'uint64'
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'getSubscription',
-    inputs: [
+    "type": "function",
+    "name": "getSubscription",
+    "inputs": [
       {
-        name: 'configId',
-        type: 'bytes32',
-        internalType: 'ConfigId'
+        "name": "configId",
+        "type": "bytes32",
+        "internalType": "ConfigId"
       },
       {
-        name: 'multiplexer',
-        type: 'address',
-        internalType: 'address'
+        "name": "multiplexer",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: 'puppet',
-        type: 'address',
-        internalType: 'address'
+        "name": "puppet",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: 'key',
-        type: 'bytes32',
-        internalType: 'bytes32'
+        "name": "key",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'tuple',
-        internalType: 'struct SubscriptionPolicy.Subscription',
-        components: [
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct SubscriptionPolicy.Subscription",
+        "components": [
           {
-            name: 'allowanceRate',
-            type: 'uint16',
-            internalType: 'uint16'
+            "name": "allowanceRate",
+            "type": "uint16",
+            "internalType": "uint16"
           },
           {
-            name: 'throttlePeriod',
-            type: 'uint32',
-            internalType: 'uint32'
+            "name": "throttlePeriod",
+            "type": "uint32",
+            "internalType": "uint32"
           },
           {
-            name: 'expiry',
-            type: 'uint64',
-            internalType: 'uint64'
+            "name": "expiry",
+            "type": "uint64",
+            "internalType": "uint64"
           }
         ]
       }
     ],
-    stateMutability: 'view'
+    "stateMutability": "view"
   },
   {
-    type: 'function',
-    name: 'initializeWithMultiplexer',
-    inputs: [
+    "type": "function",
+    "name": "initializeWithMultiplexer",
+    "inputs": [
       {
-        name: 'account',
-        type: 'address',
-        internalType: 'address'
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: 'configId',
-        type: 'bytes32',
-        internalType: 'ConfigId'
+        "name": "configId",
+        "type": "bytes32",
+        "internalType": "ConfigId"
       },
       {
-        name: 'initData',
-        type: 'bytes',
-        internalType: 'bytes'
+        "name": "initData",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'isInitialized',
-    inputs: [
+    "type": "function",
+    "name": "isInitialized",
+    "inputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'address'
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: '',
-        type: 'bytes32',
-        internalType: 'ConfigId'
+        "name": "",
+        "type": "bytes32",
+        "internalType": "ConfigId"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'bool',
-        internalType: 'bool'
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    stateMutability: 'pure'
+    "stateMutability": "pure"
   },
   {
-    type: 'function',
-    name: 'isInitialized',
-    inputs: [
+    "type": "function",
+    "name": "isInitialized",
+    "inputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'address'
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: '',
-        type: 'address',
-        internalType: 'address'
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: '',
-        type: 'bytes32',
-        internalType: 'ConfigId'
+        "name": "",
+        "type": "bytes32",
+        "internalType": "ConfigId"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'bool',
-        internalType: 'bool'
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    stateMutability: 'pure'
+    "stateMutability": "pure"
   },
   {
-    type: 'function',
-    name: 'isInitialized',
-    inputs: [
+    "type": "function",
+    "name": "isInitialized",
+    "inputs": [
       {
-        name: '',
-        type: 'address',
-        internalType: 'address'
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'bool',
-        internalType: 'bool'
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    stateMutability: 'pure'
+    "stateMutability": "pure"
   },
   {
-    type: 'function',
-    name: 'isModuleType',
-    inputs: [
+    "type": "function",
+    "name": "isModuleType",
+    "inputs": [
       {
-        name: 'moduleTypeId',
-        type: 'uint256',
-        internalType: 'uint256'
+        "name": "moduleTypeId",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'bool',
-        internalType: 'bool'
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    stateMutability: 'pure'
+    "stateMutability": "pure"
   },
   {
-    type: 'function',
-    name: 'onInstall',
-    inputs: [
+    "type": "function",
+    "name": "onInstall",
+    "inputs": [
       {
-        name: '',
-        type: 'bytes',
-        internalType: 'bytes'
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'onUninstall',
-    inputs: [
+    "type": "function",
+    "name": "onUninstall",
+    "inputs": [
       {
-        name: '',
-        type: 'bytes',
-        internalType: 'bytes'
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'setConfig',
-    inputs: [
+    "type": "function",
+    "name": "setConfig",
+    "inputs": [
       {
-        name: '_data',
-        type: 'bytes',
-        internalType: 'bytes'
+        "name": "_data",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'setPermission',
-    inputs: [
+    "type": "function",
+    "name": "setPermission",
+    "inputs": [
       {
-        name: 'functionSig',
-        type: 'bytes4',
-        internalType: 'bytes4'
+        "name": "functionSig",
+        "type": "bytes4",
+        "internalType": "bytes4"
       },
       {
-        name: 'user',
-        type: 'address',
-        internalType: 'address'
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: 'isEnabled',
-        type: 'bool',
-        internalType: 'bool'
+        "name": "isEnabled",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    name: 'supportsInterface',
-    inputs: [
+    "type": "function",
+    "name": "supportsInterface",
+    "inputs": [
       {
-        name: 'interfaceId',
-        type: 'bytes4',
-        internalType: 'bytes4'
+        "name": "interfaceId",
+        "type": "bytes4",
+        "internalType": "bytes4"
       }
     ],
-    outputs: [
+    "outputs": [
       {
-        name: '',
-        type: 'bool',
-        internalType: 'bool'
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    stateMutability: 'pure'
+    "stateMutability": "pure"
   },
   {
-    type: 'function',
-    name: 'unsubscribe',
-    inputs: [
+    "type": "function",
+    "name": "unsubscribe",
+    "inputs": [
       {
-        name: 'configId',
-        type: 'bytes32',
-        internalType: 'ConfigId'
+        "name": "configId",
+        "type": "bytes32",
+        "internalType": "ConfigId"
       },
       {
-        name: 'key',
-        type: 'bytes32',
-        internalType: 'bytes32'
+        "name": "key",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    outputs: [],
-    stateMutability: 'nonpayable'
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'error',
-    name: 'ModuleAlreadyInitialized',
-    inputs: [
+    "type": "error",
+    "name": "ModuleAlreadyInitialized",
+    "inputs": [
       {
-        name: 'smartAccount',
-        type: 'address',
-        internalType: 'address'
+        "name": "smartAccount",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },
   {
-    type: 'error',
-    name: 'NotInitialized',
-    inputs: [
+    "type": "error",
+    "name": "NotInitialized",
+    "inputs": [
       {
-        name: 'smartAccount',
-        type: 'address',
-        internalType: 'address'
+        "name": "smartAccount",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },
   {
-    type: 'error',
-    name: 'Permission__CallerNotAuthority',
-    inputs: []
+    "type": "error",
+    "name": "Permission__CallerNotAuthority",
+    "inputs": []
   },
   {
-    type: 'error',
-    name: 'ReentrancyGuardReentrantCall',
-    inputs: []
+    "type": "error",
+    "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
   }
 ] as const
