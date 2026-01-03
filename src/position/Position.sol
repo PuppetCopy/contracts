@@ -33,35 +33,35 @@ contract Position is CoreContract {
     function processPreCall(address _master, address _subaccount, uint _msgValue, bytes calldata _msgData)
         external
         view
-        returns (bytes memory hookData)
+        returns (bytes memory _hookData)
     {
         if (_msgData.length < 4) return "";
         if (bytes4(_msgData[:4]) != IERC7579Account.execute.selector) return "";
 
-        ModeCode mode = ModeCode.wrap(bytes32(_msgData[4:36]));
-        CallType callType = ModeLib.getCallType(mode);
+        ModeCode _mode = ModeCode.wrap(bytes32(_msgData[4:36]));
+        CallType _callType = ModeLib.getCallType(_mode);
 
-        if (callType == CALLTYPE_DELEGATECALL) revert Error.Position__DelegateCallBlocked();
-        if (callType != CALLTYPE_SINGLE && callType != CALLTYPE_BATCH) return "";
+        if (_callType == CALLTYPE_DELEGATECALL) revert Error.Position__DelegateCallBlocked();
+        if (_callType != CALLTYPE_SINGLE && _callType != CALLTYPE_BATCH) return "";
 
-        bytes calldata execData = _msgData[36:];
+        bytes calldata _execData = _msgData[36:];
 
-        address firstTarget = address(bytes20(execData[:20]));
-        IStage handler = handlers[firstTarget];
-        if (address(handler) == address(0)) return "";
+        address _firstTarget = address(bytes20(_execData[:20]));
+        IStage _handler = handlers[_firstTarget];
+        if (address(_handler) == address(0)) return "";
 
-        (IERC20 token, bytes memory handlerData) = handler.validate(_master, _subaccount, _msgValue, callType, execData);
+        (IERC20 _token, bytes memory _handlerData) = _handler.validate(_master, _subaccount, _msgValue, _callType, _execData);
 
-        if (handlerData.length > 0 && callType == CALLTYPE_BATCH) {
-            uint8 actionType = abi.decode(handlerData, (uint8));
-            if (actionType == ACTION_ORDER_CREATED) {
+        if (_handlerData.length > 0 && _callType == CALLTYPE_BATCH) {
+            uint8 _actionType = abi.decode(_handlerData, (uint8));
+            if (_actionType == ACTION_ORDER_CREATED) {
                 revert Error.Position__BatchOrderNotAllowed();
             }
         }
 
-        uint preBalance = address(token) != address(0) ? token.balanceOf(_subaccount) : 0;
+        uint _preBalance = address(_token) != address(0) ? _token.balanceOf(_subaccount) : 0;
 
-        return abi.encode(token, preBalance, handlerData, handler);
+        return abi.encode(_token, _preBalance, _handlerData, _handler);
     }
 
     function getNetValue(
@@ -69,20 +69,20 @@ contract Position is CoreContract {
         IERC20 _baseToken,
         IStage[] calldata _stages,
         bytes32[][] calldata _positionKeys
-    ) external view returns (uint value) {
+    ) external view returns (uint _value) {
         if (pendingOrderCount[_subaccount] != 0) {
             revert Error.Position__PendingOrdersExist();
         }
 
-        for (uint i; i < _stages.length; i++) {
-            IStage stage = _stages[i];
-            bytes32[] calldata keys = _positionKeys[i];
+        for (uint _i; _i < _stages.length; _i++) {
+            IStage _stage = _stages[_i];
+            bytes32[] calldata _keys = _positionKeys[_i];
 
-            for (uint j; j < keys.length; j++) {
-                if (!stage.verifyPositionOwner(keys[j], _subaccount)) {
+            for (uint _j; _j < _keys.length; _j++) {
+                if (!_stage.verifyPositionOwner(_keys[_j], _subaccount)) {
                     revert Error.Position__NotPositionOwner();
                 }
-                value += stage.getPositionValue(keys[j], _baseToken);
+                _value += _stage.getPositionValue(_keys[_j], _baseToken);
             }
         }
     }
@@ -92,28 +92,28 @@ contract Position is CoreContract {
     function processPostCall(address _subaccount, bytes calldata _hookData) external auth {
         if (_hookData.length == 0) return;
 
-        (IERC20 token, uint preBalance, bytes memory handlerData, IStage handler) =
+        (IERC20 _token, uint _preBalance, bytes memory _handlerData, IStage _handler) =
             abi.decode(_hookData, (IERC20, uint, bytes, IStage));
 
-        uint postBalance = address(token) != address(0) ? token.balanceOf(_subaccount) : 0;
-        handler.verify(_subaccount, token, preBalance, postBalance, handlerData);
+        uint _postBalance = address(_token) != address(0) ? _token.balanceOf(_subaccount) : 0;
+        _handler.verify(_subaccount, _token, _preBalance, _postBalance, _handlerData);
 
-        if (handlerData.length > 0) {
-            uint8 actionType = abi.decode(handlerData, (uint8));
+        if (_handlerData.length > 0) {
+            uint8 _actionType = abi.decode(_handlerData, (uint8));
 
-            if (actionType == ACTION_ORDER_CREATED) {
-                (, bytes32 orderKey, bytes32 positionKey,) =
-                    abi.decode(handlerData, (uint8, bytes32, bytes32, IERC20));
+            if (_actionType == ACTION_ORDER_CREATED) {
+                (, bytes32 _orderKey, bytes32 _positionKey,) =
+                    abi.decode(_handlerData, (uint8, bytes32, bytes32, IERC20));
                 pendingOrderCount[_subaccount]++;
-                _logEvent("CreateOrder", abi.encode(_subaccount, orderKey, positionKey, handler, token));
+                _logEvent("CreateOrder", abi.encode(_subaccount, _orderKey, _positionKey, _handler, _token));
             }
         }
     }
 
     function setHandler(address _target, IStage _handler) external auth {
-        IStage oldHandler = handlers[_target];
-        if (address(oldHandler) != address(0)) {
-            validStages[oldHandler] = false;
+        IStage _oldHandler = handlers[_target];
+        if (address(_oldHandler) != address(0)) {
+            validStages[_oldHandler] = false;
         }
 
         handlers[_target] = _handler;
@@ -127,21 +127,21 @@ contract Position is CoreContract {
         IStage[] calldata _orderStages,
         bytes32[] calldata _orderKeys
     ) external auth {
-        uint orderLen = _orderKeys.length;
-        if (orderLen != _orderStages.length) {
+        uint _orderLen = _orderKeys.length;
+        if (_orderLen != _orderStages.length) {
             revert Error.Position__ArrayLengthMismatch();
         }
 
-        for (uint i; i < orderLen; i++) {
-            IStage stage = _orderStages[i];
-            if (!validStages[stage]) revert Error.Position__InvalidStage();
-            if (stage.isOrderPending(_orderKeys[i], _subaccount)) {
+        for (uint _i; _i < _orderLen; _i++) {
+            IStage _stage = _orderStages[_i];
+            if (!validStages[_stage]) revert Error.Position__InvalidStage();
+            if (_stage.isOrderPending(_orderKeys[_i], _subaccount)) {
                 revert Error.Position__OrderStillPending();
             }
         }
 
-        uint pending = pendingOrderCount[_subaccount];
-        pendingOrderCount[_subaccount] = pending > orderLen ? pending - orderLen : 0;
+        uint _pending = pendingOrderCount[_subaccount];
+        pendingOrderCount[_subaccount] = _pending > _orderLen ? _pending - _orderLen : 0;
 
         _logEvent("SettleOrders", abi.encode(_subaccount, _orderKeys));
     }

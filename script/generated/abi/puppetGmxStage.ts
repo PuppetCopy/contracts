@@ -268,7 +268,7 @@ export default [
         "internalType": "address"
       },
       {
-        "name": "subaccount",
+        "name": "_subaccount",
         "type": "address",
         "internalType": "address"
       },
@@ -278,24 +278,24 @@ export default [
         "internalType": "uint256"
       },
       {
-        "name": "callType",
+        "name": "_callType",
         "type": "bytes1",
         "internalType": "CallType"
       },
       {
-        "name": "execData",
+        "name": "_execData",
         "type": "bytes",
         "internalType": "bytes"
       }
     ],
     "outputs": [
       {
-        "name": "token",
+        "name": "_token",
         "type": "address",
         "internalType": "contract IERC20"
       },
       {
-        "name": "hookData",
+        "name": "_hookData",
         "type": "bytes",
         "internalType": "bytes"
       }

@@ -25,7 +25,7 @@ contract DeployBase is BaseScript {
             puppetToken,
             feeMarketplaceStore,
             FeeMarketplace.Config({
-                transferGasLimit: 200_000, unlockTimeframe: 4 days, askDecayTimeframe: 7 days, askStart: 100e18
+                transferOutGasLimit: 200_000, unlockTimeframe: 4 days, askDecayTimeframe: 7 days, askStart: 100e18
             })
         );
         dictatorship.setAccess(feeMarketplaceStore, address(feeMarketplace));

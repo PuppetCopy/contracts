@@ -45,36 +45,37 @@ library Error {
     error Account__InvalidTokenAddress();
     error Account__AmountExceedsUnaccounted();
 
-    // Allocation errors
-    error Allocation__InsufficientBalance();
-    error Allocation__ActiveShares(uint totalShares);
-    error Allocation__AlreadyRegistered();
-    error Allocation__UnregisteredSubaccount();
-    error Allocation__TransferFailed();
-    error Allocation__ArrayLengthMismatch(uint puppetCount, uint allocationCount);
-    error Allocation__PuppetListTooLarge(uint provided, uint maximum);
-    error Allocation__IntentExpired(uint deadline, uint currentTime);
-    error Allocation__InvalidSignature(address expected, address recovered);
-    error Allocation__InvalidNonce(uint expected, uint provided);
-    error Allocation__InvalidPosition();
-    error Allocation__InvalidMasterHook();
-    error Allocation__InvalidMaxPuppetList();
-    error Allocation__InvalidGasLimit();
-    error Allocation__TokenNotAllowed();
-    error Allocation__DepositExceedsCap(uint amount, uint cap);
-    error Allocation__SubaccountFrozen();
-    error Allocation__ZeroAmount();
-    error Allocation__ZeroShares();
-    error Allocation__InsufficientLiquidity();
-    error Allocation__AmountMismatch(uint expected, uint actual);
-    error Allocation__InvalidAccountCodeHash();
-    error Allocation__MasterHookNotInstalled();
-    error Allocation__NetValueBelowMin(uint256 netValue, uint256 acceptableNetValue);
-    error Allocation__NetValueAboveMax(uint256 netValue, uint256 acceptableNetValue);
-    error Allocation__NetValueParamsMismatch();
-    error Allocation__TokenMismatch();
-    error Allocation__ZeroAssets();
-    error Allocation__DisposedWithShares();
+    // Allocate errors
+    error Allocate__InsufficientBalance();
+    error Allocate__ActiveShares(uint totalShares);
+    error Allocate__AlreadyRegistered();
+    error Allocate__UnregisteredSubaccount();
+    error Allocate__TransferFailed();
+    error Allocate__ArrayLengthMismatch(uint puppetCount, uint allocationCount);
+    error Allocate__PuppetListTooLarge(uint provided, uint maximum);
+    error Allocate__IntentExpired(uint deadline, uint currentTime);
+    error Allocate__InvalidSignature(address expected, address recovered);
+    error Allocate__InvalidNonce(uint expected, uint provided);
+    error Allocate__InvalidPosition();
+    error Allocate__InvalidMatch();
+    error Allocate__InvalidMasterHook();
+    error Allocate__InvalidMaxPuppetList();
+    error Allocate__InvalidGasLimit();
+    error Allocate__TokenNotAllowed();
+    error Allocate__DepositExceedsCap(uint amount, uint cap);
+    error Allocate__SubaccountFrozen();
+    error Allocate__ZeroAmount();
+    error Allocate__ZeroShares();
+    error Allocate__InsufficientLiquidity();
+    error Allocate__AmountMismatch(uint expected, uint actual);
+    error Allocate__InvalidAccountCodeHash();
+    error Allocate__MasterHookNotInstalled();
+    error Allocate__NetValueBelowMin(uint256 netValue, uint256 acceptableNetValue);
+    error Allocate__NetValueAboveMax(uint256 netValue, uint256 acceptableNetValue);
+    error Allocate__NetValueParamsMismatch();
+    error Allocate__TokenMismatch();
+    error Allocate__ZeroAssets();
+    error Allocate__DisposedWithShares();
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();
@@ -91,6 +92,9 @@ library Error {
     error Position__InvalidStage();
     error Position__ArrayLengthMismatch();
     error Position__BatchOrderNotAllowed();
+
+    // Match errors
+    error Match__TransferMismatch();
 
     // GmxStage errors
     error GmxStage__InvalidCallData();

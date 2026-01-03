@@ -7,14 +7,16 @@ import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Acco
 import {CoreContract} from "./utils/CoreContract.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 import {IUserRouter} from "./utils/interfaces/IUserRouter.sol";
-import {Allocation} from "./position/Allocation.sol";
+import {Allocate} from "./position/Allocate.sol";
+import {Match} from "./position/Match.sol";
 import {Position} from "./position/Position.sol";
 
 /// @title UserRouter
-/// @notice Passthrough router for MasterHook to Allocation/Position contracts
+/// @notice Passthrough router for MasterHook to Allocate/Position contracts
 contract UserRouter is IUserRouter, CoreContract {
     struct Config {
-        Allocation allocation;
+        Allocate allocation;
+        Match matcher;
         Position position;
     }
 
@@ -41,7 +43,8 @@ contract UserRouter is IUserRouter, CoreContract {
     }
 
     function isDisposed(IERC7579Account _subaccount) external view returns (bool) {
-        return config.allocation.disposedMap(_subaccount);
+        (,,,, bool disposed,) = config.allocation.registeredMap(_subaccount);
+        return disposed;
     }
 
     function processPreCall(address _master, address _subaccount, uint _msgValue, bytes calldata _msgData)
@@ -56,9 +59,18 @@ contract UserRouter is IUserRouter, CoreContract {
         config.position.processPostCall(_subaccount, _hookData);
     }
 
+    function setFilter(uint _dim, bytes32 _value, bool _allowed) external {
+        config.matcher.setFilter(msg.sender, _dim, _value, _allowed);
+    }
+
+    function setPolicy(address _trader, uint _allowanceRate, uint _throttlePeriod, uint _expiry) external {
+        config.matcher.setPolicy(msg.sender, _trader, _allowanceRate, _throttlePeriod, _expiry);
+    }
+
     function _setConfig(bytes memory _data) internal override {
         Config memory _config = abi.decode(_data, (Config));
         require(address(_config.allocation) != address(0), "UserRouter: invalid allocation");
+        require(address(_config.matcher) != address(0), "UserRouter: invalid matcher");
         require(address(_config.position) != address(0), "UserRouter: invalid position");
         config = _config;
     }

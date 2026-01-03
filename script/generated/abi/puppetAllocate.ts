@@ -1,4 +1,4 @@
-// This file is auto-generated from forge-artifacts/Allocation.sol/Allocation.json
+// This file is auto-generated from forge-artifacts/Allocate.sol/Allocate.json
 // Do not edit manually.
 
 export default [
@@ -13,13 +13,8 @@ export default [
       {
         "name": "_config",
         "type": "tuple",
-        "internalType": "struct Allocation.Config",
+        "internalType": "struct Allocate.Config",
         "components": [
-          {
-            "name": "position",
-            "type": "address",
-            "internalType": "contract Position"
-          },
           {
             "name": "masterHook",
             "type": "address",
@@ -31,7 +26,7 @@ export default [
             "internalType": "uint256"
           },
           {
-            "name": "transferGasLimit",
+            "name": "withdrawGasLimit",
             "type": "uint256",
             "internalType": "uint256"
           }
@@ -134,11 +129,6 @@ export default [
     "inputs": [],
     "outputs": [
       {
-        "name": "position",
-        "type": "address",
-        "internalType": "contract Position"
-      },
-      {
         "name": "masterHook",
         "type": "address",
         "internalType": "address"
@@ -149,7 +139,7 @@ export default [
         "internalType": "uint256"
       },
       {
-        "name": "transferGasLimit",
+        "name": "withdrawGasLimit",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -236,9 +226,19 @@ export default [
     "name": "executeAllocate",
     "inputs": [
       {
+        "name": "_position",
+        "type": "address",
+        "internalType": "contract Position"
+      },
+      {
+        "name": "_match",
+        "type": "address",
+        "internalType": "contract Match"
+      },
+      {
         "name": "_intent",
         "type": "tuple",
-        "internalType": "struct Allocation.CallIntent",
+        "internalType": "struct Allocate.CallIntent",
         "components": [
           {
             "name": "account",
@@ -295,7 +295,7 @@ export default [
       {
         "name": "_puppetList",
         "type": "address[]",
-        "internalType": "contract IERC7579Account[]"
+        "internalType": "address[]"
       },
       {
         "name": "_amountList",
@@ -305,7 +305,7 @@ export default [
       {
         "name": "_positionParams",
         "type": "tuple",
-        "internalType": "struct Allocation.PositionParams",
+        "internalType": "struct Allocate.PositionParams",
         "components": [
           {
             "name": "stages",
@@ -328,9 +328,14 @@ export default [
     "name": "executeWithdraw",
     "inputs": [
       {
+        "name": "_position",
+        "type": "address",
+        "internalType": "contract Position"
+      },
+      {
         "name": "_intent",
         "type": "tuple",
-        "internalType": "struct Allocation.CallIntent",
+        "internalType": "struct Allocate.CallIntent",
         "components": [
           {
             "name": "account",
@@ -387,7 +392,7 @@ export default [
       {
         "name": "_positionParams",
         "type": "tuple",
-        "internalType": "struct Allocation.PositionParams",
+        "internalType": "struct Allocate.PositionParams",
         "components": [
           {
             "name": "stages",
@@ -413,13 +418,8 @@ export default [
       {
         "name": "",
         "type": "tuple",
-        "internalType": "struct Allocation.Config",
+        "internalType": "struct Allocate.Config",
         "components": [
-          {
-            "name": "position",
-            "type": "address",
-            "internalType": "contract Position"
-          },
           {
             "name": "masterHook",
             "type": "address",
@@ -431,7 +431,7 @@ export default [
             "internalType": "uint256"
           },
           {
-            "name": "transferGasLimit",
+            "name": "withdrawGasLimit",
             "type": "uint256",
             "internalType": "uint256"
           }
@@ -822,12 +822,12 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocation__AlreadyRegistered",
+    "name": "Allocate__AlreadyRegistered",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocation__AmountMismatch",
+    "name": "Allocate__AmountMismatch",
     "inputs": [
       {
         "name": "expected",
@@ -843,7 +843,7 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocation__ArrayLengthMismatch",
+    "name": "Allocate__ArrayLengthMismatch",
     "inputs": [
       {
         "name": "puppetCount",
@@ -859,7 +859,7 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocation__DepositExceedsCap",
+    "name": "Allocate__DepositExceedsCap",
     "inputs": [
       {
         "name": "amount",
@@ -875,17 +875,17 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocation__InsufficientBalance",
+    "name": "Allocate__InsufficientBalance",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocation__InsufficientLiquidity",
+    "name": "Allocate__InsufficientLiquidity",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocation__IntentExpired",
+    "name": "Allocate__IntentExpired",
     "inputs": [
       {
         "name": "deadline",
@@ -901,27 +901,27 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocation__InvalidAccountCodeHash",
+    "name": "Allocate__InvalidAccountCodeHash",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocation__InvalidGasLimit",
+    "name": "Allocate__InvalidGasLimit",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocation__InvalidMasterHook",
+    "name": "Allocate__InvalidMasterHook",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocation__InvalidMaxPuppetList",
+    "name": "Allocate__InvalidMaxPuppetList",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocation__InvalidNonce",
+    "name": "Allocate__InvalidNonce",
     "inputs": [
       {
         "name": "expected",
@@ -937,12 +937,7 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocation__InvalidPosition",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Allocation__InvalidSignature",
+    "name": "Allocate__InvalidSignature",
     "inputs": [
       {
         "name": "expected",
@@ -958,12 +953,12 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocation__MasterHookNotInstalled",
+    "name": "Allocate__MasterHookNotInstalled",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocation__NetValueAboveMax",
+    "name": "Allocate__NetValueAboveMax",
     "inputs": [
       {
         "name": "netValue",
@@ -979,7 +974,7 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocation__NetValueBelowMin",
+    "name": "Allocate__NetValueBelowMin",
     "inputs": [
       {
         "name": "netValue",
@@ -995,12 +990,12 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocation__NetValueParamsMismatch",
+    "name": "Allocate__NetValueParamsMismatch",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocation__PuppetListTooLarge",
+    "name": "Allocate__PuppetListTooLarge",
     "inputs": [
       {
         "name": "provided",
@@ -1016,37 +1011,37 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocation__SubaccountFrozen",
+    "name": "Allocate__SubaccountFrozen",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocation__TokenMismatch",
+    "name": "Allocate__TokenMismatch",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocation__TokenNotAllowed",
+    "name": "Allocate__TokenNotAllowed",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocation__TransferFailed",
+    "name": "Allocate__TransferFailed",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocation__UnregisteredSubaccount",
+    "name": "Allocate__UnregisteredSubaccount",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocation__ZeroAssets",
+    "name": "Allocate__ZeroAssets",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocation__ZeroShares",
+    "name": "Allocate__ZeroShares",
     "inputs": []
   },
   {

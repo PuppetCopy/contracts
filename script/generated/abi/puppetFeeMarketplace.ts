@@ -26,7 +26,7 @@ export default [
         "internalType": "struct FeeMarketplace.Config",
         "components": [
           {
-            "name": "transferGasLimit",
+            "name": "transferOutGasLimit",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -140,7 +140,7 @@ export default [
     "inputs": [],
     "outputs": [
       {
-        "name": "transferGasLimit",
+        "name": "transferOutGasLimit",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -215,7 +215,7 @@ export default [
         "internalType": "struct FeeMarketplace.Config",
         "components": [
           {
-            "name": "transferGasLimit",
+            "name": "transferOutGasLimit",
             "type": "uint256",
             "internalType": "uint256"
           },

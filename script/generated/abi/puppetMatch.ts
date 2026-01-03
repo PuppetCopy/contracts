@@ -1,4 +1,4 @@
-// This file is auto-generated from forge-artifacts/Position.sol/Position.json
+// This file is auto-generated from forge-artifacts/Match.sol/Match.json
 // Do not edit manually.
 
 export default [
@@ -9,35 +9,14 @@ export default [
         "name": "_authority",
         "type": "address",
         "internalType": "contract IAuthority"
+      },
+      {
+        "name": "_config",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "ACTION_NONE",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "uint8"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ACTION_ORDER_CREATED",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "uint8"
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -78,124 +57,149 @@ export default [
   },
   {
     "type": "function",
-    "name": "getNetValue",
+    "name": "config",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "gasLimit",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "executeMatch",
     "inputs": [
       {
-        "name": "_subaccount",
+        "name": "_destination",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "_baseToken",
+        "name": "_trader",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_stage",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_collateral",
         "type": "address",
         "internalType": "contract IERC20"
       },
       {
-        "name": "_stages",
+        "name": "_puppets",
         "type": "address[]",
-        "internalType": "contract IStage[]"
+        "internalType": "address[]"
       },
       {
-        "name": "_positionKeys",
-        "type": "bytes32[][]",
-        "internalType": "bytes32[][]"
+        "name": "_amounts",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
       }
     ],
     "outputs": [
       {
-        "name": "_value",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "_allocated",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
       }
     ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "handlers",
-    "inputs": [
-      {
-        "name": "target",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IStage"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "pendingOrderCount",
-    "inputs": [
-      {
-        "name": "subaccount",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "processPostCall",
-    "inputs": [
-      {
-        "name": "_subaccount",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_hookData",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "processPreCall",
+    "name": "filterMap",
     "inputs": [
       {
-        "name": "_master",
+        "name": "puppet",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "_subaccount",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_msgValue",
+        "name": "dim",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "_msgData",
-        "type": "bytes",
-        "internalType": "bytes"
+        "name": "value",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [
       {
-        "name": "_hookData",
-        "type": "bytes",
-        "internalType": "bytes"
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "hasFilterMap",
+    "inputs": [
+      {
+        "name": "puppet",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "dim",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "policyMap",
+    "inputs": [
+      {
+        "name": "puppet",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "trader",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "allowanceRate",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "throttlePeriod",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "expiry",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -215,17 +219,27 @@ export default [
   },
   {
     "type": "function",
-    "name": "setHandler",
+    "name": "setFilter",
     "inputs": [
       {
-        "name": "_target",
+        "name": "_puppet",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "_handler",
-        "type": "address",
-        "internalType": "contract IStage"
+        "name": "_dim",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_value",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_allowed",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "outputs": [],
@@ -256,22 +270,32 @@ export default [
   },
   {
     "type": "function",
-    "name": "settleOrders",
+    "name": "setPolicy",
     "inputs": [
       {
-        "name": "_subaccount",
+        "name": "_puppet",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "_orderStages",
-        "type": "address[]",
-        "internalType": "contract IStage[]"
+        "name": "_trader",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        "name": "_orderKeys",
-        "type": "bytes32[]",
-        "internalType": "bytes32[]"
+        "name": "_allowanceRate",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_throttlePeriod",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_expiry",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -298,22 +322,32 @@ export default [
   },
   {
     "type": "function",
-    "name": "validStages",
+    "name": "throttleMap",
     "inputs": [
       {
-        "name": "stage",
+        "name": "puppet",
         "type": "address",
-        "internalType": "contract IStage"
+        "internalType": "address"
+      },
+      {
+        "name": "trader",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [
       {
         "name": "",
-        "type": "bool",
-        "internalType": "bool"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "error",
+    "name": "Match__TransferMismatch",
+    "inputs": []
   },
   {
     "type": "error",
@@ -323,41 +357,6 @@ export default [
   {
     "type": "error",
     "name": "Permission__Unauthorized",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__ArrayLengthMismatch",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__BatchOrderNotAllowed",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__DelegateCallBlocked",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__InvalidStage",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__NotPositionOwner",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__OrderStillPending",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__PendingOrdersExist",
     "inputs": []
   },
   {

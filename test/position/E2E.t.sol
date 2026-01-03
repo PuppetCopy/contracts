@@ -7,8 +7,10 @@ import {MODULE_TYPE_EXECUTOR, MODULE_TYPE_HOOK} from "modulekit/module-bases/uti
 import {ModeLib, CALLTYPE_SINGLE} from "modulekit/accounts/common/lib/ModeLib.sol";
 import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
 
-import {Allocation} from "src/position/Allocation.sol";
+import {Allocate} from "src/position/Allocate.sol";
+import {Match} from "src/position/Match.sol";
 import {Position} from "src/position/Position.sol";
+import {UserRouter} from "src/UserRouter.sol";
 import {IStage} from "src/position/interface/IStage.sol";
 import {Error} from "src/utils/Error.sol";
 
@@ -19,8 +21,10 @@ import {MockStage, MockVenue} from "../mock/MockStage.t.sol";
 /// @title E2E Test - Copy Trading Flow
 /// @notice Tests the complete flow: registration -> allocation -> trade -> settlement -> withdraw
 contract E2ETest is BasicSetup {
-    Allocation allocation;
+    Allocate allocation;
+    Match matcher;
     Position position;
+    UserRouter userRouter;
     MockStage mockStage;
     MockVenue mockVenue;
 
@@ -49,15 +53,21 @@ contract E2ETest is BasicSetup {
         sessionSigner = vm.addr(signerPrivateKey);
 
         position = new Position(dictator);
-        allocation = new Allocation(
+        matcher = new Match(dictator, abi.encode(Match.Config({gasLimit: GAS_LIMIT})));
+        allocation = new Allocate(
             dictator,
-            Allocation.Config({
-                position: position,
+            Allocate.Config({
                 masterHook: address(1),
                 maxPuppetList: MAX_PUPPET_LIST,
-                transferGasLimit: GAS_LIMIT
+                withdrawGasLimit: GAS_LIMIT
             })
         );
+
+        dictator.registerContract(address(matcher));
+        userRouter = new UserRouter(dictator, UserRouter.Config({allocation: allocation, matcher: matcher, position: position}));
+        dictator.setPermission(matcher, matcher.executeMatch.selector, address(allocation));
+        dictator.setPermission(matcher, matcher.setFilter.selector, address(userRouter));
+        dictator.setPermission(matcher, matcher.setPolicy.selector, address(userRouter));
 
         dictator.setPermission(allocation, allocation.setCodeHash.selector, users.owner);
         allocation.setCodeHash(keccak256(type(TestSmartAccount).runtimeCode), true);
@@ -103,22 +113,30 @@ contract E2ETest is BasicSetup {
         vm.stopPrank();
         vm.prank(owner);
         usdc.approve(address(allocation), type(uint).max);
+
+        // Puppets approve Match for transferFrom
         vm.prank(address(puppet1));
-        usdc.approve(address(allocation), type(uint).max);
+        usdc.approve(address(matcher), type(uint).max);
         vm.prank(address(puppet2));
-        usdc.approve(address(allocation), type(uint).max);
+        usdc.approve(address(matcher), type(uint).max);
+
+        // Set default policies for puppets (100% allowance, no throttle, far future expiry)
+        vm.prank(address(puppet1));
+        userRouter.setPolicy(address(0), 10000, 0, block.timestamp + 365 days);
+        vm.prank(address(puppet2));
+        userRouter.setPolicy(address(0), 10000, 0, block.timestamp + 365 days);
 
         vm.startPrank(users.owner);
     }
 
-    Allocation.PositionParams emptyParams;
+    Allocate.PositionParams emptyParams;
 
     function _createIntent(uint amount, uint nonce, uint deadline)
         internal
         view
-        returns (Allocation.CallIntent memory)
+        returns (Allocate.CallIntent memory)
     {
-        return Allocation.CallIntent({
+        return Allocate.CallIntent({
             account: owner,
             subaccount: masterSubaccount,
             token: usdc,
@@ -131,7 +149,7 @@ contract E2ETest is BasicSetup {
         });
     }
 
-    function _signIntent(Allocation.CallIntent memory intent, uint privateKey) internal view returns (bytes memory) {
+    function _signIntent(Allocate.CallIntent memory intent, uint privateKey) internal view returns (bytes memory) {
         bytes32 structHash = keccak256(
             abi.encode(
                 allocation.CALL_INTENT_TYPEHASH(),
@@ -150,7 +168,7 @@ contract E2ETest is BasicSetup {
         bytes32 domainSeparator = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256("Puppet Allocation"),
+                keccak256("Puppet Allocate"),
                 keccak256("1"),
                 block.chainid,
                 address(allocation)
@@ -169,18 +187,19 @@ contract E2ETest is BasicSetup {
         // =========================================
         allocation.registerMasterSubaccount(owner, sessionSigner, masterSubaccount, usdc, SUBACCOUNT_NAME);
 
-        assertTrue(allocation.registeredMap(masterSubaccount), "Subaccount should be registered");
-        assertEq(allocation.sessionSignerMap(masterSubaccount), sessionSigner, "Session signer should be set");
+        Allocate.SubaccountInfo memory info = allocation.getSubaccountInfo(masterSubaccount);
+        assertTrue(address(info.baseToken) != address(0), "Subaccount should be registered");
+        assertEq(info.signer, sessionSigner, "Session signer should be set");
 
         // =========================================
         // Step 2: Puppets allocate funds (copy)
         // =========================================
-        Allocation.CallIntent memory allocIntent = _createIntent(0, 0, block.timestamp + 1 hours);
+        Allocate.CallIntent memory allocIntent = _createIntent(0, 0, block.timestamp + 1 hours);
         bytes memory allocSig = _signIntent(allocIntent, ownerPrivateKey);
 
-        IERC7579Account[] memory puppets = new IERC7579Account[](2);
-        puppets[0] = IERC7579Account(address(puppet1));
-        puppets[1] = IERC7579Account(address(puppet2));
+        address[] memory puppets = new address[](2);
+        puppets[0] = address(puppet1);
+        puppets[1] = address(puppet2);
 
         uint[] memory amounts = new uint[](2);
         amounts[0] = 200e6; // Puppet1 allocates 200 USDC
@@ -188,7 +207,7 @@ contract E2ETest is BasicSetup {
 
         uint subaccountBalanceBefore = usdc.balanceOf(address(masterSubaccount));
 
-        allocation.executeAllocate(allocIntent, allocSig, puppets, amounts, emptyParams);
+        allocation.executeAllocate(position, matcher, allocIntent, allocSig, puppets, amounts, emptyParams);
 
         // Verify allocations
         assertEq(
@@ -294,7 +313,7 @@ contract E2ETest is BasicSetup {
         mockVenue.closePosition(address(masterSubaccount), 600e6);
         mockStage.setPositionValue(positionKey, 0);
 
-        Allocation.CallIntent memory withdrawIntent = Allocation.CallIntent({
+        Allocate.CallIntent memory withdrawIntent = Allocate.CallIntent({
             account: address(puppet1),
             subaccount: masterSubaccount,
             token: usdc,
@@ -314,7 +333,7 @@ contract E2ETest is BasicSetup {
         // In production, puppet1 would sign directly
 
         // For simplicity, we test the owner withdrawing their portion
-        Allocation.CallIntent memory ownerWithdrawIntent = Allocation.CallIntent({
+        Allocate.CallIntent memory ownerWithdrawIntent = Allocate.CallIntent({
             account: owner,
             subaccount: masterSubaccount,
             token: usdc,
@@ -390,18 +409,18 @@ contract E2ETest is BasicSetup {
         // =========================================
         allocation.registerMasterSubaccount(owner, sessionSigner, masterSubaccount, usdc, SUBACCOUNT_NAME);
 
-        Allocation.CallIntent memory allocIntent = _createIntent(0, 0, block.timestamp + 1 hours);
+        Allocate.CallIntent memory allocIntent = _createIntent(0, 0, block.timestamp + 1 hours);
         bytes memory allocSig = _signIntent(allocIntent, ownerPrivateKey);
 
-        IERC7579Account[] memory puppets = new IERC7579Account[](2);
-        puppets[0] = IERC7579Account(address(puppet1));
-        puppets[1] = IERC7579Account(address(puppet2));
+        address[] memory puppets = new address[](2);
+        puppets[0] = address(puppet1);
+        puppets[1] = address(puppet2);
 
         uint[] memory amounts = new uint[](2);
         amounts[0] = 300e6; // Puppet1 allocates 300 USDC
         amounts[1] = 200e6; // Puppet2 allocates 200 USDC
 
-        allocation.executeAllocate(allocIntent, allocSig, puppets, amounts, emptyParams);
+        allocation.executeAllocate(position, matcher, allocIntent, allocSig, puppets, amounts, emptyParams);
 
         // Total: 500 USDC allocated (300 + 200)
         // Puppet1 owns 60% (300/500), Puppet2 owns 40% (200/500)
@@ -555,7 +574,7 @@ contract E2ETest is BasicSetup {
         usdc.approve(address(allocation), type(uint).max);
         vm.startPrank(users.owner);
 
-        Allocation.CallIntent memory ownerDepositIntent = Allocation.CallIntent({
+        Allocate.CallIntent memory ownerDepositIntent = Allocate.CallIntent({
             account: owner,
             subaccount: masterSubaccount,
             token: usdc,
@@ -567,10 +586,10 @@ contract E2ETest is BasicSetup {
             nonce: 1
         });
         bytes memory ownerDepositSig = _signIntent(ownerDepositIntent, ownerPrivateKey);
-        IERC7579Account[] memory noPuppets = new IERC7579Account[](0);
+        address[] memory noPuppets = new address[](0);
         uint[] memory noAmounts = new uint[](0);
 
-        allocation.executeAllocate(ownerDepositIntent, ownerDepositSig, noPuppets, noAmounts, emptyParams);
+        allocation.executeAllocate(position, matcher, ownerDepositIntent, ownerDepositSig, noPuppets, noAmounts, emptyParams);
 
         // Owner now has shares proportional to their deposit
         uint ownerShares = allocation.shareBalanceMap(masterSubaccount, owner);
@@ -581,7 +600,7 @@ contract E2ETest is BasicSetup {
         // Owner withdraws half their shares
         uint ownerWithdrawAmount = ownerShares / 2;
 
-        Allocation.CallIntent memory ownerWithdrawIntent = Allocation.CallIntent({
+        Allocate.CallIntent memory ownerWithdrawIntent = Allocate.CallIntent({
             account: owner,
             subaccount: masterSubaccount,
             token: usdc,
@@ -594,7 +613,7 @@ contract E2ETest is BasicSetup {
         });
         bytes memory ownerWithdrawSig = _signIntent(ownerWithdrawIntent, ownerPrivateKey);
 
-        allocation.executeWithdraw(ownerWithdrawIntent, ownerWithdrawSig, emptyParams);
+        allocation.executeWithdraw(position, ownerWithdrawIntent, ownerWithdrawSig, emptyParams);
 
         // Verify withdrawal happened
         assertLt(allocation.shareBalanceMap(masterSubaccount, owner), ownerShares, "Owner shares reduced");

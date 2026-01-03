@@ -291,12 +291,12 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocation__InsufficientBalance",
+    name: "Allocate__InsufficientBalance",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__ActiveShares",
+    name: "Allocate__ActiveShares",
     inputs: [
       {
         name: "totalShares",
@@ -307,22 +307,22 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocation__AlreadyRegistered",
+    name: "Allocate__AlreadyRegistered",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__UnregisteredSubaccount",
+    name: "Allocate__UnregisteredSubaccount",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__TransferFailed",
+    name: "Allocate__TransferFailed",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__ArrayLengthMismatch",
+    name: "Allocate__ArrayLengthMismatch",
     inputs: [
       {
         name: "puppetCount",
@@ -338,7 +338,7 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocation__PuppetListTooLarge",
+    name: "Allocate__PuppetListTooLarge",
     inputs: [
       {
         name: "provided",
@@ -354,7 +354,7 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocation__IntentExpired",
+    name: "Allocate__IntentExpired",
     inputs: [
       {
         name: "deadline",
@@ -370,7 +370,7 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocation__InvalidSignature",
+    name: "Allocate__InvalidSignature",
     inputs: [
       {
         name: "expected",
@@ -386,7 +386,7 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocation__InvalidNonce",
+    name: "Allocate__InvalidNonce",
     inputs: [
       {
         name: "expected",
@@ -402,32 +402,37 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocation__InvalidPosition",
+    name: "Allocate__InvalidPosition",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__InvalidMasterHook",
+    name: "Allocate__InvalidMatch",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__InvalidMaxPuppetList",
+    name: "Allocate__InvalidMasterHook",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__InvalidGasLimit",
+    name: "Allocate__InvalidMaxPuppetList",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__TokenNotAllowed",
+    name: "Allocate__InvalidGasLimit",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__DepositExceedsCap",
+    name: "Allocate__TokenNotAllowed",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Allocate__DepositExceedsCap",
     inputs: [
       {
         name: "amount",
@@ -443,27 +448,27 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocation__SubaccountFrozen",
+    name: "Allocate__SubaccountFrozen",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__ZeroAmount",
+    name: "Allocate__ZeroAmount",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__ZeroShares",
+    name: "Allocate__ZeroShares",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__InsufficientLiquidity",
+    name: "Allocate__InsufficientLiquidity",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__AmountMismatch",
+    name: "Allocate__AmountMismatch",
     inputs: [
       {
         name: "expected",
@@ -479,17 +484,17 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocation__InvalidAccountCodeHash",
+    name: "Allocate__InvalidAccountCodeHash",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__MasterHookNotInstalled",
+    name: "Allocate__MasterHookNotInstalled",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__NetValueBelowMin",
+    name: "Allocate__NetValueBelowMin",
     inputs: [
       {
         name: "netValue",
@@ -505,7 +510,7 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocation__NetValueAboveMax",
+    name: "Allocate__NetValueAboveMax",
     inputs: [
       {
         name: "netValue",
@@ -521,22 +526,22 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocation__NetValueParamsMismatch",
+    name: "Allocate__NetValueParamsMismatch",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__TokenMismatch",
+    name: "Allocate__TokenMismatch",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__ZeroAssets",
+    name: "Allocate__ZeroAssets",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocation__DisposedWithShares",
+    name: "Allocate__DisposedWithShares",
     inputs: []
   },
   {
@@ -620,6 +625,11 @@ export const puppetErrorAbi = [
   {
     type: "error",
     name: "Position__BatchOrderNotAllowed",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Match__TransferMismatch",
     inputs: []
   },
   {

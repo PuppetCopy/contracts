@@ -20,8 +20,6 @@ contract MasterHook is IHook {
 
     IUserRouter public immutable router;
 
-    mapping(IERC7579Account subaccount => bool) public registered;
-
     constructor(IUserRouter _router) {
         router = _router;
     }
@@ -38,21 +36,16 @@ contract MasterHook is IHook {
         IERC7579Account _subaccount = IERC7579Account(msg.sender);
 
         if (router.isDisposed(_subaccount) && router.hasRemainingShares(_subaccount)) {
-            revert Error.Allocation__DisposedWithShares();
+            revert Error.Allocate__DisposedWithShares();
         }
 
         InstallParams memory params = abi.decode(_data, (InstallParams));
 
-        registered[_subaccount] = true;
-
-        // Account and signer are late-validated via SignatureChecker when signing intents
         router.registerMasterSubaccount(params.account, params.signer, _subaccount, params.baseToken, params.name);
     }
 
     function onUninstall(bytes calldata) external {
-        IERC7579Account _subaccount = IERC7579Account(msg.sender);
-        registered[_subaccount] = false;
-        router.disposeSubaccount(_subaccount);
+        router.disposeSubaccount(IERC7579Account(msg.sender));
     }
 
     function isModuleType(uint _moduleTypeId) external pure returns (bool) {
@@ -60,6 +53,6 @@ contract MasterHook is IHook {
     }
 
     function isInitialized(address _account) external view returns (bool) {
-        return registered[IERC7579Account(_account)];
+        return !router.isDisposed(IERC7579Account(_account));
     }
 }

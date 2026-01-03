@@ -87,27 +87,27 @@ contract GmxStage is IStage {
     /// @dev Token is extracted from execution data, not passed as parameter
     function validate(
         address,
-        address subaccount,
+        address _subaccount,
         uint,
-        CallType callType,
-        bytes calldata execData
-    ) external view override returns (IERC20 token, bytes memory hookData) {
-        (Call[] memory calls, bytes4 action, bytes memory actionData) = _decodeCalls(callType, execData);
+        CallType _callType,
+        bytes calldata _execData
+    ) external view override returns (IERC20 _token, bytes memory _hookData) {
+        (Call[] memory _calls, bytes4 _action, bytes memory _actionData) = _decodeCalls(_callType, _execData);
 
-        if (action == CREATE_ORDER) {
-            IBaseOrderUtils.CreateOrderParams memory params =
-                abi.decode(actionData, (IBaseOrderUtils.CreateOrderParams));
+        if (_action == CREATE_ORDER) {
+            IBaseOrderUtils.CreateOrderParams memory _params =
+                abi.decode(_actionData, (IBaseOrderUtils.CreateOrderParams));
 
-            if (_isIncreaseOrder(params.orderType)) {
-                return _validateIncrease(subaccount, calls, params);
-            } else if (_isDecreaseOrder(params.orderType)) {
-                return _validateDecrease(subaccount, calls, params);
+            if (_isIncreaseOrder(_params.orderType)) {
+                return _validateIncrease(_subaccount, _calls, _params);
+            } else if (_isDecreaseOrder(_params.orderType)) {
+                return _validateDecrease(_subaccount, _calls, _params);
             }
             revert Error.GmxStage__InvalidOrderType();
         }
 
-        if (action == CLAIM_FUNDING) {
-            return _validateClaimFunding(subaccount, calls, actionData);
+        if (_action == CLAIM_FUNDING) {
+            return _validateClaimFunding(_subaccount, _calls, _actionData);
         }
 
         // TODO: handle CANCEL_ORDER, etc.
@@ -180,190 +180,190 @@ contract GmxStage is IStage {
     // ============ Decode ============
 
     /// @dev Only CALLTYPE_SINGLE supported. Returns calls, action selector, and action data
-    function _decodeCalls(CallType callType, bytes calldata execData)
+    function _decodeCalls(CallType _callType, bytes calldata _execData)
         internal
         view
-        returns (Call[] memory calls, bytes4 action, bytes memory actionData)
+        returns (Call[] memory _calls, bytes4 _action, bytes memory _actionData)
     {
-        if (CallType.unwrap(callType) != CallType.unwrap(CALLTYPE_SINGLE)) revert Error.GmxStage__InvalidCallType();
+        if (CallType.unwrap(_callType) != CallType.unwrap(CALLTYPE_SINGLE)) revert Error.GmxStage__InvalidCallType();
 
-        (address target, uint256 value, bytes calldata callData) = ExecutionLib.decodeSingle(execData);
-        if (target != exchangeRouter) revert Error.GmxStage__InvalidTarget();
+        (address _target, uint256 _value, bytes calldata _callData) = ExecutionLib.decodeSingle(_execData);
+        if (_target != exchangeRouter) revert Error.GmxStage__InvalidTarget();
 
-        bytes memory data = callData;
-        bytes4 selector = _getSelector(data);
+        bytes memory _data = _callData;
+        bytes4 _selector = _getSelector(_data);
 
         // Multicall: decode inner bytes[] to Call[]
-        if (selector == MULTICALL) {
-            bytes[] memory innerCalls = abi.decode(_slice(data, 4), (bytes[]));
-            calls = new Call[](innerCalls.length);
+        if (_selector == MULTICALL) {
+            bytes[] memory _innerCalls = abi.decode(_slice(_data, 4), (bytes[]));
+            _calls = new Call[](_innerCalls.length);
 
-            for (uint i = 0; i < innerCalls.length; i++) {
-                calls[i] = Call(exchangeRouter, 0, innerCalls[i]);
-                bytes4 innerSelector = _getSelector(innerCalls[i]);
+            for (uint _i = 0; _i < _innerCalls.length; _i++) {
+                _calls[_i] = Call(exchangeRouter, 0, _innerCalls[_i]);
+                bytes4 _innerSelector = _getSelector(_innerCalls[_i]);
 
                 // Identify action - only one allowed per multicall
-                if (_isAction(innerSelector)) {
-                    if (action != bytes4(0)) revert Error.GmxStage__InvalidCallData();
-                    action = innerSelector;
-                    actionData = _slice(innerCalls[i], 4);
+                if (_isAction(_innerSelector)) {
+                    if (_action != bytes4(0)) revert Error.GmxStage__InvalidCallData();
+                    _action = _innerSelector;
+                    _actionData = _slice(_innerCalls[_i], 4);
                 }
             }
         } else {
             // Direct call
-            calls = new Call[](1);
-            calls[0] = Call(target, value, callData);
-            action = selector;
-            actionData = _slice(data, 4);
+            _calls = new Call[](1);
+            _calls[0] = Call(_target, _value, _callData);
+            _action = _selector;
+            _actionData = _slice(_data, 4);
         }
 
-        if (action == bytes4(0)) revert Error.GmxStage__InvalidCallData();
+        if (_action == bytes4(0)) revert Error.GmxStage__InvalidCallData();
     }
 
     // ============ Validators ============
 
     function _validateIncrease(
-        address subaccount,
-        Call[] memory calls,
-        IBaseOrderUtils.CreateOrderParams memory params
+        address _subaccount,
+        Call[] memory _calls,
+        IBaseOrderUtils.CreateOrderParams memory _params
     ) internal view returns (IERC20, bytes memory) {
-        (bool hasExecutionFee, bool hasCollateral) = _validateCalls(calls);
+        (bool _hasExecutionFee, bool _hasCollateral) = _validateCalls(_calls);
 
         // Increase requires execution fee
-        if (!hasExecutionFee) revert Error.GmxStage__InvalidExecutionSequence();
+        if (!_hasExecutionFee) revert Error.GmxStage__InvalidExecutionSequence();
 
         // Collateral: WNT uses sendWnt (already counted), ERC20 requires sendTokens
-        bool isWntCollateral = params.addresses.initialCollateralToken == wnt;
-        if (!isWntCollateral && !hasCollateral) revert Error.GmxStage__InvalidExecutionSequence();
+        bool _isWntCollateral = _params.addresses.initialCollateralToken == wnt;
+        if (!_isWntCollateral && !_hasCollateral) revert Error.GmxStage__InvalidExecutionSequence();
 
-        _validateOrderParams(subaccount, params);
+        _validateOrderParams(_subaccount, _params);
 
-        IERC20 token = IERC20(params.addresses.initialCollateralToken);
-        bytes32 orderKey = _deriveNextOrderKey();
-        bytes32 positionKey = _derivePositionKey(subaccount, params);
-        return (token, abi.encode(ACTION_ORDER_CREATED, orderKey, positionKey, token));
+        IERC20 _token = IERC20(_params.addresses.initialCollateralToken);
+        bytes32 _orderKey = _deriveNextOrderKey();
+        bytes32 _positionKey = _derivePositionKey(_subaccount, _params);
+        return (_token, abi.encode(ACTION_ORDER_CREATED, _orderKey, _positionKey, _token));
     }
 
     function _validateDecrease(
-        address subaccount,
-        Call[] memory calls,
-        IBaseOrderUtils.CreateOrderParams memory params
+        address _subaccount,
+        Call[] memory _calls,
+        IBaseOrderUtils.CreateOrderParams memory _params
     ) internal view returns (IERC20, bytes memory) {
-        (bool hasExecutionFee,) = _validateCalls(calls);
+        (bool _hasExecutionFee,) = _validateCalls(_calls);
 
         // Decrease requires execution fee
-        if (!hasExecutionFee) revert Error.GmxStage__InvalidExecutionSequence();
+        if (!_hasExecutionFee) revert Error.GmxStage__InvalidExecutionSequence();
 
-        _validateOrderParams(subaccount, params);
+        _validateOrderParams(_subaccount, _params);
 
-        IERC20 token = IERC20(params.addresses.initialCollateralToken);
-        bytes32 orderKey = _deriveNextOrderKey();
-        bytes32 positionKey = _derivePositionKey(subaccount, params);
-        return (token, abi.encode(ACTION_ORDER_CREATED, orderKey, positionKey, token));
+        IERC20 _token = IERC20(_params.addresses.initialCollateralToken);
+        bytes32 _orderKey = _deriveNextOrderKey();
+        bytes32 _positionKey = _derivePositionKey(_subaccount, _params);
+        return (_token, abi.encode(ACTION_ORDER_CREATED, _orderKey, _positionKey, _token));
     }
 
-    function _validateCalls(Call[] memory calls) internal view returns (bool hasExecutionFee, bool hasCollateral) {
-        for (uint i = 0; i < calls.length; i++) {
-            if (calls[i].target != exchangeRouter) revert Error.GmxStage__InvalidCallData();
+    function _validateCalls(Call[] memory _calls) internal view returns (bool _hasExecutionFee, bool _hasCollateral) {
+        for (uint _i = 0; _i < _calls.length; _i++) {
+            if (_calls[_i].target != exchangeRouter) revert Error.GmxStage__InvalidCallData();
 
-            bytes4 selector = _getSelector(calls[i].data);
+            bytes4 _selector = _getSelector(_calls[_i].data);
 
-            if (selector == SEND_WNT) {
-                (address receiver,) = abi.decode(_slice(calls[i].data, 4), (address, uint));
-                if (receiver == orderVault) hasExecutionFee = true;
-            } else if (selector == SEND_TOKENS) {
-                (, address receiver,) = abi.decode(_slice(calls[i].data, 4), (address, address, uint));
-                if (receiver == orderVault) hasCollateral = true;
+            if (_selector == SEND_WNT) {
+                (address _receiver,) = abi.decode(_slice(_calls[_i].data, 4), (address, uint));
+                if (_receiver == orderVault) _hasExecutionFee = true;
+            } else if (_selector == SEND_TOKENS) {
+                (, address _receiver,) = abi.decode(_slice(_calls[_i].data, 4), (address, address, uint));
+                if (_receiver == orderVault) _hasCollateral = true;
             }
         }
     }
 
     function _validateClaimFunding(
-        address subaccount,
-        Call[] memory calls,
-        bytes memory actionData
+        address _subaccount,
+        Call[] memory _calls,
+        bytes memory _actionData
     ) internal view returns (IERC20, bytes memory) {
         // claimFundingFees(address[] markets, address[] tokens, address receiver)
-        (,, address receiver) = abi.decode(actionData, (address[], address[], address));
+        (,, address _receiver) = abi.decode(_actionData, (address[], address[], address));
 
-        if (receiver != subaccount) revert Error.GmxStage__InvalidReceiver();
+        if (_receiver != _subaccount) revert Error.GmxStage__InvalidReceiver();
 
         // Validate all calls target exchangeRouter
-        for (uint i = 0; i < calls.length; i++) {
-            if (calls[i].target != exchangeRouter) revert Error.GmxStage__InvalidCallData();
+        for (uint _i = 0; _i < _calls.length; _i++) {
+            if (_calls[_i].target != exchangeRouter) revert Error.GmxStage__InvalidCallData();
         }
 
         // Claims may involve multiple tokens - no specific token tracking
         return (IERC20(address(0)), "");
     }
 
-    function _slice(bytes memory data, uint start) internal pure returns (bytes memory) {
-        bytes memory result = new bytes(data.length - start);
-        for (uint i = 0; i < result.length; i++) {
-            result[i] = data[start + i];
+    function _slice(bytes memory _data, uint _start) internal pure returns (bytes memory) {
+        bytes memory _result = new bytes(_data.length - _start);
+        for (uint _i = 0; _i < _result.length; _i++) {
+            _result[_i] = _data[_start + _i];
         }
-        return result;
+        return _result;
     }
 
     function _validateOrderParams(
-        address subaccount,
-        IBaseOrderUtils.CreateOrderParams memory params
+        address _subaccount,
+        IBaseOrderUtils.CreateOrderParams memory _params
     ) internal pure {
-        if (params.addresses.receiver != subaccount) revert Error.GmxStage__InvalidReceiver();
-        if (params.addresses.cancellationReceiver != address(0)) {
-            if (params.addresses.cancellationReceiver != subaccount) revert Error.GmxStage__InvalidReceiver();
+        if (_params.addresses.receiver != _subaccount) revert Error.GmxStage__InvalidReceiver();
+        if (_params.addresses.cancellationReceiver != address(0)) {
+            if (_params.addresses.cancellationReceiver != _subaccount) revert Error.GmxStage__InvalidReceiver();
         }
         // Token choice is validated at deposit time via tokenCapMap whitelist
-        if (params.addresses.swapPath.length > 0) revert Error.GmxStage__InvalidOrderType();
+        if (_params.addresses.swapPath.length > 0) revert Error.GmxStage__InvalidOrderType();
     }
 
     // ============ Helpers ============
 
-    function _isAction(bytes4 selector) internal view returns (bool) {
-        return selector == CREATE_ORDER ||
-               selector == CANCEL_ORDER ||
-               selector == CLAIM_FUNDING;
+    function _isAction(bytes4 _selector) internal view returns (bool) {
+        return _selector == CREATE_ORDER ||
+               _selector == CANCEL_ORDER ||
+               _selector == CLAIM_FUNDING;
     }
 
-    function _isIncreaseOrder(Order.OrderType orderType) internal pure returns (bool) {
-        return orderType == Order.OrderType.MarketIncrease ||
-               orderType == Order.OrderType.LimitIncrease ||
-               orderType == Order.OrderType.StopIncrease;
+    function _isIncreaseOrder(Order.OrderType _orderType) internal pure returns (bool) {
+        return _orderType == Order.OrderType.MarketIncrease ||
+               _orderType == Order.OrderType.LimitIncrease ||
+               _orderType == Order.OrderType.StopIncrease;
     }
 
-    function _isDecreaseOrder(Order.OrderType orderType) internal pure returns (bool) {
-        return orderType == Order.OrderType.MarketDecrease ||
-               orderType == Order.OrderType.LimitDecrease ||
-               orderType == Order.OrderType.StopLossDecrease;
+    function _isDecreaseOrder(Order.OrderType _orderType) internal pure returns (bool) {
+        return _orderType == Order.OrderType.MarketDecrease ||
+               _orderType == Order.OrderType.LimitDecrease ||
+               _orderType == Order.OrderType.StopLossDecrease;
     }
 
     /// @notice Derive the next orderKey that GMX will assign
     /// @dev GMX derives orderKey as keccak256(abi.encode(dataStore, nonce + 1))
     /// Same transaction guarantees this is the exact key
     function _deriveNextOrderKey() internal view returns (bytes32) {
-        uint256 currentNonce = dataStore.getUint(NONCE_KEY);
-        return keccak256(abi.encode(dataStore, currentNonce + 1));
+        uint256 _currentNonce = dataStore.getUint(NONCE_KEY);
+        return keccak256(abi.encode(dataStore, _currentNonce + 1));
     }
 
     /// @notice Derive GMX position key
     /// @dev Matches GMX's PositionStoreUtils key derivation
-    function _derivePositionKey(address subaccount, IBaseOrderUtils.CreateOrderParams memory params)
+    function _derivePositionKey(address _subaccount, IBaseOrderUtils.CreateOrderParams memory _params)
         internal
         pure
         returns (bytes32)
     {
         return keccak256(abi.encode(
-            subaccount,
-            params.addresses.market,
-            params.addresses.initialCollateralToken,
-            params.isLong
+            _subaccount,
+            _params.addresses.market,
+            _params.addresses.initialCollateralToken,
+            _params.isLong
         ));
     }
 
-    function _getSelector(bytes memory data) internal pure returns (bytes4 selector) {
-        if (data.length < 4) revert Error.GmxStage__InvalidCallData();
+    function _getSelector(bytes memory _data) internal pure returns (bytes4 _selector) {
+        if (_data.length < 4) revert Error.GmxStage__InvalidCallData();
         assembly {
-            selector := mload(add(data, 32))
+            _selector := mload(add(_data, 32))
         }
     }
 }

@@ -18,7 +18,12 @@ export default [
           {
             "name": "allocation",
             "type": "address",
-            "internalType": "contract Allocation"
+            "internalType": "contract Allocate"
+          },
+          {
+            "name": "matcher",
+            "type": "address",
+            "internalType": "contract Match"
           },
           {
             "name": "position",
@@ -75,7 +80,12 @@ export default [
       {
         "name": "allocation",
         "type": "address",
-        "internalType": "contract Allocation"
+        "internalType": "contract Allocate"
+      },
+      {
+        "name": "matcher",
+        "type": "address",
+        "internalType": "contract Match"
       },
       {
         "name": "position",
@@ -236,6 +246,29 @@ export default [
   },
   {
     "type": "function",
+    "name": "setFilter",
+    "inputs": [
+      {
+        "name": "_dim",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_value",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_allowed",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setPermission",
     "inputs": [
       {
@@ -252,6 +285,34 @@ export default [
         "name": "isEnabled",
         "type": "bool",
         "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setPolicy",
+    "inputs": [
+      {
+        "name": "_trader",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_allowanceRate",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_throttlePeriod",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_expiry",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
