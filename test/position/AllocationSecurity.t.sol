@@ -33,7 +33,6 @@ contract AllocationSecurityTest is BasicSetup {
     bytes32 constant SUBACCOUNT_NAME = bytes32("main");
 
     bytes32 stageKey;
-    bytes32 matchingKey;
 
     uint ownerPrivateKey = 0x1234;
     uint signerPrivateKey = 0x5678;
@@ -96,8 +95,6 @@ contract AllocationSecurityTest is BasicSetup {
         vm.prank(address(puppet2));
         usdc.approve(address(allocation), type(uint).max);
         vm.startPrank(users.owner);
-
-        matchingKey = keccak256(abi.encode(address(usdc), address(masterSubaccount)));
     }
 
     function _signIntent(Allocation.CallIntent memory intent, uint privateKey) internal view returns (bytes memory) {
@@ -108,6 +105,9 @@ contract AllocationSecurityTest is BasicSetup {
                 intent.subaccount,
                 intent.token,
                 intent.amount,
+                intent.triggerNetValue,
+                intent.acceptableNetValue,
+                intent.positionParamsHash,
                 intent.deadline,
                 intent.nonce
             )
@@ -128,21 +128,32 @@ contract AllocationSecurityTest is BasicSetup {
         return abi.encodePacked(r, s, v);
     }
 
+    function _emptyPositionParams() internal pure returns (Allocation.PositionParams memory) {
+        return Allocation.PositionParams({
+            stages: new IStage[](0),
+            positionKeys: new bytes32[][](0)
+        });
+    }
+
+    function _registerSubaccount(IERC7579Account sub, MockERC20 token) internal {
+        // Seed subaccount before registration (required by Allocation)
+        token.mint(address(sub), 1);
+        allocation.registerMasterSubaccount(owner, sessionSigner, sub, IERC20(address(token)), SUBACCOUNT_NAME);
+    }
+
     // ============================================================================
     // Share Inflation Attack Tests
     // ============================================================================
 
     /// @notice Classic inflation attack: attacker deposits 1 wei, donates to inflate price
-    /// Expected: Contract protects victim by reverting on zero shares
-    function testExploit_ClassicInflationAttack_RevertsZeroShares() public {
+    /// Expected: Contract protects victim by skipping allocations that would result in zero shares
+    function testExploit_ClassicInflationAttack_SkipsZeroShares() public {
         // Setup: use owner as attacker with a new subaccount
         TestSmartAccount attackerSub = new TestSmartAccount();
         attackerSub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
         attackerSub.installModule(MODULE_TYPE_HOOK, address(1), "");
 
-        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(attackerSub)), SUBACCOUNT_NAME);
-
-        bytes32 key = keccak256(abi.encode(address(usdc), address(attackerSub)));
+        _registerSubaccount(attackerSub, usdc);
 
         // Attacker makes first deposit of 1 wei
         usdc.mint(owner, 1);
@@ -151,28 +162,32 @@ contract AllocationSecurityTest is BasicSetup {
         usdc.approve(address(allocation), type(uint).max);
         vm.startPrank(users.owner);
 
+        Allocation.PositionParams memory emptyParams = _emptyPositionParams();
         Allocation.CallIntent memory attackerIntent = Allocation.CallIntent({
             account: owner,
-            subaccount: IERC7579Account(address(attackerSub)),
+            subaccount: attackerSub,
             token: usdc,
             amount: 1,
+            triggerNetValue: 0,
+            acceptableNetValue: type(uint).max,
+            positionParamsHash: keccak256(abi.encode(emptyParams)),
             deadline: block.timestamp + 1 hours,
             nonce: 0
         });
         bytes memory attackerSig = _signIntent(attackerIntent, ownerPrivateKey);
         IERC7579Account[] memory emptyPuppets = new IERC7579Account[](0);
         uint[] memory emptyAmounts = new uint[](0);
-        allocation.executeAllocate(attackerIntent, attackerSig, emptyPuppets, emptyAmounts);
+        allocation.executeAllocate(attackerIntent, attackerSig, emptyPuppets, emptyAmounts, emptyParams);
 
         // Attacker gets 1 share for 1 wei (1:1 ratio)
-        uint attackerShares = allocation.shareBalanceMap(key, owner);
+        uint attackerShares = allocation.shareBalanceMap(attackerSub, owner);
         assertEq(attackerShares, 1, "Attacker should get 1 share for 1 wei");
 
         // Attacker donates 1000 USDC directly to inflate share price
         usdc.mint(address(attackerSub), 1000e6);
 
         // Now share price is inflated: (1000e6 + 1) assets / 1 share
-        uint inflatedPrice = allocation.getSharePrice(key, usdc.balanceOf(address(attackerSub)));
+        uint inflatedPrice = allocation.getSharePrice(attackerSub, usdc.balanceOf(address(attackerSub)));
         assertGt(inflatedPrice, 1e30, "Price is inflated after donation");
 
         // Victim tries to deposit 999 USDC - this would result in 0 shares
@@ -181,9 +196,12 @@ contract AllocationSecurityTest is BasicSetup {
 
         Allocation.CallIntent memory intent = Allocation.CallIntent({
             account: owner,
-            subaccount: IERC7579Account(address(attackerSub)),
+            subaccount: attackerSub,
             token: usdc,
             amount: 0,
+            triggerNetValue: 0,
+            acceptableNetValue: type(uint).max,
+            positionParamsHash: keccak256(abi.encode(emptyParams)),
             deadline: block.timestamp + 1 hours,
             nonce: 1
         });
@@ -196,23 +214,25 @@ contract AllocationSecurityTest is BasicSetup {
 
         uint victimBalanceBefore = usdc.balanceOf(address(puppet1));
 
-        // Contract protects victim by reverting - can't steal with zero shares
-        vm.expectRevert(Error.Allocation__ZeroShares.selector);
-        allocation.executeAllocate(intent, sig, puppets, amounts);
+        // Contract protects victim by skipping dust allocations that would result in 0 shares
+        allocation.executeAllocate(intent, sig, puppets, amounts, emptyParams);
 
-        // Victim's funds are safe - balance unchanged
+        // Victim's funds are safe - balance unchanged (transfer was skipped)
         assertEq(usdc.balanceOf(address(puppet1)), victimBalanceBefore, "Victim funds protected");
+
+        // Victim got 0 shares (allocation was skipped)
+        assertEq(allocation.shareBalanceMap(attackerSub, address(puppet1)), 0, "Victim got no shares");
     }
 
     /// @notice Test that empty route starts fresh with 1:1 pricing
     function testExploit_EmptyRouteHasOneToOnePrice() public {
-        // Share price for non-existent route should be 1:1
-        bytes32 emptyKey = keccak256("nonexistent");
-        uint price = allocation.getSharePrice(emptyKey, 0);
+        // Share price for non-existent subaccount should be 1:1
+        IERC7579Account nonexistent = IERC7579Account(address(0x1234));
+        uint price = allocation.getSharePrice(nonexistent, 0);
         assertEq(price, 1e30, "Empty route should have 1:1 share price");
 
         // Even with assets passed, empty shares means 1:1
-        price = allocation.getSharePrice(emptyKey, 1000e6);
+        price = allocation.getSharePrice(nonexistent, 1000e6);
         assertEq(price, 1e30, "Empty route ignores passed assets for price");
     }
 
@@ -223,7 +243,7 @@ contract AllocationSecurityTest is BasicSetup {
         sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
         sub.installModule(MODULE_TYPE_HOOK, address(1), "");
 
-        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), SUBACCOUNT_NAME);
+        _registerSubaccount(sub, usdc);
 
         // First deposit via executeAllocate
         usdc.mint(owner, 1000e6);
@@ -232,21 +252,24 @@ contract AllocationSecurityTest is BasicSetup {
         usdc.approve(address(allocation), type(uint).max);
         vm.startPrank(users.owner);
 
+        Allocation.PositionParams memory emptyParams = _emptyPositionParams();
         Allocation.CallIntent memory intent = Allocation.CallIntent({
             account: owner,
-            subaccount: IERC7579Account(address(sub)),
+            subaccount: sub,
             token: usdc,
             amount: 1000e6,
+            triggerNetValue: 0,
+            acceptableNetValue: type(uint).max,
+            positionParamsHash: keccak256(abi.encode(emptyParams)),
             deadline: block.timestamp + 1 hours,
             nonce: 0
         });
         bytes memory sig = _signIntent(intent, ownerPrivateKey);
         IERC7579Account[] memory emptyPuppets = new IERC7579Account[](0);
         uint[] memory emptyAmounts = new uint[](0);
-        allocation.executeAllocate(intent, sig, emptyPuppets, emptyAmounts);
+        allocation.executeAllocate(intent, sig, emptyPuppets, emptyAmounts, emptyParams);
 
-        bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
-        uint shares = allocation.shareBalanceMap(key, owner);
+        uint shares = allocation.shareBalanceMap(sub, owner);
 
         // First depositor: shares = deposit amount (1:1)
         assertEq(shares, 1000e6, "First depositor gets 1:1 shares");
@@ -258,7 +281,7 @@ contract AllocationSecurityTest is BasicSetup {
         sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
         sub.installModule(MODULE_TYPE_HOOK, address(1), "");
 
-        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(sub)), SUBACCOUNT_NAME);
+        _registerSubaccount(sub, usdc);
 
         // First deposit of 1 wei
         usdc.mint(owner, 1);
@@ -267,27 +290,29 @@ contract AllocationSecurityTest is BasicSetup {
         usdc.approve(address(allocation), type(uint).max);
         vm.startPrank(users.owner);
 
+        Allocation.PositionParams memory emptyParams = _emptyPositionParams();
         Allocation.CallIntent memory intent = Allocation.CallIntent({
             account: owner,
-            subaccount: IERC7579Account(address(sub)),
+            subaccount: sub,
             token: usdc,
             amount: 1,
+            triggerNetValue: 0,
+            acceptableNetValue: type(uint).max,
+            positionParamsHash: keccak256(abi.encode(emptyParams)),
             deadline: block.timestamp + 1 hours,
             nonce: 0
         });
         bytes memory sig = _signIntent(intent, ownerPrivateKey);
         IERC7579Account[] memory emptyPuppets = new IERC7579Account[](0);
         uint[] memory emptyAmounts = new uint[](0);
-        allocation.executeAllocate(intent, sig, emptyPuppets, emptyAmounts);
-
-        bytes32 key = keccak256(abi.encode(address(usdc), address(sub)));
+        allocation.executeAllocate(intent, sig, emptyPuppets, emptyAmounts, emptyParams);
 
         // First depositor gets 1 share
-        assertEq(allocation.shareBalanceMap(key, owner), 1, "Gets 1 share for 1 wei");
-        assertEq(allocation.totalSharesMap(key), 1, "Total shares is 1");
+        assertEq(allocation.shareBalanceMap(sub, owner), 1, "Gets 1 share for 1 wei");
+        assertEq(allocation.totalSharesMap(sub), 1, "Total shares is 1");
 
         // Share price is now 1:1
-        uint price = allocation.getSharePrice(key, 1);
+        uint price = allocation.getSharePrice(sub, 1);
         assertEq(price, 1e30, "Share price is 1:1");
     }
 }

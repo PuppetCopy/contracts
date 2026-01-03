@@ -7,6 +7,8 @@ import {CallType} from "modulekit/accounts/common/lib/ModeLib.sol";
 
 contract MockStage is IStage {
     mapping(bytes32 => uint) public positionValues;
+    mapping(bytes32 => address) public positionOwners;
+    mapping(bytes32 => bool) public pendingOrders;
 
     bool public shouldRevertValidation;
     string public revertReason;
@@ -14,6 +16,14 @@ contract MockStage is IStage {
 
     function setPositionValue(bytes32 _posKey, uint _value) external {
         positionValues[_posKey] = _value;
+    }
+
+    function setPositionOwner(bytes32 _posKey, address _owner) external {
+        positionOwners[_posKey] = _owner;
+    }
+
+    function setOrderPending(bytes32 _orderKey, bool _pending) external {
+        pendingOrders[_orderKey] = _pending;
     }
 
     function setMockPositionKey(bytes32 _posKey) external {
@@ -47,8 +57,16 @@ contract MockStage is IStage {
 
     function settle(address, bytes calldata) external override {}
 
-    function getValue(bytes32 _positionKey) external view override returns (uint) {
+    function getPositionValue(bytes32 _positionKey, IERC20) external view override returns (uint) {
         return positionValues[_positionKey];
+    }
+
+    function verifyPositionOwner(bytes32 _positionKey, address _subaccount) external view override returns (bool) {
+        return positionOwners[_positionKey] == _subaccount;
+    }
+
+    function isOrderPending(bytes32 _orderKey, address) external view override returns (bool) {
+        return pendingOrders[_orderKey];
     }
 }
 

@@ -45,8 +45,21 @@ interface IStage {
     /// @param hookData Data from validate()
     function settle(address subaccount, bytes calldata hookData) external;
 
-    /// @notice Get current value of a position
+    /// @notice Get position value in base token units
     /// @param positionKey The position identifier
-    /// @return value Net value in collateral token units
-    function getValue(bytes32 positionKey) external view returns (uint value);
+    /// @param baseToken The token to denominate value in
+    /// @return Position value as base token amount
+    function getPositionValue(bytes32 positionKey, IERC20 baseToken) external view returns (uint);
+
+    /// @notice Verify a position belongs to a subaccount
+    /// @param positionKey The position identifier
+    /// @param subaccount The account to verify ownership
+    /// @return isOwner True if position belongs to subaccount
+    function verifyPositionOwner(bytes32 positionKey, address subaccount) external view returns (bool isOwner);
+
+    /// @notice Check if an order is still pending
+    /// @param orderKey The order identifier
+    /// @param subaccount The account that created the order
+    /// @return isPending True if order exists and is pending
+    function isOrderPending(bytes32 orderKey, address subaccount) external view returns (bool isPending);
 }

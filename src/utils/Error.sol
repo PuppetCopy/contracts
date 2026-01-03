@@ -69,6 +69,12 @@ library Error {
     error Allocation__AmountMismatch(uint expected, uint actual);
     error Allocation__InvalidAccountCodeHash();
     error Allocation__MasterHookNotInstalled();
+    error Allocation__NetValueBelowMin(uint256 netValue, uint256 acceptableNetValue);
+    error Allocation__NetValueAboveMax(uint256 netValue, uint256 acceptableNetValue);
+    error Allocation__NetValueParamsMismatch();
+    error Allocation__TokenMismatch();
+    error Allocation__ZeroAssets();
+    error Allocation__DisposedWithShares();
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();
@@ -79,6 +85,12 @@ library Error {
     error Position__InvalidAction(bytes32 action);
     error Position__DelegateCallBlocked();
     error Position__InvalidBalanceChange();
+    error Position__PendingOrdersExist();
+    error Position__NotPositionOwner();
+    error Position__OrderStillPending();
+    error Position__InvalidStage();
+    error Position__ArrayLengthMismatch();
+    error Position__BatchOrderNotAllowed();
 
     // GmxStage errors
     error GmxStage__InvalidCallData();
@@ -89,4 +101,6 @@ library Error {
     error GmxStage__InvalidAction();
     error GmxStage__InvalidBalanceChange();
     error GmxStage__InvalidExecutionSequence();
+    error GmxStage__MissingPriceFeed(address token);
+    error GmxStage__InvalidPrice(address token);
 }

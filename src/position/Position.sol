@@ -11,15 +11,17 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {IStage} from "./interface/IStage.sol";
 
 /// @title Position
-/// @notice Routes raw execute() calls to stage handlers for validation
+/// @notice Routes execute() calls to stage handlers for validation and tracks pending orders
 contract Position is CoreContract {
-    /// @notice Target address to stage handler mapping
+    uint8 public constant ACTION_NONE = 0;
+    uint8 public constant ACTION_ORDER_CREATED = 1;
+
     mapping(address target => IStage) public handlers;
+    mapping(IStage stage => bool) public validStages;
+    mapping(address subaccount => uint256) public pendingOrderCount;
 
     constructor(IAuthority _authority) CoreContract(_authority, "") {}
 
-    /// @notice Validate execute() before execution
-    /// @dev Token is extracted by handler from execution data, not passed as parameter
     function processPreCall(address _master, address _subaccount, uint _msgValue, bytes calldata _msgData)
         external
         view
@@ -36,53 +38,107 @@ contract Position is CoreContract {
 
         bytes calldata execData = _msgData[36:];
 
-        // Extract first target for routing
         address firstTarget = address(bytes20(execData[:20]));
         IStage handler = handlers[firstTarget];
         if (address(handler) == address(0)) return "";
 
-        // Handler extracts and returns the token from execution data
         (IERC20 token, bytes memory handlerData) = handler.validate(_master, _subaccount, _msgValue, callType, execData);
 
-        // Track balance if token specified (claims may return address(0))
+        if (handlerData.length > 0 && callType == CALLTYPE_BATCH) {
+            uint8 actionType = abi.decode(handlerData, (uint8));
+            if (actionType == ACTION_ORDER_CREATED) {
+                revert Error.Position__BatchOrderNotAllowed();
+            }
+        }
+
         uint preBalance = address(token) != address(0) ? token.balanceOf(_subaccount) : 0;
 
         return abi.encode(token, preBalance, handlerData, handler);
     }
 
-    /// @notice Verify state after execution
-    function processPostCall(address _subaccount, bytes calldata _hookData) external view {
+    function processPostCall(address _subaccount, bytes calldata _hookData) external auth {
         if (_hookData.length == 0) return;
 
         (IERC20 token, uint preBalance, bytes memory handlerData, IStage handler) =
             abi.decode(_hookData, (IERC20, uint, bytes, IStage));
 
-        // Skip balance tracking if no token (e.g., claims)
         uint postBalance = address(token) != address(0) ? token.balanceOf(_subaccount) : 0;
         handler.verify(_subaccount, token, preBalance, postBalance, handlerData);
+
+        if (handlerData.length > 0) {
+            uint8 actionType = abi.decode(handlerData, (uint8));
+
+            if (actionType == ACTION_ORDER_CREATED) {
+                (, bytes32 orderKey, bytes32 positionKey,) =
+                    abi.decode(handlerData, (uint8, bytes32, bytes32, IERC20));
+                pendingOrderCount[_subaccount]++;
+                _logEvent("CreateOrder", abi.encode(_subaccount, orderKey, positionKey, handler, token));
+            }
+        }
     }
 
-    /// @notice Record position outcome (called after execution)
     function settle(address _subaccount, bytes calldata _handlerData) external auth {
-        // Handler address encoded in handlerData by validate()
         (,, , IStage handler) = abi.decode(_handlerData, (IERC20, uint, bytes, IStage));
         handler.settle(_subaccount, _handlerData);
     }
 
     function setHandler(address _target, IStage _handler) external auth {
+        IStage oldHandler = handlers[_target];
+        if (address(oldHandler) != address(0)) {
+            validStages[oldHandler] = false;
+        }
+
         handlers[_target] = _handler;
+        if (address(_handler) != address(0)) {
+            validStages[_handler] = true;
+        }
     }
 
-    /// @notice Get net value (token balance only for now)
-    /// @dev Position tracking to be added later
-    function getNetValue(IERC20 _token, IERC7579Account _subaccount) external view returns (uint) {
-        return _token.balanceOf(address(_subaccount));
+    function getNetValue(
+        address _subaccount,
+        IERC20 _baseToken,
+        IStage[] calldata _stages,
+        bytes32[][] calldata _positionKeys
+    ) external view returns (uint256 value) {
+        if (pendingOrderCount[_subaccount] != 0) {
+            revert Error.Position__PendingOrdersExist();
+        }
+
+        for (uint i; i < _stages.length; i++) {
+            IStage stage = _stages[i];
+            bytes32[] calldata keys = _positionKeys[i];
+
+            for (uint j; j < keys.length; j++) {
+                if (!stage.verifyPositionOwner(keys[j], _subaccount)) {
+                    revert Error.Position__NotPositionOwner();
+                }
+                value += stage.getPositionValue(keys[j], _baseToken);
+            }
+        }
     }
 
-    /// @notice Get position keys for a matching key
-    /// @dev Position tracking to be added later
-    function getPositionKeyList(bytes32) external pure returns (bytes32[] memory) {
-        return new bytes32[](0);
+    function settleOrders(
+        address _subaccount,
+        IStage[] calldata _orderStages,
+        bytes32[] calldata _orderKeys
+    ) external auth {
+        uint orderLen = _orderKeys.length;
+        if (orderLen != _orderStages.length) {
+            revert Error.Position__ArrayLengthMismatch();
+        }
+
+        for (uint i; i < orderLen; i++) {
+            IStage stage = _orderStages[i];
+            if (!validStages[stage]) revert Error.Position__InvalidStage();
+            if (stage.isOrderPending(_orderKeys[i], _subaccount)) {
+                revert Error.Position__OrderStillPending();
+            }
+        }
+
+        uint pending = pendingOrderCount[_subaccount];
+        pendingOrderCount[_subaccount] = pending > orderLen ? pending - orderLen : 0;
+
+        _logEvent("SettleOrders", abi.encode(_subaccount, _orderKeys));
     }
 
     function _setConfig(bytes memory) internal override {}

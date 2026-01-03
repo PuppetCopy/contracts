@@ -10,11 +10,8 @@ import {IUserRouter} from "./utils/interfaces/IUserRouter.sol";
 import {Allocation} from "./position/Allocation.sol";
 import {Position} from "./position/Position.sol";
 
-/**
- * @title UserRouter
- * @notice Passthrough router with configurable contract references
- * @dev DAO can update underlying contracts. Deployed behind RouterProxy.
- */
+/// @title UserRouter
+/// @notice Passthrough router for MasterHook to Allocation/Position contracts
 contract UserRouter is IUserRouter, CoreContract {
     struct Config {
         Allocation allocation;
@@ -25,17 +22,28 @@ contract UserRouter is IUserRouter, CoreContract {
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
-    /// @inheritdoc IUserRouter
     function registerMasterSubaccount(
         address _account,
         address _signer,
         IERC7579Account _subaccount,
+        IERC20 _baseToken,
         bytes32 _name
     ) external {
-        config.allocation.registerMasterSubaccount(_account, _signer, _subaccount, _name);
+        config.allocation.registerMasterSubaccount(_account, _signer, _subaccount, _baseToken, _name);
     }
 
-    /// @inheritdoc IUserRouter
+    function disposeSubaccount(IERC7579Account _subaccount) external {
+        config.allocation.disposeSubaccount(_subaccount);
+    }
+
+    function hasRemainingShares(IERC7579Account _subaccount) external view returns (bool) {
+        return config.allocation.hasRemainingShares(_subaccount);
+    }
+
+    function isDisposed(IERC7579Account _subaccount) external view returns (bool) {
+        return config.allocation.disposedMap(_subaccount);
+    }
+
     function processPreCall(address _master, address _subaccount, uint _msgValue, bytes calldata _msgData)
         external
         view
@@ -44,14 +52,8 @@ contract UserRouter is IUserRouter, CoreContract {
         return config.position.processPreCall(_master, _subaccount, _msgValue, _msgData);
     }
 
-    /// @inheritdoc IUserRouter
-    function processPostCall(address _subaccount, bytes calldata _hookData) external view {
+    function processPostCall(address _subaccount, bytes calldata _hookData) external {
         config.position.processPostCall(_subaccount, _hookData);
-    }
-
-    /// @inheritdoc IUserRouter
-    function getPositionKeyList(bytes32 _matchingKey) external view returns (bytes32[] memory) {
-        return config.position.getPositionKeyList(_matchingKey);
     }
 
     function _setConfig(bytes memory _data) internal override {
