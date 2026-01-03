@@ -121,25 +121,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "registered",
-    "inputs": [
-      {
-        "name": "subaccount",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "router",
     "inputs": [],
     "outputs": [

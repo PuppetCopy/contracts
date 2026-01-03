@@ -28,6 +28,7 @@ import {Precision} from "../utils/Precision.sol";
 import {Match} from "./Match.sol";
 import {Position} from "./Position.sol";
 import {IStage} from "./interface/IStage.sol";
+import {PositionParams, SubaccountInfo, CallIntent} from "./interface/ITypes.sol";
 
 /// @title Allocate
 /// @notice ERC-7579 Executor module for share-based fund allocation to master subaccounts
@@ -36,23 +37,6 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
         address masterHook;
         uint maxPuppetList;
         uint withdrawGasLimit;
-    }
-
-    struct PositionParams {
-        IStage[] stages;
-        bytes32[][] positionKeys;
-    }
-
-    struct CallIntent {
-        address account;
-        IERC7579Account subaccount;
-        IERC20 token;
-        uint amount;
-        uint triggerNetValue;
-        uint acceptableNetValue;
-        bytes32 positionParamsHash;
-        uint deadline;
-        uint nonce;
     }
 
     bytes32 public constant CALL_INTENT_TYPEHASH = keccak256(
@@ -70,14 +54,6 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
     mapping(IERC20 token => uint) public tokenCapMap;
     mapping(bytes32 codeHash => bool) public account7579CodeHashMap;
 
-    struct SubaccountInfo {
-        address account;
-        address signer;
-        IERC20 baseToken;
-        bytes32 name;
-        bool disposed;
-        uint nonce;
-    }
 
     mapping(IERC7579Account subaccount => SubaccountInfo) public registeredMap;
 
@@ -132,12 +108,14 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
         bytes32 _codeHash;
         assembly { _codeHash := extcodehash(_subaccount) }
         if (!account7579CodeHashMap[_codeHash]) revert Error.Allocate__InvalidAccountCodeHash();
-        if (!_subaccount.isModuleInstalled(MODULE_TYPE_HOOK, config.masterHook, "")) revert Error.Allocate__MasterHookNotInstalled();
+        if (!_subaccount.isModuleInstalled(MODULE_TYPE_HOOK, config.masterHook, "")) {
+            revert Error.Allocate__MasterHookNotInstalled();
+        }
         if (address(registeredMap[_subaccount].baseToken) != address(0)) revert Error.Allocate__AlreadyRegistered();
         if (tokenCapMap[_baseToken] == 0) revert Error.Allocate__TokenNotAllowed();
         if (_baseToken.balanceOf(address(_subaccount)) == 0) revert Error.Allocate__ZeroAssets();
 
-        registeredMap[_subaccount] = SubaccountInfo(_account, _signer, _baseToken, _name, false, 0);
+        registeredMap[_subaccount] = SubaccountInfo(_account, _signer, _baseToken, _name, false, 0, 0, address(0), address(_subaccount));
 
         _logEvent("RegisterMasterSubaccount", abi.encode(_subaccount, _account, _signer, _baseToken, _name));
     }
@@ -175,9 +153,10 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
         IERC20 _baseToken = _info.baseToken;
 
         _ctx.allocation = _baseToken.balanceOf(address(_subaccount));
-        _ctx.netValue = _ctx.allocation + _position.getNetValue(
-            address(_subaccount), _baseToken, _positionParams.stages, _positionParams.positionKeys
-        );
+        _ctx.netValue = _ctx.allocation
+            + _position.getNetValue(
+                address(_subaccount), _baseToken, _positionParams.stages, _positionParams.positionKeys
+            );
 
         if (_ctx.netValue > _intent.acceptableNetValue) {
             revert Error.Allocate__NetValueAboveMax(_ctx.netValue, _intent.acceptableNetValue);
@@ -201,26 +180,19 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
             _ctx.totalShares += _shares;
         }
 
-        if (_puppetList.length > 0) {
-            address _stage = _positionParams.stages.length > 0 ? address(_positionParams.stages[0]) : address(0);
-            Match.MatchParams memory _matchParams = Match.MatchParams({
-                subaccount: address(_subaccount),
-                master: _intent.account,
-                chainId: block.chainid,
-                stage: _stage,
-                collateral: _baseToken
-            });
-            uint[] memory _allocatedAmounts = _match.executeMatch(_matchParams, _puppetList, _amountList);
+        _info.chainId = block.chainid;
+        _info.stage = _positionParams.stages.length > 0 ? address(_positionParams.stages[0]) : address(0);
 
-            for (uint _i; _i < _puppetList.length; ++_i) {
-                uint _amount = _allocatedAmounts[_i];
-                if (_amount > 0) {
-                    uint _shares = Precision.toFactor(_amount, _ctx.sharePrice);
-                    if (_shares > 0) {
-                        shareBalanceMap[_subaccount][_puppetList[_i]] += _shares;
-                        _ctx.totalShares += _shares;
-                        _ctx.allocated += _amount;
-                    }
+        uint[] memory _allocatedList = _match.executeMatch(_info, _puppetList, _amountList);
+
+        for (uint _i; _i < _puppetList.length; ++_i) {
+            uint _amount = _allocatedList[_i];
+            if (_amount > 0) {
+                uint _shares = Precision.toFactor(_amount, _ctx.sharePrice);
+                if (_shares > 0) {
+                    shareBalanceMap[_subaccount][_puppetList[_i]] += _shares;
+                    _ctx.totalShares += _shares;
+                    _ctx.allocated += _amount;
                 }
             }
         }
@@ -239,7 +211,7 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
                 _baseToken,
                 _intent.amount,
                 _puppetList,
-                _amountList,
+                _allocatedList,
                 _ctx.allocation,
                 _ctx.netValue,
                 _ctx.allocated,
@@ -263,10 +235,7 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
 
         uint _allocation = _baseToken.balanceOf(address(_subaccount));
         uint _positionValue = _position.getNetValue(
-            address(_subaccount),
-            _baseToken,
-            _positionParams.stages,
-            _positionParams.positionKeys
+            address(_subaccount), _baseToken, _positionParams.stages, _positionParams.positionKeys
         );
         uint _netValue = _allocation + _positionValue;
 
@@ -285,7 +254,9 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
 
         _subaccount.executeFromExecutor{gas: config.withdrawGasLimit}(
             MODE_TRY,
-            ExecutionLib.encodeSingle(address(_baseToken), 0, abi.encodeCall(IERC20.transfer, (_intent.account, _amountOut)))
+            ExecutionLib.encodeSingle(
+                address(_baseToken), 0, abi.encodeCall(IERC20.transfer, (_intent.account, _amountOut))
+            )
         );
 
         uint _actualOut = _allocation - _baseToken.balanceOf(address(_subaccount));
@@ -357,7 +328,8 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
 
         if (
             !SignatureChecker.isValidSignatureNow(_intent.account, _hash, _signature)
-                && (_info.signer == address(0) || !SignatureChecker.isValidSignatureNow(_info.signer, _hash, _signature))
+                && (_info.signer == address(0)
+                    || !SignatureChecker.isValidSignatureNow(_info.signer, _hash, _signature))
         ) {
             revert Error.Allocate__InvalidSignature(_intent.account, _info.signer);
         }

@@ -10,6 +10,7 @@ import {Match} from "src/position/Match.sol";
 import {Position} from "src/position/Position.sol";
 import {UserRouter} from "src/UserRouter.sol";
 import {IStage} from "src/position/interface/IStage.sol";
+import {PositionParams, CallIntent} from "src/position/interface/ITypes.sol";
 import {Error} from "src/utils/Error.sol";
 
 import {BasicSetup} from "../base/BasicSetup.t.sol";
@@ -114,7 +115,7 @@ contract AllocateSecurityTest is BasicSetup {
         vm.startPrank(users.owner);
     }
 
-    function _signIntent(Allocate.CallIntent memory intent, uint privateKey) internal view returns (bytes memory) {
+    function _signIntent(CallIntent memory intent, uint privateKey) internal view returns (bytes memory) {
         bytes32 structHash = keccak256(
             abi.encode(
                 allocation.CALL_INTENT_TYPEHASH(),
@@ -145,8 +146,8 @@ contract AllocateSecurityTest is BasicSetup {
         return abi.encodePacked(r, s, v);
     }
 
-    function _emptyPositionParams() internal pure returns (Allocate.PositionParams memory) {
-        return Allocate.PositionParams({
+    function _emptyPositionParams() internal pure returns (PositionParams memory) {
+        return PositionParams({
             stages: new IStage[](0),
             positionKeys: new bytes32[][](0)
         });
@@ -180,8 +181,8 @@ contract AllocateSecurityTest is BasicSetup {
         usdc.approve(address(allocation), type(uint).max);
         vm.startPrank(users.owner);
 
-        Allocate.PositionParams memory emptyParams = _emptyPositionParams();
-        Allocate.CallIntent memory attackerIntent = Allocate.CallIntent({
+        PositionParams memory emptyParams = _emptyPositionParams();
+        CallIntent memory attackerIntent = CallIntent({
             account: owner,
             subaccount: attackerSub,
             token: usdc,
@@ -212,7 +213,7 @@ contract AllocateSecurityTest is BasicSetup {
         // If keeper makes a mistake and includes them, funds transfer but no shares given
         usdc.mint(address(puppet1), 999e6);
 
-        Allocate.CallIntent memory intent = Allocate.CallIntent({
+        CallIntent memory intent = CallIntent({
             account: owner,
             subaccount: attackerSub,
             token: usdc,
@@ -270,8 +271,8 @@ contract AllocateSecurityTest is BasicSetup {
         usdc.approve(address(allocation), type(uint).max);
         vm.startPrank(users.owner);
 
-        Allocate.PositionParams memory emptyParams = _emptyPositionParams();
-        Allocate.CallIntent memory intent = Allocate.CallIntent({
+        PositionParams memory emptyParams = _emptyPositionParams();
+        CallIntent memory intent = CallIntent({
             account: owner,
             subaccount: sub,
             token: usdc,
@@ -308,8 +309,8 @@ contract AllocateSecurityTest is BasicSetup {
         usdc.approve(address(allocation), type(uint).max);
         vm.startPrank(users.owner);
 
-        Allocate.PositionParams memory emptyParams = _emptyPositionParams();
-        Allocate.CallIntent memory intent = Allocate.CallIntent({
+        PositionParams memory emptyParams = _emptyPositionParams();
+        CallIntent memory intent = CallIntent({
             account: owner,
             subaccount: sub,
             token: usdc,

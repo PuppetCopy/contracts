@@ -43,7 +43,7 @@ contract UserRouter is IUserRouter, CoreContract {
     }
 
     function isDisposed(IERC7579Account _subaccount) external view returns (bool) {
-        (,,,, bool disposed,) = config.allocation.registeredMap(_subaccount);
+        (,,,, bool disposed,,,,) = config.allocation.registeredMap(_subaccount);
         return disposed;
     }
 

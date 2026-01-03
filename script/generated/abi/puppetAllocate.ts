@@ -82,25 +82,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "baseTokenMap",
-    "inputs": [
-      {
-        "name": "subaccount",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IERC20"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "canCall",
     "inputs": [
       {
@@ -158,25 +139,6 @@ export default [
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "disposedMap",
-    "inputs": [
-      {
-        "name": "subaccount",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -466,6 +428,57 @@ export default [
   },
   {
     "type": "function",
+    "name": "getSubaccountInfo",
+    "inputs": [
+      {
+        "name": "_subaccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct Allocate.SubaccountInfo",
+        "components": [
+          {
+            "name": "account",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "signer",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "baseToken",
+            "type": "address",
+            "internalType": "contract IERC20"
+          },
+          {
+            "name": "name",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "disposed",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "nonce",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getUserShares",
     "inputs": [
       {
@@ -547,25 +560,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "nonceMap",
-    "inputs": [
-      {
-        "name": "subaccount",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "onInstall",
     "inputs": [
       {
@@ -635,28 +629,34 @@ export default [
     ],
     "outputs": [
       {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "sessionSignerMap",
-    "inputs": [
-      {
-        "name": "subaccount",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
+        "name": "account",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "signer",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "baseToken",
+        "type": "address",
+        "internalType": "contract IERC20"
+      },
+      {
+        "name": "name",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "disposed",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "nonce",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"

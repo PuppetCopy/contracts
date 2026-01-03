@@ -73,29 +73,36 @@ export default [
     "name": "executeMatch",
     "inputs": [
       {
-        "name": "_destination",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_trader",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_stage",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_collateral",
-        "type": "address",
-        "internalType": "contract IERC20"
+        "name": "_params",
+        "type": "tuple",
+        "internalType": "struct Match.MatchParams",
+        "components": [
+          {
+            "name": "subaccount",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "master",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "chainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "stage",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "collateral",
+            "type": "address",
+            "internalType": "contract IERC20"
+          }
+        ]
       },
       {
         "name": "_puppets",

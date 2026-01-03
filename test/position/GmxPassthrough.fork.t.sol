@@ -182,7 +182,7 @@ contract GmxPassthroughTest is ForkSetup {
 
         // With correct subaccount (matching receiver), should pass
         (, bytes memory hookData) = gmxStage.validate(users.owner, rawReceiver, executionFee, CALLTYPE_SINGLE, execData);
-        bytes32 positionKey = abi.decode(hookData, (bytes32));
+        (,, bytes32 positionKey,) = abi.decode(hookData, (uint8, bytes32, bytes32, address));
         assertTrue(positionKey != bytes32(0), "Position key returned");
     }
 
@@ -210,7 +210,7 @@ contract GmxPassthroughTest is ForkSetup {
 
         (, bytes memory hookData) = gmxStage.validate(users.owner, subaccount, 0.001 ether, CALLTYPE_SINGLE, execData);
 
-        bytes32 positionKey = abi.decode(hookData, (bytes32));
+        (,, bytes32 positionKey,) = abi.decode(hookData, (uint8, bytes32, bytes32, address));
         bytes32 expectedKey = keccak256(abi.encode(subaccount, gmxEthUsdcMarket, address(usdc), true));
         assertEq(positionKey, expectedKey, "Position key derived correctly");
     }
@@ -235,7 +235,7 @@ contract GmxPassthroughTest is ForkSetup {
 
         (, bytes memory hookData) = gmxStage.validate(users.owner, subaccount, totalWnt, CALLTYPE_SINGLE, execData);
 
-        bytes32 positionKey = abi.decode(hookData, (bytes32));
+        (,, bytes32 positionKey,) = abi.decode(hookData, (uint8, bytes32, bytes32, address));
         bytes32 expectedKey = keccak256(abi.encode(subaccount, gmxEthUsdcMarket, address(wnt), true));
         assertEq(positionKey, expectedKey, "Position key derived correctly");
     }
@@ -264,7 +264,7 @@ contract GmxPassthroughTest is ForkSetup {
 
         (, bytes memory hookData) = gmxStage.validate(users.owner, subaccount, executionFee, CALLTYPE_SINGLE, execData);
 
-        bytes32 positionKey = abi.decode(hookData, (bytes32));
+        (,, bytes32 positionKey,) = abi.decode(hookData, (uint8, bytes32, bytes32, address));
         bytes32 expectedKey = keccak256(abi.encode(subaccount, gmxEthUsdcMarket, address(wnt), true));
         assertEq(positionKey, expectedKey, "Position key derived correctly");
     }
@@ -321,7 +321,7 @@ contract GmxPassthroughTest is ForkSetup {
 
         (, bytes memory hookData) = gmxStage.validate(users.owner, subaccount, executionFee, CALLTYPE_SINGLE, execData);
 
-        bytes32 positionKey = abi.decode(hookData, (bytes32));
+        (,, bytes32 positionKey,) = abi.decode(hookData, (uint8, bytes32, bytes32, address));
         bytes32 expectedKey = keccak256(abi.encode(subaccount, gmxEthUsdcMarket, address(usdc), true));
         assertEq(positionKey, expectedKey, "Position key derived correctly");
     }
@@ -374,7 +374,7 @@ contract GmxPassthroughTest is ForkSetup {
 
         (, bytes memory hookData) = gmxStage.validate(users.owner, subaccount, executionFee, CALLTYPE_SINGLE, execData);
 
-        bytes32 positionKey = abi.decode(hookData, (bytes32));
+        (,, bytes32 positionKey,) = abi.decode(hookData, (uint8, bytes32, bytes32, address));
         bytes32 expectedKey = keccak256(abi.encode(subaccount, gmxEthUsdcMarket, address(usdc), true));
         assertEq(positionKey, expectedKey, "Position key derived correctly");
     }
@@ -428,7 +428,7 @@ contract GmxPassthroughTest is ForkSetup {
 
         (, bytes memory hookData) = gmxStage.validate(users.owner, subaccount, executionFee, CALLTYPE_SINGLE, execData);
 
-        bytes32 positionKey = abi.decode(hookData, (bytes32));
+        (,, bytes32 positionKey,) = abi.decode(hookData, (uint8, bytes32, bytes32, address));
         bytes32 expectedKey = keccak256(abi.encode(subaccount, gmxEthUsdcMarket, address(usdc), true));
         assertEq(positionKey, expectedKey, "Position key derived correctly");
     }

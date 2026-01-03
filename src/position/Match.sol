@@ -6,6 +6,7 @@ import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "../utils/Precision.sol";
+import {SubaccountInfo} from "./interface/ITypes.sol";
 
 contract Match is CoreContract {
     uint constant DIM_CHAIN = 0;
@@ -22,19 +23,9 @@ contract Match is CoreContract {
         uint expiry;
     }
 
-    struct MatchParams {
-        address subaccount;
-        address master;
-        uint chainId;
-        address stage;
-        IERC20 collateral;
-    }
-
     Config public config;
 
     mapping(address puppet => mapping(uint dim => mapping(bytes32 value => bool))) public filterMap;
-    mapping(address puppet => mapping(uint dim => bool)) public hasFilterMap;
-
     mapping(address puppet => mapping(address trader => Policy)) public policyMap;
     mapping(address puppet => mapping(address trader => uint)) public throttleMap;
 
@@ -44,19 +35,19 @@ contract Match is CoreContract {
         config = abi.decode(_data, (Config));
     }
 
-    function executeMatch(
-        MatchParams calldata _params,
-        address[] calldata _puppets,
-        uint[] calldata _amounts
-    ) external auth returns (uint[] memory _allocated) {
-        _allocated = new uint[](_puppets.length);
+    function executeMatch(SubaccountInfo calldata _params, address[] calldata _puppets, uint[] calldata _amountList)
+        external
+        auth
+        returns (uint[] memory _allocatedList)
+    {
+        _allocatedList = new uint[](_puppets.length);
 
         bytes32 _chainKey = bytes32(_params.chainId);
         bytes32 _stageKey = bytes32(uint(uint160(_params.stage)));
-        bytes32 _collateralKey = bytes32(uint(uint160(address(_params.collateral))));
+        bytes32 _collateralKey = bytes32(uint(uint160(address(_params.baseToken))));
         uint _gasLimit = config.gasLimit;
 
-        uint _balanceBefore = _params.collateral.balanceOf(_params.subaccount);
+        uint _balanceBefore = _params.baseToken.balanceOf(_params.subaccount);
         uint _total;
 
         for (uint _i; _i < _puppets.length; ++_i) {
@@ -66,39 +57,35 @@ contract Match is CoreContract {
             if (!_passesFilter(_puppet, DIM_STAGE, _stageKey)) continue;
             if (!_passesFilter(_puppet, DIM_COLLATERAL, _collateralKey)) continue;
 
-            if (block.timestamp < throttleMap[_puppet][_params.master]) continue;
+            if (block.timestamp < throttleMap[_puppet][_params.account]) continue;
 
-            Policy memory _p = policyMap[_puppet][_params.master];
+            Policy memory _p = policyMap[_puppet][_params.account];
             if (_p.expiry == 0) _p = policyMap[_puppet][address(0)];
             if (_p.expiry == 0 || block.timestamp > _p.expiry) continue;
 
-            uint _balance = _params.collateral.balanceOf(_puppet);
+            uint _balance = _params.baseToken.allowance(_puppet, address(this));
             uint _maxAllowed = Precision.applyBasisPoints(_p.allowanceRate, _balance);
-            uint _cappedAmount = _amounts[_i] > _maxAllowed ? _maxAllowed : _amounts[_i];
+            uint _cappedAmount = _amountList[_i] > _maxAllowed ? _maxAllowed : _amountList[_i];
             if (_cappedAmount == 0) continue;
 
-            (bool _success,) = address(_params.collateral).call{gas: _gasLimit}(
+            (bool _success,) = address(_params.baseToken).call{gas: _gasLimit}(
                 abi.encodeCall(IERC20.transferFrom, (_puppet, _params.subaccount, _cappedAmount))
             );
             if (!_success) continue;
 
-            throttleMap[_puppet][_params.master] = block.timestamp + _p.throttlePeriod;
-            _allocated[_i] = _cappedAmount;
+            throttleMap[_puppet][_params.account] = block.timestamp + _p.throttlePeriod;
+            _allocatedList[_i] = _cappedAmount;
             _total += _cappedAmount;
         }
 
-        if (_params.collateral.balanceOf(_params.subaccount) != _balanceBefore + _total) {
+        if (_params.baseToken.balanceOf(_params.subaccount) != _balanceBefore + _total) {
             revert Error.Match__TransferMismatch();
         }
     }
 
     function setFilter(address _puppet, uint _dim, bytes32 _value, bool _allowed) external auth {
-        if (_value == bytes32(0)) {
-            hasFilterMap[_puppet][_dim] = _allowed;
-        } else {
-            filterMap[_puppet][_dim][_value] = _allowed;
-            if (_allowed) hasFilterMap[_puppet][_dim] = true;
-        }
+        filterMap[_puppet][_dim][_value] = _allowed;
+        if (_allowed && _value != bytes32(0)) filterMap[_puppet][_dim][bytes32(0)] = true;
         _logEvent("SetFilter", abi.encode(_puppet, _dim, _value, _allowed));
     }
 
@@ -112,7 +99,7 @@ contract Match is CoreContract {
     }
 
     function _passesFilter(address _puppet, uint _dim, bytes32 _value) internal view returns (bool) {
-        if (!hasFilterMap[_puppet][_dim]) return true;
+        if (!filterMap[_puppet][_dim][bytes32(0)]) return true;
         return filterMap[_puppet][_dim][_value];
     }
 }
