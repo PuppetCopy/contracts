@@ -2,20 +2,15 @@
 pragma solidity ^0.8.33;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
+
 import {CoreContract} from "../utils/CoreContract.sol";
-import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "../utils/Precision.sol";
-import {SubaccountInfo} from "./interface/ITypes.sol";
 
 contract Match is CoreContract {
-    uint constant DIM_CHAIN = 0;
-    uint constant DIM_STAGE = 1;
-    uint constant DIM_COLLATERAL = 2;
-
-    struct Config {
-        uint gasLimit;
-    }
+    uint constant DIM_STAGE = 0;
+    uint constant DIM_COLLATERAL = 1;
 
     struct Policy {
         uint allowanceRate;
@@ -23,63 +18,50 @@ contract Match is CoreContract {
         uint expiry;
     }
 
-    Config public config;
-
     mapping(address puppet => mapping(uint dim => mapping(bytes32 value => bool))) public filterMap;
     mapping(address puppet => mapping(address trader => Policy)) public policyMap;
     mapping(address puppet => mapping(address trader => uint)) public throttleMap;
 
-    constructor(IAuthority _authority, bytes memory _config) CoreContract(_authority, _config) {}
+    constructor(IAuthority _authority) CoreContract(_authority, "") {}
 
-    function _setConfig(bytes memory _data) internal override {
-        config = abi.decode(_data, (Config));
-    }
+    function _setConfig(bytes memory) internal override {}
 
-    function executeMatch(SubaccountInfo calldata _params, address[] calldata _puppets, uint[] calldata _amountList)
-        external
-        auth
-        returns (uint[] memory _allocatedList)
-    {
-        _allocatedList = new uint[](_puppets.length);
+    function getMatchAmountList(
+        IERC20 _baseToken,
+        address _stage,
+        address _masterSubaccount,
+        IERC7579Account[] calldata _puppetList,
+        uint[] calldata _requestedAmountList
+    ) external view returns (uint[] memory _matchedAmountList) {
+        _matchedAmountList = new uint[](_puppetList.length);
 
-        bytes32 _chainKey = bytes32(_params.chainId);
-        bytes32 _stageKey = bytes32(uint(uint160(_params.stage)));
-        bytes32 _collateralKey = bytes32(uint(uint160(address(_params.baseToken))));
-        uint _gasLimit = config.gasLimit;
+        bytes32 _stageKey = bytes32(uint(uint160(_stage)));
+        bytes32 _collateralKey = bytes32(uint(uint160(address(_baseToken))));
 
-        uint _balanceBefore = _params.baseToken.balanceOf(_params.subaccount);
-        uint _total;
+        for (uint _i; _i < _puppetList.length; ++_i) {
+            address _puppetAddr = address(_puppetList[_i]);
 
-        for (uint _i; _i < _puppets.length; ++_i) {
-            address _puppet = _puppets[_i];
+            if (!_passesFilter(_puppetAddr, DIM_STAGE, _stageKey)) continue;
+            if (!_passesFilter(_puppetAddr, DIM_COLLATERAL, _collateralKey)) continue;
+            if (block.timestamp < throttleMap[_puppetAddr][_masterSubaccount]) continue;
 
-            if (!_passesFilter(_puppet, DIM_CHAIN, _chainKey)) continue;
-            if (!_passesFilter(_puppet, DIM_STAGE, _stageKey)) continue;
-            if (!_passesFilter(_puppet, DIM_COLLATERAL, _collateralKey)) continue;
-
-            if (block.timestamp < throttleMap[_puppet][_params.account]) continue;
-
-            Policy memory _p = policyMap[_puppet][_params.account];
-            if (_p.expiry == 0) _p = policyMap[_puppet][address(0)];
+            Policy memory _p = policyMap[_puppetAddr][_masterSubaccount];
+            if (_p.expiry == 0) _p = policyMap[_puppetAddr][address(0)];
             if (_p.expiry == 0 || block.timestamp > _p.expiry) continue;
 
-            uint _balance = _params.baseToken.allowance(_puppet, address(this));
+            uint _balance = _baseToken.balanceOf(_puppetAddr);
             uint _maxAllowed = Precision.applyBasisPoints(_p.allowanceRate, _balance);
-            uint _cappedAmount = _amountList[_i] > _maxAllowed ? _maxAllowed : _amountList[_i];
-            if (_cappedAmount == 0) continue;
+            uint _cappedAmount = _requestedAmountList[_i] > _maxAllowed ? _maxAllowed : _requestedAmountList[_i];
 
-            (bool _success,) = address(_params.baseToken).call{gas: _gasLimit}(
-                abi.encodeCall(IERC20.transferFrom, (_puppet, _params.subaccount, _cappedAmount))
-            );
-            if (!_success) continue;
-
-            throttleMap[_puppet][_params.account] = block.timestamp + _p.throttlePeriod;
-            _allocatedList[_i] = _cappedAmount;
-            _total += _cappedAmount;
+            _matchedAmountList[_i] = _cappedAmount;
         }
+    }
 
-        if (_params.baseToken.balanceOf(_params.subaccount) != _balanceBefore + _total) {
-            revert Error.Match__TransferMismatch();
+    function recordThrottle(address _puppet, address _masterSubaccount) external auth {
+        Policy memory _p = policyMap[_puppet][_masterSubaccount];
+        if (_p.expiry == 0) _p = policyMap[_puppet][address(0)];
+        if (_p.throttlePeriod > 0) {
+            throttleMap[_puppet][_masterSubaccount] = block.timestamp + _p.throttlePeriod;
         }
     }
 

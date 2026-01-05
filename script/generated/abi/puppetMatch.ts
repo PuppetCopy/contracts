@@ -9,11 +9,6 @@ export default [
         "name": "_authority",
         "type": "address",
         "internalType": "contract IAuthority"
-      },
-      {
-        "name": "_config",
-        "type": "bytes",
-        "internalType": "bytes"
       }
     ],
     "stateMutability": "nonpayable"
@@ -57,75 +52,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "config",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "gasLimit",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "executeMatch",
-    "inputs": [
-      {
-        "name": "_params",
-        "type": "tuple",
-        "internalType": "struct Match.MatchParams",
-        "components": [
-          {
-            "name": "subaccount",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "master",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "chainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "stage",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "collateral",
-            "type": "address",
-            "internalType": "contract IERC20"
-          }
-        ]
-      },
-      {
-        "name": "_puppets",
-        "type": "address[]",
-        "internalType": "address[]"
-      },
-      {
-        "name": "_amounts",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "_allocated",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "filterMap",
     "inputs": [
       {
@@ -155,24 +81,39 @@ export default [
   },
   {
     "type": "function",
-    "name": "hasFilterMap",
+    "name": "getMatchAmountList",
     "inputs": [
       {
-        "name": "puppet",
+        "name": "_baseToken",
+        "type": "address",
+        "internalType": "contract IERC20"
+      },
+      {
+        "name": "_stage",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "dim",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "_masterSubaccount",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_puppetList",
+        "type": "address[]",
+        "internalType": "contract IERC7579Account[]"
+      },
+      {
+        "name": "_requestedAmountList",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
       }
     ],
     "outputs": [
       {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
+        "name": "_matchedAmountList",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
       }
     ],
     "stateMutability": "view"
@@ -210,6 +151,24 @@ export default [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "recordThrottle",
+    "inputs": [
+      {
+        "name": "_puppet",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_masterSubaccount",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -350,11 +309,6 @@ export default [
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "error",
-    "name": "Match__TransferMismatch",
-    "inputs": []
   },
   {
     "type": "error",

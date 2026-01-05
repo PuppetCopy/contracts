@@ -1,6 +1,6 @@
 import { $ } from 'bun'
 
-const GMX_NODE_MODULES_PATH = './node_modules/@gmx'
+const GMX_LIB_PATH = './lib/gmx-synthetics'
 
 // Contract name mappings (deployment name -> our name)
 const CONTRACT_MAPPINGS = {
@@ -25,13 +25,13 @@ type DeploymentData = {
 }
 
 async function fetchGmxDeployments(): Promise<DeploymentData> {
-  console.log('🔄 Loading GMX deployments from node_modules...')
+  console.log('🔄 Loading GMX deployments from lib/gmx-synthetics...')
 
   try {
-    // Read all deployment files from node_modules
+    // Read all deployment files from lib
     console.log('📁 Loading Arbitrum deployments...')
     const deploymentFiles =
-      await $`find ${GMX_NODE_MODULES_PATH}/deployments/arbitrum -name "*.json" -not -name "*metadata*"`.text()
+      await $`find ${GMX_LIB_PATH}/deployments/arbitrum -name "*.json" -not -name "*metadata*"`.text()
     const files = deploymentFiles.trim().split('\n').filter(Boolean)
 
     const deployments: DeploymentData = {}
@@ -49,7 +49,7 @@ async function fetchGmxDeployments(): Promise<DeploymentData> {
     return deployments
   } catch (error) {
     throw new Error(
-      `Failed to load GMX deployments from node_modules: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to load GMX deployments from lib/gmx-synthetics: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }
@@ -58,8 +58,8 @@ async function generateGmxErrors(): Promise<number> {
   console.log('⚠️  Generating GMX error ABI...')
 
   try {
-    // Read the Errors.sol file from node_modules
-    const errorsFile = Bun.file(`${GMX_NODE_MODULES_PATH}/contracts/error/Errors.sol`)
+    // Read the Errors.sol file from lib
+    const errorsFile = Bun.file(`${GMX_LIB_PATH}/contracts/error/Errors.sol`)
     const content = await errorsFile.text()
 
     // Parse custom errors from the Solidity file
@@ -134,7 +134,7 @@ async function generateGmxErrors(): Promise<number> {
 
     // Write the GMX error ABI file
     const abiContent = `// This file is auto-generated. Do not edit manually.
-// Source: GMX contracts/error/Errors.sol from @gmx node_modules
+// Source: GMX contracts/error/Errors.sol from lib/gmx-synthetics
 
 export const gmxErrorAbi = ${JSON.stringify(errors, null, 2)} as const
 `
@@ -238,7 +238,7 @@ try {
       const abiFilePath = `./script/generated/gmx/abi/${abiFileName}.ts`
 
       const abiContent = `// This file is auto-generated. Do not edit manually.
-// Source: GMX deployment files from @gmx node_modules
+// Source: GMX deployment files from lib/gmx-synthetics
 
 export default ${JSON.stringify(contract.abi, null, 2)} as const
 `
@@ -256,7 +256,7 @@ export default ${JSON.stringify(contract.abi, null, 2)} as const
 
   // Write the main contracts file
   const contractListContent = `// This file is auto-generated. Do not edit manually.
-// Source: GMX deployment files from @gmx node_modules
+// Source: GMX deployment files from lib/gmx-synthetics
 
 // Import generated ABIs
 ${contracts

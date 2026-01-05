@@ -12,6 +12,7 @@ struct PositionParams {
 
 struct CallIntent {
     address account;
+    address signer;
     IERC7579Account subaccount;
     IERC20 token;
     uint amount;
@@ -29,7 +30,5 @@ struct SubaccountInfo {
     bytes32 name;
     bool disposed;
     uint nonce;
-    uint chainId;
     address stage;
-    address subaccount;
 }

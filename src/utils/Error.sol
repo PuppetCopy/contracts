@@ -11,6 +11,8 @@ library Error {
     error TransferUtils__InvalidReceiver();
     error TransferUtils__EmptyTokenTransferGasLimit(IERC20 token);
 
+    error TokenRouter__InvalidTransferGasLimit();
+
     error Dictatorship__ContractNotRegistered();
     error Dictatorship__ContractAlreadyInitialized();
     error Dictatorship__ConfigurationUpdateFailed();
@@ -54,7 +56,9 @@ library Error {
     error Allocate__ArrayLengthMismatch(uint puppetCount, uint allocationCount);
     error Allocate__PuppetListTooLarge(uint provided, uint maximum);
     error Allocate__IntentExpired(uint deadline, uint currentTime);
-    error Allocate__InvalidSignature(address expected, address recovered);
+    error Allocate__InvalidSignature(address signer);
+    error Allocate__InvalidSubaccountMaster(address expected, address provided);
+    error Allocate__UnauthorizedSigner(address signer);
     error Allocate__InvalidNonce(uint expected, uint provided);
     error Allocate__InvalidPosition();
     error Allocate__InvalidMatch();
@@ -69,6 +73,7 @@ library Error {
     error Allocate__InsufficientLiquidity();
     error Allocate__AmountMismatch(uint expected, uint actual);
     error Allocate__InvalidAccountCodeHash();
+    error Allocate__ExecutorNotInstalled();
     error Allocate__MasterHookNotInstalled();
     error Allocate__NetValueBelowMin(uint256 netValue, uint256 acceptableNetValue);
     error Allocate__NetValueAboveMax(uint256 netValue, uint256 acceptableNetValue);
@@ -93,8 +98,11 @@ library Error {
     error Position__ArrayLengthMismatch();
     error Position__BatchOrderNotAllowed();
 
+    error UserRouter__UnauthorizedCaller();
+
     // Match errors
     error Match__TransferMismatch();
+    error Match__InvalidConfig();
 
     // GmxStage errors
     error GmxStage__InvalidCallData();

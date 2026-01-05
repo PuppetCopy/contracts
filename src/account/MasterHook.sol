@@ -29,7 +29,7 @@ contract MasterHook is IHook {
     }
 
     function postCheck(bytes calldata hookData) external {
-        router.processPostCall(msg.sender, hookData);
+        router.processPostCall(hookData);
     }
 
     function onInstall(bytes calldata _data) external {

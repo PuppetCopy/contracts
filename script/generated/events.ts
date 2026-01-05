@@ -9,7 +9,7 @@ export const CONTRACT_EVENT_MAP = {
     },
     ExecuteAllocate: {
       hash: '0xc8e7f8df3ca4c122ae1fbf63eae5c258f59a8cee842870bab121051deca41d18',
-      args: [{type:"address",name:"subaccount"},{type:"address",name:"account"},{type:"address",name:"baseToken"},{type:"uint256",name:"amount"},{type:"address[]",name:"puppetList"},{type:"uint256[]",name:"amountList"},{type:"uint256",name:"allocation"},{type:"uint256",name:"netValue"},{type:"uint256",name:"allocated"},{type:"uint256",name:"sharePrice"},{type:"uint256",name:"userShares"},{type:"uint256",name:"totalShares"},{type:"uint256",name:"nonce"}]
+      args: [{type:"address",name:"subaccount"},{type:"address",name:"account"},{type:"address",name:"baseToken"},{type:"uint256",name:"amount"},{type:"address[]",name:"puppetList"},{type:"uint256[]",name:"allocatedList"},{type:"uint256",name:"allocation"},{type:"uint256",name:"netValue"},{type:"uint256",name:"allocated"},{type:"uint256",name:"sharePrice"},{type:"uint256",name:"userShares"},{type:"uint256",name:"totalShares"},{type:"uint256",name:"nonce"}]
     },
     ExecuteWithdraw: {
       hash: '0xcb64880bdc7e62dd4b02aedd4304adf2d6fbf5b649a653a21a9beadd95e24298',

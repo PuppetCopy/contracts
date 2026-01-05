@@ -9,19 +9,12 @@
     "test:target": "bun run test --match-test AllocationTest",
     "test:fork": "forge test --match-contract TradingForkTest -vvvv --fork-url=arbitrum",
     "build": "forge build",
-    "build:sizes": "forge build --sizes || true",
     "build:prod": "FOUNDRY_PROFILE=prod forge build",
     "generate": "bun run script/generate.ts",
     "build:ts": "tsc -b",
-    "script:deploy": "FOUNDRY_PROFILE=prod bun ./script/deploy.ts",
-    "script:deploy:base": "SCRIPT_NAME=DeployBase FOUNDRY_PROFILE=prod bun ./script/deploy.ts",
-    "script:deploy:position": "SCRIPT_NAME=DeployPosition FOUNDRY_PROFILE=prod bun ./script/deploy.ts",
-    "script:deploy:user-router": "SCRIPT_NAME=DeployUserRouter FOUNDRY_PROFILE=prod bun ./script/deploy.ts",
     "docgen": "forge doc --out '.docgen' --build",
-    "gas-report": "forge test --match-contract TradingTest --gas-report",
-    "lint:sol": "forge fmt --check",
-    "lint:fmt": "forge fmt",
-    "lint": "forge lint src --severity high --severity med"
+    "lint": "forge fmt --check",
+    "lint:fmt": "forge fmt"
   },
   "files": [
     "./src",

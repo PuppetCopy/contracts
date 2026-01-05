@@ -1,12 +1,12 @@
 // This file is auto-generated. Do not edit manually.
-// Source: GMX deployment files from @gmx node_modules
+// Source: GMX deployment files from lib/gmx-synthetics
 
-import datastoreAbi from './abi/gmxDatastore.js'
-import eventemitterAbi from './abi/gmxEventEmitter.js'
-import exchangerouterAbi from './abi/gmxExchangeRouter.js'
-import ordervaultAbi from './abi/gmxOrderVault.js'
 // Import generated ABIs
 import readerv2Abi from './abi/gmxReaderV2.js'
+import exchangerouterAbi from './abi/gmxExchangeRouter.js'
+import ordervaultAbi from './abi/gmxOrderVault.js'
+import datastoreAbi from './abi/gmxDatastore.js'
+import eventemitterAbi from './abi/gmxEventEmitter.js'
 
 export const GMX_V2_CONTRACT_MAP = {
   GmxReaderV2: {

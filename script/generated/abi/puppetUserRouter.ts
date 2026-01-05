@@ -151,11 +151,6 @@ export default [
     "name": "processPostCall",
     "inputs": [
       {
-        "name": "_subaccount",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "_hookData",
         "type": "bytes",
         "internalType": "bytes"
@@ -345,6 +340,11 @@ export default [
   {
     "type": "error",
     "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UserRouter__UnauthorizedCaller",
     "inputs": []
   }
 ] as const

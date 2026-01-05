@@ -51,7 +51,7 @@ contract AllocateSecurityTest is BasicSetup {
         sessionSigner = vm.addr(signerPrivateKey);
 
         position = new Position(dictator);
-        matcher = new Match(dictator, abi.encode(Match.Config({gasLimit: GAS_LIMIT})));
+        matcher = new Match(dictator);
         allocation = new Allocate(
             dictator,
             Allocate.Config({
@@ -63,7 +63,7 @@ contract AllocateSecurityTest is BasicSetup {
 
         dictator.registerContract(address(matcher));
         userRouter = new UserRouter(dictator, UserRouter.Config({allocation: allocation, matcher: matcher, position: position}));
-        dictator.setPermission(matcher, matcher.executeMatch.selector, address(allocation));
+        dictator.setPermission(matcher, matcher.recordThrottle.selector, address(allocation));
         dictator.setPermission(matcher, matcher.setFilter.selector, address(userRouter));
         dictator.setPermission(matcher, matcher.setPolicy.selector, address(userRouter));
 
@@ -99,14 +99,8 @@ contract AllocateSecurityTest is BasicSetup {
         usdc.mint(address(puppet1), 500e6);
         usdc.mint(address(puppet2), 500e6);
 
-        // Puppets approve Match for transferFrom
-        vm.stopPrank();
-        vm.prank(address(puppet1));
-        usdc.approve(address(matcher), type(uint).max);
-        vm.prank(address(puppet2));
-        usdc.approve(address(matcher), type(uint).max);
-
         // Set default policies for puppets (100% allowance, no throttle, far future expiry)
+        vm.stopPrank();
         vm.prank(address(puppet1));
         userRouter.setPolicy(address(0), 10000, 0, block.timestamp + 365 days);
         vm.prank(address(puppet2));
@@ -120,6 +114,7 @@ contract AllocateSecurityTest is BasicSetup {
             abi.encode(
                 allocation.CALL_INTENT_TYPEHASH(),
                 intent.account,
+                intent.signer,
                 intent.subaccount,
                 intent.token,
                 intent.amount,
@@ -154,8 +149,6 @@ contract AllocateSecurityTest is BasicSetup {
     }
 
     function _registerSubaccount(IERC7579Account sub, MockERC20 token) internal {
-        // Seed subaccount before registration (required by Allocate)
-        token.mint(address(sub), 1);
         allocation.registerMasterSubaccount(owner, sessionSigner, sub, IERC20(address(token)), SUBACCOUNT_NAME);
     }
 
@@ -184,6 +177,7 @@ contract AllocateSecurityTest is BasicSetup {
         PositionParams memory emptyParams = _emptyPositionParams();
         CallIntent memory attackerIntent = CallIntent({
             account: owner,
+            signer: owner,
             subaccount: attackerSub,
             token: usdc,
             amount: 1,
@@ -194,7 +188,7 @@ contract AllocateSecurityTest is BasicSetup {
             nonce: 0
         });
         bytes memory attackerSig = _signIntent(attackerIntent, ownerPrivateKey);
-        address[] memory emptyPuppets = new address[](0);
+        IERC7579Account[] memory emptyPuppets = new IERC7579Account[](0);
         uint[] memory emptyAmounts = new uint[](0);
         allocation.executeAllocate(position, matcher, attackerIntent, attackerSig, emptyPuppets, emptyAmounts, emptyParams);
 
@@ -215,6 +209,7 @@ contract AllocateSecurityTest is BasicSetup {
 
         CallIntent memory intent = CallIntent({
             account: owner,
+            signer: owner,
             subaccount: attackerSub,
             token: usdc,
             amount: 0,
@@ -226,8 +221,8 @@ contract AllocateSecurityTest is BasicSetup {
         });
         bytes memory sig = _signIntent(intent, ownerPrivateKey);
 
-        address[] memory puppets = new address[](1);
-        puppets[0] = address(puppet1);
+        IERC7579Account[] memory puppets = new IERC7579Account[](1);
+        puppets[0] = puppet1;
         uint[] memory amounts = new uint[](1);
         amounts[0] = 999e6;
 
@@ -274,6 +269,7 @@ contract AllocateSecurityTest is BasicSetup {
         PositionParams memory emptyParams = _emptyPositionParams();
         CallIntent memory intent = CallIntent({
             account: owner,
+            signer: owner,
             subaccount: sub,
             token: usdc,
             amount: 1000e6,
@@ -284,7 +280,7 @@ contract AllocateSecurityTest is BasicSetup {
             nonce: 0
         });
         bytes memory sig = _signIntent(intent, ownerPrivateKey);
-        address[] memory emptyPuppets = new address[](0);
+        IERC7579Account[] memory emptyPuppets = new IERC7579Account[](0);
         uint[] memory emptyAmounts = new uint[](0);
         allocation.executeAllocate(position, matcher, intent, sig, emptyPuppets, emptyAmounts, emptyParams);
 
@@ -312,6 +308,7 @@ contract AllocateSecurityTest is BasicSetup {
         PositionParams memory emptyParams = _emptyPositionParams();
         CallIntent memory intent = CallIntent({
             account: owner,
+            signer: owner,
             subaccount: sub,
             token: usdc,
             amount: 1,
@@ -322,7 +319,7 @@ contract AllocateSecurityTest is BasicSetup {
             nonce: 0
         });
         bytes memory sig = _signIntent(intent, ownerPrivateKey);
-        address[] memory emptyPuppets = new address[](0);
+        IERC7579Account[] memory emptyPuppets = new IERC7579Account[](0);
         uint[] memory emptyAmounts = new uint[](0);
         allocation.executeAllocate(position, matcher, intent, sig, emptyPuppets, emptyAmounts, emptyParams);
 

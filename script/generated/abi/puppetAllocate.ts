@@ -200,10 +200,15 @@ export default [
       {
         "name": "_intent",
         "type": "tuple",
-        "internalType": "struct Allocate.CallIntent",
+        "internalType": "struct CallIntent",
         "components": [
           {
             "name": "account",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "signer",
             "type": "address",
             "internalType": "address"
           },
@@ -257,7 +262,7 @@ export default [
       {
         "name": "_puppetList",
         "type": "address[]",
-        "internalType": "address[]"
+        "internalType": "contract IERC7579Account[]"
       },
       {
         "name": "_amountList",
@@ -267,7 +272,7 @@ export default [
       {
         "name": "_positionParams",
         "type": "tuple",
-        "internalType": "struct Allocate.PositionParams",
+        "internalType": "struct PositionParams",
         "components": [
           {
             "name": "stages",
@@ -297,10 +302,15 @@ export default [
       {
         "name": "_intent",
         "type": "tuple",
-        "internalType": "struct Allocate.CallIntent",
+        "internalType": "struct CallIntent",
         "components": [
           {
             "name": "account",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "signer",
             "type": "address",
             "internalType": "address"
           },
@@ -354,7 +364,7 @@ export default [
       {
         "name": "_positionParams",
         "type": "tuple",
-        "internalType": "struct Allocate.PositionParams",
+        "internalType": "struct PositionParams",
         "components": [
           {
             "name": "stages",
@@ -440,7 +450,7 @@ export default [
       {
         "name": "",
         "type": "tuple",
-        "internalType": "struct Allocate.SubaccountInfo",
+        "internalType": "struct SubaccountInfo",
         "components": [
           {
             "name": "account",
@@ -471,6 +481,11 @@ export default [
             "name": "nonce",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "stage",
+            "type": "address",
+            "internalType": "address"
           }
         ]
       }
@@ -657,6 +672,11 @@ export default [
         "name": "nonce",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "stage",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -875,6 +895,11 @@ export default [
   },
   {
     "type": "error",
+    "name": "Allocate__ExecutorNotInstalled",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "Allocate__InsufficientBalance",
     "inputs": []
   },
@@ -940,12 +965,23 @@ export default [
     "name": "Allocate__InvalidSignature",
     "inputs": [
       {
+        "name": "signer",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "Allocate__InvalidSubaccountMaster",
+    "inputs": [
+      {
         "name": "expected",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "recovered",
+        "name": "provided",
         "type": "address",
         "internalType": "address"
       }
@@ -1028,6 +1064,17 @@ export default [
     "type": "error",
     "name": "Allocate__TransferFailed",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Allocate__UnauthorizedSigner",
+    "inputs": [
+      {
+        "name": "signer",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
   },
   {
     "type": "error",

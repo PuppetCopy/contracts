@@ -83,6 +83,11 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
+    name: "TokenRouter__InvalidTransferGasLimit",
+    inputs: []
+  },
+  {
+    type: "error",
     name: "Dictatorship__ContractNotRegistered",
     inputs: []
   },
@@ -373,12 +378,34 @@ export const puppetErrorAbi = [
     name: "Allocate__InvalidSignature",
     inputs: [
       {
+        name: "signer",
+        internalType: "address",
+        type: "address"
+      }
+    ]
+  },
+  {
+    type: "error",
+    name: "Allocate__InvalidSubaccountMaster",
+    inputs: [
+      {
         name: "expected",
         internalType: "address",
         type: "address"
       },
       {
-        name: "recovered",
+        name: "provided",
+        internalType: "address",
+        type: "address"
+      }
+    ]
+  },
+  {
+    type: "error",
+    name: "Allocate__UnauthorizedSigner",
+    inputs: [
+      {
+        name: "signer",
         internalType: "address",
         type: "address"
       }
@@ -485,6 +512,11 @@ export const puppetErrorAbi = [
   {
     type: "error",
     name: "Allocate__InvalidAccountCodeHash",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Allocate__ExecutorNotInstalled",
     inputs: []
   },
   {
@@ -629,7 +661,17 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
+    name: "UserRouter__UnauthorizedCaller",
+    inputs: []
+  },
+  {
+    type: "error",
     name: "Match__TransferMismatch",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Match__InvalidConfig",
     inputs: []
   },
   {

@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 
 import {CoreContract} from "./utils/CoreContract.sol";
+import {Error} from "./utils/Error.sol";
 import {IAuthority} from "./utils/interfaces/IAuthority.sol";
 import {IUserRouter} from "./utils/interfaces/IUserRouter.sol";
 import {Allocate} from "./position/Allocate.sol";
@@ -31,10 +32,12 @@ contract UserRouter is IUserRouter, CoreContract {
         IERC20 _baseToken,
         bytes32 _name
     ) external {
+        if (msg.sender != config.allocation.getConfig().masterHook) revert Error.UserRouter__UnauthorizedCaller();
         config.allocation.registerMasterSubaccount(_account, _signer, _subaccount, _baseToken, _name);
     }
 
     function disposeSubaccount(IERC7579Account _subaccount) external {
+        if (msg.sender != config.allocation.getConfig().masterHook) revert Error.UserRouter__UnauthorizedCaller();
         config.allocation.disposeSubaccount(_subaccount);
     }
 
@@ -43,7 +46,7 @@ contract UserRouter is IUserRouter, CoreContract {
     }
 
     function isDisposed(IERC7579Account _subaccount) external view returns (bool) {
-        (,,,, bool disposed,,,,) = config.allocation.registeredMap(_subaccount);
+        (,,,, bool disposed,,) = config.allocation.registeredMap(_subaccount);
         return disposed;
     }
 
@@ -55,8 +58,8 @@ contract UserRouter is IUserRouter, CoreContract {
         return config.position.processPreCall(_master, _subaccount, _msgValue, _msgData);
     }
 
-    function processPostCall(address _subaccount, bytes calldata _hookData) external {
-        config.position.processPostCall(_subaccount, _hookData);
+    function processPostCall(bytes calldata _hookData) external {
+        config.position.processPostCall(msg.sender, _hookData);
     }
 
     function setFilter(uint _dim, bytes32 _value, bool _allowed) external {

@@ -1,1591 +1,1591 @@
 // This file is auto-generated. Do not edit manually.
-// Source: GMX deployment files from @gmx node_modules
+// Source: GMX deployment files from lib/gmx-synthetics
 
 export default [
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'contract Router',
-        name: '_router',
-        type: 'address'
+        "internalType": "contract Router",
+        "name": "_router",
+        "type": "address"
       },
       {
-        internalType: 'contract RoleStore',
-        name: '_roleStore',
-        type: 'address'
+        "internalType": "contract RoleStore",
+        "name": "_roleStore",
+        "type": "address"
       },
       {
-        internalType: 'contract DataStore',
-        name: '_dataStore',
-        type: 'address'
+        "internalType": "contract DataStore",
+        "name": "_dataStore",
+        "type": "address"
       },
       {
-        internalType: 'contract EventEmitter',
-        name: '_eventEmitter',
-        type: 'address'
+        "internalType": "contract EventEmitter",
+        "name": "_eventEmitter",
+        "type": "address"
       },
       {
-        internalType: 'contract IDepositHandler',
-        name: '_depositHandler',
-        type: 'address'
+        "internalType": "contract IDepositHandler",
+        "name": "_depositHandler",
+        "type": "address"
       },
       {
-        internalType: 'contract IWithdrawalHandler',
-        name: '_withdrawalHandler',
-        type: 'address'
+        "internalType": "contract IWithdrawalHandler",
+        "name": "_withdrawalHandler",
+        "type": "address"
       },
       {
-        internalType: 'contract IShiftHandler',
-        name: '_shiftHandler',
-        type: 'address'
+        "internalType": "contract IShiftHandler",
+        "name": "_shiftHandler",
+        "type": "address"
       },
       {
-        internalType: 'contract IOrderHandler',
-        name: '_orderHandler',
-        type: 'address'
+        "internalType": "contract IOrderHandler",
+        "name": "_orderHandler",
+        "type": "address"
       },
       {
-        internalType: 'contract IExternalHandler',
-        name: '_externalHandler',
-        type: 'address'
+        "internalType": "contract IExternalHandler",
+        "name": "_externalHandler",
+        "type": "address"
       },
       {
-        internalType: 'contract IJitOrderHandler',
-        name: '_jitOrderHandler',
-        type: 'address'
+        "internalType": "contract IJitOrderHandler",
+        "name": "_jitOrderHandler",
+        "type": "address"
       }
     ],
-    stateMutability: 'nonpayable',
-    type: 'constructor'
+    "stateMutability": "nonpayable",
+    "type": "constructor"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: 'adjustedClaimableAmount',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "adjustedClaimableAmount",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'claimedAmount',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "claimedAmount",
+        "type": "uint256"
       }
     ],
-    name: 'CollateralAlreadyClaimed',
-    type: 'error'
+    "name": "CollateralAlreadyClaimed",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'bytes32',
-        name: 'key',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "key",
+        "type": "bytes32"
       }
     ],
-    name: 'DisabledFeature',
-    type: 'error'
+    "name": "DisabledFeature",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'market',
-        type: 'address'
+        "internalType": "address",
+        "name": "market",
+        "type": "address"
       }
     ],
-    name: 'DisabledMarket',
-    type: 'error'
+    "name": "DisabledMarket",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'market',
-        type: 'address'
+        "internalType": "address",
+        "name": "market",
+        "type": "address"
       },
       {
-        internalType: 'address',
-        name: 'token',
-        type: 'address'
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       }
     ],
-    name: 'EmptyAddressInMarketTokenBalanceValidation',
-    type: 'error'
+    "name": "EmptyAddressInMarketTokenBalanceValidation",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'EmptyDeposit',
-    type: 'error'
+    "inputs": [],
+    "name": "EmptyDeposit",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'EmptyHoldingAddress',
-    type: 'error'
+    "inputs": [],
+    "name": "EmptyHoldingAddress",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'EmptyMarket',
-    type: 'error'
+    "inputs": [],
+    "name": "EmptyMarket",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'EmptyOrder',
-    type: 'error'
+    "inputs": [],
+    "name": "EmptyOrder",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'EmptyReceiver',
-    type: 'error'
+    "inputs": [],
+    "name": "EmptyReceiver",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'token',
-        type: 'address'
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       }
     ],
-    name: 'EmptyTokenTranferGasLimit',
-    type: 'error'
+    "name": "EmptyTokenTranferGasLimit",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: 'marketsLength',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "marketsLength",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'tokensLength',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "tokensLength",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'timeKeysLength',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "timeKeysLength",
+        "type": "uint256"
       }
     ],
-    name: 'InvalidClaimCollateralInput',
-    type: 'error'
+    "name": "InvalidClaimCollateralInput",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: 'value',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
       }
     ],
-    name: 'InvalidClaimableFactor',
-    type: 'error'
+    "name": "InvalidClaimableFactor",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'market',
-        type: 'address'
+        "internalType": "address",
+        "name": "market",
+        "type": "address"
       },
       {
-        internalType: 'address',
-        name: 'token',
-        type: 'address'
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       },
       {
-        internalType: 'uint256',
-        name: 'balance',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "balance",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'expectedMinBalance',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "expectedMinBalance",
+        "type": "uint256"
       }
     ],
-    name: 'InvalidMarketTokenBalance',
-    type: 'error'
+    "name": "InvalidMarketTokenBalance",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'market',
-        type: 'address'
+        "internalType": "address",
+        "name": "market",
+        "type": "address"
       },
       {
-        internalType: 'address',
-        name: 'token',
-        type: 'address'
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       },
       {
-        internalType: 'uint256',
-        name: 'balance',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "balance",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'claimableFundingFeeAmount',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "claimableFundingFeeAmount",
+        "type": "uint256"
       }
     ],
-    name: 'InvalidMarketTokenBalanceForClaimableFunding',
-    type: 'error'
+    "name": "InvalidMarketTokenBalanceForClaimableFunding",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'market',
-        type: 'address'
+        "internalType": "address",
+        "name": "market",
+        "type": "address"
       },
       {
-        internalType: 'address',
-        name: 'token',
-        type: 'address'
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       },
       {
-        internalType: 'uint256',
-        name: 'balance',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "balance",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'collateralAmount',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "collateralAmount",
+        "type": "uint256"
       }
     ],
-    name: 'InvalidMarketTokenBalanceForCollateralAmount',
-    type: 'error'
+    "name": "InvalidMarketTokenBalanceForCollateralAmount",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: 'uiFeeFactor',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "uiFeeFactor",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'maxUiFeeFactor',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "maxUiFeeFactor",
+        "type": "uint256"
       }
     ],
-    name: 'InvalidUiFeeFactor',
-    type: 'error'
+    "name": "InvalidUiFeeFactor",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'token',
-        type: 'address'
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       },
       {
-        internalType: 'address',
-        name: 'receiver',
-        type: 'address'
+        "internalType": "address",
+        "name": "receiver",
+        "type": "address"
       },
       {
-        internalType: 'uint256',
-        name: 'amount',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
       }
     ],
-    name: 'TokenTransferError',
-    type: 'error'
+    "name": "TokenTransferError",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'msgSender',
-        type: 'address'
+        "internalType": "address",
+        "name": "msgSender",
+        "type": "address"
       },
       {
-        internalType: 'string',
-        name: 'role',
-        type: 'string'
+        "internalType": "string",
+        "name": "role",
+        "type": "string"
       }
     ],
-    name: 'Unauthorized',
-    type: 'error'
+    "name": "Unauthorized",
+    "type": "error"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: false,
-        internalType: 'string',
-        name: 'reason',
-        type: 'string'
+        "indexed": false,
+        "internalType": "string",
+        "name": "reason",
+        "type": "string"
       },
       {
-        indexed: false,
-        internalType: 'bytes',
-        name: 'returndata',
-        type: 'bytes'
+        "indexed": false,
+        "internalType": "bytes",
+        "name": "returndata",
+        "type": "bytes"
       }
     ],
-    name: 'TokenTransferReverted',
-    type: 'event'
+    "name": "TokenTransferReverted",
+    "type": "event"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'bytes32',
-        name: 'key',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "key",
+        "type": "bytes32"
       }
     ],
-    name: 'cancelDeposit',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "cancelDeposit",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'bytes32',
-        name: 'key',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "key",
+        "type": "bytes32"
       }
     ],
-    name: 'cancelOrder',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "cancelOrder",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'bytes32',
-        name: 'key',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "key",
+        "type": "bytes32"
       }
     ],
-    name: 'cancelShift',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "cancelShift",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'bytes32',
-        name: 'key',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "key",
+        "type": "bytes32"
       }
     ],
-    name: 'cancelWithdrawal',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "cancelWithdrawal",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address[]',
-        name: 'markets',
-        type: 'address[]'
+        "internalType": "address[]",
+        "name": "markets",
+        "type": "address[]"
       },
       {
-        internalType: 'address[]',
-        name: 'tokens',
-        type: 'address[]'
+        "internalType": "address[]",
+        "name": "tokens",
+        "type": "address[]"
       },
       {
-        internalType: 'address',
-        name: 'receiver',
-        type: 'address'
+        "internalType": "address",
+        "name": "receiver",
+        "type": "address"
       }
     ],
-    name: 'claimAffiliateRewards',
-    outputs: [
+    "name": "claimAffiliateRewards",
+    "outputs": [
       {
-        internalType: 'uint256[]',
-        name: '',
-        type: 'uint256[]'
+        "internalType": "uint256[]",
+        "name": "",
+        "type": "uint256[]"
       }
     ],
-    stateMutability: 'payable',
-    type: 'function'
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address[]',
-        name: 'markets',
-        type: 'address[]'
+        "internalType": "address[]",
+        "name": "markets",
+        "type": "address[]"
       },
       {
-        internalType: 'address[]',
-        name: 'tokens',
-        type: 'address[]'
+        "internalType": "address[]",
+        "name": "tokens",
+        "type": "address[]"
       },
       {
-        internalType: 'uint256[]',
-        name: 'timeKeys',
-        type: 'uint256[]'
+        "internalType": "uint256[]",
+        "name": "timeKeys",
+        "type": "uint256[]"
       },
       {
-        internalType: 'address',
-        name: 'receiver',
-        type: 'address'
+        "internalType": "address",
+        "name": "receiver",
+        "type": "address"
       }
     ],
-    name: 'claimCollateral',
-    outputs: [
+    "name": "claimCollateral",
+    "outputs": [
       {
-        internalType: 'uint256[]',
-        name: '',
-        type: 'uint256[]'
+        "internalType": "uint256[]",
+        "name": "",
+        "type": "uint256[]"
       }
     ],
-    stateMutability: 'payable',
-    type: 'function'
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address[]',
-        name: 'markets',
-        type: 'address[]'
+        "internalType": "address[]",
+        "name": "markets",
+        "type": "address[]"
       },
       {
-        internalType: 'address[]',
-        name: 'tokens',
-        type: 'address[]'
+        "internalType": "address[]",
+        "name": "tokens",
+        "type": "address[]"
       },
       {
-        internalType: 'address',
-        name: 'receiver',
-        type: 'address'
+        "internalType": "address",
+        "name": "receiver",
+        "type": "address"
       }
     ],
-    name: 'claimFundingFees',
-    outputs: [
+    "name": "claimFundingFees",
+    "outputs": [
       {
-        internalType: 'uint256[]',
-        name: '',
-        type: 'uint256[]'
+        "internalType": "uint256[]",
+        "name": "",
+        "type": "uint256[]"
       }
     ],
-    stateMutability: 'payable',
-    type: 'function'
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address[]',
-        name: 'markets',
-        type: 'address[]'
+        "internalType": "address[]",
+        "name": "markets",
+        "type": "address[]"
       },
       {
-        internalType: 'address[]',
-        name: 'tokens',
-        type: 'address[]'
+        "internalType": "address[]",
+        "name": "tokens",
+        "type": "address[]"
       },
       {
-        internalType: 'address',
-        name: 'receiver',
-        type: 'address'
+        "internalType": "address",
+        "name": "receiver",
+        "type": "address"
       }
     ],
-    name: 'claimUiFees',
-    outputs: [
+    "name": "claimUiFees",
+    "outputs": [
       {
-        internalType: 'uint256[]',
-        name: '',
-        type: 'uint256[]'
+        "internalType": "uint256[]",
+        "name": "",
+        "type": "uint256[]"
       }
     ],
-    stateMutability: 'payable',
-    type: 'function'
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        components: [
+        "components": [
           {
-            components: [
+            "components": [
               {
-                internalType: 'address',
-                name: 'receiver',
-                type: 'address'
+                "internalType": "address",
+                "name": "receiver",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'callbackContract',
-                type: 'address'
+                "internalType": "address",
+                "name": "callbackContract",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'uiFeeReceiver',
-                type: 'address'
+                "internalType": "address",
+                "name": "uiFeeReceiver",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'market',
-                type: 'address'
+                "internalType": "address",
+                "name": "market",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'initialLongToken',
-                type: 'address'
+                "internalType": "address",
+                "name": "initialLongToken",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'initialShortToken',
-                type: 'address'
+                "internalType": "address",
+                "name": "initialShortToken",
+                "type": "address"
               },
               {
-                internalType: 'address[]',
-                name: 'longTokenSwapPath',
-                type: 'address[]'
+                "internalType": "address[]",
+                "name": "longTokenSwapPath",
+                "type": "address[]"
               },
               {
-                internalType: 'address[]',
-                name: 'shortTokenSwapPath',
-                type: 'address[]'
+                "internalType": "address[]",
+                "name": "shortTokenSwapPath",
+                "type": "address[]"
               }
             ],
-            internalType: 'struct IDepositUtils.CreateDepositParamsAddresses',
-            name: 'addresses',
-            type: 'tuple'
+            "internalType": "struct IDepositUtils.CreateDepositParamsAddresses",
+            "name": "addresses",
+            "type": "tuple"
           },
           {
-            internalType: 'uint256',
-            name: 'minMarketTokens',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "minMarketTokens",
+            "type": "uint256"
           },
           {
-            internalType: 'bool',
-            name: 'shouldUnwrapNativeToken',
-            type: 'bool'
+            "internalType": "bool",
+            "name": "shouldUnwrapNativeToken",
+            "type": "bool"
           },
           {
-            internalType: 'uint256',
-            name: 'executionFee',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "executionFee",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'callbackGasLimit',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "callbackGasLimit",
+            "type": "uint256"
           },
           {
-            internalType: 'bytes32[]',
-            name: 'dataList',
-            type: 'bytes32[]'
+            "internalType": "bytes32[]",
+            "name": "dataList",
+            "type": "bytes32[]"
           }
         ],
-        internalType: 'struct IDepositUtils.CreateDepositParams',
-        name: 'params',
-        type: 'tuple'
+        "internalType": "struct IDepositUtils.CreateDepositParams",
+        "name": "params",
+        "type": "tuple"
       }
     ],
-    name: 'createDeposit',
-    outputs: [
+    "name": "createDeposit",
+    "outputs": [
       {
-        internalType: 'bytes32',
-        name: '',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
       }
     ],
-    stateMutability: 'payable',
-    type: 'function'
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        components: [
+        "components": [
           {
-            components: [
+            "components": [
               {
-                internalType: 'address',
-                name: 'receiver',
-                type: 'address'
+                "internalType": "address",
+                "name": "receiver",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'cancellationReceiver',
-                type: 'address'
+                "internalType": "address",
+                "name": "cancellationReceiver",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'callbackContract',
-                type: 'address'
+                "internalType": "address",
+                "name": "callbackContract",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'uiFeeReceiver',
-                type: 'address'
+                "internalType": "address",
+                "name": "uiFeeReceiver",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'market',
-                type: 'address'
+                "internalType": "address",
+                "name": "market",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'initialCollateralToken',
-                type: 'address'
+                "internalType": "address",
+                "name": "initialCollateralToken",
+                "type": "address"
               },
               {
-                internalType: 'address[]',
-                name: 'swapPath',
-                type: 'address[]'
+                "internalType": "address[]",
+                "name": "swapPath",
+                "type": "address[]"
               }
             ],
-            internalType: 'struct IBaseOrderUtils.CreateOrderParamsAddresses',
-            name: 'addresses',
-            type: 'tuple'
+            "internalType": "struct IBaseOrderUtils.CreateOrderParamsAddresses",
+            "name": "addresses",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                internalType: 'uint256',
-                name: 'sizeDeltaUsd',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "sizeDeltaUsd",
+                "type": "uint256"
               },
               {
-                internalType: 'uint256',
-                name: 'initialCollateralDeltaAmount',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "initialCollateralDeltaAmount",
+                "type": "uint256"
               },
               {
-                internalType: 'uint256',
-                name: 'triggerPrice',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "triggerPrice",
+                "type": "uint256"
               },
               {
-                internalType: 'uint256',
-                name: 'acceptablePrice',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "acceptablePrice",
+                "type": "uint256"
               },
               {
-                internalType: 'uint256',
-                name: 'executionFee',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "executionFee",
+                "type": "uint256"
               },
               {
-                internalType: 'uint256',
-                name: 'callbackGasLimit',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "callbackGasLimit",
+                "type": "uint256"
               },
               {
-                internalType: 'uint256',
-                name: 'minOutputAmount',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "minOutputAmount",
+                "type": "uint256"
               },
               {
-                internalType: 'uint256',
-                name: 'validFromTime',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "validFromTime",
+                "type": "uint256"
               }
             ],
-            internalType: 'struct IBaseOrderUtils.CreateOrderParamsNumbers',
-            name: 'numbers',
-            type: 'tuple'
+            "internalType": "struct IBaseOrderUtils.CreateOrderParamsNumbers",
+            "name": "numbers",
+            "type": "tuple"
           },
           {
-            internalType: 'enum Order.OrderType',
-            name: 'orderType',
-            type: 'uint8'
+            "internalType": "enum Order.OrderType",
+            "name": "orderType",
+            "type": "uint8"
           },
           {
-            internalType: 'enum Order.DecreasePositionSwapType',
-            name: 'decreasePositionSwapType',
-            type: 'uint8'
+            "internalType": "enum Order.DecreasePositionSwapType",
+            "name": "decreasePositionSwapType",
+            "type": "uint8"
           },
           {
-            internalType: 'bool',
-            name: 'isLong',
-            type: 'bool'
+            "internalType": "bool",
+            "name": "isLong",
+            "type": "bool"
           },
           {
-            internalType: 'bool',
-            name: 'shouldUnwrapNativeToken',
-            type: 'bool'
+            "internalType": "bool",
+            "name": "shouldUnwrapNativeToken",
+            "type": "bool"
           },
           {
-            internalType: 'bool',
-            name: 'autoCancel',
-            type: 'bool'
+            "internalType": "bool",
+            "name": "autoCancel",
+            "type": "bool"
           },
           {
-            internalType: 'bytes32',
-            name: 'referralCode',
-            type: 'bytes32'
+            "internalType": "bytes32",
+            "name": "referralCode",
+            "type": "bytes32"
           },
           {
-            internalType: 'bytes32[]',
-            name: 'dataList',
-            type: 'bytes32[]'
+            "internalType": "bytes32[]",
+            "name": "dataList",
+            "type": "bytes32[]"
           }
         ],
-        internalType: 'struct IBaseOrderUtils.CreateOrderParams',
-        name: 'params',
-        type: 'tuple'
+        "internalType": "struct IBaseOrderUtils.CreateOrderParams",
+        "name": "params",
+        "type": "tuple"
       }
     ],
-    name: 'createOrder',
-    outputs: [
+    "name": "createOrder",
+    "outputs": [
       {
-        internalType: 'bytes32',
-        name: '',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
       }
     ],
-    stateMutability: 'payable',
-    type: 'function'
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        components: [
+        "components": [
           {
-            components: [
+            "components": [
               {
-                internalType: 'address',
-                name: 'receiver',
-                type: 'address'
+                "internalType": "address",
+                "name": "receiver",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'callbackContract',
-                type: 'address'
+                "internalType": "address",
+                "name": "callbackContract",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'uiFeeReceiver',
-                type: 'address'
+                "internalType": "address",
+                "name": "uiFeeReceiver",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'fromMarket',
-                type: 'address'
+                "internalType": "address",
+                "name": "fromMarket",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'toMarket',
-                type: 'address'
+                "internalType": "address",
+                "name": "toMarket",
+                "type": "address"
               }
             ],
-            internalType: 'struct IShiftUtils.CreateShiftParamsAddresses',
-            name: 'addresses',
-            type: 'tuple'
+            "internalType": "struct IShiftUtils.CreateShiftParamsAddresses",
+            "name": "addresses",
+            "type": "tuple"
           },
           {
-            internalType: 'uint256',
-            name: 'minMarketTokens',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "minMarketTokens",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'executionFee',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "executionFee",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'callbackGasLimit',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "callbackGasLimit",
+            "type": "uint256"
           },
           {
-            internalType: 'bytes32[]',
-            name: 'dataList',
-            type: 'bytes32[]'
+            "internalType": "bytes32[]",
+            "name": "dataList",
+            "type": "bytes32[]"
           }
         ],
-        internalType: 'struct IShiftUtils.CreateShiftParams',
-        name: 'params',
-        type: 'tuple'
+        "internalType": "struct IShiftUtils.CreateShiftParams",
+        "name": "params",
+        "type": "tuple"
       }
     ],
-    name: 'createShift',
-    outputs: [
+    "name": "createShift",
+    "outputs": [
       {
-        internalType: 'bytes32',
-        name: '',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
       }
     ],
-    stateMutability: 'payable',
-    type: 'function'
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        components: [
+        "components": [
           {
-            components: [
+            "components": [
               {
-                internalType: 'address',
-                name: 'receiver',
-                type: 'address'
+                "internalType": "address",
+                "name": "receiver",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'callbackContract',
-                type: 'address'
+                "internalType": "address",
+                "name": "callbackContract",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'uiFeeReceiver',
-                type: 'address'
+                "internalType": "address",
+                "name": "uiFeeReceiver",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'market',
-                type: 'address'
+                "internalType": "address",
+                "name": "market",
+                "type": "address"
               },
               {
-                internalType: 'address[]',
-                name: 'longTokenSwapPath',
-                type: 'address[]'
+                "internalType": "address[]",
+                "name": "longTokenSwapPath",
+                "type": "address[]"
               },
               {
-                internalType: 'address[]',
-                name: 'shortTokenSwapPath',
-                type: 'address[]'
+                "internalType": "address[]",
+                "name": "shortTokenSwapPath",
+                "type": "address[]"
               }
             ],
-            internalType: 'struct IWithdrawalUtils.CreateWithdrawalParamsAddresses',
-            name: 'addresses',
-            type: 'tuple'
+            "internalType": "struct IWithdrawalUtils.CreateWithdrawalParamsAddresses",
+            "name": "addresses",
+            "type": "tuple"
           },
           {
-            internalType: 'uint256',
-            name: 'minLongTokenAmount',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "minLongTokenAmount",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'minShortTokenAmount',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "minShortTokenAmount",
+            "type": "uint256"
           },
           {
-            internalType: 'bool',
-            name: 'shouldUnwrapNativeToken',
-            type: 'bool'
+            "internalType": "bool",
+            "name": "shouldUnwrapNativeToken",
+            "type": "bool"
           },
           {
-            internalType: 'uint256',
-            name: 'executionFee',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "executionFee",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'callbackGasLimit',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "callbackGasLimit",
+            "type": "uint256"
           },
           {
-            internalType: 'bytes32[]',
-            name: 'dataList',
-            type: 'bytes32[]'
+            "internalType": "bytes32[]",
+            "name": "dataList",
+            "type": "bytes32[]"
           }
         ],
-        internalType: 'struct IWithdrawalUtils.CreateWithdrawalParams',
-        name: 'params',
-        type: 'tuple'
+        "internalType": "struct IWithdrawalUtils.CreateWithdrawalParams",
+        "name": "params",
+        "type": "tuple"
       }
     ],
-    name: 'createWithdrawal',
-    outputs: [
+    "name": "createWithdrawal",
+    "outputs": [
       {
-        internalType: 'bytes32',
-        name: '',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
       }
     ],
-    stateMutability: 'payable',
-    type: 'function'
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'dataStore',
-    outputs: [
+    "inputs": [],
+    "name": "dataStore",
+    "outputs": [
       {
-        internalType: 'contract DataStore',
-        name: '',
-        type: 'address'
+        "internalType": "contract DataStore",
+        "name": "",
+        "type": "address"
       }
     ],
-    stateMutability: 'view',
-    type: 'function'
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'depositHandler',
-    outputs: [
+    "inputs": [],
+    "name": "depositHandler",
+    "outputs": [
       {
-        internalType: 'contract IDepositHandler',
-        name: '',
-        type: 'address'
+        "internalType": "contract IDepositHandler",
+        "name": "",
+        "type": "address"
       }
     ],
-    stateMutability: 'view',
-    type: 'function'
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'eventEmitter',
-    outputs: [
+    "inputs": [],
+    "name": "eventEmitter",
+    "outputs": [
       {
-        internalType: 'contract EventEmitter',
-        name: '',
-        type: 'address'
+        "internalType": "contract EventEmitter",
+        "name": "",
+        "type": "address"
       }
     ],
-    stateMutability: 'view',
-    type: 'function'
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        components: [
+        "components": [
           {
-            components: [
+            "components": [
               {
-                internalType: 'address',
-                name: 'receiver',
-                type: 'address'
+                "internalType": "address",
+                "name": "receiver",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'callbackContract',
-                type: 'address'
+                "internalType": "address",
+                "name": "callbackContract",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'uiFeeReceiver',
-                type: 'address'
+                "internalType": "address",
+                "name": "uiFeeReceiver",
+                "type": "address"
               },
               {
-                internalType: 'address',
-                name: 'market',
-                type: 'address'
+                "internalType": "address",
+                "name": "market",
+                "type": "address"
               },
               {
-                internalType: 'address[]',
-                name: 'longTokenSwapPath',
-                type: 'address[]'
+                "internalType": "address[]",
+                "name": "longTokenSwapPath",
+                "type": "address[]"
               },
               {
-                internalType: 'address[]',
-                name: 'shortTokenSwapPath',
-                type: 'address[]'
+                "internalType": "address[]",
+                "name": "shortTokenSwapPath",
+                "type": "address[]"
               }
             ],
-            internalType: 'struct IWithdrawalUtils.CreateWithdrawalParamsAddresses',
-            name: 'addresses',
-            type: 'tuple'
+            "internalType": "struct IWithdrawalUtils.CreateWithdrawalParamsAddresses",
+            "name": "addresses",
+            "type": "tuple"
           },
           {
-            internalType: 'uint256',
-            name: 'minLongTokenAmount',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "minLongTokenAmount",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'minShortTokenAmount',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "minShortTokenAmount",
+            "type": "uint256"
           },
           {
-            internalType: 'bool',
-            name: 'shouldUnwrapNativeToken',
-            type: 'bool'
+            "internalType": "bool",
+            "name": "shouldUnwrapNativeToken",
+            "type": "bool"
           },
           {
-            internalType: 'uint256',
-            name: 'executionFee',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "executionFee",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'callbackGasLimit',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "callbackGasLimit",
+            "type": "uint256"
           },
           {
-            internalType: 'bytes32[]',
-            name: 'dataList',
-            type: 'bytes32[]'
+            "internalType": "bytes32[]",
+            "name": "dataList",
+            "type": "bytes32[]"
           }
         ],
-        internalType: 'struct IWithdrawalUtils.CreateWithdrawalParams',
-        name: 'params',
-        type: 'tuple'
+        "internalType": "struct IWithdrawalUtils.CreateWithdrawalParams",
+        "name": "params",
+        "type": "tuple"
       },
       {
-        components: [
+        "components": [
           {
-            internalType: 'address[]',
-            name: 'tokens',
-            type: 'address[]'
+            "internalType": "address[]",
+            "name": "tokens",
+            "type": "address[]"
           },
           {
-            internalType: 'address[]',
-            name: 'providers',
-            type: 'address[]'
+            "internalType": "address[]",
+            "name": "providers",
+            "type": "address[]"
           },
           {
-            internalType: 'bytes[]',
-            name: 'data',
-            type: 'bytes[]'
+            "internalType": "bytes[]",
+            "name": "data",
+            "type": "bytes[]"
           }
         ],
-        internalType: 'struct OracleUtils.SetPricesParams',
-        name: 'oracleParams',
-        type: 'tuple'
+        "internalType": "struct OracleUtils.SetPricesParams",
+        "name": "oracleParams",
+        "type": "tuple"
       }
     ],
-    name: 'executeAtomicWithdrawal',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "executeAtomicWithdrawal",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'externalHandler',
-    outputs: [
+    "inputs": [],
+    "name": "externalHandler",
+    "outputs": [
       {
-        internalType: 'contract IExternalHandler',
-        name: '',
-        type: 'address'
+        "internalType": "contract IExternalHandler",
+        "name": "",
+        "type": "address"
       }
     ],
-    stateMutability: 'view',
-    type: 'function'
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'jitOrderHandler',
-    outputs: [
+    "inputs": [],
+    "name": "jitOrderHandler",
+    "outputs": [
       {
-        internalType: 'contract IJitOrderHandler',
-        name: '',
-        type: 'address'
+        "internalType": "contract IJitOrderHandler",
+        "name": "",
+        "type": "address"
       }
     ],
-    stateMutability: 'view',
-    type: 'function'
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address[]',
-        name: 'externalCallTargets',
-        type: 'address[]'
+        "internalType": "address[]",
+        "name": "externalCallTargets",
+        "type": "address[]"
       },
       {
-        internalType: 'bytes[]',
-        name: 'externalCallDataList',
-        type: 'bytes[]'
+        "internalType": "bytes[]",
+        "name": "externalCallDataList",
+        "type": "bytes[]"
       },
       {
-        internalType: 'address[]',
-        name: 'refundTokens',
-        type: 'address[]'
+        "internalType": "address[]",
+        "name": "refundTokens",
+        "type": "address[]"
       },
       {
-        internalType: 'address[]',
-        name: 'refundReceivers',
-        type: 'address[]'
+        "internalType": "address[]",
+        "name": "refundReceivers",
+        "type": "address[]"
       }
     ],
-    name: 'makeExternalCalls',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "makeExternalCalls",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'bytes[]',
-        name: 'data',
-        type: 'bytes[]'
+        "internalType": "bytes[]",
+        "name": "data",
+        "type": "bytes[]"
       }
     ],
-    name: 'multicall',
-    outputs: [
+    "name": "multicall",
+    "outputs": [
       {
-        internalType: 'bytes[]',
-        name: 'results',
-        type: 'bytes[]'
+        "internalType": "bytes[]",
+        "name": "results",
+        "type": "bytes[]"
       }
     ],
-    stateMutability: 'payable',
-    type: 'function'
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'orderHandler',
-    outputs: [
+    "inputs": [],
+    "name": "orderHandler",
+    "outputs": [
       {
-        internalType: 'contract IOrderHandler',
-        name: '',
-        type: 'address'
+        "internalType": "contract IOrderHandler",
+        "name": "",
+        "type": "address"
       }
     ],
-    stateMutability: 'view',
-    type: 'function'
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'roleStore',
-    outputs: [
+    "inputs": [],
+    "name": "roleStore",
+    "outputs": [
       {
-        internalType: 'contract RoleStore',
-        name: '',
-        type: 'address'
+        "internalType": "contract RoleStore",
+        "name": "",
+        "type": "address"
       }
     ],
-    stateMutability: 'view',
-    type: 'function'
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'router',
-    outputs: [
+    "inputs": [],
+    "name": "router",
+    "outputs": [
       {
-        internalType: 'contract Router',
-        name: '',
-        type: 'address'
+        "internalType": "contract Router",
+        "name": "",
+        "type": "address"
       }
     ],
-    stateMutability: 'view',
-    type: 'function'
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'receiver',
-        type: 'address'
+        "internalType": "address",
+        "name": "receiver",
+        "type": "address"
       },
       {
-        internalType: 'uint256',
-        name: 'amount',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
       }
     ],
-    name: 'sendNativeToken',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "sendNativeToken",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'token',
-        type: 'address'
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       },
       {
-        internalType: 'address',
-        name: 'receiver',
-        type: 'address'
+        "internalType": "address",
+        "name": "receiver",
+        "type": "address"
       },
       {
-        internalType: 'uint256',
-        name: 'amount',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
       }
     ],
-    name: 'sendTokens',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "sendTokens",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'receiver',
-        type: 'address'
+        "internalType": "address",
+        "name": "receiver",
+        "type": "address"
       },
       {
-        internalType: 'uint256',
-        name: 'amount',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
       }
     ],
-    name: 'sendWnt',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "sendWnt",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'market',
-        type: 'address'
+        "internalType": "address",
+        "name": "market",
+        "type": "address"
       },
       {
-        internalType: 'address',
-        name: 'callbackContract',
-        type: 'address'
+        "internalType": "address",
+        "name": "callbackContract",
+        "type": "address"
       }
     ],
-    name: 'setSavedCallbackContract',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "setSavedCallbackContract",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: 'uiFeeFactor',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "uiFeeFactor",
+        "type": "uint256"
       }
     ],
-    name: 'setUiFeeFactor',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "setUiFeeFactor",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'shiftHandler',
-    outputs: [
+    "inputs": [],
+    "name": "shiftHandler",
+    "outputs": [
       {
-        internalType: 'contract IShiftHandler',
-        name: '',
-        type: 'address'
+        "internalType": "contract IShiftHandler",
+        "name": "",
+        "type": "address"
       }
     ],
-    stateMutability: 'view',
-    type: 'function'
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        components: [
+        "components": [
           {
-            internalType: 'address[]',
-            name: 'primaryTokens',
-            type: 'address[]'
+            "internalType": "address[]",
+            "name": "primaryTokens",
+            "type": "address[]"
           },
           {
-            components: [
+            "components": [
               {
-                internalType: 'uint256',
-                name: 'min',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "min",
+                "type": "uint256"
               },
               {
-                internalType: 'uint256',
-                name: 'max',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "max",
+                "type": "uint256"
               }
             ],
-            internalType: 'struct Price.Props[]',
-            name: 'primaryPrices',
-            type: 'tuple[]'
+            "internalType": "struct Price.Props[]",
+            "name": "primaryPrices",
+            "type": "tuple[]"
           },
           {
-            internalType: 'uint256',
-            name: 'minTimestamp',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "minTimestamp",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'maxTimestamp',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "maxTimestamp",
+            "type": "uint256"
           }
         ],
-        internalType: 'struct OracleUtils.SimulatePricesParams',
-        name: 'simulatedOracleParams',
-        type: 'tuple'
+        "internalType": "struct OracleUtils.SimulatePricesParams",
+        "name": "simulatedOracleParams",
+        "type": "tuple"
       }
     ],
-    name: 'simulateExecuteLatestDeposit',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "simulateExecuteLatestDeposit",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        components: [
+        "components": [
           {
-            internalType: 'address',
-            name: 'glv',
-            type: 'address'
+            "internalType": "address",
+            "name": "glv",
+            "type": "address"
           },
           {
-            internalType: 'address',
-            name: 'fromMarket',
-            type: 'address'
+            "internalType": "address",
+            "name": "fromMarket",
+            "type": "address"
           },
           {
-            internalType: 'address',
-            name: 'toMarket',
-            type: 'address'
+            "internalType": "address",
+            "name": "toMarket",
+            "type": "address"
           },
           {
-            internalType: 'uint256',
-            name: 'marketTokenAmount',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "marketTokenAmount",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'minMarketTokens',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "minMarketTokens",
+            "type": "uint256"
           }
         ],
-        internalType: 'struct GlvShiftUtils.CreateGlvShiftParams[]',
-        name: 'shiftParamsList',
-        type: 'tuple[]'
+        "internalType": "struct GlvShiftUtils.CreateGlvShiftParams[]",
+        "name": "shiftParamsList",
+        "type": "tuple[]"
       },
       {
-        components: [
+        "components": [
           {
-            internalType: 'address[]',
-            name: 'primaryTokens',
-            type: 'address[]'
+            "internalType": "address[]",
+            "name": "primaryTokens",
+            "type": "address[]"
           },
           {
-            components: [
+            "components": [
               {
-                internalType: 'uint256',
-                name: 'min',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "min",
+                "type": "uint256"
               },
               {
-                internalType: 'uint256',
-                name: 'max',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "max",
+                "type": "uint256"
               }
             ],
-            internalType: 'struct Price.Props[]',
-            name: 'primaryPrices',
-            type: 'tuple[]'
+            "internalType": "struct Price.Props[]",
+            "name": "primaryPrices",
+            "type": "tuple[]"
           },
           {
-            internalType: 'uint256',
-            name: 'minTimestamp',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "minTimestamp",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'maxTimestamp',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "maxTimestamp",
+            "type": "uint256"
           }
         ],
-        internalType: 'struct OracleUtils.SimulatePricesParams',
-        name: 'simulatedOracleParams',
-        type: 'tuple'
+        "internalType": "struct OracleUtils.SimulatePricesParams",
+        "name": "simulatedOracleParams",
+        "type": "tuple"
       }
     ],
-    name: 'simulateExecuteLatestJitOrder',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "simulateExecuteLatestJitOrder",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        components: [
+        "components": [
           {
-            internalType: 'address[]',
-            name: 'primaryTokens',
-            type: 'address[]'
+            "internalType": "address[]",
+            "name": "primaryTokens",
+            "type": "address[]"
           },
           {
-            components: [
+            "components": [
               {
-                internalType: 'uint256',
-                name: 'min',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "min",
+                "type": "uint256"
               },
               {
-                internalType: 'uint256',
-                name: 'max',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "max",
+                "type": "uint256"
               }
             ],
-            internalType: 'struct Price.Props[]',
-            name: 'primaryPrices',
-            type: 'tuple[]'
+            "internalType": "struct Price.Props[]",
+            "name": "primaryPrices",
+            "type": "tuple[]"
           },
           {
-            internalType: 'uint256',
-            name: 'minTimestamp',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "minTimestamp",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'maxTimestamp',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "maxTimestamp",
+            "type": "uint256"
           }
         ],
-        internalType: 'struct OracleUtils.SimulatePricesParams',
-        name: 'simulatedOracleParams',
-        type: 'tuple'
+        "internalType": "struct OracleUtils.SimulatePricesParams",
+        "name": "simulatedOracleParams",
+        "type": "tuple"
       }
     ],
-    name: 'simulateExecuteLatestOrder',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "simulateExecuteLatestOrder",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        components: [
+        "components": [
           {
-            internalType: 'address[]',
-            name: 'primaryTokens',
-            type: 'address[]'
+            "internalType": "address[]",
+            "name": "primaryTokens",
+            "type": "address[]"
           },
           {
-            components: [
+            "components": [
               {
-                internalType: 'uint256',
-                name: 'min',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "min",
+                "type": "uint256"
               },
               {
-                internalType: 'uint256',
-                name: 'max',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "max",
+                "type": "uint256"
               }
             ],
-            internalType: 'struct Price.Props[]',
-            name: 'primaryPrices',
-            type: 'tuple[]'
+            "internalType": "struct Price.Props[]",
+            "name": "primaryPrices",
+            "type": "tuple[]"
           },
           {
-            internalType: 'uint256',
-            name: 'minTimestamp',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "minTimestamp",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'maxTimestamp',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "maxTimestamp",
+            "type": "uint256"
           }
         ],
-        internalType: 'struct OracleUtils.SimulatePricesParams',
-        name: 'simulatedOracleParams',
-        type: 'tuple'
+        "internalType": "struct OracleUtils.SimulatePricesParams",
+        "name": "simulatedOracleParams",
+        "type": "tuple"
       }
     ],
-    name: 'simulateExecuteLatestShift',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "simulateExecuteLatestShift",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        components: [
+        "components": [
           {
-            internalType: 'address[]',
-            name: 'primaryTokens',
-            type: 'address[]'
+            "internalType": "address[]",
+            "name": "primaryTokens",
+            "type": "address[]"
           },
           {
-            components: [
+            "components": [
               {
-                internalType: 'uint256',
-                name: 'min',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "min",
+                "type": "uint256"
               },
               {
-                internalType: 'uint256',
-                name: 'max',
-                type: 'uint256'
+                "internalType": "uint256",
+                "name": "max",
+                "type": "uint256"
               }
             ],
-            internalType: 'struct Price.Props[]',
-            name: 'primaryPrices',
-            type: 'tuple[]'
+            "internalType": "struct Price.Props[]",
+            "name": "primaryPrices",
+            "type": "tuple[]"
           },
           {
-            internalType: 'uint256',
-            name: 'minTimestamp',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "minTimestamp",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'maxTimestamp',
-            type: 'uint256'
+            "internalType": "uint256",
+            "name": "maxTimestamp",
+            "type": "uint256"
           }
         ],
-        internalType: 'struct OracleUtils.SimulatePricesParams',
-        name: 'simulatedOracleParams',
-        type: 'tuple'
+        "internalType": "struct OracleUtils.SimulatePricesParams",
+        "name": "simulatedOracleParams",
+        "type": "tuple"
       },
       {
-        internalType: 'enum ISwapPricingUtils.SwapPricingType',
-        name: 'swapPricingType',
-        type: 'uint8'
+        "internalType": "enum ISwapPricingUtils.SwapPricingType",
+        "name": "swapPricingType",
+        "type": "uint8"
       }
     ],
-    name: 'simulateExecuteLatestWithdrawal',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "simulateExecuteLatestWithdrawal",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'bytes32',
-        name: 'key',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "key",
+        "type": "bytes32"
       },
       {
-        internalType: 'uint256',
-        name: 'sizeDeltaUsd',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "sizeDeltaUsd",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'acceptablePrice',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "acceptablePrice",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'triggerPrice',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "triggerPrice",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'minOutputAmount',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "minOutputAmount",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'validFromTime',
-        type: 'uint256'
+        "internalType": "uint256",
+        "name": "validFromTime",
+        "type": "uint256"
       },
       {
-        internalType: 'bool',
-        name: 'autoCancel',
-        type: 'bool'
+        "internalType": "bool",
+        "name": "autoCancel",
+        "type": "bool"
       }
     ],
-    name: 'updateOrder',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
+    "name": "updateOrder",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'withdrawalHandler',
-    outputs: [
+    "inputs": [],
+    "name": "withdrawalHandler",
+    "outputs": [
       {
-        internalType: 'contract IWithdrawalHandler',
-        name: '',
-        type: 'address'
+        "internalType": "contract IWithdrawalHandler",
+        "name": "",
+        "type": "address"
       }
     ],
-    stateMutability: 'view',
-    type: 'function'
+    "stateMutability": "view",
+    "type": "function"
   }
 ] as const

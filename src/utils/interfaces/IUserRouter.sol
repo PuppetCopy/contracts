@@ -15,13 +15,13 @@ interface IUserRouter {
 
     function disposeSubaccount(IERC7579Account subaccount) external;
 
-    function hasRemainingShares(IERC7579Account subaccount) external view returns (bool);
-
     function isDisposed(IERC7579Account subaccount) external view returns (bool);
+
+    function hasRemainingShares(IERC7579Account subaccount) external view returns (bool);
 
     function processPreCall(address master, address subaccount, uint msgValue, bytes calldata msgData)
         external
         returns (bytes memory hookData);
 
-    function processPostCall(address subaccount, bytes calldata hookData) external;
+    function processPostCall(bytes calldata hookData) external;
 }

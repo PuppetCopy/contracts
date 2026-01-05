@@ -20,7 +20,6 @@ import {
     MODE_DEFAULT
 } from "modulekit/accounts/common/lib/ModeLib.sol";
 import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
-
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
 import {IAuthority} from "../utils/interfaces/IAuthority.sol";
@@ -40,20 +39,17 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
     }
 
     bytes32 public constant CALL_INTENT_TYPEHASH = keccak256(
-        "CallIntent(address account,address subaccount,address token,uint256 amount,uint256 triggerNetValue,uint256 acceptableNetValue,bytes32 positionParamsHash,uint256 deadline,uint256 nonce)"
+        "CallIntent(address account,address signer,address subaccount,address token,uint256 amount,uint256 triggerNetValue,uint256 acceptableNetValue,bytes32 positionParamsHash,uint256 deadline,uint256 nonce)"
     );
 
-    ModeCode internal constant MODE_TRY =
-        ModeCode.wrap(bytes32(abi.encodePacked(CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT, ModePayload.wrap(0x00))));
-    ModeCode internal constant MODE_STRICT = ModeCode.wrap(
-        bytes32(abi.encodePacked(CALLTYPE_SINGLE, EXECTYPE_DEFAULT, MODE_DEFAULT, ModePayload.wrap(0x00)))
-    );
+    ModeCode internal constant MODE_TRY    = ModeCode.wrap(bytes32(abi.encodePacked(CALLTYPE_SINGLE, EXECTYPE_TRY, MODE_DEFAULT, ModePayload.wrap(0x00))));
+    ModeCode internal constant MODE_STRICT = ModeCode.wrap(bytes32(abi.encodePacked(CALLTYPE_SINGLE, EXECTYPE_DEFAULT, MODE_DEFAULT, ModePayload.wrap(0x00))));
 
     Config public config;
 
     mapping(IERC20 token => uint) public tokenCapMap;
-    mapping(bytes32 codeHash => bool) public account7579CodeHashMap;
 
+    mapping(bytes32 codeHash => bool) public account7579CodeHashMap;
 
     mapping(IERC7579Account subaccount => SubaccountInfo) public registeredMap;
 
@@ -62,8 +58,7 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
 
     constructor(IAuthority _authority, Config memory _config)
         CoreContract(_authority, abi.encode(_config))
-        EIP712("Puppet Allocate", "1")
-    {}
+        EIP712("Puppet Allocate", "1") {}
 
     function getConfig() external view returns (Config memory) {
         return config;
@@ -104,18 +99,16 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
         IERC7579Account _subaccount,
         IERC20 _baseToken,
         bytes32 _name
-    ) external {
+    ) external auth {
         bytes32 _codeHash;
         assembly { _codeHash := extcodehash(_subaccount) }
         if (!account7579CodeHashMap[_codeHash]) revert Error.Allocate__InvalidAccountCodeHash();
-        if (!_subaccount.isModuleInstalled(MODULE_TYPE_HOOK, config.masterHook, "")) {
-            revert Error.Allocate__MasterHookNotInstalled();
-        }
+        if (!_subaccount.isModuleInstalled(MODULE_TYPE_EXECUTOR, address(this), "")) revert Error.Allocate__ExecutorNotInstalled();
+        if (!_subaccount.isModuleInstalled(MODULE_TYPE_HOOK, config.masterHook, "")) revert Error.Allocate__MasterHookNotInstalled();
         if (address(registeredMap[_subaccount].baseToken) != address(0)) revert Error.Allocate__AlreadyRegistered();
         if (tokenCapMap[_baseToken] == 0) revert Error.Allocate__TokenNotAllowed();
-        if (_baseToken.balanceOf(address(_subaccount)) == 0) revert Error.Allocate__ZeroAssets();
 
-        registeredMap[_subaccount] = SubaccountInfo(_account, _signer, _baseToken, _name, false, 0, 0, address(0), address(_subaccount));
+        registeredMap[_subaccount] = SubaccountInfo(_account, _signer, _baseToken, _name, false, 0, address(0));
 
         _logEvent("RegisterMasterSubaccount", abi.encode(_subaccount, _account, _signer, _baseToken, _name));
     }
@@ -134,19 +127,17 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
         Match _match,
         CallIntent calldata _intent,
         bytes calldata _signature,
-        address[] calldata _puppetList,
+        IERC7579Account[] calldata _puppetList,
         uint[] calldata _amountList,
         PositionParams calldata _positionParams
     ) external auth {
         SubaccountInfo memory _info = _verifyIntent(_intent, _signature, _positionParams);
-        if (_info.disposed) revert Error.Allocate__SubaccountFrozen();
 
-        if (_puppetList.length != _amountList.length) {
-            revert Error.Allocate__ArrayLengthMismatch(_puppetList.length, _amountList.length);
-        }
-        if (_puppetList.length > config.maxPuppetList) {
-            revert Error.Allocate__PuppetListTooLarge(_puppetList.length, config.maxPuppetList);
-        }
+        if (_intent.account != _info.account) revert Error.Allocate__InvalidSubaccountMaster(_info.account, _intent.account);
+        if (_intent.signer != _info.account && _intent.signer != _info.signer) revert Error.Allocate__UnauthorizedSigner(_intent.signer);
+        if (_info.disposed) revert Error.Allocate__SubaccountFrozen();
+        if (_puppetList.length != _amountList.length) revert Error.Allocate__ArrayLengthMismatch(_puppetList.length, _amountList.length);
+        if (_puppetList.length > config.maxPuppetList) revert Error.Allocate__PuppetListTooLarge(_puppetList.length, config.maxPuppetList);
 
         AllocateContext memory _ctx;
         IERC7579Account _subaccount = _intent.subaccount;
@@ -158,9 +149,7 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
                 address(_subaccount), _baseToken, _positionParams.stages, _positionParams.positionKeys
             );
 
-        if (_ctx.netValue > _intent.acceptableNetValue) {
-            revert Error.Allocate__NetValueAboveMax(_ctx.netValue, _intent.acceptableNetValue);
-        }
+        if (_ctx.netValue > _intent.acceptableNetValue) revert Error.Allocate__NetValueAboveMax(_ctx.netValue, _intent.acceptableNetValue);
 
         _ctx.sharePrice = getSharePrice(_subaccount, _ctx.netValue);
         _ctx.totalShares = totalSharesMap[_subaccount];
@@ -180,27 +169,46 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
             _ctx.totalShares += _shares;
         }
 
-        _info.chainId = block.chainid;
         _info.stage = _positionParams.stages.length > 0 ? address(_positionParams.stages[0]) : address(0);
 
-        uint[] memory _allocatedList = _match.executeMatch(_info, _puppetList, _amountList);
+        uint[] memory _matchedAmountList = _match.getMatchAmountList(
+            _baseToken, _info.stage, address(_subaccount), _puppetList, _amountList
+        );
+
+        uint[] memory _allocatedList = new uint[](_puppetList.length);
 
         for (uint _i; _i < _puppetList.length; ++_i) {
-            uint _amount = _allocatedList[_i];
-            if (_amount > 0) {
-                uint _shares = Precision.toFactor(_amount, _ctx.sharePrice);
-                if (_shares > 0) {
-                    shareBalanceMap[_subaccount][_puppetList[_i]] += _shares;
-                    _ctx.totalShares += _shares;
-                    _ctx.allocated += _amount;
-                }
+            uint _amount = _matchedAmountList[_i];
+            if (_amount == 0) continue;
+
+            IERC7579Account _puppet = _puppetList[_i];
+            uint _balanceBefore = _baseToken.balanceOf(address(_subaccount));
+
+            try _puppet.executeFromExecutor{gas: config.withdrawGasLimit}(
+                MODE_TRY,
+                ExecutionLib.encodeSingle(
+                    address(_baseToken), 0, abi.encodeCall(IERC20.transfer, (address(_subaccount), _amount))
+                )
+            ) {} catch {
+                continue;
+            }
+
+            uint _transferred = _baseToken.balanceOf(address(_subaccount)) - _balanceBefore;
+            if (_transferred == 0) continue;
+
+            _match.recordThrottle(address(_puppet), address(_subaccount));
+
+            uint _shares = Precision.toFactor(_transferred, _ctx.sharePrice);
+            if (_shares > 0) {
+                shareBalanceMap[_subaccount][address(_puppet)] += _shares;
+                _ctx.totalShares += _shares;
+                _ctx.allocated += _transferred;
+                _allocatedList[_i] = _transferred;
             }
         }
 
         _ctx.allocation += _intent.amount + _ctx.allocated;
-        if (_ctx.allocation > tokenCapMap[_baseToken]) {
-            revert Error.Allocate__DepositExceedsCap(_ctx.allocation, tokenCapMap[_baseToken]);
-        }
+        if (_ctx.allocation > tokenCapMap[_baseToken]) revert Error.Allocate__DepositExceedsCap(_ctx.allocation, tokenCapMap[_baseToken]);
         totalSharesMap[_subaccount] = _ctx.totalShares;
 
         _logEvent(
@@ -230,6 +238,13 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
         PositionParams calldata _positionParams
     ) external auth {
         SubaccountInfo memory _info = _verifyIntent(_intent, _signature, _positionParams);
+
+        if (_intent.account == _info.account) {
+            if (_intent.signer != _info.account && _intent.signer != _info.signer) revert Error.Allocate__UnauthorizedSigner(_intent.signer);
+        } else {
+            if (_intent.signer != _intent.account) revert Error.Allocate__UnauthorizedSigner(_intent.signer);
+        }
+
         IERC20 _baseToken = _info.baseToken;
         IERC7579Account _subaccount = _intent.subaccount;
 
@@ -239,9 +254,7 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
         );
         uint _netValue = _allocation + _positionValue;
 
-        if (_netValue < _intent.acceptableNetValue) {
-            revert Error.Allocate__NetValueBelowMin(_netValue, _intent.acceptableNetValue);
-        }
+        if (_netValue < _intent.acceptableNetValue) revert Error.Allocate__NetValueBelowMin(_netValue, _intent.acceptableNetValue);
 
         uint _sharePrice = getSharePrice(_subaccount, _netValue);
         uint _sharesBurnt = Precision.toFactor(_intent.amount, _sharePrice);
@@ -253,7 +266,7 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
         if (_amountOut > _allocation) revert Error.Allocate__InsufficientLiquidity();
 
         _subaccount.executeFromExecutor{gas: config.withdrawGasLimit}(
-            MODE_TRY,
+            MODE_STRICT,
             ExecutionLib.encodeSingle(
                 address(_baseToken), 0, abi.encodeCall(IERC20.transfer, (_intent.account, _amountOut))
             )
@@ -287,30 +300,22 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
         );
     }
 
-    function _verifyIntent(
-        CallIntent calldata _intent,
-        bytes calldata _signature,
-        PositionParams calldata _positionParams
-    ) internal returns (SubaccountInfo memory _info) {
-        if (block.timestamp > _intent.deadline) {
-            revert Error.Allocate__IntentExpired(_intent.deadline, block.timestamp);
-        }
+    function disposeSubaccount(IERC7579Account _subaccount) external auth {
+        if (address(registeredMap[_subaccount].baseToken) == address(0)) return;
+        if (registeredMap[_subaccount].disposed) return;
 
-        if (keccak256(abi.encode(_positionParams)) != _intent.positionParamsHash) {
-            revert Error.Allocate__NetValueParamsMismatch();
-        }
+        registeredMap[_subaccount].disposed = true;
 
-        IERC7579Account _subaccount = _intent.subaccount;
-        _info = registeredMap[_subaccount];
-        if (address(_info.baseToken) == address(0)) revert Error.Allocate__UnregisteredSubaccount();
-        if (address(_intent.token) != address(_info.baseToken)) revert Error.Allocate__TokenMismatch();
-        if (tokenCapMap[_info.baseToken] == 0) revert Error.Allocate__TokenNotAllowed();
+        _logEvent("DisposeSubaccount", abi.encode(_subaccount));
+    }
 
-        bytes32 _hash = _hashTypedDataV4(
+    function _hashIntent(CallIntent calldata _intent) internal view returns (bytes32) {
+        return _hashTypedDataV4(
             keccak256(
                 abi.encode(
                     CALL_INTENT_TYPEHASH,
                     _intent.account,
+                    _intent.signer,
                     _intent.subaccount,
                     _intent.token,
                     _intent.amount,
@@ -322,16 +327,27 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
                 )
             )
         );
+    }
+
+    function _verifyIntent(
+        CallIntent calldata _intent,
+        bytes calldata _signature,
+        PositionParams calldata _positionParams
+    ) internal returns (SubaccountInfo memory _subaccountParams) {
+        if (block.timestamp > _intent.deadline) revert Error.Allocate__IntentExpired(_intent.deadline, block.timestamp);
+        if (keccak256(abi.encode(_positionParams)) != _intent.positionParamsHash) revert Error.Allocate__NetValueParamsMismatch();
+
+        IERC7579Account _subaccount = _intent.subaccount;
+        _subaccountParams = registeredMap[_subaccount];
+        if (address(_subaccountParams.baseToken) == address(0)) revert Error.Allocate__UnregisteredSubaccount();
+        if (address(_intent.token) != address(_subaccountParams.baseToken)) revert Error.Allocate__TokenMismatch();
+        if (tokenCapMap[_subaccountParams.baseToken] == 0) revert Error.Allocate__TokenNotAllowed();
 
         uint _expectedNonce = registeredMap[_subaccount].nonce++;
         if (_expectedNonce != _intent.nonce) revert Error.Allocate__InvalidNonce(_expectedNonce, _intent.nonce);
 
-        if (
-            !SignatureChecker.isValidSignatureNow(_intent.account, _hash, _signature)
-                && (_info.signer == address(0)
-                    || !SignatureChecker.isValidSignatureNow(_info.signer, _hash, _signature))
-        ) {
-            revert Error.Allocate__InvalidSignature(_intent.account, _info.signer);
+        if (!SignatureChecker.isValidSignatureNow(_intent.signer, _hashIntent(_intent), _signature)) {
+            revert Error.Allocate__InvalidSignature(_intent.signer);
         }
     }
 
@@ -352,15 +368,6 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
     }
 
     function onInstall(bytes calldata) external {}
-
-    function disposeSubaccount(IERC7579Account _subaccount) external {
-        if (address(registeredMap[_subaccount].baseToken) == address(0)) return;
-        if (registeredMap[_subaccount].disposed) return;
-
-        registeredMap[_subaccount].disposed = true;
-
-        _logEvent("DisposeSubaccount", abi.encode(_subaccount));
-    }
 
     function onUninstall(bytes calldata) external {
         IERC7579Account _subaccount = IERC7579Account(msg.sender);

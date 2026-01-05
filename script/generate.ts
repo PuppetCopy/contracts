@@ -283,16 +283,16 @@ async function main(): Promise<void> {
     Bun.env.SKIP_NETWORK === '1' ||
     Bun.env.SKIP_NETWORK === 'true'
   if (!skipGmx) {
-    // Check if @gmx package exists before attempting GMX generation
-    const gmxPath = './node_modules/@gmx'
-    const gmxExists = await Bun.file(`${gmxPath}/deployments`)
+    // Check if gmx-synthetics lib exists before attempting GMX generation
+    const gmxPath = './lib/gmx-synthetics'
+    const gmxExists = await Bun.file(`${gmxPath}/deployments/arbitrum/Reader.json`)
       .exists()
       .catch(() => false)
     if (gmxExists) {
       await generateGmx()
       await generateGmxIndex()
     } else {
-      console.log('Skipping GMX generation (@gmx package not installed)')
+      console.log('Skipping GMX generation (gmx-synthetics lib not found)')
     }
   }
 

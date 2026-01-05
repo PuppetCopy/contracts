@@ -1,2061 +1,2061 @@
 // This file is auto-generated. Do not edit manually.
-// Source: GMX deployment files from @gmx node_modules
+// Source: GMX deployment files from lib/gmx-synthetics
 
 export default [
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'contract RoleStore',
-        name: '_roleStore',
-        type: 'address'
+        "internalType": "contract RoleStore",
+        "name": "_roleStore",
+        "type": "address"
       }
     ],
-    stateMutability: 'nonpayable',
-    type: 'constructor'
+    "stateMutability": "nonpayable",
+    "type": "constructor"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'msgSender',
-        type: 'address'
+        "internalType": "address",
+        "name": "msgSender",
+        "type": "address"
       },
       {
-        internalType: 'string',
-        name: 'role',
-        type: 'string'
+        "internalType": "string",
+        "name": "role",
+        "type": "string"
       }
     ],
-    name: 'Unauthorized',
-    type: 'error'
+    "name": "Unauthorized",
+    "type": "error"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: false,
-        internalType: 'address',
-        name: 'msgSender',
-        type: 'address'
+        "indexed": false,
+        "internalType": "address",
+        "name": "msgSender",
+        "type": "address"
       },
       {
-        indexed: false,
-        internalType: 'string',
-        name: 'eventName',
-        type: 'string'
+        "indexed": false,
+        "internalType": "string",
+        "name": "eventName",
+        "type": "string"
       },
       {
-        indexed: true,
-        internalType: 'string',
-        name: 'eventNameHash',
-        type: 'string'
+        "indexed": true,
+        "internalType": "string",
+        "name": "eventNameHash",
+        "type": "string"
       },
       {
-        components: [
+        "components": [
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'address',
-                    name: 'value',
-                    type: 'address'
+                    "internalType": "address",
+                    "name": "value",
+                    "type": "address"
                   }
                 ],
-                internalType: 'struct EventUtils.AddressKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.AddressKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'address[]',
-                    name: 'value',
-                    type: 'address[]'
+                    "internalType": "address[]",
+                    "name": "value",
+                    "type": "address[]"
                   }
                 ],
-                internalType: 'struct EventUtils.AddressArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.AddressArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.AddressItems',
-            name: 'addressItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.AddressItems",
+            "name": "addressItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'uint256',
-                    name: 'value',
-                    type: 'uint256'
+                    "internalType": "uint256",
+                    "name": "value",
+                    "type": "uint256"
                   }
                 ],
-                internalType: 'struct EventUtils.UintKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.UintKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'uint256[]',
-                    name: 'value',
-                    type: 'uint256[]'
+                    "internalType": "uint256[]",
+                    "name": "value",
+                    "type": "uint256[]"
                   }
                 ],
-                internalType: 'struct EventUtils.UintArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.UintArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.UintItems',
-            name: 'uintItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.UintItems",
+            "name": "uintItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'int256',
-                    name: 'value',
-                    type: 'int256'
+                    "internalType": "int256",
+                    "name": "value",
+                    "type": "int256"
                   }
                 ],
-                internalType: 'struct EventUtils.IntKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.IntKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'int256[]',
-                    name: 'value',
-                    type: 'int256[]'
+                    "internalType": "int256[]",
+                    "name": "value",
+                    "type": "int256[]"
                   }
                 ],
-                internalType: 'struct EventUtils.IntArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.IntArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.IntItems',
-            name: 'intItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.IntItems",
+            "name": "intItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bool',
-                    name: 'value',
-                    type: 'bool'
+                    "internalType": "bool",
+                    "name": "value",
+                    "type": "bool"
                   }
                 ],
-                internalType: 'struct EventUtils.BoolKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BoolKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bool[]',
-                    name: 'value',
-                    type: 'bool[]'
+                    "internalType": "bool[]",
+                    "name": "value",
+                    "type": "bool[]"
                   }
                 ],
-                internalType: 'struct EventUtils.BoolArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BoolArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.BoolItems',
-            name: 'boolItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.BoolItems",
+            "name": "boolItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes32',
-                    name: 'value',
-                    type: 'bytes32'
+                    "internalType": "bytes32",
+                    "name": "value",
+                    "type": "bytes32"
                   }
                 ],
-                internalType: 'struct EventUtils.Bytes32KeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.Bytes32KeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes32[]',
-                    name: 'value',
-                    type: 'bytes32[]'
+                    "internalType": "bytes32[]",
+                    "name": "value",
+                    "type": "bytes32[]"
                   }
                 ],
-                internalType: 'struct EventUtils.Bytes32ArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.Bytes32ArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.Bytes32Items',
-            name: 'bytes32Items',
-            type: 'tuple'
+            "internalType": "struct EventUtils.Bytes32Items",
+            "name": "bytes32Items",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes',
-                    name: 'value',
-                    type: 'bytes'
+                    "internalType": "bytes",
+                    "name": "value",
+                    "type": "bytes"
                   }
                 ],
-                internalType: 'struct EventUtils.BytesKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BytesKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes[]',
-                    name: 'value',
-                    type: 'bytes[]'
+                    "internalType": "bytes[]",
+                    "name": "value",
+                    "type": "bytes[]"
                   }
                 ],
-                internalType: 'struct EventUtils.BytesArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BytesArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.BytesItems',
-            name: 'bytesItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.BytesItems",
+            "name": "bytesItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'string',
-                    name: 'value',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "value",
+                    "type": "string"
                   }
                 ],
-                internalType: 'struct EventUtils.StringKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.StringKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'string[]',
-                    name: 'value',
-                    type: 'string[]'
+                    "internalType": "string[]",
+                    "name": "value",
+                    "type": "string[]"
                   }
                 ],
-                internalType: 'struct EventUtils.StringArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.StringArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.StringItems',
-            name: 'stringItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.StringItems",
+            "name": "stringItems",
+            "type": "tuple"
           }
         ],
-        indexed: false,
-        internalType: 'struct EventUtils.EventLogData',
-        name: 'eventData',
-        type: 'tuple'
+        "indexed": false,
+        "internalType": "struct EventUtils.EventLogData",
+        "name": "eventData",
+        "type": "tuple"
       }
     ],
-    name: 'EventLog',
-    type: 'event'
+    "name": "EventLog",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: false,
-        internalType: 'address',
-        name: 'msgSender',
-        type: 'address'
+        "indexed": false,
+        "internalType": "address",
+        "name": "msgSender",
+        "type": "address"
       },
       {
-        indexed: false,
-        internalType: 'string',
-        name: 'eventName',
-        type: 'string'
+        "indexed": false,
+        "internalType": "string",
+        "name": "eventName",
+        "type": "string"
       },
       {
-        indexed: true,
-        internalType: 'string',
-        name: 'eventNameHash',
-        type: 'string'
+        "indexed": true,
+        "internalType": "string",
+        "name": "eventNameHash",
+        "type": "string"
       },
       {
-        indexed: true,
-        internalType: 'bytes32',
-        name: 'topic1',
-        type: 'bytes32'
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "topic1",
+        "type": "bytes32"
       },
       {
-        components: [
+        "components": [
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'address',
-                    name: 'value',
-                    type: 'address'
+                    "internalType": "address",
+                    "name": "value",
+                    "type": "address"
                   }
                 ],
-                internalType: 'struct EventUtils.AddressKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.AddressKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'address[]',
-                    name: 'value',
-                    type: 'address[]'
+                    "internalType": "address[]",
+                    "name": "value",
+                    "type": "address[]"
                   }
                 ],
-                internalType: 'struct EventUtils.AddressArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.AddressArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.AddressItems',
-            name: 'addressItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.AddressItems",
+            "name": "addressItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'uint256',
-                    name: 'value',
-                    type: 'uint256'
+                    "internalType": "uint256",
+                    "name": "value",
+                    "type": "uint256"
                   }
                 ],
-                internalType: 'struct EventUtils.UintKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.UintKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'uint256[]',
-                    name: 'value',
-                    type: 'uint256[]'
+                    "internalType": "uint256[]",
+                    "name": "value",
+                    "type": "uint256[]"
                   }
                 ],
-                internalType: 'struct EventUtils.UintArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.UintArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.UintItems',
-            name: 'uintItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.UintItems",
+            "name": "uintItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'int256',
-                    name: 'value',
-                    type: 'int256'
+                    "internalType": "int256",
+                    "name": "value",
+                    "type": "int256"
                   }
                 ],
-                internalType: 'struct EventUtils.IntKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.IntKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'int256[]',
-                    name: 'value',
-                    type: 'int256[]'
+                    "internalType": "int256[]",
+                    "name": "value",
+                    "type": "int256[]"
                   }
                 ],
-                internalType: 'struct EventUtils.IntArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.IntArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.IntItems',
-            name: 'intItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.IntItems",
+            "name": "intItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bool',
-                    name: 'value',
-                    type: 'bool'
+                    "internalType": "bool",
+                    "name": "value",
+                    "type": "bool"
                   }
                 ],
-                internalType: 'struct EventUtils.BoolKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BoolKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bool[]',
-                    name: 'value',
-                    type: 'bool[]'
+                    "internalType": "bool[]",
+                    "name": "value",
+                    "type": "bool[]"
                   }
                 ],
-                internalType: 'struct EventUtils.BoolArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BoolArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.BoolItems',
-            name: 'boolItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.BoolItems",
+            "name": "boolItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes32',
-                    name: 'value',
-                    type: 'bytes32'
+                    "internalType": "bytes32",
+                    "name": "value",
+                    "type": "bytes32"
                   }
                 ],
-                internalType: 'struct EventUtils.Bytes32KeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.Bytes32KeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes32[]',
-                    name: 'value',
-                    type: 'bytes32[]'
+                    "internalType": "bytes32[]",
+                    "name": "value",
+                    "type": "bytes32[]"
                   }
                 ],
-                internalType: 'struct EventUtils.Bytes32ArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.Bytes32ArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.Bytes32Items',
-            name: 'bytes32Items',
-            type: 'tuple'
+            "internalType": "struct EventUtils.Bytes32Items",
+            "name": "bytes32Items",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes',
-                    name: 'value',
-                    type: 'bytes'
+                    "internalType": "bytes",
+                    "name": "value",
+                    "type": "bytes"
                   }
                 ],
-                internalType: 'struct EventUtils.BytesKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BytesKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes[]',
-                    name: 'value',
-                    type: 'bytes[]'
+                    "internalType": "bytes[]",
+                    "name": "value",
+                    "type": "bytes[]"
                   }
                 ],
-                internalType: 'struct EventUtils.BytesArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BytesArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.BytesItems',
-            name: 'bytesItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.BytesItems",
+            "name": "bytesItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'string',
-                    name: 'value',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "value",
+                    "type": "string"
                   }
                 ],
-                internalType: 'struct EventUtils.StringKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.StringKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'string[]',
-                    name: 'value',
-                    type: 'string[]'
+                    "internalType": "string[]",
+                    "name": "value",
+                    "type": "string[]"
                   }
                 ],
-                internalType: 'struct EventUtils.StringArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.StringArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.StringItems',
-            name: 'stringItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.StringItems",
+            "name": "stringItems",
+            "type": "tuple"
           }
         ],
-        indexed: false,
-        internalType: 'struct EventUtils.EventLogData',
-        name: 'eventData',
-        type: 'tuple'
+        "indexed": false,
+        "internalType": "struct EventUtils.EventLogData",
+        "name": "eventData",
+        "type": "tuple"
       }
     ],
-    name: 'EventLog1',
-    type: 'event'
+    "name": "EventLog1",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: false,
-        internalType: 'address',
-        name: 'msgSender',
-        type: 'address'
+        "indexed": false,
+        "internalType": "address",
+        "name": "msgSender",
+        "type": "address"
       },
       {
-        indexed: false,
-        internalType: 'string',
-        name: 'eventName',
-        type: 'string'
+        "indexed": false,
+        "internalType": "string",
+        "name": "eventName",
+        "type": "string"
       },
       {
-        indexed: true,
-        internalType: 'string',
-        name: 'eventNameHash',
-        type: 'string'
+        "indexed": true,
+        "internalType": "string",
+        "name": "eventNameHash",
+        "type": "string"
       },
       {
-        indexed: true,
-        internalType: 'bytes32',
-        name: 'topic1',
-        type: 'bytes32'
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "topic1",
+        "type": "bytes32"
       },
       {
-        indexed: true,
-        internalType: 'bytes32',
-        name: 'topic2',
-        type: 'bytes32'
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "topic2",
+        "type": "bytes32"
       },
       {
-        components: [
+        "components": [
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'address',
-                    name: 'value',
-                    type: 'address'
+                    "internalType": "address",
+                    "name": "value",
+                    "type": "address"
                   }
                 ],
-                internalType: 'struct EventUtils.AddressKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.AddressKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'address[]',
-                    name: 'value',
-                    type: 'address[]'
+                    "internalType": "address[]",
+                    "name": "value",
+                    "type": "address[]"
                   }
                 ],
-                internalType: 'struct EventUtils.AddressArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.AddressArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.AddressItems',
-            name: 'addressItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.AddressItems",
+            "name": "addressItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'uint256',
-                    name: 'value',
-                    type: 'uint256'
+                    "internalType": "uint256",
+                    "name": "value",
+                    "type": "uint256"
                   }
                 ],
-                internalType: 'struct EventUtils.UintKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.UintKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'uint256[]',
-                    name: 'value',
-                    type: 'uint256[]'
+                    "internalType": "uint256[]",
+                    "name": "value",
+                    "type": "uint256[]"
                   }
                 ],
-                internalType: 'struct EventUtils.UintArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.UintArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.UintItems',
-            name: 'uintItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.UintItems",
+            "name": "uintItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'int256',
-                    name: 'value',
-                    type: 'int256'
+                    "internalType": "int256",
+                    "name": "value",
+                    "type": "int256"
                   }
                 ],
-                internalType: 'struct EventUtils.IntKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.IntKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'int256[]',
-                    name: 'value',
-                    type: 'int256[]'
+                    "internalType": "int256[]",
+                    "name": "value",
+                    "type": "int256[]"
                   }
                 ],
-                internalType: 'struct EventUtils.IntArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.IntArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.IntItems',
-            name: 'intItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.IntItems",
+            "name": "intItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bool',
-                    name: 'value',
-                    type: 'bool'
+                    "internalType": "bool",
+                    "name": "value",
+                    "type": "bool"
                   }
                 ],
-                internalType: 'struct EventUtils.BoolKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BoolKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bool[]',
-                    name: 'value',
-                    type: 'bool[]'
+                    "internalType": "bool[]",
+                    "name": "value",
+                    "type": "bool[]"
                   }
                 ],
-                internalType: 'struct EventUtils.BoolArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BoolArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.BoolItems',
-            name: 'boolItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.BoolItems",
+            "name": "boolItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes32',
-                    name: 'value',
-                    type: 'bytes32'
+                    "internalType": "bytes32",
+                    "name": "value",
+                    "type": "bytes32"
                   }
                 ],
-                internalType: 'struct EventUtils.Bytes32KeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.Bytes32KeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes32[]',
-                    name: 'value',
-                    type: 'bytes32[]'
+                    "internalType": "bytes32[]",
+                    "name": "value",
+                    "type": "bytes32[]"
                   }
                 ],
-                internalType: 'struct EventUtils.Bytes32ArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.Bytes32ArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.Bytes32Items',
-            name: 'bytes32Items',
-            type: 'tuple'
+            "internalType": "struct EventUtils.Bytes32Items",
+            "name": "bytes32Items",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes',
-                    name: 'value',
-                    type: 'bytes'
+                    "internalType": "bytes",
+                    "name": "value",
+                    "type": "bytes"
                   }
                 ],
-                internalType: 'struct EventUtils.BytesKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BytesKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes[]',
-                    name: 'value',
-                    type: 'bytes[]'
+                    "internalType": "bytes[]",
+                    "name": "value",
+                    "type": "bytes[]"
                   }
                 ],
-                internalType: 'struct EventUtils.BytesArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BytesArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.BytesItems',
-            name: 'bytesItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.BytesItems",
+            "name": "bytesItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'string',
-                    name: 'value',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "value",
+                    "type": "string"
                   }
                 ],
-                internalType: 'struct EventUtils.StringKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.StringKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'string[]',
-                    name: 'value',
-                    type: 'string[]'
+                    "internalType": "string[]",
+                    "name": "value",
+                    "type": "string[]"
                   }
                 ],
-                internalType: 'struct EventUtils.StringArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.StringArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.StringItems',
-            name: 'stringItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.StringItems",
+            "name": "stringItems",
+            "type": "tuple"
           }
         ],
-        indexed: false,
-        internalType: 'struct EventUtils.EventLogData',
-        name: 'eventData',
-        type: 'tuple'
+        "indexed": false,
+        "internalType": "struct EventUtils.EventLogData",
+        "name": "eventData",
+        "type": "tuple"
       }
     ],
-    name: 'EventLog2',
-    type: 'event'
+    "name": "EventLog2",
+    "type": "event"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'bytes32',
-        name: 'topic1',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "topic1",
+        "type": "bytes32"
       },
       {
-        internalType: 'bytes',
-        name: 'data',
-        type: 'bytes'
+        "internalType": "bytes",
+        "name": "data",
+        "type": "bytes"
       }
     ],
-    name: 'emitDataLog1',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function'
+    "name": "emitDataLog1",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'bytes32',
-        name: 'topic1',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "topic1",
+        "type": "bytes32"
       },
       {
-        internalType: 'bytes32',
-        name: 'topic2',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "topic2",
+        "type": "bytes32"
       },
       {
-        internalType: 'bytes',
-        name: 'data',
-        type: 'bytes'
+        "internalType": "bytes",
+        "name": "data",
+        "type": "bytes"
       }
     ],
-    name: 'emitDataLog2',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function'
+    "name": "emitDataLog2",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'bytes32',
-        name: 'topic1',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "topic1",
+        "type": "bytes32"
       },
       {
-        internalType: 'bytes32',
-        name: 'topic2',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "topic2",
+        "type": "bytes32"
       },
       {
-        internalType: 'bytes32',
-        name: 'topic3',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "topic3",
+        "type": "bytes32"
       },
       {
-        internalType: 'bytes',
-        name: 'data',
-        type: 'bytes'
+        "internalType": "bytes",
+        "name": "data",
+        "type": "bytes"
       }
     ],
-    name: 'emitDataLog3',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function'
+    "name": "emitDataLog3",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'bytes32',
-        name: 'topic1',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "topic1",
+        "type": "bytes32"
       },
       {
-        internalType: 'bytes32',
-        name: 'topic2',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "topic2",
+        "type": "bytes32"
       },
       {
-        internalType: 'bytes32',
-        name: 'topic3',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "topic3",
+        "type": "bytes32"
       },
       {
-        internalType: 'bytes32',
-        name: 'topic4',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "topic4",
+        "type": "bytes32"
       },
       {
-        internalType: 'bytes',
-        name: 'data',
-        type: 'bytes'
+        "internalType": "bytes",
+        "name": "data",
+        "type": "bytes"
       }
     ],
-    name: 'emitDataLog4',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function'
+    "name": "emitDataLog4",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'string',
-        name: 'eventName',
-        type: 'string'
+        "internalType": "string",
+        "name": "eventName",
+        "type": "string"
       },
       {
-        components: [
+        "components": [
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'address',
-                    name: 'value',
-                    type: 'address'
+                    "internalType": "address",
+                    "name": "value",
+                    "type": "address"
                   }
                 ],
-                internalType: 'struct EventUtils.AddressKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.AddressKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'address[]',
-                    name: 'value',
-                    type: 'address[]'
+                    "internalType": "address[]",
+                    "name": "value",
+                    "type": "address[]"
                   }
                 ],
-                internalType: 'struct EventUtils.AddressArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.AddressArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.AddressItems',
-            name: 'addressItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.AddressItems",
+            "name": "addressItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'uint256',
-                    name: 'value',
-                    type: 'uint256'
+                    "internalType": "uint256",
+                    "name": "value",
+                    "type": "uint256"
                   }
                 ],
-                internalType: 'struct EventUtils.UintKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.UintKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'uint256[]',
-                    name: 'value',
-                    type: 'uint256[]'
+                    "internalType": "uint256[]",
+                    "name": "value",
+                    "type": "uint256[]"
                   }
                 ],
-                internalType: 'struct EventUtils.UintArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.UintArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.UintItems',
-            name: 'uintItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.UintItems",
+            "name": "uintItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'int256',
-                    name: 'value',
-                    type: 'int256'
+                    "internalType": "int256",
+                    "name": "value",
+                    "type": "int256"
                   }
                 ],
-                internalType: 'struct EventUtils.IntKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.IntKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'int256[]',
-                    name: 'value',
-                    type: 'int256[]'
+                    "internalType": "int256[]",
+                    "name": "value",
+                    "type": "int256[]"
                   }
                 ],
-                internalType: 'struct EventUtils.IntArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.IntArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.IntItems',
-            name: 'intItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.IntItems",
+            "name": "intItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bool',
-                    name: 'value',
-                    type: 'bool'
+                    "internalType": "bool",
+                    "name": "value",
+                    "type": "bool"
                   }
                 ],
-                internalType: 'struct EventUtils.BoolKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BoolKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bool[]',
-                    name: 'value',
-                    type: 'bool[]'
+                    "internalType": "bool[]",
+                    "name": "value",
+                    "type": "bool[]"
                   }
                 ],
-                internalType: 'struct EventUtils.BoolArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BoolArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.BoolItems',
-            name: 'boolItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.BoolItems",
+            "name": "boolItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes32',
-                    name: 'value',
-                    type: 'bytes32'
+                    "internalType": "bytes32",
+                    "name": "value",
+                    "type": "bytes32"
                   }
                 ],
-                internalType: 'struct EventUtils.Bytes32KeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.Bytes32KeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes32[]',
-                    name: 'value',
-                    type: 'bytes32[]'
+                    "internalType": "bytes32[]",
+                    "name": "value",
+                    "type": "bytes32[]"
                   }
                 ],
-                internalType: 'struct EventUtils.Bytes32ArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.Bytes32ArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.Bytes32Items',
-            name: 'bytes32Items',
-            type: 'tuple'
+            "internalType": "struct EventUtils.Bytes32Items",
+            "name": "bytes32Items",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes',
-                    name: 'value',
-                    type: 'bytes'
+                    "internalType": "bytes",
+                    "name": "value",
+                    "type": "bytes"
                   }
                 ],
-                internalType: 'struct EventUtils.BytesKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BytesKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes[]',
-                    name: 'value',
-                    type: 'bytes[]'
+                    "internalType": "bytes[]",
+                    "name": "value",
+                    "type": "bytes[]"
                   }
                 ],
-                internalType: 'struct EventUtils.BytesArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BytesArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.BytesItems',
-            name: 'bytesItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.BytesItems",
+            "name": "bytesItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'string',
-                    name: 'value',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "value",
+                    "type": "string"
                   }
                 ],
-                internalType: 'struct EventUtils.StringKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.StringKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'string[]',
-                    name: 'value',
-                    type: 'string[]'
+                    "internalType": "string[]",
+                    "name": "value",
+                    "type": "string[]"
                   }
                 ],
-                internalType: 'struct EventUtils.StringArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.StringArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.StringItems',
-            name: 'stringItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.StringItems",
+            "name": "stringItems",
+            "type": "tuple"
           }
         ],
-        internalType: 'struct EventUtils.EventLogData',
-        name: 'eventData',
-        type: 'tuple'
+        "internalType": "struct EventUtils.EventLogData",
+        "name": "eventData",
+        "type": "tuple"
       }
     ],
-    name: 'emitEventLog',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function'
+    "name": "emitEventLog",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'string',
-        name: 'eventName',
-        type: 'string'
+        "internalType": "string",
+        "name": "eventName",
+        "type": "string"
       },
       {
-        internalType: 'bytes32',
-        name: 'topic1',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "topic1",
+        "type": "bytes32"
       },
       {
-        components: [
+        "components": [
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'address',
-                    name: 'value',
-                    type: 'address'
+                    "internalType": "address",
+                    "name": "value",
+                    "type": "address"
                   }
                 ],
-                internalType: 'struct EventUtils.AddressKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.AddressKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'address[]',
-                    name: 'value',
-                    type: 'address[]'
+                    "internalType": "address[]",
+                    "name": "value",
+                    "type": "address[]"
                   }
                 ],
-                internalType: 'struct EventUtils.AddressArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.AddressArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.AddressItems',
-            name: 'addressItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.AddressItems",
+            "name": "addressItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'uint256',
-                    name: 'value',
-                    type: 'uint256'
+                    "internalType": "uint256",
+                    "name": "value",
+                    "type": "uint256"
                   }
                 ],
-                internalType: 'struct EventUtils.UintKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.UintKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'uint256[]',
-                    name: 'value',
-                    type: 'uint256[]'
+                    "internalType": "uint256[]",
+                    "name": "value",
+                    "type": "uint256[]"
                   }
                 ],
-                internalType: 'struct EventUtils.UintArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.UintArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.UintItems',
-            name: 'uintItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.UintItems",
+            "name": "uintItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'int256',
-                    name: 'value',
-                    type: 'int256'
+                    "internalType": "int256",
+                    "name": "value",
+                    "type": "int256"
                   }
                 ],
-                internalType: 'struct EventUtils.IntKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.IntKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'int256[]',
-                    name: 'value',
-                    type: 'int256[]'
+                    "internalType": "int256[]",
+                    "name": "value",
+                    "type": "int256[]"
                   }
                 ],
-                internalType: 'struct EventUtils.IntArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.IntArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.IntItems',
-            name: 'intItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.IntItems",
+            "name": "intItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bool',
-                    name: 'value',
-                    type: 'bool'
+                    "internalType": "bool",
+                    "name": "value",
+                    "type": "bool"
                   }
                 ],
-                internalType: 'struct EventUtils.BoolKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BoolKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bool[]',
-                    name: 'value',
-                    type: 'bool[]'
+                    "internalType": "bool[]",
+                    "name": "value",
+                    "type": "bool[]"
                   }
                 ],
-                internalType: 'struct EventUtils.BoolArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BoolArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.BoolItems',
-            name: 'boolItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.BoolItems",
+            "name": "boolItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes32',
-                    name: 'value',
-                    type: 'bytes32'
+                    "internalType": "bytes32",
+                    "name": "value",
+                    "type": "bytes32"
                   }
                 ],
-                internalType: 'struct EventUtils.Bytes32KeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.Bytes32KeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes32[]',
-                    name: 'value',
-                    type: 'bytes32[]'
+                    "internalType": "bytes32[]",
+                    "name": "value",
+                    "type": "bytes32[]"
                   }
                 ],
-                internalType: 'struct EventUtils.Bytes32ArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.Bytes32ArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.Bytes32Items',
-            name: 'bytes32Items',
-            type: 'tuple'
+            "internalType": "struct EventUtils.Bytes32Items",
+            "name": "bytes32Items",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes',
-                    name: 'value',
-                    type: 'bytes'
+                    "internalType": "bytes",
+                    "name": "value",
+                    "type": "bytes"
                   }
                 ],
-                internalType: 'struct EventUtils.BytesKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BytesKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes[]',
-                    name: 'value',
-                    type: 'bytes[]'
+                    "internalType": "bytes[]",
+                    "name": "value",
+                    "type": "bytes[]"
                   }
                 ],
-                internalType: 'struct EventUtils.BytesArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BytesArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.BytesItems',
-            name: 'bytesItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.BytesItems",
+            "name": "bytesItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'string',
-                    name: 'value',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "value",
+                    "type": "string"
                   }
                 ],
-                internalType: 'struct EventUtils.StringKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.StringKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'string[]',
-                    name: 'value',
-                    type: 'string[]'
+                    "internalType": "string[]",
+                    "name": "value",
+                    "type": "string[]"
                   }
                 ],
-                internalType: 'struct EventUtils.StringArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.StringArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.StringItems',
-            name: 'stringItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.StringItems",
+            "name": "stringItems",
+            "type": "tuple"
           }
         ],
-        internalType: 'struct EventUtils.EventLogData',
-        name: 'eventData',
-        type: 'tuple'
+        "internalType": "struct EventUtils.EventLogData",
+        "name": "eventData",
+        "type": "tuple"
       }
     ],
-    name: 'emitEventLog1',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function'
+    "name": "emitEventLog1",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'string',
-        name: 'eventName',
-        type: 'string'
+        "internalType": "string",
+        "name": "eventName",
+        "type": "string"
       },
       {
-        internalType: 'bytes32',
-        name: 'topic1',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "topic1",
+        "type": "bytes32"
       },
       {
-        internalType: 'bytes32',
-        name: 'topic2',
-        type: 'bytes32'
+        "internalType": "bytes32",
+        "name": "topic2",
+        "type": "bytes32"
       },
       {
-        components: [
+        "components": [
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'address',
-                    name: 'value',
-                    type: 'address'
+                    "internalType": "address",
+                    "name": "value",
+                    "type": "address"
                   }
                 ],
-                internalType: 'struct EventUtils.AddressKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.AddressKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'address[]',
-                    name: 'value',
-                    type: 'address[]'
+                    "internalType": "address[]",
+                    "name": "value",
+                    "type": "address[]"
                   }
                 ],
-                internalType: 'struct EventUtils.AddressArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.AddressArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.AddressItems',
-            name: 'addressItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.AddressItems",
+            "name": "addressItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'uint256',
-                    name: 'value',
-                    type: 'uint256'
+                    "internalType": "uint256",
+                    "name": "value",
+                    "type": "uint256"
                   }
                 ],
-                internalType: 'struct EventUtils.UintKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.UintKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'uint256[]',
-                    name: 'value',
-                    type: 'uint256[]'
+                    "internalType": "uint256[]",
+                    "name": "value",
+                    "type": "uint256[]"
                   }
                 ],
-                internalType: 'struct EventUtils.UintArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.UintArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.UintItems',
-            name: 'uintItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.UintItems",
+            "name": "uintItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'int256',
-                    name: 'value',
-                    type: 'int256'
+                    "internalType": "int256",
+                    "name": "value",
+                    "type": "int256"
                   }
                 ],
-                internalType: 'struct EventUtils.IntKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.IntKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'int256[]',
-                    name: 'value',
-                    type: 'int256[]'
+                    "internalType": "int256[]",
+                    "name": "value",
+                    "type": "int256[]"
                   }
                 ],
-                internalType: 'struct EventUtils.IntArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.IntArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.IntItems',
-            name: 'intItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.IntItems",
+            "name": "intItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bool',
-                    name: 'value',
-                    type: 'bool'
+                    "internalType": "bool",
+                    "name": "value",
+                    "type": "bool"
                   }
                 ],
-                internalType: 'struct EventUtils.BoolKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BoolKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bool[]',
-                    name: 'value',
-                    type: 'bool[]'
+                    "internalType": "bool[]",
+                    "name": "value",
+                    "type": "bool[]"
                   }
                 ],
-                internalType: 'struct EventUtils.BoolArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BoolArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.BoolItems',
-            name: 'boolItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.BoolItems",
+            "name": "boolItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes32',
-                    name: 'value',
-                    type: 'bytes32'
+                    "internalType": "bytes32",
+                    "name": "value",
+                    "type": "bytes32"
                   }
                 ],
-                internalType: 'struct EventUtils.Bytes32KeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.Bytes32KeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes32[]',
-                    name: 'value',
-                    type: 'bytes32[]'
+                    "internalType": "bytes32[]",
+                    "name": "value",
+                    "type": "bytes32[]"
                   }
                 ],
-                internalType: 'struct EventUtils.Bytes32ArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.Bytes32ArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.Bytes32Items',
-            name: 'bytes32Items',
-            type: 'tuple'
+            "internalType": "struct EventUtils.Bytes32Items",
+            "name": "bytes32Items",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes',
-                    name: 'value',
-                    type: 'bytes'
+                    "internalType": "bytes",
+                    "name": "value",
+                    "type": "bytes"
                   }
                 ],
-                internalType: 'struct EventUtils.BytesKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BytesKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'bytes[]',
-                    name: 'value',
-                    type: 'bytes[]'
+                    "internalType": "bytes[]",
+                    "name": "value",
+                    "type": "bytes[]"
                   }
                 ],
-                internalType: 'struct EventUtils.BytesArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.BytesArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.BytesItems',
-            name: 'bytesItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.BytesItems",
+            "name": "bytesItems",
+            "type": "tuple"
           },
           {
-            components: [
+            "components": [
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'string',
-                    name: 'value',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "value",
+                    "type": "string"
                   }
                 ],
-                internalType: 'struct EventUtils.StringKeyValue[]',
-                name: 'items',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.StringKeyValue[]",
+                "name": "items",
+                "type": "tuple[]"
               },
               {
-                components: [
+                "components": [
                   {
-                    internalType: 'string',
-                    name: 'key',
-                    type: 'string'
+                    "internalType": "string",
+                    "name": "key",
+                    "type": "string"
                   },
                   {
-                    internalType: 'string[]',
-                    name: 'value',
-                    type: 'string[]'
+                    "internalType": "string[]",
+                    "name": "value",
+                    "type": "string[]"
                   }
                 ],
-                internalType: 'struct EventUtils.StringArrayKeyValue[]',
-                name: 'arrayItems',
-                type: 'tuple[]'
+                "internalType": "struct EventUtils.StringArrayKeyValue[]",
+                "name": "arrayItems",
+                "type": "tuple[]"
               }
             ],
-            internalType: 'struct EventUtils.StringItems',
-            name: 'stringItems',
-            type: 'tuple'
+            "internalType": "struct EventUtils.StringItems",
+            "name": "stringItems",
+            "type": "tuple"
           }
         ],
-        internalType: 'struct EventUtils.EventLogData',
-        name: 'eventData',
-        type: 'tuple'
+        "internalType": "struct EventUtils.EventLogData",
+        "name": "eventData",
+        "type": "tuple"
       }
     ],
-    name: 'emitEventLog2',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function'
+    "name": "emitEventLog2",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'roleStore',
-    outputs: [
+    "inputs": [],
+    "name": "roleStore",
+    "outputs": [
       {
-        internalType: 'contract RoleStore',
-        name: '',
-        type: 'address'
+        "internalType": "contract RoleStore",
+        "name": "",
+        "type": "address"
       }
     ],
-    stateMutability: 'view',
-    type: 'function'
+    "stateMutability": "view",
+    "type": "function"
   }
 ] as const

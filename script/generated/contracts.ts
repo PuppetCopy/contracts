@@ -12,10 +12,12 @@ import positionAbi from './abi/puppetPosition.js'
 import userrouterAbi from './abi/puppetUserRouter.js'
 import masterhookAbi from './abi/puppetMasterHook.js'
 import gmxstageAbi from './abi/puppetGmxStage.js'
+import tokenrouterAbi from './abi/puppetTokenRouter.js'
+import proxyuserrouterAbi from './abi/puppetProxyUserRouter.js'
 
 export const PUPPET_CONTRACT_MAP = {
   Dictatorship: {
-    address: '0x61719F8f2f7445c99C86d43278680F8a69246Db0',
+    address: '0x778820d455AA439F92578521F751c3439B193EC3',
     chainId: 42161,
     abi: dictatorshipAbi
   },
@@ -40,33 +42,47 @@ export const PUPPET_CONTRACT_MAP = {
     abi: feemarketplaceAbi
   },
   Match: {
-    address: '0x6AD7dCD75EB97EaEc1D9e62C6Af7E8a49Ac1A8d4',
+    address: '0xE7fc062B5015ac5e9fa9DC3E8182B1959e7252cc',
     chainId: 42161,
     abi: matchAbi
   },
   Allocate: {
-    address: '0x3F74b37D931D71c01EC0BBa730aF2AACbb89F532',
+    address: '0x8EFACa3d5a6dEcfcAE13E6521897E15E86746796',
     chainId: 42161,
     abi: allocateAbi
   },
   Position: {
-    address: '0xC1EEE594624B613e30DA071F1Cd632179E6Bd1fa',
+    address: '0xe50cA753400bf25Ebc9480F5D04f2F22B978b4fd',
     chainId: 42161,
     abi: positionAbi
   },
   UserRouter: {
-    address: '0x1CF68142f84599E6824CdF03C0B0672431E57534',
+    address: '0x456289bE407E3Ed74E727804BBD7FC65f52b2e65',
     chainId: 42161,
     abi: userrouterAbi
   },
+  UserRouterImpl: {
+    address: '0x0B1ba8b68CF1282a7770DecB650511126DF5142B',
+    chainId: 42161
+  },
   MasterHook: {
-    address: '0x4587Ac86b519c3A08F5F030988917D330524A166',
+    address: '0xFD79dEefa341313Ed06Ba3709d39eC5aA062aDac',
     chainId: 42161,
     abi: masterhookAbi
   },
   GmxStage: {
-    address: '0x6AD7dCD75EB97EaEc1D9e62C6Af7E8a49Ac1A8d4',
+    address: '0x4c6810e9b7b787fa5419C793912F6Aa37e485F7F',
     chainId: 42161,
     abi: gmxstageAbi
+  },
+  TokenRouter: {
+    address: '0x0c69DB327925cd9367E39B7CB773Fcf97005a02c',
+    chainId: 42161,
+    abi: tokenrouterAbi
+  },
+  ProxyUserRouter: {
+    address: '0x0DD0CdeeC28F81a404474d26eB72affDA3A18f7d',
+    chainId: 42161,
+    abi: proxyuserrouterAbi
   }
 } as const
