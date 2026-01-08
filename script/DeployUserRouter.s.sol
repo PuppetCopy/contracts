@@ -27,7 +27,7 @@ contract DeployUserRouter is BaseScript {
         proxyUserRouter.update(address(userRouter));
 
         address proxyAddr = address(proxyUserRouter);
-        dictatorship.setPermission(allocation, allocation.registerMasterSubaccount.selector, proxyAddr);
+        dictatorship.setPermission(allocation, allocation.createMasterAccount.selector, proxyAddr);
 
         vm.stopBroadcast();
     }

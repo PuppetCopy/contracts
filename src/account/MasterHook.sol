@@ -9,10 +9,10 @@ import {Error} from "../utils/Error.sol";
 import {IUserRouter} from "../utils/interfaces/IUserRouter.sol";
 
 /// @title MasterHook
-/// @notice ERC-7579 Hook module for master subaccounts enabling fund-raising through Allocation
+/// @notice ERC-7579 Hook module for master accounts enabling fund-raising through Allocation
 contract MasterHook is IHook {
     struct InstallParams {
-        address account;
+        address user;
         address signer;
         IERC20 baseToken;
         bytes32 name;
@@ -33,19 +33,17 @@ contract MasterHook is IHook {
     }
 
     function onInstall(bytes calldata _data) external {
-        IERC7579Account _subaccount = IERC7579Account(msg.sender);
+        IERC7579Account _masterAccount = IERC7579Account(msg.sender);
 
-        if (router.isDisposed(_subaccount) && router.hasRemainingShares(_subaccount)) {
-            revert Error.Allocate__DisposedWithShares();
-        }
+        if (router.isDisposed(_masterAccount) && router.hasRemainingShares(_masterAccount)) revert Error.Allocate__DisposedWithShares();
 
         InstallParams memory params = abi.decode(_data, (InstallParams));
 
-        router.registerMasterSubaccount(params.account, params.signer, _subaccount, params.baseToken, params.name);
+        router.createMasterAccount(params.user, params.signer, _masterAccount, params.baseToken, params.name);
     }
 
     function onUninstall(bytes calldata) external {
-        router.disposeSubaccount(IERC7579Account(msg.sender));
+        router.disposeMasterAccount(IERC7579Account(msg.sender));
     }
 
     function isModuleType(uint _moduleTypeId) external pure returns (bool) {

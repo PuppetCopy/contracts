@@ -9,6 +9,18 @@ export default [
         "name": "_authority",
         "type": "address",
         "internalType": "contract IAuthority"
+      },
+      {
+        "name": "_config",
+        "type": "tuple",
+        "internalType": "struct Match.Config",
+        "components": [
+          {
+            "name": "minThrottlePeriod",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
       }
     ],
     "stateMutability": "nonpayable"
@@ -52,6 +64,19 @@ export default [
   },
   {
     "type": "function",
+    "name": "config",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "minThrottlePeriod",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "filterMap",
     "inputs": [
       {
@@ -75,45 +100,6 @@ export default [
         "name": "",
         "type": "bool",
         "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getMatchAmountList",
-    "inputs": [
-      {
-        "name": "_baseToken",
-        "type": "address",
-        "internalType": "contract IERC20"
-      },
-      {
-        "name": "_stage",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_masterSubaccount",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_puppetList",
-        "type": "address[]",
-        "internalType": "contract IERC7579Account[]"
-      },
-      {
-        "name": "_requestedAmountList",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "_matchedAmountList",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
       }
     ],
     "stateMutability": "view"
@@ -154,20 +140,46 @@ export default [
   },
   {
     "type": "function",
-    "name": "recordThrottle",
+    "name": "recordMatchAmountList",
     "inputs": [
       {
-        "name": "_puppet",
+        "name": "_baseToken",
+        "type": "address",
+        "internalType": "contract IERC20"
+      },
+      {
+        "name": "_stage",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "_masterSubaccount",
+        "name": "_masterAccount",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "_puppetList",
+        "type": "address[]",
+        "internalType": "contract IERC7579Account[]"
+      },
+      {
+        "name": "_requestedAmountList",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
       }
     ],
-    "outputs": [],
+    "outputs": [
+      {
+        "name": "_matchedAmountList",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "_totalMatched",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "stateMutability": "nonpayable"
   },
   {
@@ -309,6 +321,27 @@ export default [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "error",
+    "name": "Match__InvalidMinThrottlePeriod",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Match__ThrottlePeriodBelowMin",
+    "inputs": [
+      {
+        "name": "provided",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "minimum",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

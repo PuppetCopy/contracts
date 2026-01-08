@@ -268,7 +268,7 @@ export default [
         "internalType": "address"
       },
       {
-        "name": "_subaccount",
+        "name": "_masterAccount",
         "type": "address",
         "internalType": "address"
       },
@@ -345,7 +345,7 @@ export default [
         "internalType": "bytes32"
       },
       {
-        "name": "subaccount",
+        "name": "masterAccount",
         "type": "address",
         "internalType": "address"
       }

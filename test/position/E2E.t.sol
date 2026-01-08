@@ -12,7 +12,7 @@ import {Match} from "src/position/Match.sol";
 import {Position} from "src/position/Position.sol";
 import {UserRouter} from "src/UserRouter.sol";
 import {IStage} from "src/position/interface/IStage.sol";
-import {PositionParams, CallIntent, SubaccountInfo} from "src/position/interface/ITypes.sol";
+import {PositionParams, CallIntent, MasterAccountInfo} from "src/position/interface/ITypes.sol";
 import {Error} from "src/utils/Error.sol";
 
 import {BasicSetup} from "../base/BasicSetup.t.sol";
@@ -54,7 +54,7 @@ contract E2ETest is BasicSetup {
         sessionSigner = vm.addr(signerPrivateKey);
 
         position = new Position(dictator);
-        matcher = new Match(dictator);
+        matcher = new Match(dictator, Match.Config({minThrottlePeriod: 6 hours}));
         allocation = new Allocate(
             dictator,
             Allocate.Config({
@@ -66,7 +66,7 @@ contract E2ETest is BasicSetup {
 
         dictator.registerContract(address(matcher));
         userRouter = new UserRouter(dictator, UserRouter.Config({allocation: allocation, matcher: matcher, position: position}));
-        dictator.setPermission(matcher, matcher.recordThrottle.selector, address(allocation));
+        dictator.setPermission(matcher, matcher.recordMatchAmountList.selector, address(allocation));
         dictator.setPermission(matcher, matcher.setFilter.selector, address(userRouter));
         dictator.setPermission(matcher, matcher.setPolicy.selector, address(userRouter));
 
@@ -77,7 +77,7 @@ contract E2ETest is BasicSetup {
         mockVenue = new MockVenue();
         mockVenue.setToken(usdc);
 
-        dictator.setPermission(allocation, allocation.registerMasterSubaccount.selector, users.owner);
+        dictator.setPermission(allocation, allocation.createMasterAccount.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeAllocate.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeWithdraw.selector, users.owner);
         dictator.setPermission(allocation, allocation.setTokenCap.selector, users.owner);
@@ -107,7 +107,7 @@ contract E2ETest is BasicSetup {
 
         // Mint tokens
         usdc.mint(owner, 10_000e6);
-        usdc.mint(address(masterSubaccount), 100e6); // Seed for registration
+        // Note: masterSubaccount has no initial balance - 1-click flow tests can mint before registration
         usdc.mint(address(puppet1), 500e6);
         usdc.mint(address(puppet2), 500e6);
 
@@ -117,9 +117,9 @@ contract E2ETest is BasicSetup {
 
         // Set default policies for puppets (100% allowance, no throttle, far future expiry)
         vm.prank(address(puppet1));
-        userRouter.setPolicy(address(0), 10000, 0, block.timestamp + 365 days);
+        userRouter.setPolicy(address(0), 10000, 6 hours, block.timestamp + 365 days);
         vm.prank(address(puppet2));
-        userRouter.setPolicy(address(0), 10000, 0, block.timestamp + 365 days);
+        userRouter.setPolicy(address(0), 10000, 6 hours, block.timestamp + 365 days);
 
         vm.startPrank(users.owner);
     }
@@ -132,9 +132,9 @@ contract E2ETest is BasicSetup {
         returns (CallIntent memory)
     {
         return CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: masterSubaccount,
+            masterAccount: masterSubaccount,
             token: usdc,
             amount: amount,
             triggerNetValue: 0,
@@ -149,9 +149,9 @@ contract E2ETest is BasicSetup {
         bytes32 structHash = keccak256(
             abi.encode(
                 allocation.CALL_INTENT_TYPEHASH(),
-                intent.account,
+                intent.user,
                 intent.signer,
-                intent.subaccount,
+                intent.masterAccount,
                 intent.token,
                 intent.amount,
                 intent.triggerNetValue,
@@ -178,7 +178,7 @@ contract E2ETest is BasicSetup {
     }
 
     function _registerMasterSubaccount() internal {
-        allocation.registerMasterSubaccount(owner, sessionSigner, masterSubaccount, usdc, SUBACCOUNT_NAME);
+        allocation.createMasterAccount(owner, sessionSigner, masterSubaccount, usdc, SUBACCOUNT_NAME);
     }
 
     /// @notice Complete E2E test: register -> allocate -> trade -> settle -> withdraw
@@ -188,7 +188,7 @@ contract E2ETest is BasicSetup {
         // =========================================
         _registerMasterSubaccount();
 
-        SubaccountInfo memory info = allocation.getSubaccountInfo(masterSubaccount);
+        MasterAccountInfo memory info = allocation.getMasterAccountInfo(masterSubaccount);
         assertTrue(address(info.baseToken) != address(0), "Subaccount should be registered");
         assertEq(info.signer, sessionSigner, "Session signer should be set");
 
@@ -315,9 +315,9 @@ contract E2ETest is BasicSetup {
         mockStage.setPositionValue(positionKey, 0);
 
         CallIntent memory withdrawIntent = CallIntent({
-            account: address(puppet1),
+            user: address(puppet1),
             signer: address(puppet1),
-            subaccount: masterSubaccount,
+            masterAccount: masterSubaccount,
             token: usdc,
             amount: puppet1Shares, // Withdraw all shares
             triggerNetValue: 0,
@@ -336,9 +336,9 @@ contract E2ETest is BasicSetup {
 
         // For simplicity, we test the owner withdrawing their portion
         CallIntent memory ownerWithdrawIntent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: masterSubaccount,
+            masterAccount: masterSubaccount,
             token: usdc,
             amount: 0, // Owner has 0 shares in this test
             triggerNetValue: 0,
@@ -484,9 +484,9 @@ contract E2ETest is BasicSetup {
         mockStage.setPositionOwner(positionKey1, address(masterSubaccount));
         mockStage.setPositionOwner(positionKey2, address(masterSubaccount));
 
-        // Subaccount has some remaining collateral (100 USDC from seed)
+        // Subaccount has remaining collateral from puppet allocations
         uint subaccountBalance = usdc.balanceOf(address(masterSubaccount));
-        assertEq(subaccountBalance, 600e6, "Subaccount has 600 USDC (100 seed + 500 allocated)");
+        assertEq(subaccountBalance, 500e6, "Subaccount has 500 USDC from puppet allocations");
 
         // =========================================
         // Calculate net value with open positions
@@ -501,13 +501,13 @@ contract E2ETest is BasicSetup {
         uint netValue = position.getNetValue(address(masterSubaccount), usdc, stages, posKeys);
         assertEq(netValue, 530e6, "Net value = position values (250 + 280)");
 
-        // Total value = collateral (600) + position value (530) = 1130 USDC
+        // Total value = collateral (500) + position value (530) = 1030 USDC
         // But wait - in real scenario, collateral was used to open positions
-        // Let's simulate: 500 USDC used for positions, 100 remains as collateral
+        // Let's simulate: 400 USDC used for positions, 100 remains as collateral
         // Simulate funds used for positions (transfer out to venue)
         vm.stopPrank();
         vm.prank(address(masterSubaccount));
-        usdc.transfer(address(mockVenue), 500e6);
+        usdc.transfer(address(mockVenue), 400e6);
         vm.startPrank(users.owner);
 
         uint remainingCollateral = usdc.balanceOf(address(masterSubaccount));
@@ -578,9 +578,9 @@ contract E2ETest is BasicSetup {
         vm.startPrank(users.owner);
 
         CallIntent memory ownerDepositIntent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: masterSubaccount,
+            masterAccount: masterSubaccount,
             token: usdc,
             amount: 100e6,
             triggerNetValue: 0,
@@ -605,9 +605,9 @@ contract E2ETest is BasicSetup {
         uint ownerWithdrawAmount = ownerShares / 2;
 
         CallIntent memory ownerWithdrawIntent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: masterSubaccount,
+            masterAccount: masterSubaccount,
             token: usdc,
             amount: ownerWithdrawAmount,
             triggerNetValue: 0,

@@ -10,3 +10,6 @@
 [submodule "lib/gmx-synthetics"]
 	path = lib/gmx-synthetics
 	url = https://github.com/gmx-io/gmx-synthetics
+[submodule "lib/the-compact"]
+	path = lib/the-compact
+	url = https://github.com/Uniswap/the-compact

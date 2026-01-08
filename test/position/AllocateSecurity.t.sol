@@ -51,7 +51,7 @@ contract AllocateSecurityTest is BasicSetup {
         sessionSigner = vm.addr(signerPrivateKey);
 
         position = new Position(dictator);
-        matcher = new Match(dictator);
+        matcher = new Match(dictator, Match.Config({minThrottlePeriod: 6 hours}));
         allocation = new Allocate(
             dictator,
             Allocate.Config({
@@ -63,7 +63,7 @@ contract AllocateSecurityTest is BasicSetup {
 
         dictator.registerContract(address(matcher));
         userRouter = new UserRouter(dictator, UserRouter.Config({allocation: allocation, matcher: matcher, position: position}));
-        dictator.setPermission(matcher, matcher.recordThrottle.selector, address(allocation));
+        dictator.setPermission(matcher, matcher.recordMatchAmountList.selector, address(allocation));
         dictator.setPermission(matcher, matcher.setFilter.selector, address(userRouter));
         dictator.setPermission(matcher, matcher.setPolicy.selector, address(userRouter));
 
@@ -76,7 +76,7 @@ contract AllocateSecurityTest is BasicSetup {
 
         stageKey = keccak256("mock_stage");
 
-        dictator.setPermission(allocation, allocation.registerMasterSubaccount.selector, users.owner);
+        dictator.setPermission(allocation, allocation.createMasterAccount.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeAllocate.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeWithdraw.selector, users.owner);
         dictator.setPermission(allocation, allocation.setTokenCap.selector, users.owner);
@@ -102,9 +102,9 @@ contract AllocateSecurityTest is BasicSetup {
         // Set default policies for puppets (100% allowance, no throttle, far future expiry)
         vm.stopPrank();
         vm.prank(address(puppet1));
-        userRouter.setPolicy(address(0), 10000, 0, block.timestamp + 365 days);
+        userRouter.setPolicy(address(0), 10000, 6 hours, block.timestamp + 365 days);
         vm.prank(address(puppet2));
-        userRouter.setPolicy(address(0), 10000, 0, block.timestamp + 365 days);
+        userRouter.setPolicy(address(0), 10000, 6 hours, block.timestamp + 365 days);
 
         vm.startPrank(users.owner);
     }
@@ -113,9 +113,9 @@ contract AllocateSecurityTest is BasicSetup {
         bytes32 structHash = keccak256(
             abi.encode(
                 allocation.CALL_INTENT_TYPEHASH(),
-                intent.account,
+                intent.user,
                 intent.signer,
-                intent.subaccount,
+                intent.masterAccount,
                 intent.token,
                 intent.amount,
                 intent.triggerNetValue,
@@ -149,7 +149,7 @@ contract AllocateSecurityTest is BasicSetup {
     }
 
     function _registerSubaccount(IERC7579Account sub, MockERC20 token) internal {
-        allocation.registerMasterSubaccount(owner, sessionSigner, sub, IERC20(address(token)), SUBACCOUNT_NAME);
+        allocation.createMasterAccount(owner, sessionSigner, sub, IERC20(address(token)), SUBACCOUNT_NAME);
     }
 
     // ============================================================================
@@ -176,9 +176,9 @@ contract AllocateSecurityTest is BasicSetup {
 
         PositionParams memory emptyParams = _emptyPositionParams();
         CallIntent memory attackerIntent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: attackerSub,
+            masterAccount: attackerSub,
             token: usdc,
             amount: 1,
             triggerNetValue: 0,
@@ -208,9 +208,9 @@ contract AllocateSecurityTest is BasicSetup {
         usdc.mint(address(puppet1), 999e6);
 
         CallIntent memory intent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: attackerSub,
+            masterAccount: attackerSub,
             token: usdc,
             amount: 0,
             triggerNetValue: 0,
@@ -268,9 +268,9 @@ contract AllocateSecurityTest is BasicSetup {
 
         PositionParams memory emptyParams = _emptyPositionParams();
         CallIntent memory intent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: sub,
+            masterAccount: sub,
             token: usdc,
             amount: 1000e6,
             triggerNetValue: 0,
@@ -307,9 +307,9 @@ contract AllocateSecurityTest is BasicSetup {
 
         PositionParams memory emptyParams = _emptyPositionParams();
         CallIntent memory intent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: sub,
+            masterAccount: sub,
             token: usdc,
             amount: 1,
             triggerNetValue: 0,

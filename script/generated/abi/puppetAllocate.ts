@@ -129,10 +129,43 @@ export default [
   },
   {
     "type": "function",
-    "name": "disposeSubaccount",
+    "name": "createMasterAccount",
     "inputs": [
       {
-        "name": "_subaccount",
+        "name": "_user",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_signer",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_masterAccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
+      },
+      {
+        "name": "_baseToken",
+        "type": "address",
+        "internalType": "contract IERC20"
+      },
+      {
+        "name": "_name",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "disposeMasterAccount",
+    "inputs": [
+      {
+        "name": "_masterAccount",
         "type": "address",
         "internalType": "contract IERC7579Account"
       }
@@ -203,7 +236,7 @@ export default [
         "internalType": "struct CallIntent",
         "components": [
           {
-            "name": "account",
+            "name": "user",
             "type": "address",
             "internalType": "address"
           },
@@ -213,7 +246,7 @@ export default [
             "internalType": "address"
           },
           {
-            "name": "subaccount",
+            "name": "masterAccount",
             "type": "address",
             "internalType": "contract IERC7579Account"
           },
@@ -305,7 +338,7 @@ export default [
         "internalType": "struct CallIntent",
         "components": [
           {
-            "name": "account",
+            "name": "user",
             "type": "address",
             "internalType": "address"
           },
@@ -315,7 +348,7 @@ export default [
             "internalType": "address"
           },
           {
-            "name": "subaccount",
+            "name": "masterAccount",
             "type": "address",
             "internalType": "contract IERC7579Account"
           },
@@ -414,34 +447,10 @@ export default [
   },
   {
     "type": "function",
-    "name": "getSharePrice",
+    "name": "getMasterAccountInfo",
     "inputs": [
       {
-        "name": "_subaccount",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      },
-      {
-        "name": "_totalAssets",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getSubaccountInfo",
-    "inputs": [
-      {
-        "name": "_subaccount",
+        "name": "_masterAccount",
         "type": "address",
         "internalType": "contract IERC7579Account"
       }
@@ -450,10 +459,10 @@ export default [
       {
         "name": "",
         "type": "tuple",
-        "internalType": "struct SubaccountInfo",
+        "internalType": "struct MasterAccountInfo",
         "components": [
           {
-            "name": "account",
+            "name": "user",
             "type": "address",
             "internalType": "address"
           },
@@ -494,10 +503,34 @@ export default [
   },
   {
     "type": "function",
+    "name": "getSharePrice",
+    "inputs": [
+      {
+        "name": "_masterAccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
+      },
+      {
+        "name": "_totalAssets",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getUserShares",
     "inputs": [
       {
-        "name": "_subaccount",
+        "name": "_masterAccount",
         "type": "address",
         "internalType": "contract IERC7579Account"
       },
@@ -521,7 +554,7 @@ export default [
     "name": "hasRemainingShares",
     "inputs": [
       {
-        "name": "_subaccount",
+        "name": "_masterAccount",
         "type": "address",
         "internalType": "contract IERC7579Account"
       }
@@ -597,54 +630,21 @@ export default [
       }
     ],
     "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "registerMasterSubaccount",
-    "inputs": [
-      {
-        "name": "_account",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_signer",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_subaccount",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      },
-      {
-        "name": "_baseToken",
-        "type": "address",
-        "internalType": "contract IERC20"
-      },
-      {
-        "name": "_name",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "pure"
   },
   {
     "type": "function",
     "name": "registeredMap",
     "inputs": [
       {
-        "name": "subaccount",
+        "name": "masterAccount",
         "type": "address",
         "internalType": "contract IERC7579Account"
       }
     ],
     "outputs": [
       {
-        "name": "account",
+        "name": "user",
         "type": "address",
         "internalType": "address"
       },
@@ -758,7 +758,7 @@ export default [
     "name": "shareBalanceMap",
     "inputs": [
       {
-        "name": "subaccount",
+        "name": "masterAccount",
         "type": "address",
         "internalType": "contract IERC7579Account"
       },
@@ -820,7 +820,7 @@ export default [
     "name": "totalSharesMap",
     "inputs": [
       {
-        "name": "subaccount",
+        "name": "masterAccount",
         "type": "address",
         "internalType": "contract IERC7579Account"
       }
@@ -895,11 +895,6 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocate__ExecutorNotInstalled",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "Allocate__InsufficientBalance",
     "inputs": []
   },
@@ -933,6 +928,22 @@ export default [
     "type": "error",
     "name": "Allocate__InvalidGasLimit",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Allocate__InvalidMasterAccountOwner",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "provided",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
   },
   {
     "type": "error",
@@ -973,23 +984,7 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocate__InvalidSubaccountMaster",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "provided",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "Allocate__MasterHookNotInstalled",
+    "name": "Allocate__MasterAccountFrozen",
     "inputs": []
   },
   {
@@ -1047,11 +1042,6 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocate__SubaccountFrozen",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "Allocate__TokenMismatch",
     "inputs": []
   },
@@ -1078,7 +1068,12 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocate__UnregisteredSubaccount",
+    "name": "Allocate__UninstallDisabled",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Allocate__UnregisteredMasterAccount",
     "inputs": []
   },
   {

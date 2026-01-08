@@ -51,13 +51,13 @@ library Error {
     error Allocate__InsufficientBalance();
     error Allocate__ActiveShares(uint totalShares);
     error Allocate__AlreadyRegistered();
-    error Allocate__UnregisteredSubaccount();
+    error Allocate__UnregisteredMasterAccount();
     error Allocate__TransferFailed();
     error Allocate__ArrayLengthMismatch(uint puppetCount, uint allocationCount);
     error Allocate__PuppetListTooLarge(uint provided, uint maximum);
     error Allocate__IntentExpired(uint deadline, uint currentTime);
     error Allocate__InvalidSignature(address signer);
-    error Allocate__InvalidSubaccountMaster(address expected, address provided);
+    error Allocate__InvalidMasterAccountOwner(address expected, address provided);
     error Allocate__UnauthorizedSigner(address signer);
     error Allocate__InvalidNonce(uint expected, uint provided);
     error Allocate__InvalidPosition();
@@ -67,7 +67,7 @@ library Error {
     error Allocate__InvalidGasLimit();
     error Allocate__TokenNotAllowed();
     error Allocate__DepositExceedsCap(uint amount, uint cap);
-    error Allocate__SubaccountFrozen();
+    error Allocate__MasterAccountFrozen();
     error Allocate__ZeroAmount();
     error Allocate__ZeroShares();
     error Allocate__InsufficientLiquidity();
@@ -81,6 +81,7 @@ library Error {
     error Allocate__TokenMismatch();
     error Allocate__ZeroAssets();
     error Allocate__DisposedWithShares();
+    error Allocate__UninstallDisabled();
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();
@@ -103,6 +104,8 @@ library Error {
     // Match errors
     error Match__TransferMismatch();
     error Match__InvalidConfig();
+    error Match__InvalidMinThrottlePeriod();
+    error Match__ThrottlePeriodBelowMin(uint provided, uint minimum);
 
     // GmxStage errors
     error GmxStage__InvalidCallData();

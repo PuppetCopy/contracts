@@ -25,37 +25,37 @@ contract UserRouter is IUserRouter, CoreContract {
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
-    function registerMasterSubaccount(
-        address _account,
+    function createMasterAccount(
+        address _user,
         address _signer,
-        IERC7579Account _subaccount,
+        IERC7579Account _masterAccount,
         IERC20 _baseToken,
         bytes32 _name
     ) external {
         if (msg.sender != config.allocation.getConfig().masterHook) revert Error.UserRouter__UnauthorizedCaller();
-        config.allocation.registerMasterSubaccount(_account, _signer, _subaccount, _baseToken, _name);
+        config.allocation.createMasterAccount(_user, _signer, _masterAccount, _baseToken, _name);
     }
 
-    function disposeSubaccount(IERC7579Account _subaccount) external {
+    function disposeMasterAccount(IERC7579Account _masterAccount) external {
         if (msg.sender != config.allocation.getConfig().masterHook) revert Error.UserRouter__UnauthorizedCaller();
-        config.allocation.disposeSubaccount(_subaccount);
+        config.allocation.disposeMasterAccount(_masterAccount);
     }
 
-    function hasRemainingShares(IERC7579Account _subaccount) external view returns (bool) {
-        return config.allocation.hasRemainingShares(_subaccount);
+    function hasRemainingShares(IERC7579Account _masterAccount) external view returns (bool) {
+        return config.allocation.hasRemainingShares(_masterAccount);
     }
 
-    function isDisposed(IERC7579Account _subaccount) external view returns (bool) {
-        (,,,, bool disposed,,) = config.allocation.registeredMap(_subaccount);
+    function isDisposed(IERC7579Account _masterAccount) external view returns (bool) {
+        (,,,, bool disposed,,) = config.allocation.registeredMap(_masterAccount);
         return disposed;
     }
 
-    function processPreCall(address _master, address _subaccount, uint _msgValue, bytes calldata _msgData)
+    function processPreCall(address _msgSender, address _masterAccount, uint _msgValue, bytes calldata _msgData)
         external
         view
         returns (bytes memory hookData)
     {
-        return config.position.processPreCall(_master, _subaccount, _msgValue, _msgData);
+        return config.position.processPreCall(_msgSender, _masterAccount, _msgValue, _msgData);
     }
 
     function processPostCall(bytes calldata _hookData) external {

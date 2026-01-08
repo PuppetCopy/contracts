@@ -97,10 +97,43 @@ export default [
   },
   {
     "type": "function",
-    "name": "disposeSubaccount",
+    "name": "createMasterAccount",
     "inputs": [
       {
-        "name": "_subaccount",
+        "name": "_user",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_signer",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_masterAccount",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
+      },
+      {
+        "name": "_baseToken",
+        "type": "address",
+        "internalType": "contract IERC20"
+      },
+      {
+        "name": "_name",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "disposeMasterAccount",
+    "inputs": [
+      {
+        "name": "_masterAccount",
         "type": "address",
         "internalType": "contract IERC7579Account"
       }
@@ -113,7 +146,7 @@ export default [
     "name": "hasRemainingShares",
     "inputs": [
       {
-        "name": "_subaccount",
+        "name": "_masterAccount",
         "type": "address",
         "internalType": "contract IERC7579Account"
       }
@@ -132,7 +165,7 @@ export default [
     "name": "isDisposed",
     "inputs": [
       {
-        "name": "_subaccount",
+        "name": "_masterAccount",
         "type": "address",
         "internalType": "contract IERC7579Account"
       }
@@ -164,12 +197,12 @@ export default [
     "name": "processPreCall",
     "inputs": [
       {
-        "name": "_master",
+        "name": "_msgSender",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "_subaccount",
+        "name": "_masterAccount",
         "type": "address",
         "internalType": "address"
       },
@@ -192,39 +225,6 @@ export default [
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "registerMasterSubaccount",
-    "inputs": [
-      {
-        "name": "_account",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_signer",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_subaccount",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      },
-      {
-        "name": "_baseToken",
-        "type": "address",
-        "internalType": "contract IERC20"
-      },
-      {
-        "name": "_name",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",

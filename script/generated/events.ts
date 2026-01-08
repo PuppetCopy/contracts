@@ -3,21 +3,21 @@
 
 export const CONTRACT_EVENT_MAP = {
   Allocate: {
-    DisposeSubaccount: {
-      hash: '0x848ff9c9196aa98cee682344c956ac8141a85c70adf39e7cb08955783b776849',
-      args: [{type:"address",name:"subaccount"}]
+    CreateMasterAccount: {
+      hash: '0x4059d1f6f0fd0192a40d2f430cb8ccd06243ecc898663a937a3ff50f255eb57a',
+      args: [{type:"address",name:"masterAccount"},{type:"address",name:"user"},{type:"address",name:"signer"},{type:"address",name:"baseToken"},{type:"bytes32",name:"name"},{type:"uint256",name:"initialBalance"}]
+    },
+    DisposeMasterAccount: {
+      hash: '0x9a993c2f2bc5eb84aecb7e0b8ee4d838ab21d2ca6c72b1164dfd2acbac7900cc',
+      args: [{type:"address",name:"masterAccount"}]
     },
     ExecuteAllocate: {
       hash: '0xc8e7f8df3ca4c122ae1fbf63eae5c258f59a8cee842870bab121051deca41d18',
-      args: [{type:"address",name:"subaccount"},{type:"address",name:"account"},{type:"address",name:"baseToken"},{type:"uint256",name:"amount"},{type:"address[]",name:"puppetList"},{type:"uint256[]",name:"allocatedList"},{type:"uint256",name:"allocation"},{type:"uint256",name:"netValue"},{type:"uint256",name:"allocated"},{type:"uint256",name:"sharePrice"},{type:"uint256",name:"userShares"},{type:"uint256",name:"totalShares"},{type:"uint256",name:"nonce"}]
+      args: [{type:"address",name:"masterAccount"},{type:"address",name:"user"},{type:"address",name:"baseToken"},{type:"uint256",name:"amount"},{type:"address[]",name:"puppetList"},{type:"uint256[]",name:"allocatedList"},{type:"uint256",name:"allocation"},{type:"uint256",name:"netValue"},{type:"uint256",name:"allocated"},{type:"uint256",name:"sharePrice"},{type:"uint256",name:"userShares"},{type:"uint256",name:"totalShares"},{type:"uint256",name:"nonce"}]
     },
     ExecuteWithdraw: {
       hash: '0xcb64880bdc7e62dd4b02aedd4304adf2d6fbf5b649a653a21a9beadd95e24298',
-      args: [{type:"address",name:"subaccount"},{type:"address",name:"account"},{type:"address",name:"token"},{type:"uint256",name:"amount"},{type:"uint256",name:"allocation"},{type:"uint256",name:"positionValue"},{type:"uint256",name:"amountOut"},{type:"uint256",name:"sharesBurnt"},{type:"uint256",name:"sharePrice"},{type:"uint256",name:"userShares"},{type:"uint256",name:"totalShares"},{type:"uint256",name:"nonce"}]
-    },
-    RegisterMasterSubaccount: {
-      hash: '0x09e8c25fd8e4adbf9b7cf2e27e69f1b49bad3f478f4824b60796af819ceca2e0',
-      args: [{type:"address",name:"subaccount"},{type:"address",name:"account"},{type:"address",name:"signer"},{type:"address",name:"baseToken"},{type:"bytes32",name:"name"}]
+      args: [{type:"address",name:"masterAccount"},{type:"address",name:"user"},{type:"address",name:"token"},{type:"uint256",name:"amount"},{type:"uint256",name:"allocation"},{type:"uint256",name:"positionValue"},{type:"uint256",name:"amountOut"},{type:"uint256",name:"sharesBurnt"},{type:"uint256",name:"sharePrice"},{type:"uint256",name:"userShares"},{type:"uint256",name:"totalShares"},{type:"uint256",name:"nonce"}]
     },
     SetCodeHash: {
       hash: '0xf2e7974b4b30b0f3c8dea8c83c030f6d6fd38ebdbaecdce207549e1feea8b303',
@@ -26,10 +26,6 @@ export const CONTRACT_EVENT_MAP = {
     SetTokenCap: {
       hash: '0x0eed9dd37bbcb01292183ae212328bd52aab55ce6eb475eb4fb6350de9286029',
       args: [{type:"address",name:"token"},{type:"uint256",name:"cap"}]
-    },
-    Uninstall: {
-      hash: '0xcf0fb4af6fa71203bf8ca49a15d730b9e9a0385a52961e75ded30718d69a944e',
-      args: [{type:"address",name:"subaccount"}]
     }
   },
   FeeMarketplace: {
@@ -39,13 +35,17 @@ export const CONTRACT_EVENT_MAP = {
     },
     Deposit: {
       hash: '0xe09149d2123147c5f43d258257fef0b7b969db78269369ebcf5ebb9eef8592f2',
-      args: [{type:"address",name:"feeToken"},{type:"address",name:"depositor"},{type:"uint256",name:"amount"}]
+      args: [{type:"address",name:"feeToken"},{type:"address",name:"depositor"},{type:"uint256",name:"amount"},{type:"uint256",name:"askResetTimestamp"}]
+    },
+    SyncUnlock: {
+      hash: '0x52013b45f52967160137b4ae679ff4e81492a54ee8fd3e7a65641c56904876fb',
+      args: [{type:"address",name:"feeToken"},{type:"uint256",name:"pending"},{type:"uint256",name:"timestamp"}]
     }
   },
   Match: {
     SetFilter: {
       hash: '0xbd078dd032ec2100a860998c1f7e2df073bc372d108d3b913e943de8aec04dc9',
-      args: [{type:"address",name:"puppet"},{type:"uint256",name:"dim"},{type:"bytes32",name:"value"},{type:"bool",name:"allowed"}]
+      args: [{type:"address",name:"puppet"},{type:"uint256",name:"dim"},{type:"bytes32",name:"value"},{type:"bool",name:"allowed"},{type:"bool",name:"filterInitialized"}]
     },
     SetPolicy: {
       hash: '0xcf09d97688624e8aaa0a521c63f07a43275782b762891376270588276aa06b84',
@@ -55,11 +55,15 @@ export const CONTRACT_EVENT_MAP = {
   Position: {
     CreateOrder: {
       hash: '0x955ac4f6e0bb2a94d08f77f71ab4b23bc953ceed54625cd77c25f38079079d19',
-      args: [{type:"address",name:"subaccount"},{type:"bytes32",name:"orderKey"},{type:"bytes32",name:"positionKey"},{type:"address",name:"handler"},{type:"address",name:"token"}]
+      args: [{type:"address",name:"masterAccount"},{type:"bytes32",name:"orderKey"},{type:"bytes32",name:"positionKey"},{type:"address",name:"handler"},{type:"address",name:"token"},{type:"uint256",name:"newPendingCount"}]
+    },
+    SetHandler: {
+      hash: '0xa181a54d863733a562edb6fc766710fee249b51b2563aafa8d1bca55de313166',
+      args: [{type:"address",name:"target"},{type:"address",name:"oldHandler"},{type:"address",name:"handler"}]
     },
     SettleOrders: {
       hash: '0x34e35d9c2270bbec97412cade1887c5ee3a88bb86c95a40f5b1e9ccbaffb4d2d',
-      args: [{type:"address",name:"subaccount"},{type:"bytes32[]",name:"orderKeys"}]
+      args: [{type:"address",name:"masterAccount"},{type:"bytes32[]",name:"orderKeys"},{type:"uint256",name:"newPendingCount"}]
     }
   }
 } as const

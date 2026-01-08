@@ -317,7 +317,7 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocate__UnregisteredSubaccount",
+    name: "Allocate__UnregisteredMasterAccount",
     inputs: []
   },
   {
@@ -386,7 +386,7 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocate__InvalidSubaccountMaster",
+    name: "Allocate__InvalidMasterAccountOwner",
     inputs: [
       {
         name: "expected",
@@ -475,7 +475,7 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocate__SubaccountFrozen",
+    name: "Allocate__MasterAccountFrozen",
     inputs: []
   },
   {
@@ -578,6 +578,11 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
+    name: "Allocate__UninstallDisabled",
+    inputs: []
+  },
+  {
+    type: "error",
     name: "FeeMarketplace__InsufficientUnlockedBalance",
     inputs: [
       {
@@ -673,6 +678,27 @@ export const puppetErrorAbi = [
     type: "error",
     name: "Match__InvalidConfig",
     inputs: []
+  },
+  {
+    type: "error",
+    name: "Match__InvalidMinThrottlePeriod",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Match__ThrottlePeriodBelowMin",
+    inputs: [
+      {
+        name: "provided",
+        internalType: "uint256",
+        type: "uint256"
+      },
+      {
+        name: "minimum",
+        internalType: "uint256",
+        type: "uint256"
+      }
+    ]
   },
   {
     type: "error",

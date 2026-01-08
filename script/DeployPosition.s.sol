@@ -26,7 +26,7 @@ contract DeployPosition is BaseScript {
         ProxyUserRouter proxyUserRouter = new ProxyUserRouter(dictatorship);
         MasterHook masterHook = new MasterHook(IUserRouter(address(proxyUserRouter)));
         Position position = new Position(dictatorship);
-        Match matcher = new Match(dictatorship);
+        Match matcher = new Match(dictatorship, Match.Config({minThrottlePeriod: 6 hours}));
         Allocate allocation = new Allocate(
             dictatorship,
             Allocate.Config({masterHook: address(masterHook), maxPuppetList: 100, withdrawGasLimit: 200_000})
@@ -43,12 +43,12 @@ contract DeployPosition is BaseScript {
 
         dictatorship.setPermission(position, position.processPostCall.selector, address(proxyUserRouter));
 
-        dictatorship.setPermission(matcher, matcher.recordThrottle.selector, address(allocation));
+        dictatorship.setPermission(matcher, matcher.recordMatchAmountList.selector, address(allocation));
         dictatorship.setPermission(matcher, matcher.setFilter.selector, address(proxyUserRouter));
         dictatorship.setPermission(matcher, matcher.setPolicy.selector, address(proxyUserRouter));
 
-        dictatorship.setPermission(allocation, allocation.registerMasterSubaccount.selector, address(proxyUserRouter));
-        dictatorship.setPermission(allocation, allocation.disposeSubaccount.selector, address(proxyUserRouter));
+        dictatorship.setPermission(allocation, allocation.createMasterAccount.selector, address(proxyUserRouter));
+        dictatorship.setPermission(allocation, allocation.disposeMasterAccount.selector, address(proxyUserRouter));
 
         dictatorship.setPermission(position, position.settleOrders.selector, DEPLOYER_ADDRESS);
         dictatorship.setPermission(allocation, allocation.executeAllocate.selector, DEPLOYER_ADDRESS);
@@ -57,7 +57,7 @@ contract DeployPosition is BaseScript {
         dictatorship.setPermission(position, position.setHandler.selector, DEPLOYER_ADDRESS);
         position.setHandler(Const.gmxExchangeRouter, IStage(address(gmxStage)));
         dictatorship.setPermission(allocation, allocation.setCodeHash.selector, DEPLOYER_ADDRESS);
-        allocation.setCodeHash(Const.account7579CodeHash, true);
+        allocation.setCodeHash(Const.latestAccount7579CodeHash, true);
         dictatorship.setPermission(allocation, allocation.setTokenCap.selector, DEPLOYER_ADDRESS);
         allocation.setTokenCap(IERC20(Const.usdc), 100e6);
 

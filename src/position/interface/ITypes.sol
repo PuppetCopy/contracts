@@ -11,9 +11,9 @@ struct PositionParams {
 }
 
 struct CallIntent {
-    address account;
+    address user;
     address signer;
-    IERC7579Account subaccount;
+    IERC7579Account masterAccount;
     IERC20 token;
     uint amount;
     uint triggerNetValue;
@@ -23,8 +23,8 @@ struct CallIntent {
     uint nonce;
 }
 
-struct SubaccountInfo {
-    address account;
+struct MasterAccountInfo {
+    address user;
     address signer;
     IERC20 baseToken;
     bytes32 name;

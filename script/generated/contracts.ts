@@ -17,7 +17,7 @@ import proxyuserrouterAbi from './abi/puppetProxyUserRouter.js'
 
 export const PUPPET_CONTRACT_MAP = {
   Dictatorship: {
-    address: '0x778820d455AA439F92578521F751c3439B193EC3',
+    address: '0xbF52B3399542a353D3bFb40b1237836cC9A02Ed4',
     chainId: 42161,
     abi: dictatorshipAbi
   },
@@ -42,22 +42,22 @@ export const PUPPET_CONTRACT_MAP = {
     abi: feemarketplaceAbi
   },
   Match: {
-    address: '0xE7fc062B5015ac5e9fa9DC3E8182B1959e7252cc',
+    address: '0xE7eAB5469ebbE492469E723FF5DAe7Cb91c6D04e',
     chainId: 42161,
     abi: matchAbi
   },
   Allocate: {
-    address: '0x8EFACa3d5a6dEcfcAE13E6521897E15E86746796',
+    address: '0x5d2D41305b33DFf126FCb9585f919c7f13d183dB',
     chainId: 42161,
     abi: allocateAbi
   },
   Position: {
-    address: '0xe50cA753400bf25Ebc9480F5D04f2F22B978b4fd',
+    address: '0x49F7e5F896ad4530eBedB1d4697Ffb5b31f34972',
     chainId: 42161,
     abi: positionAbi
   },
   UserRouter: {
-    address: '0x456289bE407E3Ed74E727804BBD7FC65f52b2e65',
+    address: '0x91DeC0891d3d5DF935790C6dc97c674f7f976994',
     chainId: 42161,
     abi: userrouterAbi
   },
@@ -66,12 +66,12 @@ export const PUPPET_CONTRACT_MAP = {
     chainId: 42161
   },
   MasterHook: {
-    address: '0xFD79dEefa341313Ed06Ba3709d39eC5aA062aDac',
+    address: '0x0bf4f1740E9809b88c9B0317654EB80c35CEe33E',
     chainId: 42161,
     abi: masterhookAbi
   },
   GmxStage: {
-    address: '0x4c6810e9b7b787fa5419C793912F6Aa37e485F7F',
+    address: '0xB5E7CC3eD87F4f517351D50C639Fe9aB22b1D2Eb',
     chainId: 42161,
     abi: gmxstageAbi
   },
@@ -81,7 +81,7 @@ export const PUPPET_CONTRACT_MAP = {
     abi: tokenrouterAbi
   },
   ProxyUserRouter: {
-    address: '0x0DD0CdeeC28F81a404474d26eB72affDA3A18f7d',
+    address: '0x8ea4425d1f26f1c715AF4020427480af9Fef20fF',
     chainId: 42161,
     abi: proxyuserrouterAbi
   }

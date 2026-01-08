@@ -87,7 +87,7 @@ contract GmxStage is IStage {
     /// @dev Token is extracted from execution data, not passed as parameter
     function validate(
         address,
-        address _subaccount,
+        address _masterAccount,
         uint,
         CallType _callType,
         bytes calldata _execData
@@ -99,15 +99,15 @@ contract GmxStage is IStage {
                 abi.decode(_actionData, (IBaseOrderUtils.CreateOrderParams));
 
             if (_isIncreaseOrder(_params.orderType)) {
-                return _validateIncrease(_subaccount, _calls, _params);
+                return _validateIncrease(_masterAccount, _calls, _params);
             } else if (_isDecreaseOrder(_params.orderType)) {
-                return _validateDecrease(_subaccount, _calls, _params);
+                return _validateDecrease(_masterAccount, _calls, _params);
             }
             revert Error.GmxStage__InvalidOrderType();
         }
 
         if (_action == CLAIM_FUNDING) {
-            return _validateClaimFunding(_subaccount, _calls, _actionData);
+            return _validateClaimFunding(_masterAccount, _calls, _actionData);
         }
 
         // TODO: handle CANCEL_ORDER, etc.
@@ -165,10 +165,10 @@ contract GmxStage is IStage {
         return uint(netValueUsd) * (10 ** baseDecimals) / (uint(basePrice) * 1e22);
     }
 
-    /// @notice Verify a position belongs to a subaccount
+    /// @notice Verify a position belongs to a master account
     /// @dev Checks GMX dataStore for position account
-    function verifyPositionOwner(bytes32 positionKey, address subaccount) external view override returns (bool) {
-        return dataStore.getAddress(keccak256(abi.encode(POSITION_ACCOUNT, positionKey))) == subaccount;
+    function verifyPositionOwner(bytes32 positionKey, address masterAccount) external view override returns (bool) {
+        return dataStore.getAddress(keccak256(abi.encode(POSITION_ACCOUNT, positionKey))) == masterAccount;
     }
 
     /// @notice Check if an order is still pending in GMX
@@ -223,7 +223,7 @@ contract GmxStage is IStage {
     // ============ Validators ============
 
     function _validateIncrease(
-        address _subaccount,
+        address _masterAccount,
         Call[] memory _calls,
         IBaseOrderUtils.CreateOrderParams memory _params
     ) internal view returns (IERC20, bytes memory) {
@@ -236,16 +236,16 @@ contract GmxStage is IStage {
         bool _isWntCollateral = _params.addresses.initialCollateralToken == wnt;
         if (!_isWntCollateral && !_hasCollateral) revert Error.GmxStage__InvalidExecutionSequence();
 
-        _validateOrderParams(_subaccount, _params);
+        _validateOrderParams(_masterAccount, _params);
 
         IERC20 _token = IERC20(_params.addresses.initialCollateralToken);
         bytes32 _orderKey = _deriveNextOrderKey();
-        bytes32 _positionKey = _derivePositionKey(_subaccount, _params);
+        bytes32 _positionKey = _derivePositionKey(_masterAccount, _params);
         return (_token, abi.encode(ACTION_ORDER_CREATED, _orderKey, _positionKey, _token));
     }
 
     function _validateDecrease(
-        address _subaccount,
+        address _masterAccount,
         Call[] memory _calls,
         IBaseOrderUtils.CreateOrderParams memory _params
     ) internal view returns (IERC20, bytes memory) {
@@ -254,11 +254,11 @@ contract GmxStage is IStage {
         // Decrease requires execution fee
         if (!_hasExecutionFee) revert Error.GmxStage__InvalidExecutionSequence();
 
-        _validateOrderParams(_subaccount, _params);
+        _validateOrderParams(_masterAccount, _params);
 
         IERC20 _token = IERC20(_params.addresses.initialCollateralToken);
         bytes32 _orderKey = _deriveNextOrderKey();
-        bytes32 _positionKey = _derivePositionKey(_subaccount, _params);
+        bytes32 _positionKey = _derivePositionKey(_masterAccount, _params);
         return (_token, abi.encode(ACTION_ORDER_CREATED, _orderKey, _positionKey, _token));
     }
 
@@ -279,14 +279,14 @@ contract GmxStage is IStage {
     }
 
     function _validateClaimFunding(
-        address _subaccount,
+        address _masterAccount,
         Call[] memory _calls,
         bytes memory _actionData
     ) internal view returns (IERC20, bytes memory) {
         // claimFundingFees(address[] markets, address[] tokens, address receiver)
         (,, address _receiver) = abi.decode(_actionData, (address[], address[], address));
 
-        if (_receiver != _subaccount) revert Error.GmxStage__InvalidReceiver();
+        if (_receiver != _masterAccount) revert Error.GmxStage__InvalidReceiver();
 
         // Validate all calls target exchangeRouter
         for (uint _i = 0; _i < _calls.length; _i++) {
@@ -306,12 +306,12 @@ contract GmxStage is IStage {
     }
 
     function _validateOrderParams(
-        address _subaccount,
+        address _masterAccount,
         IBaseOrderUtils.CreateOrderParams memory _params
     ) internal pure {
-        if (_params.addresses.receiver != _subaccount) revert Error.GmxStage__InvalidReceiver();
+        if (_params.addresses.receiver != _masterAccount) revert Error.GmxStage__InvalidReceiver();
         if (_params.addresses.cancellationReceiver != address(0)) {
-            if (_params.addresses.cancellationReceiver != _subaccount) revert Error.GmxStage__InvalidReceiver();
+            if (_params.addresses.cancellationReceiver != _masterAccount) revert Error.GmxStage__InvalidReceiver();
         }
         // Token choice is validated at deposit time via tokenCapMap whitelist
         if (_params.addresses.swapPath.length > 0) revert Error.GmxStage__InvalidOrderType();
@@ -347,13 +347,13 @@ contract GmxStage is IStage {
 
     /// @notice Derive GMX position key
     /// @dev Matches GMX's PositionStoreUtils key derivation
-    function _derivePositionKey(address _subaccount, IBaseOrderUtils.CreateOrderParams memory _params)
+    function _derivePositionKey(address _masterAccount, IBaseOrderUtils.CreateOrderParams memory _params)
         internal
         pure
         returns (bytes32)
     {
         return keccak256(abi.encode(
-            _subaccount,
+            _masterAccount,
             _params.addresses.market,
             _params.addresses.initialCollateralToken,
             _params.isLong

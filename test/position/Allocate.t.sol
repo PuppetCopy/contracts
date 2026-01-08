@@ -10,7 +10,7 @@ import {Match} from "src/position/Match.sol";
 import {Position} from "src/position/Position.sol";
 import {UserRouter} from "src/UserRouter.sol";
 import {IStage} from "src/position/interface/IStage.sol";
-import {PositionParams, CallIntent, SubaccountInfo} from "src/position/interface/ITypes.sol";
+import {PositionParams, CallIntent, MasterAccountInfo} from "src/position/interface/ITypes.sol";
 import {Error} from "src/utils/Error.sol";
 
 import {BasicSetup} from "../base/BasicSetup.t.sol";
@@ -49,7 +49,7 @@ contract AllocateTest is BasicSetup {
         sessionSigner = vm.addr(signerPrivateKey);
 
         position = new Position(dictator);
-        matcher = new Match(dictator);
+        matcher = new Match(dictator, Match.Config({minThrottlePeriod: 6 hours}));
         allocation = new Allocate(
             dictator,
             Allocate.Config({masterHook: address(1), maxPuppetList: MAX_PUPPET_LIST, withdrawGasLimit: GAS_LIMIT})
@@ -57,7 +57,7 @@ contract AllocateTest is BasicSetup {
 
         dictator.registerContract(address(matcher));
         userRouter = new UserRouter(dictator, UserRouter.Config({allocation: allocation, matcher: matcher, position: position}));
-        dictator.setPermission(matcher, matcher.recordThrottle.selector, address(allocation));
+        dictator.setPermission(matcher, matcher.recordMatchAmountList.selector, address(allocation));
         dictator.setPermission(matcher, matcher.setFilter.selector, address(userRouter));
         dictator.setPermission(matcher, matcher.setPolicy.selector, address(userRouter));
 
@@ -70,7 +70,7 @@ contract AllocateTest is BasicSetup {
 
         stageKey = keccak256("mock_stage");
 
-        dictator.setPermission(allocation, allocation.registerMasterSubaccount.selector, users.owner);
+        dictator.setPermission(allocation, allocation.createMasterAccount.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeAllocate.selector, users.owner);
         dictator.setPermission(allocation, allocation.executeWithdraw.selector, users.owner);
         dictator.setPermission(allocation, allocation.setTokenCap.selector, users.owner);
@@ -93,7 +93,7 @@ contract AllocateTest is BasicSetup {
         position.setHandler(address(mockVenue), IStage(address(mockStage)));
 
         usdc.mint(owner, 10_000e6);
-        usdc.mint(address(masterSubaccount), 1000e6);
+        // Note: masterSubaccount has no initial balance - tests that need 1-click flow can mint before registration
         usdc.mint(address(puppet1), 500e6);
         usdc.mint(address(puppet2), 500e6);
 
@@ -103,9 +103,9 @@ contract AllocateTest is BasicSetup {
 
         // Set default policies for puppets (100% allowance, no throttle, far future expiry)
         vm.prank(address(puppet1));
-        userRouter.setPolicy(address(0), 10000, 0, block.timestamp + 365 days);
+        userRouter.setPolicy(address(0), 10000, 6 hours, block.timestamp + 365 days);
         vm.prank(address(puppet2));
-        userRouter.setPolicy(address(0), 10000, 0, block.timestamp + 365 days);
+        userRouter.setPolicy(address(0), 10000, 6 hours, block.timestamp + 365 days);
 
         vm.startPrank(users.owner);
     }
@@ -118,9 +118,9 @@ contract AllocateTest is BasicSetup {
         returns (CallIntent memory)
     {
         return CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: masterSubaccount,
+            masterAccount: masterSubaccount,
             token: usdc,
             amount: amount,
             triggerNetValue: 0,
@@ -135,9 +135,9 @@ contract AllocateTest is BasicSetup {
         bytes32 structHash = keccak256(
             abi.encode(
                 allocation.CALL_INTENT_TYPEHASH(),
-                intent.account,
+                intent.user,
                 intent.signer,
-                intent.subaccount,
+                intent.masterAccount,
                 intent.token,
                 intent.amount,
                 intent.triggerNetValue,
@@ -164,18 +164,18 @@ contract AllocateTest is BasicSetup {
     }
 
     function _registerSubaccount(IERC7579Account sub, MockERC20 token) internal {
-        allocation.registerMasterSubaccount(owner, sessionSigner, sub, IERC20(address(token)), SUBACCOUNT_NAME);
+        allocation.createMasterAccount(owner, sessionSigner, sub, IERC20(address(token)), SUBACCOUNT_NAME);
     }
 
     function _registerMasterSubaccount() internal {
-        allocation.registerMasterSubaccount(owner, sessionSigner, masterSubaccount, usdc, SUBACCOUNT_NAME);
+        allocation.createMasterAccount(owner, sessionSigner, masterSubaccount, usdc, SUBACCOUNT_NAME);
     }
 
     function testCreateMasterSubaccount_RegistersSubaccount() public {
         // masterSubaccount already seeded in setUp
         _registerMasterSubaccount();
 
-        SubaccountInfo memory info = allocation.getSubaccountInfo(masterSubaccount);
+        MasterAccountInfo memory info = allocation.getMasterAccountInfo(masterSubaccount);
         assertTrue(address(info.baseToken) != address(0), "Subaccount registered");
         // No initial shares - shares created at deposit time
         assertEq(allocation.totalSharesMap(masterSubaccount), 0, "No initial shares");
@@ -184,7 +184,7 @@ contract AllocateTest is BasicSetup {
     function testCreateMasterSubaccount_AssociatesSignerWithSubaccount() public {
         _registerMasterSubaccount();
 
-        SubaccountInfo memory info = allocation.getSubaccountInfo(masterSubaccount);
+        MasterAccountInfo memory info = allocation.getMasterAccountInfo(masterSubaccount);
         assertEq(info.signer, sessionSigner, "Signer mapped to subaccount");
     }
 
@@ -228,7 +228,7 @@ contract AllocateTest is BasicSetup {
 
         assertGt(allocation.shareBalanceMap(masterSubaccount, address(puppet1)), 0, "Puppet1 has shares");
         assertGt(allocation.shareBalanceMap(masterSubaccount, address(puppet2)), 0, "Puppet2 has shares");
-        assertEq(usdc.balanceOf(address(masterSubaccount)), 1300e6, "Subaccount received puppet funds");
+        assertEq(usdc.balanceOf(address(masterSubaccount)), 300e6, "Subaccount received puppet funds");
     }
 
     function testExecuteAllocate_FailedPuppetTransfersSkipped() public {
@@ -291,9 +291,9 @@ contract AllocateTest is BasicSetup {
         vm.startPrank(users.owner);
 
         CallIntent memory depositIntent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: sub,
+            masterAccount: sub,
             token: usdc,
             amount: 500e6,
             triggerNetValue: 0,
@@ -311,9 +311,9 @@ contract AllocateTest is BasicSetup {
         uint initialBalance = usdc.balanceOf(owner);
 
         CallIntent memory intent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: sub,
+            masterAccount: sub,
             token: usdc,
             amount: 250e6,
             triggerNetValue: 0,
@@ -328,74 +328,6 @@ contract AllocateTest is BasicSetup {
 
         assertLt(allocation.shareBalanceMap(sub, owner), initialShares, "Shares burnt");
         assertGt(usdc.balanceOf(owner), initialBalance, "Owner received tokens");
-    }
-
-    function testExecuteWithdraw_AllowedWhenFrozen() public {
-        // Create fresh subaccount to avoid pre-existing balance issues
-        TestSmartAccount sub = new TestSmartAccount();
-        sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-        sub.installModule(MODULE_TYPE_HOOK, address(1), "");
-
-        _registerSubaccount(sub, usdc);
-
-        // Owner deposits to have shares
-        usdc.mint(owner, 200e6);
-        vm.stopPrank();
-        vm.prank(owner);
-        usdc.approve(address(allocation), type(uint).max);
-        vm.startPrank(users.owner);
-
-        CallIntent memory allocIntent = CallIntent({
-            account: owner,
-            signer: owner,
-            subaccount: sub,
-            token: usdc,
-            amount: 200e6,
-            triggerNetValue: 0,
-            acceptableNetValue: type(uint).max,
-            positionParamsHash: keccak256(abi.encode(emptyParams)),
-            deadline: block.timestamp + 1 hours,
-            nonce: 0
-        });
-        bytes memory allocSig = _signIntent(allocIntent, ownerPrivateKey);
-        IERC7579Account[] memory emptyPuppets = new IERC7579Account[](0);
-        uint[] memory emptyAmounts = new uint[](0);
-        allocation.executeAllocate(position, matcher, allocIntent, allocSig, emptyPuppets, emptyAmounts, emptyParams);
-
-        uint sharesBefore = allocation.shareBalanceMap(sub, owner);
-        assertGt(sharesBefore, 0, "Owner has shares");
-
-        // Freeze the subaccount
-        vm.stopPrank();
-        vm.prank(address(sub));
-        sub.uninstallModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-
-        SubaccountInfo memory info = allocation.getSubaccountInfo(sub);
-        assertTrue(info.disposed, "Subaccount frozen");
-
-        sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-
-        // Withdraw while frozen - should succeed
-        vm.startPrank(users.owner);
-        uint ownerBalanceBefore = usdc.balanceOf(owner);
-
-        CallIntent memory intent = CallIntent({
-            account: owner,
-            signer: owner,
-            subaccount: sub,
-            token: usdc,
-            amount: 100e6,
-            triggerNetValue: 0,
-            acceptableNetValue: 0, // floor for withdraw
-            positionParamsHash: keccak256(abi.encode(emptyParams)),
-            deadline: block.timestamp + 1 hours,
-            nonce: 1
-        });
-        bytes memory sig = _signIntent(intent, ownerPrivateKey);
-
-        allocation.executeWithdraw(position, intent, sig, emptyParams);
-
-        assertGt(usdc.balanceOf(owner), ownerBalanceBefore, "Withdrawal succeeded while frozen");
     }
 
     function testVerifyIntent_AcceptsOwnerSignature() public {
@@ -415,9 +347,9 @@ contract AllocateTest is BasicSetup {
 
         // Session signer can sign allocate intents
         CallIntent memory intent = CallIntent({
-            account: owner,
+            user: owner,
             signer: sessionSigner,
-            subaccount: masterSubaccount,
+            masterAccount: masterSubaccount,
             token: usdc,
             amount: 0,
             triggerNetValue: 0,
@@ -436,7 +368,7 @@ contract AllocateTest is BasicSetup {
     function testVerifyIntent_IncrementsNonce() public {
         _registerMasterSubaccount();
 
-        assertEq(allocation.getSubaccountInfo(masterSubaccount).nonce, 0, "Initial nonce is 0");
+        assertEq(allocation.getMasterAccountInfo(masterSubaccount).nonce, 0, "Initial nonce is 0");
 
         CallIntent memory intent = _createIntent(0, 0, block.timestamp + 1 hours);
         bytes memory sig = _signIntent(intent, ownerPrivateKey);
@@ -445,24 +377,12 @@ contract AllocateTest is BasicSetup {
         uint[] memory amounts = new uint[](0);
 
         allocation.executeAllocate(position, matcher, intent, sig, puppets, amounts, emptyParams);
-        assertEq(allocation.getSubaccountInfo(masterSubaccount).nonce, 1, "Nonce incremented");
+        assertEq(allocation.getMasterAccountInfo(masterSubaccount).nonce, 1, "Nonce incremented");
 
         intent.nonce = 1;
         sig = _signIntent(intent, ownerPrivateKey);
         allocation.executeAllocate(position, matcher, intent, sig, puppets, amounts, emptyParams);
-        assertEq(allocation.getSubaccountInfo(masterSubaccount).nonce, 2, "Nonce incremented again");
-    }
-
-    function testOnUninstall_FreezesSubaccount() public {
-        _registerMasterSubaccount();
-
-        assertFalse(allocation.getSubaccountInfo(masterSubaccount).disposed, "Not frozen initially");
-
-        vm.stopPrank();
-        vm.prank(address(masterSubaccount));
-        masterSubaccount.uninstallModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-
-        assertTrue(allocation.getSubaccountInfo(masterSubaccount).disposed, "Frozen after uninstall");
+        assertEq(allocation.getMasterAccountInfo(masterSubaccount).nonce, 2, "Nonce incremented again");
     }
 
     function testShareAccounting_VirtualOffsetProtectsFirstDeposit() public {
@@ -486,9 +406,9 @@ contract AllocateTest is BasicSetup {
         vm.startPrank(users.owner);
 
         CallIntent memory intent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: sub,
+            masterAccount: sub,
             token: usdc,
             amount: 1000e6,
             triggerNetValue: 0,
@@ -520,34 +440,14 @@ contract AllocateTest is BasicSetup {
         noHook.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
 
         vm.expectRevert(Error.Allocate__MasterHookNotInstalled.selector);
-        allocation.registerMasterSubaccount(owner, sessionSigner, IERC7579Account(address(noHook)), usdc, SUBACCOUNT_NAME);
+        allocation.createMasterAccount(owner, sessionSigner, IERC7579Account(address(noHook)), usdc, SUBACCOUNT_NAME);
     }
 
     function testRevert_CreateMasterSubaccount_AlreadyRegistered() public {
         _registerMasterSubaccount();
 
         vm.expectRevert(Error.Allocate__AlreadyRegistered.selector);
-        allocation.registerMasterSubaccount(owner, sessionSigner, masterSubaccount, usdc, SUBACCOUNT_NAME);
-    }
-
-    function testRevert_ExecuteAllocate_Frozen() public {
-        _registerMasterSubaccount();
-
-        vm.stopPrank();
-        vm.prank(address(masterSubaccount));
-        masterSubaccount.uninstallModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-
-        masterSubaccount.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-
-        vm.startPrank(users.owner);
-        CallIntent memory intent = _createIntent(0, 0, block.timestamp + 1 hours);
-        bytes memory sig = _signIntent(intent, ownerPrivateKey);
-
-        IERC7579Account[] memory puppets = new IERC7579Account[](0);
-        uint[] memory amounts = new uint[](0);
-
-        vm.expectRevert(Error.Allocate__SubaccountFrozen.selector);
-        allocation.executeAllocate(position, matcher, intent, sig, puppets, amounts, emptyParams);
+        allocation.createMasterAccount(owner, sessionSigner, masterSubaccount, usdc, SUBACCOUNT_NAME);
     }
 
     function testRevert_ExecuteAllocate_ArrayLengthMismatch() public {
@@ -582,9 +482,9 @@ contract AllocateTest is BasicSetup {
         _registerMasterSubaccount();
 
         CallIntent memory intent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: masterSubaccount,
+            masterAccount: masterSubaccount,
             token: usdc,
             amount: 0,
             triggerNetValue: 0,
@@ -603,9 +503,9 @@ contract AllocateTest is BasicSetup {
         _registerMasterSubaccount();
 
         CallIntent memory intent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: masterSubaccount,
+            masterAccount: masterSubaccount,
             token: usdc,
             amount: 2000e6,
             triggerNetValue: 0,
@@ -684,15 +584,15 @@ contract AllocateTest is BasicSetup {
         usdc.approve(address(allocation), type(uint).max);
         vm.startPrank(users.owner);
 
-        allocation.registerMasterSubaccount(owner, sessionSigner, sub1, usdc, name1);
-        allocation.registerMasterSubaccount(owner, sessionSigner, sub2, usdc, name2);
+        allocation.createMasterAccount(owner, sessionSigner, sub1, usdc, name1);
+        allocation.createMasterAccount(owner, sessionSigner, sub2, usdc, name2);
 
         // Nonces are per subaccount now, not per matchingKey
-        assertEq(allocation.getSubaccountInfo(sub1).nonce, 0, "Nonce for sub1 is independent");
-        assertEq(allocation.getSubaccountInfo(sub2).nonce, 0, "Nonce for sub2 is independent");
+        assertEq(allocation.getMasterAccountInfo(sub1).nonce, 0, "Nonce for sub1 is independent");
+        assertEq(allocation.getMasterAccountInfo(sub2).nonce, 0, "Nonce for sub2 is independent");
 
-        assertTrue(address(allocation.getSubaccountInfo(sub1).baseToken) != address(0), "Sub1 registered");
-        assertTrue(address(allocation.getSubaccountInfo(sub2).baseToken) != address(0), "Sub2 registered");
+        assertTrue(address(allocation.getMasterAccountInfo(sub1).baseToken) != address(0), "Sub1 registered");
+        assertTrue(address(allocation.getMasterAccountInfo(sub2).baseToken) != address(0), "Sub2 registered");
     }
 
     function testEdge_MixedPuppetSuccess() public {
@@ -719,7 +619,7 @@ contract AllocateTest is BasicSetup {
         assertGt(allocation.shareBalanceMap(masterSubaccount, address(puppet1)), 0, "Puppet1 succeeded");
         assertEq(allocation.shareBalanceMap(masterSubaccount, address(emptyPuppet)), 0, "Empty puppet failed");
         assertGt(allocation.shareBalanceMap(masterSubaccount, address(puppet2)), 0, "Puppet2 succeeded");
-        assertEq(usdc.balanceOf(address(masterSubaccount)), 1300e6, "Only successful transfers counted");
+        assertEq(usdc.balanceOf(address(masterSubaccount)), 300e6, "Only successful transfers counted");
     }
 
     function testEdge_PuppetWithBalanceButNoAllowance() public {
@@ -791,41 +691,6 @@ contract AllocateTest is BasicSetup {
         assertGt(allocation.shareBalanceMap(masterSubaccount, address(puppet1)), 0, "Approved puppet has shares");
     }
 
-    function testEdge_PuppetRevokesAllowance() public {
-        _registerMasterSubaccount();
-
-        // First allocation with puppet1 (has approval)
-        CallIntent memory intent1 = _createIntent(0, 0, block.timestamp + 1 hours);
-        bytes memory sig1 = _signIntent(intent1, ownerPrivateKey);
-
-        IERC7579Account[] memory puppets = new IERC7579Account[](1);
-        puppets[0] = puppet1;
-        uint[] memory amounts = new uint[](1);
-        amounts[0] = 100e6;
-
-        allocation.executeAllocate(position, matcher, intent1, sig1, puppets, amounts, emptyParams);
-        uint sharesAfterFirst = allocation.shareBalanceMap(masterSubaccount, address(puppet1));
-        assertGt(sharesAfterFirst, 0, "First allocation succeeded");
-
-        // Puppet uninstalls executor - transfers will fail
-        vm.stopPrank();
-        vm.prank(address(puppet1));
-        puppet1.uninstallModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-        vm.startPrank(users.owner);
-
-        // Second allocation attempt should fail for puppet1
-        CallIntent memory intent2 = _createIntent(0, 1, block.timestamp + 1 hours);
-        bytes memory sig2 = _signIntent(intent2, ownerPrivateKey);
-
-        uint puppet1BalanceBefore = usdc.balanceOf(address(puppet1));
-
-        allocation.executeAllocate(position, matcher, intent2, sig2, puppets, amounts, emptyParams);
-
-        // Puppet1 shares should be unchanged (second allocation skipped)
-        assertEq(allocation.shareBalanceMap(masterSubaccount, address(puppet1)), sharesAfterFirst, "Shares unchanged after revoke");
-        assertEq(usdc.balanceOf(address(puppet1)), puppet1BalanceBefore, "Balance unchanged after revoke");
-    }
-
     function testEdge_SharePriceAfterDeposits() public {
         // Use fresh subaccount to have clean state
         TestSmartAccount sub = new TestSmartAccount();
@@ -842,9 +707,9 @@ contract AllocateTest is BasicSetup {
         vm.startPrank(users.owner);
 
         CallIntent memory intent1 = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: sub,
+            masterAccount: sub,
             token: usdc,
             amount: 500e6,
             triggerNetValue: 0,
@@ -863,9 +728,9 @@ contract AllocateTest is BasicSetup {
 
         // Second deposit from puppet
         CallIntent memory intent2 = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: sub,
+            masterAccount: sub,
             token: usdc,
             amount: 0,
             triggerNetValue: 0,
@@ -904,26 +769,6 @@ contract AllocateTest is BasicSetup {
         allocation.executeAllocate(position, matcher, intent, sig, puppets, amounts, emptyParams);
     }
 
-    function testEdge_FrozenBlocksAllocate() public {
-        _registerMasterSubaccount();
-
-        vm.stopPrank();
-        vm.prank(address(masterSubaccount));
-        masterSubaccount.uninstallModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-        masterSubaccount.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-
-        vm.startPrank(users.owner);
-
-        CallIntent memory intent = _createIntent(0, 0, block.timestamp + 1 hours);
-        bytes memory sig = _signIntent(intent, ownerPrivateKey);
-
-        IERC7579Account[] memory puppets = new IERC7579Account[](0);
-        uint[] memory amounts = new uint[](0);
-
-        vm.expectRevert(Error.Allocate__SubaccountFrozen.selector);
-        allocation.executeAllocate(position, matcher, intent, sig, puppets, amounts, emptyParams);
-    }
-
     function testEdge_NonBaseTokenReverts() public {
         // Each subaccount has a single baseToken set at registration
         TestSmartAccount sub = new TestSmartAccount();
@@ -944,9 +789,9 @@ contract AllocateTest is BasicSetup {
 
         // Try to allocate WETH (not the baseToken) - should revert
         CallIntent memory wethIntent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: sub,
+            masterAccount: sub,
             token: weth,
             amount: 5e18,
             triggerNetValue: 0,
@@ -978,9 +823,9 @@ contract AllocateTest is BasicSetup {
         vm.startPrank(users.owner);
 
         CallIntent memory intent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: sub,
+            masterAccount: sub,
             token: usdc,
             amount: 500e6,
             triggerNetValue: 0,
@@ -1020,9 +865,9 @@ contract AllocateTest is BasicSetup {
         vm.startPrank(users.owner);
 
         CallIntent memory intent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: sub,
+            masterAccount: sub,
             token: usdc,
             amount: 500e6,
             triggerNetValue: 0,
@@ -1073,9 +918,9 @@ contract AllocateTest is BasicSetup {
         vm.startPrank(users.owner);
 
         CallIntent memory ownerIntent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: sub,
+            masterAccount: sub,
             token: usdc,
             amount: 500e6,
             triggerNetValue: 0,
@@ -1096,9 +941,9 @@ contract AllocateTest is BasicSetup {
 
         // Puppet1 deposits 500e6 after profit
         CallIntent memory intent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: sub,
+            masterAccount: sub,
             token: usdc,
             amount: 0,
             triggerNetValue: 0,
@@ -1146,9 +991,9 @@ contract AllocateTest is BasicSetup {
         vm.startPrank(users.owner);
 
         CallIntent memory intent = CallIntent({
-            account: owner,
+            user: owner,
             signer: owner,
-            subaccount: sub,
+            masterAccount: sub,
             token: usdc,
             amount: 500e6,
             triggerNetValue: 0,
@@ -1217,13 +1062,13 @@ contract AllocateTest is BasicSetup {
 
         // Set default policies for puppets (100% allowance, no throttle, far future expiry)
         vm.prank(address(p1));
-        userRouter.setPolicy(address(0), 10000, 0, block.timestamp + 365 days);
+        userRouter.setPolicy(address(0), 10000, 6 hours, block.timestamp + 365 days);
         vm.prank(address(p2));
-        userRouter.setPolicy(address(0), 10000, 0, block.timestamp + 365 days);
+        userRouter.setPolicy(address(0), 10000, 6 hours, block.timestamp + 365 days);
         vm.prank(address(p3));
-        userRouter.setPolicy(address(0), 10000, 0, block.timestamp + 365 days);
+        userRouter.setPolicy(address(0), 10000, 6 hours, block.timestamp + 365 days);
         vm.prank(address(p4));
-        userRouter.setPolicy(address(0), 10000, 0, block.timestamp + 365 days);
+        userRouter.setPolicy(address(0), 10000, 6 hours, block.timestamp + 365 days);
 
         vm.startPrank(users.owner);
 
@@ -1234,9 +1079,9 @@ contract AllocateTest is BasicSetup {
         // Owner deposits 1000e6 + puppets deposit their amounts
         {
             CallIntent memory intent = CallIntent({
-                account: owner,
+                user: owner,
                 signer: owner,
-                subaccount: sub,
+                masterAccount: sub,
                 token: usdc,
                 amount: 1000e6,
                 triggerNetValue: 0,
@@ -1287,9 +1132,9 @@ contract AllocateTest is BasicSetup {
         uint p4SharesBefore;
         {
             CallIntent memory intent = CallIntent({
-                account: owner,
+                user: owner,
                 signer: owner,
-                subaccount: sub,
+                masterAccount: sub,
                 token: usdc,
                 amount: 0,
                 triggerNetValue: 0,
@@ -1318,15 +1163,19 @@ contract AllocateTest is BasicSetup {
         vm.stopPrank();
         vm.prank(address(p2));
         usdc.transfer(address(1), usdc.balanceOf(address(p2)));
+
+        // Warp past throttle period to allow second allocation
+        vm.warp(block.timestamp + 7 hours);
+
         vm.startPrank(users.owner);
 
         {
             usdc.mint(address(p1), 100e6);
 
             CallIntent memory intent = CallIntent({
-                account: owner,
+                user: owner,
                 signer: owner,
-                subaccount: sub,
+                masterAccount: sub,
                 token: usdc,
                 amount: 0,
                 triggerNetValue: 0,
@@ -1354,37 +1203,6 @@ contract AllocateTest is BasicSetup {
 
             uint p1SharesAfter = allocation.shareBalanceMap(sub, address(p1));
             assertGt(p1SharesAfter, p1Shares, "Phase 5: P1 shares increased");
-        }
-
-        // Phase 6: Freeze the subaccount
-        vm.stopPrank();
-        vm.prank(address(sub));
-        sub.uninstallModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-        sub.installModule(MODULE_TYPE_EXECUTOR, address(allocation), "");
-        vm.startPrank(users.owner);
-
-        assertTrue(allocation.getSubaccountInfo(sub).disposed, "Phase 7: Subaccount frozen");
-
-        {
-            CallIntent memory intent = CallIntent({
-                account: owner,
-                signer: owner,
-                subaccount: sub,
-                token: usdc,
-                amount: 0,
-                triggerNetValue: 0,
-                acceptableNetValue: type(uint).max,
-                positionParamsHash: keccak256(abi.encode(emptyParams)),
-                deadline: block.timestamp + 1 hours,
-                nonce: nonce
-            });
-            bytes memory sig = _signIntent(intent, ownerPrivateKey);
-
-            IERC7579Account[] memory puppets = new IERC7579Account[](0);
-            uint[] memory amounts = new uint[](0);
-
-            vm.expectRevert(Error.Allocate__SubaccountFrozen.selector);
-            allocation.executeAllocate(position, matcher, intent, sig, puppets, amounts, emptyParams);
         }
 
         // Final balance check - no more position simulation needed, profit already reflected
@@ -1420,7 +1238,7 @@ contract AllocateTest is BasicSetup {
     }
 
     function testEdge_CapEnforcedOnAllocate() public {
-        allocation.setTokenCap(usdc, 1200e6);
+        allocation.setTokenCap(usdc, 200e6);
 
         _registerMasterSubaccount();
 
@@ -1435,7 +1253,7 @@ contract AllocateTest is BasicSetup {
         amounts[0] = 150e6;
         amounts[1] = 150e6;
 
-        vm.expectRevert(abi.encodeWithSelector(Error.Allocate__DepositExceedsCap.selector, 1300e6, 1200e6));
+        vm.expectRevert(abi.encodeWithSelector(Error.Allocate__DepositExceedsCap.selector, 300e6, 200e6));
         allocation.executeAllocate(position, matcher, intent, sig, puppets, amounts, emptyParams);
     }
 }
