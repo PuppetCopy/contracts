@@ -134,11 +134,6 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocate__DisposedWithShares",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "ModuleAlreadyInitialized",
     "inputs": [
       {

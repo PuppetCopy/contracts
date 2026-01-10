@@ -4,6 +4,7 @@ import { generateEventParamsCode, parseEventsFromSolidity } from './parse-events
 
 const FORGE_ARTIFACTS_PATH = './forge-artifacts'
 const DEPLOYMENTS_PATH = './deployments.json'
+const BROADCAST_PATH = './broadcast'
 const ERROR_SOL_PATH = './src/utils/Error.sol'
 const OUTPUT_DIR = './script/generated'
 
@@ -11,7 +12,57 @@ type ContractInfo = {
   name: string
   address: string
   chainId: number
+  blockNumber: number
   abi?: unknown[]
+}
+
+type BroadcastArtifact = {
+  transactions: {
+    hash: string
+    transactionType: string
+    contractName: string
+    contractAddress: string
+  }[]
+  receipts: {
+    transactionHash: string
+    blockNumber: string
+  }[]
+}
+
+
+async function loadBlockNumbersFromBroadcasts(chainId: number): Promise<Map<string, number>> {
+  const blockNumbers = new Map<string, number>()
+
+  // Scan all broadcast directories for this chain
+  const broadcastGlob = new Bun.Glob(`*/${chainId}/run-latest.json`)
+
+  for await (const file of broadcastGlob.scan({ cwd: BROADCAST_PATH })) {
+    try {
+      const broadcastFile = Bun.file(join(BROADCAST_PATH, file))
+      const broadcast: BroadcastArtifact = await broadcastFile.json()
+
+      // Build txHash -> blockNumber map from receipts
+      const receiptMap = new Map<string, number>()
+      for (const receipt of broadcast.receipts) {
+        receiptMap.set(receipt.transactionHash, Number(receipt.blockNumber))
+      }
+
+      // Extract block numbers for CREATE transactions
+      for (const tx of broadcast.transactions) {
+        if (tx.transactionType === 'CREATE' && tx.contractAddress) {
+          const blockNumber = receiptMap.get(tx.hash)
+          if (blockNumber) {
+            // Normalize address to lowercase for comparison
+            blockNumbers.set(tx.contractAddress.toLowerCase(), blockNumber)
+          }
+        }
+      }
+    } catch {
+      // Skip files that can't be parsed
+    }
+  }
+
+  return blockNumbers
 }
 
 async function findAbiFile(contractName: string): Promise<unknown[] | undefined> {
@@ -97,7 +148,7 @@ async function generateContracts(): Promise<void> {
   console.log('Loading Puppet contract deployments...')
 
   const deploymentsFile = Bun.file(DEPLOYMENTS_PATH)
-  const deployments = await deploymentsFile.json()
+  const deployments: Record<string, Record<string, string>> = await deploymentsFile.json()
 
   const contracts: ContractInfo[] = []
 
@@ -108,13 +159,21 @@ async function generateContracts(): Promise<void> {
     const contractNames = Object.keys(addresses)
     console.log(`  Found ${contractNames.length} contracts on chain ${chainId}`)
 
+    // Load block numbers from broadcast files for this chain
+    const blockNumbers = await loadBlockNumbersFromBroadcasts(chainId)
+
     for (const contractName of contractNames) {
       const abi = await findAbiFile(contractName)
+      const address = addresses[contractName]
+
+      // Look up block number from broadcast files (normalized to lowercase)
+      const blockNumber = blockNumbers.get(address.toLowerCase()) ?? 0
 
       contracts.push({
         name: contractName,
-        address: addresses[contractName],
+        address,
         chainId,
+        blockNumber,
         abi
       })
     }
@@ -162,12 +221,14 @@ ${contracts
       return `  ${contract.name}: {
     address: '${contract.address}',
     chainId: ${contract.chainId},
+    blockNumber: ${contract.blockNumber},
     abi: ${contract.name.toLowerCase()}Abi
   }`
     }
     return `  ${contract.name}: {
     address: '${contract.address}',
-    chainId: ${contract.chainId}
+    chainId: ${contract.chainId},
+    blockNumber: ${contract.blockNumber}
   }`
   })
   .join(',\n')}

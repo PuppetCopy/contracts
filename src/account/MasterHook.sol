@@ -33,17 +33,14 @@ contract MasterHook is IHook {
     }
 
     function onInstall(bytes calldata _data) external {
-        IERC7579Account _masterAccount = IERC7579Account(msg.sender);
-
-        if (router.isDisposed(_masterAccount) && router.hasRemainingShares(_masterAccount)) revert Error.Allocate__DisposedWithShares();
-
         InstallParams memory params = abi.decode(_data, (InstallParams));
+        IERC7579Account _master = IERC7579Account(msg.sender);
 
-        router.createMasterAccount(params.user, params.signer, _masterAccount, params.baseToken, params.name);
+        router.createMaster(params.user, params.signer, _master, params.baseToken, params.name);
     }
 
     function onUninstall(bytes calldata) external {
-        router.disposeMasterAccount(IERC7579Account(msg.sender));
+        router.disposeMaster(IERC7579Account(msg.sender));
     }
 
     function isModuleType(uint _moduleTypeId) external pure returns (bool) {

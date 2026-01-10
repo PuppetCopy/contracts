@@ -8,6 +8,8 @@ import feemarketplacestoreAbi from './abi/puppetFeeMarketplaceStore.js'
 import feemarketplaceAbi from './abi/puppetFeeMarketplace.js'
 import matchAbi from './abi/puppetMatch.js'
 import allocateAbi from './abi/puppetAllocate.js'
+import attestAbi from './abi/puppetAttest.js'
+import compactAbi from './abi/puppetCompact.js'
 import positionAbi from './abi/puppetPosition.js'
 import userrouterAbi from './abi/puppetUserRouter.js'
 import masterhookAbi from './abi/puppetMasterHook.js'
@@ -19,70 +21,96 @@ export const PUPPET_CONTRACT_MAP = {
   Dictatorship: {
     address: '0xbF52B3399542a353D3bFb40b1237836cC9A02Ed4',
     chainId: 42161,
+    blockNumber: 418295878,
     abi: dictatorshipAbi
   },
   PuppetToken: {
     address: '0x3b1A496303b8272C6558b1E9159074F13176adc8',
     chainId: 42161,
+    blockNumber: 0,
     abi: puppettokenAbi
   },
   PuppetVoteToken: {
     address: '0x95718B4EEC9316E3a61ef75A2BBD3951cF465Bff',
     chainId: 42161,
+    blockNumber: 0,
     abi: puppetvotetokenAbi
   },
   FeeMarketplaceStore: {
     address: '0xaF5798725AFA764748f9Dc85E8418510B459F722',
     chainId: 42161,
+    blockNumber: 0,
     abi: feemarketplacestoreAbi
   },
   FeeMarketplace: {
     address: '0x4d80C64A10e44c724203485A4349727e01A0BaDF',
     chainId: 42161,
+    blockNumber: 0,
     abi: feemarketplaceAbi
   },
   Match: {
     address: '0xE7eAB5469ebbE492469E723FF5DAe7Cb91c6D04e',
     chainId: 42161,
+    blockNumber: 418295895,
     abi: matchAbi
   },
   Allocate: {
     address: '0x5d2D41305b33DFf126FCb9585f919c7f13d183dB',
     chainId: 42161,
+    blockNumber: 418295899,
     abi: allocateAbi
+  },
+  Attest: {
+    address: '0x0000000000000000000000000000000000000000',
+    chainId: 42161,
+    blockNumber: 0,
+    abi: attestAbi
+  },
+  Compact: {
+    address: '0x0000000000000000000000000000000000000000',
+    chainId: 42161,
+    blockNumber: 0,
+    abi: compactAbi
   },
   Position: {
     address: '0x49F7e5F896ad4530eBedB1d4697Ffb5b31f34972',
     chainId: 42161,
+    blockNumber: 418295891,
     abi: positionAbi
   },
   UserRouter: {
     address: '0x91DeC0891d3d5DF935790C6dc97c674f7f976994',
     chainId: 42161,
+    blockNumber: 418295904,
     abi: userrouterAbi
   },
   UserRouterImpl: {
     address: '0x0B1ba8b68CF1282a7770DecB650511126DF5142B',
-    chainId: 42161
+    chainId: 42161,
+    blockNumber: 0
   },
   MasterHook: {
     address: '0x0bf4f1740E9809b88c9B0317654EB80c35CEe33E',
     chainId: 42161,
+    blockNumber: 418295886,
     abi: masterhookAbi
   },
   GmxStage: {
     address: '0xB5E7CC3eD87F4f517351D50C639Fe9aB22b1D2Eb',
     chainId: 42161,
+    blockNumber: 418295909,
     abi: gmxstageAbi
   },
   TokenRouter: {
     address: '0x0c69DB327925cd9367E39B7CB773Fcf97005a02c',
     chainId: 42161,
+    blockNumber: 0,
     abi: tokenrouterAbi
   },
   ProxyUserRouter: {
     address: '0x8ea4425d1f26f1c715AF4020427480af9Fef20fF',
     chainId: 42161,
+    blockNumber: 418295882,
     abi: proxyuserrouterAbi
   }
 } as const

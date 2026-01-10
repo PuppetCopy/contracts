@@ -5,21 +5,19 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 
 interface IUserRouter {
-    function createMasterAccount(
+    function createMaster(
         address user,
         address signer,
-        IERC7579Account masterAccount,
+        IERC7579Account master,
         IERC20 baseToken,
         bytes32 name
     ) external;
 
-    function disposeMasterAccount(IERC7579Account masterAccount) external;
+    function disposeMaster(IERC7579Account master) external;
 
-    function isDisposed(IERC7579Account masterAccount) external view returns (bool);
+    function isDisposed(IERC7579Account master) external view returns (bool);
 
-    function hasRemainingShares(IERC7579Account masterAccount) external view returns (bool);
-
-    function processPreCall(address msgSender, address masterAccount, uint msgValue, bytes calldata msgData)
+    function processPreCall(address msgSender, address master, uint msgValue, bytes calldata msgData)
         external
         returns (bytes memory hookData);
 

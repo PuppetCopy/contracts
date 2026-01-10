@@ -95,6 +95,12 @@ export const ARBITRUM_TOKEN_LIST = [
     dataStreamFeedDecimals: 18
   },
   {
+    symbol: 'AR',
+    decimals: 12,
+    address: '0x4b9a2b862E1a30e6E844c991D31Dc6387c9d65D5',
+    name: 'Arweave'
+  },
+  {
     symbol: 'ARB',
     decimals: 18,
     address: '0x912CE59144191C1204E64559FE8253a0e49E6548',
@@ -197,6 +203,12 @@ export const ARBITRUM_TOKEN_LIST = [
     priceFeedAddress: '0x256654437f1ADA8057684b18d742eFD14034C400'
   },
   {
+    symbol: 'CHZ',
+    decimals: 18,
+    address: '0x5dB4692926C8ceebF6Da0995358Bbc438F3fd80C',
+    name: 'Chiliz'
+  },
+  {
     symbol: 'CRO',
     decimals: 8,
     address: '0xB7EfE7c7f059E84Ab87A83A169c583Fb4A54fAc3',
@@ -235,6 +247,12 @@ export const ARBITRUM_TOKEN_LIST = [
     dataStreamFeedId: '0x0003571a596aab1cafe1a883795dab90cd8cca48e25f53ab3665aa67d008f386',
     dataStreamFeedDecimals: 18,
     priceFeedAddress: '0xc5C8E77B397E531B8EC06BFb0048328B30E9eCfB'
+  },
+  {
+    symbol: 'DASH',
+    decimals: 8,
+    address: '0x426FE015a5F4E6Ad4E6497ad79265D07EA9F121e',
+    name: 'Dash'
   },
   {
     symbol: 'DOGE',
@@ -370,6 +388,12 @@ export const ARBITRUM_TOKEN_LIST = [
     synthetic: true,
     dataStreamFeedId: '0x000344d7a7d81f051ee273a63f94f8bef7d44ca89aa03e0c5bf4d085df19adb6',
     dataStreamFeedDecimals: 18
+  },
+  {
+    symbol: 'JTO',
+    decimals: 9,
+    address: '0xF01D2AA2f3f903A93D57c4Bf672C8096DE485FA7',
+    name: 'Jito'
   },
   {
     symbol: 'JUP',
@@ -700,6 +724,12 @@ export const ARBITRUM_TOKEN_LIST = [
     synthetic: true,
     dataStreamFeedId: '0x000348ce31679e9ce1f80ec929f1d7c86499569d67f1cea80a90d6e5e3c127a7',
     dataStreamFeedDecimals: 18
+  },
+  {
+    symbol: 'SYRUP',
+    decimals: 18,
+    address: '0x9759C297fb6C91e252c7292cECa30a509558E5De',
+    name: 'Syrup'
   },
   {
     symbol: 'TAO',

@@ -1,4 +1,4 @@
-// This file is auto-generated from forge-artifacts/TokenRouter.sol/TokenRouter.json
+// This file is auto-generated from forge-artifacts/Attest.sol/Attest.json
 // Do not edit manually.
 
 export default [
@@ -13,12 +13,12 @@ export default [
       {
         "name": "_config",
         "type": "tuple",
-        "internalType": "struct TokenRouter.Config",
+        "internalType": "struct Attest.Config",
         "components": [
           {
-            "name": "transferGasLimit",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "attestor",
+            "type": "address",
+            "internalType": "address"
           }
         ]
       }
@@ -64,20 +64,45 @@ export default [
   },
   {
     "type": "function",
-    "name": "getConfig",
+    "name": "config",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "attestor",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getAttestor",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "tuple",
-        "internalType": "struct TokenRouter.Config",
-        "components": [
-          {
-            "name": "transferGasLimit",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isNonceConsumed",
+    "inputs": [
+      {
+        "name": "nonce",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
@@ -139,31 +164,36 @@ export default [
   },
   {
     "type": "function",
-    "name": "transfer",
+    "name": "verify",
     "inputs": [
       {
-        "name": "token",
-        "type": "address",
-        "internalType": "contract IERC20"
+        "name": "_digest",
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
       {
-        "name": "from",
-        "type": "address",
-        "internalType": "address"
+        "name": "_signature",
+        "type": "bytes",
+        "internalType": "bytes"
       },
       {
-        "name": "to",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
+        "name": "_nonce",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "error",
+    "name": "Attest__InvalidAttestor",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Attest__InvalidSignature",
+    "inputs": []
   },
   {
     "type": "error",
@@ -179,36 +209,5 @@ export default [
     "type": "error",
     "name": "ReentrancyGuardReentrantCall",
     "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "TokenRouter__InvalidTransferGasLimit",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "TransferUtils__TokenTransferFromError",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "contract IERC20"
-      },
-      {
-        "name": "from",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "to",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
   }
 ] as const

@@ -25,37 +25,33 @@ contract UserRouter is IUserRouter, CoreContract {
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
-    function createMasterAccount(
+    function createMaster(
         address _user,
         address _signer,
-        IERC7579Account _masterAccount,
+        IERC7579Account _master,
         IERC20 _baseToken,
         bytes32 _name
     ) external {
         if (msg.sender != config.allocation.getConfig().masterHook) revert Error.UserRouter__UnauthorizedCaller();
-        config.allocation.createMasterAccount(_user, _signer, _masterAccount, _baseToken, _name);
+        config.allocation.createMaster(_user, _signer, _master, _baseToken, _name);
     }
 
-    function disposeMasterAccount(IERC7579Account _masterAccount) external {
+    function disposeMaster(IERC7579Account _master) external {
         if (msg.sender != config.allocation.getConfig().masterHook) revert Error.UserRouter__UnauthorizedCaller();
-        config.allocation.disposeMasterAccount(_masterAccount);
+        config.allocation.disposeMaster(_master);
     }
 
-    function hasRemainingShares(IERC7579Account _masterAccount) external view returns (bool) {
-        return config.allocation.hasRemainingShares(_masterAccount);
-    }
-
-    function isDisposed(IERC7579Account _masterAccount) external view returns (bool) {
-        (,,,, bool disposed,,) = config.allocation.registeredMap(_masterAccount);
+    function isDisposed(IERC7579Account _master) external view returns (bool) {
+        (,,,, bool disposed,) = config.allocation.registeredMap(_master);
         return disposed;
     }
 
-    function processPreCall(address _msgSender, address _masterAccount, uint _msgValue, bytes calldata _msgData)
+    function processPreCall(address _msgSender, address _master, uint _msgValue, bytes calldata _msgData)
         external
         view
         returns (bytes memory hookData)
     {
-        return config.position.processPreCall(_msgSender, _masterAccount, _msgValue, _msgData);
+        return config.position.processPreCall(_msgSender, _master, _msgValue, _msgData);
     }
 
     function processPostCall(bytes calldata _hookData) external {

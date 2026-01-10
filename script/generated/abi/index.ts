@@ -7,6 +7,8 @@ export { default as feemarketplacestoreAbi } from './puppetFeeMarketplaceStore.j
 export { default as feemarketplaceAbi } from './puppetFeeMarketplace.js'
 export { default as matchAbi } from './puppetMatch.js'
 export { default as allocateAbi } from './puppetAllocate.js'
+export { default as attestAbi } from './puppetAttest.js'
+export { default as compactAbi } from './puppetCompact.js'
 export { default as positionAbi } from './puppetPosition.js'
 export { default as userrouterAbi } from './puppetUserRouter.js'
 export { default as masterhookAbi } from './puppetMasterHook.js'

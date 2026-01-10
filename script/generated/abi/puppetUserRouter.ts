@@ -97,7 +97,7 @@ export default [
   },
   {
     "type": "function",
-    "name": "createMasterAccount",
+    "name": "createMaster",
     "inputs": [
       {
         "name": "_user",
@@ -110,7 +110,7 @@ export default [
         "internalType": "address"
       },
       {
-        "name": "_masterAccount",
+        "name": "_master",
         "type": "address",
         "internalType": "contract IERC7579Account"
       },
@@ -130,10 +130,10 @@ export default [
   },
   {
     "type": "function",
-    "name": "disposeMasterAccount",
+    "name": "disposeMaster",
     "inputs": [
       {
-        "name": "_masterAccount",
+        "name": "_master",
         "type": "address",
         "internalType": "contract IERC7579Account"
       }
@@ -143,29 +143,10 @@ export default [
   },
   {
     "type": "function",
-    "name": "hasRemainingShares",
-    "inputs": [
-      {
-        "name": "_masterAccount",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "isDisposed",
     "inputs": [
       {
-        "name": "_masterAccount",
+        "name": "_master",
         "type": "address",
         "internalType": "contract IERC7579Account"
       }
@@ -202,7 +183,7 @@ export default [
         "internalType": "address"
       },
       {
-        "name": "_masterAccount",
+        "name": "_master",
         "type": "address",
         "internalType": "address"
       },

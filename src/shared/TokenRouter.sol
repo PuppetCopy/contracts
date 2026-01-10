@@ -9,16 +9,13 @@ import {TransferUtils} from "../utils/TransferUtils.sol";
 import {IAuthority} from "./../utils/interfaces/IAuthority.sol";
 
 contract TokenRouter is CoreContract {
-    event Transfer(IERC20 indexed token, address indexed from, address indexed to, uint amount);
     struct Config {
         uint transferGasLimit;
     }
 
     Config config;
 
-    constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {
-        authority = _authority;
-    }
+    constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
     function getConfig() external view returns (Config memory) {
         return config;
@@ -26,7 +23,7 @@ contract TokenRouter is CoreContract {
 
     function transfer(IERC20 token, address from, address to, uint amount) external auth {
         TransferUtils.transferStrictlyFrom(config.transferGasLimit, token, from, to, amount);
-        emit Transfer(token, from, to, amount);
+        _logEvent("Transfer", abi.encode(msg.sender, token, from, to, amount));
     }
 
     function _setConfig(bytes memory _data) internal virtual override {

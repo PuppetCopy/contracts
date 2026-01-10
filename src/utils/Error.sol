@@ -51,23 +51,23 @@ library Error {
     error Allocate__InsufficientBalance();
     error Allocate__ActiveShares(uint totalShares);
     error Allocate__AlreadyRegistered();
-    error Allocate__UnregisteredMasterAccount();
+    error Allocate__UnregisteredMaster();
     error Allocate__TransferFailed();
     error Allocate__ArrayLengthMismatch(uint puppetCount, uint allocationCount);
     error Allocate__PuppetListTooLarge(uint provided, uint maximum);
     error Allocate__IntentExpired(uint deadline, uint currentTime);
     error Allocate__InvalidSignature(address signer);
-    error Allocate__InvalidMasterAccountOwner(address expected, address provided);
+    error Allocate__InvalidMasterOwner(address expected, address provided);
     error Allocate__UnauthorizedSigner(address signer);
     error Allocate__InvalidNonce(uint expected, uint provided);
     error Allocate__InvalidPosition();
-    error Allocate__InvalidMatch();
     error Allocate__InvalidMasterHook();
+    error Allocate__InvalidTokenRouter();
     error Allocate__InvalidMaxPuppetList();
     error Allocate__InvalidGasLimit();
     error Allocate__TokenNotAllowed();
     error Allocate__DepositExceedsCap(uint amount, uint cap);
-    error Allocate__MasterAccountFrozen();
+    error Allocate__MasterFrozen();
     error Allocate__ZeroAmount();
     error Allocate__ZeroShares();
     error Allocate__InsufficientLiquidity();
@@ -75,13 +75,31 @@ library Error {
     error Allocate__InvalidAccountCodeHash();
     error Allocate__ExecutorNotInstalled();
     error Allocate__MasterHookNotInstalled();
+    error Allocate__InvalidCompact();
     error Allocate__NetValueBelowMin(uint256 netValue, uint256 acceptableNetValue);
     error Allocate__NetValueAboveMax(uint256 netValue, uint256 acceptableNetValue);
     error Allocate__NetValueParamsMismatch();
     error Allocate__TokenMismatch();
     error Allocate__ZeroAssets();
-    error Allocate__DisposedWithShares();
+    error Allocate__MasterDisposed();
     error Allocate__UninstallDisabled();
+    error Allocate__InvalidAttestation();
+    error Allocate__AttestationExpired(uint deadline, uint currentTime);
+    error Allocate__InvalidAttestor();
+
+    // Attest errors
+    error Attest__InvalidAttestor();
+    error Attest__InvalidSignature();
+
+    // Compact errors
+    error Compact__InvalidAttestor();
+    error Compact__InvalidSignature();
+    error Compact__ExpiredDeadline();
+    error Compact__ArrayLengthMismatch();
+
+    // NonceLib errors
+    error NonceLib__InvalidNonce(uint nonce);
+    error NonceLib__InvalidNonceForAccount(address account, uint nonce);
 
     error FeeMarketplace__InsufficientUnlockedBalance(uint unlockedBalance);
     error FeeMarketplace__ZeroDeposit();

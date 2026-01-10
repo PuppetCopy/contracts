@@ -317,7 +317,7 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocate__UnregisteredMasterAccount",
+    name: "Allocate__UnregisteredMaster",
     inputs: []
   },
   {
@@ -386,7 +386,7 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocate__InvalidMasterAccountOwner",
+    name: "Allocate__InvalidMasterOwner",
     inputs: [
       {
         name: "expected",
@@ -434,12 +434,12 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocate__InvalidMatch",
+    name: "Allocate__InvalidMasterHook",
     inputs: []
   },
   {
     type: "error",
-    name: "Allocate__InvalidMasterHook",
+    name: "Allocate__InvalidTokenRouter",
     inputs: []
   },
   {
@@ -475,7 +475,7 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocate__MasterAccountFrozen",
+    name: "Allocate__MasterFrozen",
     inputs: []
   },
   {
@@ -522,6 +522,11 @@ export const puppetErrorAbi = [
   {
     type: "error",
     name: "Allocate__MasterHookNotInstalled",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Allocate__InvalidCompact",
     inputs: []
   },
   {
@@ -573,13 +578,96 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
-    name: "Allocate__DisposedWithShares",
+    name: "Allocate__MasterDisposed",
     inputs: []
   },
   {
     type: "error",
     name: "Allocate__UninstallDisabled",
     inputs: []
+  },
+  {
+    type: "error",
+    name: "Allocate__InvalidAttestation",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Allocate__AttestationExpired",
+    inputs: [
+      {
+        name: "deadline",
+        internalType: "uint256",
+        type: "uint256"
+      },
+      {
+        name: "currentTime",
+        internalType: "uint256",
+        type: "uint256"
+      }
+    ]
+  },
+  {
+    type: "error",
+    name: "Allocate__InvalidAttestor",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Attest__InvalidAttestor",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Attest__InvalidSignature",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Compact__InvalidAttestor",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Compact__InvalidSignature",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Compact__ExpiredDeadline",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Compact__ArrayLengthMismatch",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "NonceLib__InvalidNonce",
+    inputs: [
+      {
+        name: "nonce",
+        internalType: "uint256",
+        type: "uint256"
+      }
+    ]
+  },
+  {
+    type: "error",
+    name: "NonceLib__InvalidNonceForAccount",
+    inputs: [
+      {
+        name: "account",
+        internalType: "address",
+        type: "address"
+      },
+      {
+        name: "nonce",
+        internalType: "uint256",
+        type: "uint256"
+      }
+    ]
   },
   {
     type: "error",

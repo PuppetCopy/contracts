@@ -22,12 +22,13 @@ contract DeployUserRouter is BaseScript {
         ProxyUserRouter proxyUserRouter = ProxyUserRouter(payable(getDeployedAddress("ProxyUserRouter")));
 
         UserRouter userRouter = new UserRouter(
-            IAuthority(address(dictatorship)), UserRouter.Config({allocation: allocation, matcher: matcher, position: position})
+            IAuthority(address(dictatorship)),
+            UserRouter.Config({allocation: allocation, matcher: matcher, position: position})
         );
         proxyUserRouter.update(address(userRouter));
 
         address proxyAddr = address(proxyUserRouter);
-        dictatorship.setPermission(allocation, allocation.createMasterAccount.selector, proxyAddr);
+        dictatorship.setPermission(allocation, allocation.createMaster.selector, proxyAddr);
 
         vm.stopBroadcast();
     }

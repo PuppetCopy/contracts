@@ -16,7 +16,7 @@ struct Call {
 interface IStage {
     /// @notice Validate execution before it runs
     /// @param msgSender The address that called the master account's execute function
-    /// @param masterAccount The master's 7579 account executing
+    /// @param master The master's 7579 account executing
     /// @param value The ETH value sent with the execute() call
     /// @param callType The ERC-7579 call type (single or batch)
     /// @param execData The raw execution calldata
@@ -24,19 +24,19 @@ interface IStage {
     /// @return hookData Data for postCheck after execution
     function validate(
         address msgSender,
-        address masterAccount,
+        address master,
         uint value,
         CallType callType,
         bytes calldata execData
     ) external view returns (IERC20 token, bytes memory hookData);
 
     /// @notice Verify state after execution
-    /// @param masterAccount The master account that executed
+    /// @param master The master account that executed
     /// @param token The collateral token
     /// @param preBalance Token balance before execution
     /// @param postBalance Token balance after execution
     /// @param hookData Data from validate()
-    function verify(address masterAccount, IERC20 token, uint preBalance, uint postBalance, bytes calldata hookData)
+    function verify(address master, IERC20 token, uint preBalance, uint postBalance, bytes calldata hookData)
         external
         view;
 
@@ -48,13 +48,13 @@ interface IStage {
 
     /// @notice Verify a position belongs to a master account
     /// @param positionKey The position identifier
-    /// @param masterAccount The account to verify ownership
+    /// @param master The account to verify ownership
     /// @return isOwner True if position belongs to master account
-    function verifyPositionOwner(bytes32 positionKey, address masterAccount) external view returns (bool isOwner);
+    function verifyPositionOwner(bytes32 positionKey, address master) external view returns (bool isOwner);
 
     /// @notice Check if an order is still pending
     /// @param orderKey The order identifier
-    /// @param masterAccount The account that created the order
+    /// @param master The account that created the order
     /// @return isPending True if order exists and is pending
-    function isOrderPending(bytes32 orderKey, address masterAccount) external view returns (bool isPending);
+    function isOrderPending(bytes32 orderKey, address master) external view returns (bool isPending);
 }

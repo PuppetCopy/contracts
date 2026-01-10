@@ -16,12 +16,22 @@ export default [
         "internalType": "struct Allocate.Config",
         "components": [
           {
+            "name": "attest",
+            "type": "address",
+            "internalType": "contract Attest"
+          },
+          {
             "name": "masterHook",
             "type": "address",
             "internalType": "address"
           },
           {
-            "name": "maxPuppetList",
+            "name": "compact",
+            "type": "address",
+            "internalType": "contract Compact"
+          },
+          {
+            "name": "allocateGasLimit",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -37,7 +47,20 @@ export default [
   },
   {
     "type": "function",
-    "name": "CALL_INTENT_TYPEHASH",
+    "name": "ALLOCATE_ATTESTATION_TYPEHASH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "WITHDRAW_ATTESTATION_TYPEHASH",
     "inputs": [],
     "outputs": [
       {
@@ -66,6 +89,71 @@ export default [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "allocate",
+    "inputs": [
+      {
+        "name": "_matcher",
+        "type": "address",
+        "internalType": "contract Match"
+      },
+      {
+        "name": "_master",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
+      },
+      {
+        "name": "_puppetList",
+        "type": "address[]",
+        "internalType": "address[]"
+      },
+      {
+        "name": "_requestedAmountList",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "_attestation",
+        "type": "tuple",
+        "internalType": "struct Allocate.AllocateAttestation",
+        "components": [
+          {
+            "name": "sharePrice",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "puppetListHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "amountListHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "nonce",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "signature",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -106,16 +194,50 @@ export default [
   },
   {
     "type": "function",
+    "name": "computeTokenId",
+    "inputs": [
+      {
+        "name": "_master",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_baseToken",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
     "name": "config",
     "inputs": [],
     "outputs": [
+      {
+        "name": "attest",
+        "type": "address",
+        "internalType": "contract Attest"
+      },
       {
         "name": "masterHook",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "maxPuppetList",
+        "name": "compact",
+        "type": "address",
+        "internalType": "contract Compact"
+      },
+      {
+        "name": "allocateGasLimit",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -129,7 +251,7 @@ export default [
   },
   {
     "type": "function",
-    "name": "createMasterAccount",
+    "name": "createMaster",
     "inputs": [
       {
         "name": "_user",
@@ -142,7 +264,7 @@ export default [
         "internalType": "address"
       },
       {
-        "name": "_masterAccount",
+        "name": "_master",
         "type": "address",
         "internalType": "contract IERC7579Account"
       },
@@ -162,10 +284,10 @@ export default [
   },
   {
     "type": "function",
-    "name": "disposeMasterAccount",
+    "name": "disposeMaster",
     "inputs": [
       {
-        "name": "_masterAccount",
+        "name": "_master",
         "type": "address",
         "internalType": "contract IERC7579Account"
       }
@@ -218,205 +340,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "executeAllocate",
-    "inputs": [
-      {
-        "name": "_position",
-        "type": "address",
-        "internalType": "contract Position"
-      },
-      {
-        "name": "_match",
-        "type": "address",
-        "internalType": "contract Match"
-      },
-      {
-        "name": "_intent",
-        "type": "tuple",
-        "internalType": "struct CallIntent",
-        "components": [
-          {
-            "name": "user",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "signer",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "masterAccount",
-            "type": "address",
-            "internalType": "contract IERC7579Account"
-          },
-          {
-            "name": "token",
-            "type": "address",
-            "internalType": "contract IERC20"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "triggerNetValue",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "acceptableNetValue",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "positionParamsHash",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "deadline",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "nonce",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-      },
-      {
-        "name": "_signature",
-        "type": "bytes",
-        "internalType": "bytes"
-      },
-      {
-        "name": "_puppetList",
-        "type": "address[]",
-        "internalType": "contract IERC7579Account[]"
-      },
-      {
-        "name": "_amountList",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      },
-      {
-        "name": "_positionParams",
-        "type": "tuple",
-        "internalType": "struct PositionParams",
-        "components": [
-          {
-            "name": "stages",
-            "type": "address[]",
-            "internalType": "contract IStage[]"
-          },
-          {
-            "name": "positionKeys",
-            "type": "bytes32[][]",
-            "internalType": "bytes32[][]"
-          }
-        ]
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "executeWithdraw",
-    "inputs": [
-      {
-        "name": "_position",
-        "type": "address",
-        "internalType": "contract Position"
-      },
-      {
-        "name": "_intent",
-        "type": "tuple",
-        "internalType": "struct CallIntent",
-        "components": [
-          {
-            "name": "user",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "signer",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "masterAccount",
-            "type": "address",
-            "internalType": "contract IERC7579Account"
-          },
-          {
-            "name": "token",
-            "type": "address",
-            "internalType": "contract IERC20"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "triggerNetValue",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "acceptableNetValue",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "positionParamsHash",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "deadline",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "nonce",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-      },
-      {
-        "name": "_signature",
-        "type": "bytes",
-        "internalType": "bytes"
-      },
-      {
-        "name": "_positionParams",
-        "type": "tuple",
-        "internalType": "struct PositionParams",
-        "components": [
-          {
-            "name": "stages",
-            "type": "address[]",
-            "internalType": "contract IStage[]"
-          },
-          {
-            "name": "positionKeys",
-            "type": "bytes32[][]",
-            "internalType": "bytes32[][]"
-          }
-        ]
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "getConfig",
     "inputs": [],
     "outputs": [
@@ -426,12 +349,22 @@ export default [
         "internalType": "struct Allocate.Config",
         "components": [
           {
+            "name": "attest",
+            "type": "address",
+            "internalType": "contract Attest"
+          },
+          {
             "name": "masterHook",
             "type": "address",
             "internalType": "address"
           },
           {
-            "name": "maxPuppetList",
+            "name": "compact",
+            "type": "address",
+            "internalType": "contract Compact"
+          },
+          {
+            "name": "allocateGasLimit",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -447,10 +380,10 @@ export default [
   },
   {
     "type": "function",
-    "name": "getMasterAccountInfo",
+    "name": "getMasterInfo",
     "inputs": [
       {
-        "name": "_masterAccount",
+        "name": "_master",
         "type": "address",
         "internalType": "contract IERC7579Account"
       }
@@ -459,7 +392,7 @@ export default [
       {
         "name": "",
         "type": "tuple",
-        "internalType": "struct MasterAccountInfo",
+        "internalType": "struct MasterInfo",
         "components": [
           {
             "name": "user",
@@ -487,83 +420,11 @@ export default [
             "internalType": "bool"
           },
           {
-            "name": "nonce",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
             "name": "stage",
             "type": "address",
             "internalType": "address"
           }
         ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getSharePrice",
-    "inputs": [
-      {
-        "name": "_masterAccount",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      },
-      {
-        "name": "_totalAssets",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getUserShares",
-    "inputs": [
-      {
-        "name": "_masterAccount",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      },
-      {
-        "name": "_account",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "hasRemainingShares",
-    "inputs": [
-      {
-        "name": "_masterAccount",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
@@ -637,7 +498,7 @@ export default [
     "name": "registeredMap",
     "inputs": [
       {
-        "name": "masterAccount",
+        "name": "master",
         "type": "address",
         "internalType": "contract IERC7579Account"
       }
@@ -667,11 +528,6 @@ export default [
         "name": "disposed",
         "type": "bool",
         "internalType": "bool"
-      },
-      {
-        "name": "nonce",
-        "type": "uint256",
-        "internalType": "uint256"
       },
       {
         "name": "stage",
@@ -755,30 +611,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "shareBalanceMap",
-    "inputs": [
-      {
-        "name": "masterAccount",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      },
-      {
-        "name": "account",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "supportsInterface",
     "inputs": [
       {
@@ -817,22 +649,53 @@ export default [
   },
   {
     "type": "function",
-    "name": "totalSharesMap",
+    "name": "withdraw",
     "inputs": [
       {
-        "name": "masterAccount",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
+        "name": "_attestation",
+        "type": "tuple",
+        "internalType": "struct Allocate.WithdrawAttestation",
+        "components": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "master",
+            "type": "address",
+            "internalType": "contract IERC7579Account"
+          },
+          {
+            "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "sharePrice",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "nonce",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "signature",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
       }
     ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "event",
@@ -879,6 +742,22 @@ export default [
   },
   {
     "type": "error",
+    "name": "Allocate__AttestationExpired",
+    "inputs": [
+      {
+        "name": "deadline",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "currentTime",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "Allocate__DepositExceedsCap",
     "inputs": [
       {
@@ -905,23 +784,22 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocate__IntentExpired",
-    "inputs": [
-      {
-        "name": "deadline",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "currentTime",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
+    "name": "Allocate__InvalidAccountCodeHash",
+    "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocate__InvalidAccountCodeHash",
+    "name": "Allocate__InvalidAttestation",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Allocate__InvalidAttestor",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Allocate__InvalidCompact",
     "inputs": []
   },
   {
@@ -931,118 +809,12 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocate__InvalidMasterAccountOwner",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "provided",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "Allocate__InvalidMasterHook",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocate__InvalidMaxPuppetList",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Allocate__InvalidNonce",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "provided",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "Allocate__InvalidSignature",
-    "inputs": [
-      {
-        "name": "signer",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "Allocate__MasterAccountFrozen",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Allocate__NetValueAboveMax",
-    "inputs": [
-      {
-        "name": "netValue",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "acceptableNetValue",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "Allocate__NetValueBelowMin",
-    "inputs": [
-      {
-        "name": "netValue",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "acceptableNetValue",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "Allocate__NetValueParamsMismatch",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Allocate__PuppetListTooLarge",
-    "inputs": [
-      {
-        "name": "provided",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "maximum",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "Allocate__TokenMismatch",
+    "name": "Allocate__MasterDisposed",
     "inputs": []
   },
   {
@@ -1052,33 +824,17 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocate__TransferFailed",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Allocate__UnauthorizedSigner",
-    "inputs": [
-      {
-        "name": "signer",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "Allocate__UninstallDisabled",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocate__UnregisteredMasterAccount",
+    "name": "Allocate__UnregisteredMaster",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocate__ZeroAssets",
+    "name": "Allocate__ZeroAmount",
     "inputs": []
   },
   {

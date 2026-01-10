@@ -81,7 +81,7 @@ export default [
     "name": "getNetValue",
     "inputs": [
       {
-        "name": "_masterAccount",
+        "name": "_master",
         "type": "address",
         "internalType": "address"
       },
@@ -134,7 +134,7 @@ export default [
     "name": "pendingOrderCount",
     "inputs": [
       {
-        "name": "masterAccount",
+        "name": "master",
         "type": "address",
         "internalType": "address"
       }
@@ -153,7 +153,7 @@ export default [
     "name": "processPostCall",
     "inputs": [
       {
-        "name": "_masterAccount",
+        "name": "_master",
         "type": "address",
         "internalType": "address"
       },
@@ -176,7 +176,7 @@ export default [
         "internalType": "address"
       },
       {
-        "name": "_masterAccount",
+        "name": "_master",
         "type": "address",
         "internalType": "address"
       },
@@ -259,7 +259,7 @@ export default [
     "name": "settleOrders",
     "inputs": [
       {
-        "name": "_masterAccount",
+        "name": "_master",
         "type": "address",
         "internalType": "address"
       },

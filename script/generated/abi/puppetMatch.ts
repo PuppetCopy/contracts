@@ -153,14 +153,14 @@ export default [
         "internalType": "address"
       },
       {
-        "name": "_masterAccount",
+        "name": "_master",
         "type": "address",
         "internalType": "address"
       },
       {
         "name": "_puppetList",
         "type": "address[]",
-        "internalType": "contract IERC7579Account[]"
+        "internalType": "address[]"
       },
       {
         "name": "_requestedAmountList",

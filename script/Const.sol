@@ -10,6 +10,9 @@ library Const {
     // Note: SDK version must NOT specify account.version to use this validator (SDK bug workaround)
     bytes32 constant latestAccount7579CodeHash = 0x37f47513090b87acd09e20f11f5536ac41e0a4403b6d782f4073e3cebfb263ab;
 
+    // The Compact (ERC-6909 token vault)
+    address constant theCompact = 0x00000000000000171ede64904551eeDF3C6C9788;
+
     // Liquidity Pools
     address constant BasePool = 0x19da41A2ccd0792b9b674777E72447903FE29074;
 

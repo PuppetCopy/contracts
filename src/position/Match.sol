@@ -2,7 +2,6 @@
 pragma solidity ^0.8.33;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
@@ -40,8 +39,8 @@ contract Match is CoreContract {
     function recordMatchAmountList(
         IERC20 _baseToken,
         address _stage,
-        address _masterAccount,
-        IERC7579Account[] calldata _puppetList,
+        address _master,
+        address[] calldata _puppetList,
         uint[] calldata _requestedAmountList
     ) external auth returns (uint[] memory _matchedAmountList, uint _totalMatched) {
         _matchedAmountList = new uint[](_puppetList.length);
@@ -50,24 +49,27 @@ contract Match is CoreContract {
         bytes32 _collateralKey = bytes32(uint(uint160(address(_baseToken))));
 
         for (uint _i; _i < _puppetList.length; ++_i) {
-            address _puppetAddr = address(_puppetList[_i]);
+            address _puppet = _puppetList[_i];
 
-            if (!_passesFilter(_puppetAddr, DIM_STAGE, _stageKey)) continue;
-            if (!_passesFilter(_puppetAddr, DIM_COLLATERAL, _collateralKey)) continue;
-            if (block.timestamp < throttleMap[_puppetAddr][_masterAccount]) continue;
+            if (!_passesFilter(_puppet, DIM_STAGE, _stageKey)) continue;
+            if (!_passesFilter(_puppet, DIM_COLLATERAL, _collateralKey)) continue;
+            if (block.timestamp < throttleMap[_puppet][_master]) continue;
 
-            Policy memory _p = policyMap[_puppetAddr][_masterAccount];
-            if (_p.expiry == 0) _p = policyMap[_puppetAddr][address(0)];
+            Policy memory _p = policyMap[_puppet][_master];
+            if (_p.expiry == 0) _p = policyMap[_puppet][address(0)];
             if (_p.expiry == 0 || block.timestamp > _p.expiry) continue;
 
-            uint _balance = _baseToken.balanceOf(_puppetAddr);
+            uint _balance = _baseToken.balanceOf(_puppet);
             uint _maxAllowed = Precision.applyBasisPoints(_p.allowanceRate, _balance);
             uint _cappedAmount = _requestedAmountList[_i] > _maxAllowed ? _maxAllowed : _requestedAmountList[_i];
 
             _matchedAmountList[_i] = _cappedAmount;
             _totalMatched += _cappedAmount;
 
-            throttleMap[_puppetAddr][_masterAccount] = block.timestamp + _p.throttlePeriod;
+            uint _nextAllowedTimestamp = block.timestamp + _p.throttlePeriod;
+            throttleMap[_puppet][_master] = _nextAllowedTimestamp;
+
+            _logEvent("Throttle", abi.encode(_puppet, _master, _nextAllowedTimestamp, _cappedAmount));
         }
     }
 
