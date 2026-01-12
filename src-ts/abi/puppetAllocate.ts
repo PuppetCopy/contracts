@@ -50,27 +50,13 @@ export default [
   },
   {
     "type": "function",
-    "name": "account7579CodeHashMap",
-    "inputs": [
-      {
-        "name": "codeHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "allocate",
     "inputs": [
+      {
+        "name": "_registry",
+        "type": "address",
+        "internalType": "contract Registry"
+      },
       {
         "name": "_tokenRouter",
         "type": "address",
@@ -219,39 +205,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "createMaster",
-    "inputs": [
-      {
-        "name": "_user",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_signer",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_master",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      },
-      {
-        "name": "_baseToken",
-        "type": "address",
-        "internalType": "contract IERC20"
-      },
-      {
-        "name": "_name",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "eip712Domain",
     "inputs": [],
     "outputs": [
@@ -325,47 +278,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "getMasterInfo",
-    "inputs": [
-      {
-        "name": "_master",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "internalType": "struct MasterInfo",
-        "components": [
-          {
-            "name": "user",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "signer",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "baseToken",
-            "type": "address",
-            "internalType": "contract IERC20"
-          },
-          {
-            "name": "name",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "isInitialized",
     "inputs": [
       {
@@ -430,58 +342,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "registeredMap",
-    "inputs": [
-      {
-        "name": "master",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "signer",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "baseToken",
-        "type": "address",
-        "internalType": "contract IERC20"
-      },
-      {
-        "name": "name",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "setCodeHash",
-    "inputs": [
-      {
-        "name": "_codeHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_allowed",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setConfig",
     "inputs": [
       {
@@ -518,24 +378,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "setTokenCap",
-    "inputs": [
-      {
-        "name": "_token",
-        "type": "address",
-        "internalType": "contract IERC20"
-      },
-      {
-        "name": "_cap",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "supportsInterface",
     "inputs": [
       {
@@ -554,34 +396,10 @@ export default [
     "stateMutability": "pure"
   },
   {
-    "type": "function",
-    "name": "tokenCapMap",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "contract IERC20"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
     "type": "event",
     "name": "EIP712DomainChanged",
     "inputs": [],
     "anonymous": false
-  },
-  {
-    "type": "error",
-    "name": "Allocate__AlreadyRegistered",
-    "inputs": []
   },
   {
     "type": "error",
@@ -688,11 +506,6 @@ export default [
         "internalType": "uint256"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "Allocate__InvalidAccountCodeHash",
-    "inputs": []
   },
   {
     "type": "error",

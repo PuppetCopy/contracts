@@ -26,19 +26,14 @@ export default [
             "internalType": "contract Match"
           },
           {
-            "name": "position",
-            "type": "address",
-            "internalType": "contract Position"
-          },
-          {
             "name": "tokenRouter",
             "type": "address",
             "internalType": "contract TokenRouter"
           },
           {
-            "name": "masterHook",
+            "name": "registry",
             "type": "address",
-            "internalType": "address"
+            "internalType": "contract Registry"
           }
         ]
       }
@@ -173,55 +168,17 @@ export default [
         "internalType": "contract Match"
       },
       {
-        "name": "position",
-        "type": "address",
-        "internalType": "contract Position"
-      },
-      {
         "name": "tokenRouter",
         "type": "address",
         "internalType": "contract TokenRouter"
       },
       {
-        "name": "masterHook",
+        "name": "registry",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract Registry"
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "createMaster",
-    "inputs": [
-      {
-        "name": "_user",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_signer",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_master",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      },
-      {
-        "name": "_baseToken",
-        "type": "address",
-        "internalType": "contract IERC20"
-      },
-      {
-        "name": "_name",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -244,19 +201,14 @@ export default [
             "internalType": "contract Match"
           },
           {
-            "name": "position",
-            "type": "address",
-            "internalType": "contract Position"
-          },
-          {
             "name": "tokenRouter",
             "type": "address",
             "internalType": "contract TokenRouter"
           },
           {
-            "name": "masterHook",
+            "name": "registry",
             "type": "address",
-            "internalType": "address"
+            "internalType": "contract Registry"
           }
         ]
       }
@@ -281,53 +233,6 @@ export default [
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "processPostCall",
-    "inputs": [
-      {
-        "name": "_hookData",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "processPreCall",
-    "inputs": [
-      {
-        "name": "_caller",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_master",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      },
-      {
-        "name": "_callValue",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_callData",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "hookData",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -443,11 +348,6 @@ export default [
   {
     "type": "error",
     "name": "ReentrancyGuardReentrantCall",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "UserRouter__UnauthorizedCaller",
     "inputs": []
   }
 ] as const

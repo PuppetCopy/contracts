@@ -6,9 +6,14 @@ export default [
     "type": "constructor",
     "inputs": [
       {
-        "name": "_router",
+        "name": "_position",
         "type": "address",
-        "internalType": "contract IUserRouter"
+        "internalType": "contract Position"
+      },
+      {
+        "name": "_registry",
+        "type": "address",
+        "internalType": "contract Registry"
       }
     ],
     "stateMutability": "nonpayable"
@@ -79,6 +84,19 @@ export default [
   },
   {
     "type": "function",
+    "name": "position",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract Position"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "postCheck",
     "inputs": [
       {
@@ -121,13 +139,13 @@ export default [
   },
   {
     "type": "function",
-    "name": "router",
+    "name": "registry",
     "inputs": [],
     "outputs": [
       {
         "name": "",
         "type": "address",
-        "internalType": "contract IUserRouter"
+        "internalType": "contract Registry"
       }
     ],
     "stateMutability": "view"

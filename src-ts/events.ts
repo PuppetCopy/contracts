@@ -6,18 +6,6 @@ export const CONTRACT_EVENT_MAP = {
     Allocate: {
       hash: '0x2d453a8b2eb4888bfee5a5b17781ba95747a5f795cd81b44fe943773178f8d8e',
       args: [{type:"address",name:"master"},{type:"uint256",name:"allocated"},{type:"uint256",name:"masterShares"},{type:"address[]",name:"puppetList"},{type:"uint256[]",name:"matchedAmountList"},{type:"uint256[]",name:"shareList"},{type:"uint256",name:"balance"},{type:"uint256",name:"sharePrice"},{type:"uint256",name:"nonce"}]
-    },
-    CreateMaster: {
-      hash: '0x84f532c220fa6acb8fb9d0ffdba204004c6f1edc207d2379b0ab021c2c2b4e9e',
-      args: [{type:"address",name:"master"},{type:"address",name:"user"},{type:"address",name:"signer"},{type:"address",name:"baseToken"},{type:"bytes32",name:"name"},{type:"uint256",name:"initialBalance"}]
-    },
-    SetCodeHash: {
-      hash: '0xf2e7974b4b30b0f3c8dea8c83c030f6d6fd38ebdbaecdce207549e1feea8b303',
-      args: [{type:"bytes32",name:"codeHash"},{type:"bool",name:"allowed"}]
-    },
-    SetTokenCap: {
-      hash: '0x0eed9dd37bbcb01292183ae212328bd52aab55ce6eb475eb4fb6350de9286029',
-      args: [{type:"address",name:"token"},{type:"uint256",name:"cap"}]
     }
   },
   FeeMarketplace: {
@@ -60,6 +48,16 @@ export const CONTRACT_EVENT_MAP = {
     SettleOrders: {
       hash: '0x34e35d9c2270bbec97412cade1887c5ee3a88bb86c95a40f5b1e9ccbaffb4d2d',
       args: [{type:"address",name:"master"},{type:"bytes32[]",name:"orderKeyList"},{type:"uint256",name:"pendingCount"}]
+    }
+  },
+  Registry: {
+    CreateMaster: {
+      hash: '0x84f532c220fa6acb8fb9d0ffdba204004c6f1edc207d2379b0ab021c2c2b4e9e',
+      args: [{type:"address",name:"master"},{type:"address",name:"user"},{type:"address",name:"signer"},{type:"address",name:"baseToken"},{type:"bytes32",name:"name"}]
+    },
+    SetTokenCap: {
+      hash: '0x0eed9dd37bbcb01292183ae212328bd52aab55ce6eb475eb4fb6350de9286029',
+      args: [{type:"address",name:"token"},{type:"uint256",name:"cap"}]
     }
   },
   TokenRouter: {

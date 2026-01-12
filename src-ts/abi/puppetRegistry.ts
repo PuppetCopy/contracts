@@ -1,4 +1,4 @@
-// This file is auto-generated from forge-artifacts/Position.sol/Position.json
+// This file is auto-generated from forge-artifacts/Registry.sol/Registry.json
 // Do not edit manually.
 
 export default [
@@ -9,6 +9,23 @@ export default [
         "name": "_authority",
         "type": "address",
         "internalType": "contract IAuthority"
+      },
+      {
+        "name": "_config",
+        "type": "tuple",
+        "internalType": "struct Registry.Config",
+        "components": [
+          {
+            "name": "masterHook",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "account7579CodeList",
+            "type": "bytes32[]",
+            "internalType": "bytes32[]"
+          }
+        ]
       }
     ],
     "stateMutability": "nonpayable"
@@ -52,8 +69,31 @@ export default [
   },
   {
     "type": "function",
-    "name": "getNetValue",
+    "name": "config",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "masterHook",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "createMaster",
     "inputs": [
+      {
+        "name": "_user",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_signer",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "_master",
         "type": "address",
@@ -65,28 +105,121 @@ export default [
         "internalType": "contract IERC20"
       },
       {
-        "name": "_stageList",
-        "type": "address[]",
-        "internalType": "contract IStage[]"
-      },
-      {
-        "name": "_positionKeyList",
-        "type": "bytes32[][]",
-        "internalType": "bytes32[][]"
+        "name": "_name",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getConfig",
+    "inputs": [],
     "outputs": [
       {
-        "name": "_value",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct Registry.Config",
+        "components": [
+          {
+            "name": "masterHook",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "account7579CodeList",
+            "type": "bytes32[]",
+            "internalType": "bytes32[]"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "pendingOrderCount",
+    "name": "getMasterInfo",
+    "inputs": [
+      {
+        "name": "_master",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct MasterInfo",
+        "components": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "signer",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "baseToken",
+            "type": "address",
+            "internalType": "contract IERC20"
+          },
+          {
+            "name": "name",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isAllowedCodeHash",
+    "inputs": [
+      {
+        "name": "_codeHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isRegistered",
+    "inputs": [
+      {
+        "name": "_master",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "registeredMap",
     "inputs": [
       {
         "name": "master",
@@ -96,69 +229,27 @@ export default [
     ],
     "outputs": [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "processPostCall",
-    "inputs": [
-      {
-        "name": "_master",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      },
-      {
-        "name": "_hookData",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "processPreCall",
-    "inputs": [
-      {
-        "name": "_registry",
-        "type": "address",
-        "internalType": "contract Registry"
-      },
-      {
-        "name": "_caller",
+        "name": "user",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "_master",
+        "name": "signer",
         "type": "address",
-        "internalType": "contract IERC7579Account"
+        "internalType": "address"
       },
       {
-        "name": "_callValue",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "baseToken",
+        "type": "address",
+        "internalType": "contract IERC20"
       },
       {
-        "name": "_callData",
-        "type": "bytes",
-        "internalType": "bytes"
+        "name": "name",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    "outputs": [
-      {
-        "name": "_hookData",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -198,63 +289,21 @@ export default [
   },
   {
     "type": "function",
-    "name": "setStage",
+    "name": "setTokenCap",
     "inputs": [
       {
-        "name": "_target",
+        "name": "_token",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC20"
       },
       {
-        "name": "_stage",
-        "type": "address",
-        "internalType": "contract IStage"
+        "name": "_cap",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "settleOrders",
-    "inputs": [
-      {
-        "name": "_master",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      },
-      {
-        "name": "_stageList",
-        "type": "address[]",
-        "internalType": "contract IStage[]"
-      },
-      {
-        "name": "_orderKeyList",
-        "type": "bytes32[]",
-        "internalType": "bytes32[]"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "stageMap",
-    "inputs": [
-      {
-        "name": "target",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IStage"
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -277,19 +326,19 @@ export default [
   },
   {
     "type": "function",
-    "name": "validStages",
+    "name": "tokenCapMap",
     "inputs": [
       {
-        "name": "stage",
+        "name": "token",
         "type": "address",
-        "internalType": "contract IStage"
+        "internalType": "contract IERC20"
       }
     ],
     "outputs": [
       {
         "name": "",
-        "type": "bool",
-        "internalType": "bool"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -306,52 +355,27 @@ export default [
   },
   {
     "type": "error",
-    "name": "Position__ArrayLengthMismatch",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__BatchOrderNotAllowed",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__DelegateCallBlocked",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__InvalidAction",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__InvalidBaseToken",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__InvalidStage",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__NotPositionOwner",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__OrderStillPending",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Position__PendingOrdersExist",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Registry__AlreadyRegistered",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Registry__InvalidAccountCodeHash",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Registry__TokenNotAllowed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Registry__UnauthorizedCaller",
     "inputs": []
   }
 ] as const

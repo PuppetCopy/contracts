@@ -294,6 +294,26 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
+    name: "Registry__UnauthorizedCaller",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Registry__InvalidAccountCodeHash",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Registry__AlreadyRegistered",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Registry__TokenNotAllowed",
+    inputs: []
+  },
+  {
+    type: "error",
     name: "Compact__ArrayLengthMismatch",
     inputs: []
   },

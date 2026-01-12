@@ -5,7 +5,7 @@ import {Test} from "forge-std/src/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Dictatorship} from "src/shared/Dictatorship.sol";
-import {Const} from "script/Const.sol";
+import {Const} from "script/deploy/shared/Const.sol";
 
 /// @title ForkSetup
 /// @notice Base test setup for Arbitrum fork tests
