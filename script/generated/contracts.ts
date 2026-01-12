@@ -1,15 +1,12 @@
-// This file is auto-generated from Puppet deployments.json and forge-artifacts
+// This file is auto-generated from Puppet deployments.toml and forge-artifacts
 // Do not edit manually.
 
-import dictatorshipAbi from './abi/puppetDictatorship.js'
 import puppettokenAbi from './abi/puppetPuppetToken.js'
 import puppetvotetokenAbi from './abi/puppetPuppetVoteToken.js'
 import feemarketplacestoreAbi from './abi/puppetFeeMarketplaceStore.js'
 import feemarketplaceAbi from './abi/puppetFeeMarketplace.js'
 import matchAbi from './abi/puppetMatch.js'
 import allocateAbi from './abi/puppetAllocate.js'
-import attestAbi from './abi/puppetAttest.js'
-import compactAbi from './abi/puppetCompact.js'
 import positionAbi from './abi/puppetPosition.js'
 import userrouterAbi from './abi/puppetUserRouter.js'
 import masterhookAbi from './abi/puppetMasterHook.js'
@@ -18,12 +15,6 @@ import tokenrouterAbi from './abi/puppetTokenRouter.js'
 import proxyuserrouterAbi from './abi/puppetProxyUserRouter.js'
 
 export const PUPPET_CONTRACT_MAP = {
-  Dictatorship: {
-    address: '0xbF52B3399542a353D3bFb40b1237836cC9A02Ed4',
-    chainId: 42161,
-    blockNumber: 418295878,
-    abi: dictatorshipAbi
-  },
   PuppetToken: {
     address: '0x3b1A496303b8272C6558b1E9159074F13176adc8',
     chainId: 42161,
@@ -59,18 +50,6 @@ export const PUPPET_CONTRACT_MAP = {
     chainId: 42161,
     blockNumber: 418295899,
     abi: allocateAbi
-  },
-  Attest: {
-    address: '0x0000000000000000000000000000000000000000',
-    chainId: 42161,
-    blockNumber: 0,
-    abi: attestAbi
-  },
-  Compact: {
-    address: '0x0000000000000000000000000000000000000000',
-    chainId: 42161,
-    blockNumber: 0,
-    abi: compactAbi
   },
   Position: {
     address: '0x49F7e5F896ad4530eBedB1d4697Ffb5b31f34972',

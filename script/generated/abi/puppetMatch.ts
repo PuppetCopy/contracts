@@ -106,6 +106,26 @@ export default [
   },
   {
     "type": "function",
+    "name": "getConfig",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct Match.Config",
+        "components": [
+          {
+            "name": "minThrottlePeriod",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "policyMap",
     "inputs": [
       {
@@ -114,9 +134,9 @@ export default [
         "internalType": "address"
       },
       {
-        "name": "trader",
+        "name": "master",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC7579Account"
       }
     ],
     "outputs": [
@@ -155,7 +175,7 @@ export default [
       {
         "name": "_master",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC7579Account"
       },
       {
         "name": "_puppetList",
@@ -256,9 +276,9 @@ export default [
         "internalType": "address"
       },
       {
-        "name": "_trader",
+        "name": "_master",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC7579Account"
       },
       {
         "name": "_allowanceRate",
@@ -308,9 +328,9 @@ export default [
         "internalType": "address"
       },
       {
-        "name": "trader",
+        "name": "master",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC7579Account"
       }
     ],
     "outputs": [

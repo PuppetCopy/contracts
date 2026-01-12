@@ -3,6 +3,7 @@ pragma solidity ^0.8.33;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {CallType} from "modulekit/accounts/common/lib/ModeLib.sol";
+import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 
 /// @notice Single call in a batch (matches extension output and ERC-7579 Execution)
 struct Call {
@@ -24,7 +25,7 @@ interface IStage {
     /// @return hookData Data for postCheck after execution
     function validate(
         address msgSender,
-        address master,
+        IERC7579Account master,
         uint value,
         CallType callType,
         bytes calldata execData
@@ -36,7 +37,7 @@ interface IStage {
     /// @param preBalance Token balance before execution
     /// @param postBalance Token balance after execution
     /// @param hookData Data from validate()
-    function verify(address master, IERC20 token, uint preBalance, uint postBalance, bytes calldata hookData)
+    function verify(IERC7579Account master, IERC20 token, uint preBalance, uint postBalance, bytes calldata hookData)
         external
         view;
 
@@ -50,11 +51,11 @@ interface IStage {
     /// @param positionKey The position identifier
     /// @param master The account to verify ownership
     /// @return isOwner True if position belongs to master account
-    function verifyPositionOwner(bytes32 positionKey, address master) external view returns (bool isOwner);
+    function verifyPositionOwner(bytes32 positionKey, IERC7579Account master) external view returns (bool isOwner);
 
     /// @notice Check if an order is still pending
     /// @param orderKey The order identifier
     /// @param master The account that created the order
     /// @return isPending True if order exists and is pending
-    function isOrderPending(bytes32 orderKey, address master) external view returns (bool isPending);
+    function isOrderPending(bytes32 orderKey, IERC7579Account master) external view returns (bool isPending);
 }

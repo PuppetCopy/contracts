@@ -11,6 +11,7 @@ import {IUserRouter} from "./utils/interfaces/IUserRouter.sol";
 import {Allocate} from "./position/Allocate.sol";
 import {Match} from "./position/Match.sol";
 import {Position} from "./position/Position.sol";
+import {TokenRouter} from "./shared/TokenRouter.sol";
 
 /// @title UserRouter
 /// @notice Passthrough router for MasterHook to Allocate/Position contracts
@@ -19,9 +20,15 @@ contract UserRouter is IUserRouter, CoreContract {
         Allocate allocation;
         Match matcher;
         Position position;
+        TokenRouter tokenRouter;
+        address masterHook;
     }
 
     Config public config;
+
+    function getConfig() external view returns (Config memory) {
+        return config;
+    }
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
@@ -32,12 +39,12 @@ contract UserRouter is IUserRouter, CoreContract {
         IERC20 _baseToken,
         bytes32 _name
     ) external {
-        if (msg.sender != config.allocation.getConfig().masterHook) revert Error.UserRouter__UnauthorizedCaller();
+        if (msg.sender != config.masterHook) revert Error.UserRouter__UnauthorizedCaller();
         config.allocation.createMaster(_user, _signer, _master, _baseToken, _name);
     }
 
     function disposeMaster(IERC7579Account _master) external {
-        if (msg.sender != config.allocation.getConfig().masterHook) revert Error.UserRouter__UnauthorizedCaller();
+        if (msg.sender != config.masterHook) revert Error.UserRouter__UnauthorizedCaller();
         config.allocation.disposeMaster(_master);
     }
 
@@ -46,7 +53,7 @@ contract UserRouter is IUserRouter, CoreContract {
         return disposed;
     }
 
-    function processPreCall(address _msgSender, address _master, uint _msgValue, bytes calldata _msgData)
+    function processPreCall(address _msgSender, IERC7579Account _master, uint _msgValue, bytes calldata _msgData)
         external
         view
         returns (bytes memory hookData)
@@ -55,15 +62,25 @@ contract UserRouter is IUserRouter, CoreContract {
     }
 
     function processPostCall(bytes calldata _hookData) external {
-        config.position.processPostCall(msg.sender, _hookData);
+        config.position.processPostCall(IERC7579Account(msg.sender), _hookData);
     }
 
     function setFilter(uint _dim, bytes32 _value, bool _allowed) external {
         config.matcher.setFilter(msg.sender, _dim, _value, _allowed);
     }
 
-    function setPolicy(address _trader, uint _allowanceRate, uint _throttlePeriod, uint _expiry) external {
-        config.matcher.setPolicy(msg.sender, _trader, _allowanceRate, _throttlePeriod, _expiry);
+    function setPolicy(IERC7579Account _master, uint _allowanceRate, uint _throttlePeriod, uint _expiry) external {
+        config.matcher.setPolicy(msg.sender, _master, _allowanceRate, _throttlePeriod, _expiry);
+    }
+
+    function allocate(
+        address[] calldata _puppetList,
+        uint[] calldata _requestedAmountList,
+        Allocate.AllocateAttestation calldata _attestation
+    ) external {
+        config.allocation.allocate(
+            config.tokenRouter, config.matcher, IERC7579Account(msg.sender), _puppetList, _requestedAmountList, _attestation
+        );
     }
 
     function _setConfig(bytes memory _data) internal override {
@@ -71,6 +88,8 @@ contract UserRouter is IUserRouter, CoreContract {
         require(address(_config.allocation) != address(0), "UserRouter: invalid allocation");
         require(address(_config.matcher) != address(0), "UserRouter: invalid matcher");
         require(address(_config.position) != address(0), "UserRouter: invalid position");
+        require(address(_config.tokenRouter) != address(0), "UserRouter: invalid tokenRouter");
+        require(_config.masterHook != address(0), "UserRouter: invalid masterHook");
         config = _config;
     }
 }

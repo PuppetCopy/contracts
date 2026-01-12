@@ -6,6 +6,8 @@ import {IAuthority} from "src/utils/interfaces/IAuthority.sol";
 import {Allocate} from "src/position/Allocate.sol";
 import {Match} from "src/position/Match.sol";
 import {Position} from "src/position/Position.sol";
+import {MasterHook} from "src/account/MasterHook.sol";
+import {TokenRouter} from "src/shared/TokenRouter.sol";
 import {UserRouter} from "src/UserRouter.sol";
 import {ProxyUserRouter} from "src/utils/ProxyUserRouter.sol";
 
@@ -13,17 +15,27 @@ import {BaseScript} from "./BaseScript.s.sol";
 
 contract DeployUserRouter is BaseScript {
     function run() public {
+        _loadDeployments();
+
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
 
-        Dictatorship dictatorship = Dictatorship(getDeployedAddress("Dictatorship"));
-        Allocate allocation = Allocate(getDeployedAddress("Allocate"));
-        Match matcher = Match(getDeployedAddress("Match"));
-        Position position = Position(getDeployedAddress("Position"));
-        ProxyUserRouter proxyUserRouter = ProxyUserRouter(payable(getDeployedAddress("ProxyUserRouter")));
+        Dictatorship dictatorship = Dictatorship(_getChainAddress("Dictatorship"));
+        Allocate allocation = Allocate(_getChainAddress("Allocate"));
+        Match matcher = Match(_getChainAddress("Match"));
+        Position position = Position(_getChainAddress("Position"));
+        MasterHook masterHook = MasterHook(_getChainAddress("MasterHook"));
+        TokenRouter tokenRouter = TokenRouter(_getChainAddress("TokenRouter"));
+        ProxyUserRouter proxyUserRouter = ProxyUserRouter(payable(_getChainAddress("ProxyUserRouter")));
 
         UserRouter userRouter = new UserRouter(
             IAuthority(address(dictatorship)),
-            UserRouter.Config({allocation: allocation, matcher: matcher, position: position})
+            UserRouter.Config({
+                allocation: allocation,
+                matcher: matcher,
+                position: position,
+                tokenRouter: tokenRouter,
+                masterHook: address(masterHook)
+            })
         );
         proxyUserRouter.update(address(userRouter));
 

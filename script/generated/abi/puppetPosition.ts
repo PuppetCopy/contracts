@@ -83,7 +83,7 @@ export default [
       {
         "name": "_master",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC7579Account"
       },
       {
         "name": "_baseToken",
@@ -112,31 +112,12 @@ export default [
   },
   {
     "type": "function",
-    "name": "handlers",
-    "inputs": [
-      {
-        "name": "target",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IStage"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "pendingOrderCount",
     "inputs": [
       {
         "name": "master",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC7579Account"
       }
     ],
     "outputs": [
@@ -155,7 +136,7 @@ export default [
       {
         "name": "_master",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC7579Account"
       },
       {
         "name": "_hookData",
@@ -178,7 +159,7 @@ export default [
       {
         "name": "_master",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC7579Account"
       },
       {
         "name": "_msgValue",
@@ -215,24 +196,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "setHandler",
-    "inputs": [
-      {
-        "name": "_target",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_handler",
-        "type": "address",
-        "internalType": "contract IStage"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setPermission",
     "inputs": [
       {
@@ -256,12 +219,30 @@ export default [
   },
   {
     "type": "function",
+    "name": "setStage",
+    "inputs": [
+      {
+        "name": "_target",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_stage",
+        "type": "address",
+        "internalType": "contract IStage"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "settleOrders",
     "inputs": [
       {
         "name": "_master",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC7579Account"
       },
       {
         "name": "_orderStages",
@@ -276,6 +257,25 @@ export default [
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "stageMap",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IStage"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",

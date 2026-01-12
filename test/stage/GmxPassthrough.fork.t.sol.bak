@@ -31,8 +31,8 @@ contract GmxPassthroughTest is ForkSetup {
         gmxStage = new GmxStage(gmxDataStore, gmxExchangeRouter, gmxOrderVault, address(wnt));
 
         position = new Position(dictator);
-        dictator.setPermission(position, position.setHandler.selector, users.owner);
-        position.setHandler(gmxExchangeRouter, IStage(address(gmxStage)));
+        dictator.setPermission(position, position.setStage.selector, users.owner);
+        position.setStage(gmxExchangeRouter, IStage(address(gmxStage)));
 
         subaccount = makeAddr("subaccount");
         _dealUSDC(subaccount, 10_000e6);

@@ -18,11 +18,11 @@
   },
   "files": [
     "./src",
-    "./deployments.json",
+    "./deployments.toml",
     "./dist"
   ],
   "exports": {
-  ".": {
+    ".": {
       "types": "./dist/types/index.d.ts",
       "import": "./dist/esm/index.js"
     },
@@ -47,6 +47,7 @@
   "devDependencies": {
     "@types/bun": "catalog:",
     "dotenv": "catalog:",
+    "smol-toml": "^1.6.0",
     "typescript": "catalog:",
     "viem": "catalog:"
   }

@@ -17,8 +17,9 @@ interface IUserRouter {
 
     function isDisposed(IERC7579Account master) external view returns (bool);
 
-    function processPreCall(address msgSender, address master, uint msgValue, bytes calldata msgData)
+    function processPreCall(address msgSender, IERC7579Account master, uint msgValue, bytes calldata msgData)
         external
+        view
         returns (bytes memory hookData);
 
     function processPostCall(bytes calldata hookData) external;

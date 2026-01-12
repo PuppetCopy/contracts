@@ -2,6 +2,7 @@
 pragma solidity ^0.8.33;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 
 import {CoreContract} from "../utils/CoreContract.sol";
 import {Error} from "../utils/Error.sol";
@@ -24,9 +25,13 @@ contract Match is CoreContract {
 
     Config public config;
 
+    function getConfig() external view returns (Config memory) {
+        return config;
+    }
+
     mapping(address puppet => mapping(uint dim => mapping(bytes32 value => bool))) public filterMap;
-    mapping(address puppet => mapping(address trader => Policy)) public policyMap;
-    mapping(address puppet => mapping(address trader => uint)) public throttleMap;
+    mapping(address puppet => mapping(IERC7579Account master => Policy)) public policyMap;
+    mapping(address puppet => mapping(IERC7579Account master => uint)) public throttleMap;
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
 
@@ -39,7 +44,7 @@ contract Match is CoreContract {
     function recordMatchAmountList(
         IERC20 _baseToken,
         address _stage,
-        address _master,
+        IERC7579Account _master,
         address[] calldata _puppetList,
         uint[] calldata _requestedAmountList
     ) external auth returns (uint[] memory _matchedAmountList, uint _totalMatched) {
@@ -56,12 +61,14 @@ contract Match is CoreContract {
             if (block.timestamp < throttleMap[_puppet][_master]) continue;
 
             Policy memory _p = policyMap[_puppet][_master];
-            if (_p.expiry == 0) _p = policyMap[_puppet][address(0)];
+            if (_p.expiry == 0) _p = policyMap[_puppet][IERC7579Account(address(0))];
             if (_p.expiry == 0 || block.timestamp > _p.expiry) continue;
 
             uint _balance = _baseToken.balanceOf(_puppet);
             uint _maxAllowed = Precision.applyBasisPoints(_p.allowanceRate, _balance);
             uint _cappedAmount = _requestedAmountList[_i] > _maxAllowed ? _maxAllowed : _requestedAmountList[_i];
+
+            if (_cappedAmount == 0) continue;
 
             _matchedAmountList[_i] = _cappedAmount;
             _totalMatched += _cappedAmount;
@@ -83,16 +90,16 @@ contract Match is CoreContract {
         _logEvent("SetFilter", abi.encode(_puppet, _dim, _value, _allowed, _filterInitialized));
     }
 
-    function setPolicy(address _puppet, address _trader, uint _allowanceRate, uint _throttlePeriod, uint _expiry)
+    function setPolicy(address _puppet, IERC7579Account _master, uint _allowanceRate, uint _throttlePeriod, uint _expiry)
         external
         auth
     {
         if (_expiry != 0 && _throttlePeriod < config.minThrottlePeriod) {
             revert Error.Match__ThrottlePeriodBelowMin(_throttlePeriod, config.minThrottlePeriod);
         }
-        policyMap[_puppet][_trader] = Policy(_allowanceRate, _throttlePeriod, _expiry);
-        if (_expiry == 0) delete throttleMap[_puppet][_trader];
-        _logEvent("SetPolicy", abi.encode(_puppet, _trader, _allowanceRate, _throttlePeriod, _expiry));
+        policyMap[_puppet][_master] = Policy(_allowanceRate, _throttlePeriod, _expiry);
+        if (_expiry == 0) delete throttleMap[_puppet][_master];
+        _logEvent("SetPolicy", abi.encode(_puppet, _master, _allowanceRate, _throttlePeriod, _expiry));
     }
 
     function _passesFilter(address _puppet, uint _dim, bytes32 _value) internal view returns (bool) {

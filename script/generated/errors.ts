@@ -609,7 +609,59 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
+    name: "Allocate__AttestationBlockStale",
+    inputs: [
+      {
+        name: "attestedBlock",
+        internalType: "uint256",
+        type: "uint256"
+      },
+      {
+        name: "currentBlock",
+        internalType: "uint256",
+        type: "uint256"
+      },
+      {
+        name: "maxStaleness",
+        internalType: "uint256",
+        type: "uint256"
+      }
+    ]
+  },
+  {
+    type: "error",
+    name: "Allocate__AttestationTimestampStale",
+    inputs: [
+      {
+        name: "attestedTimestamp",
+        internalType: "uint256",
+        type: "uint256"
+      },
+      {
+        name: "currentTimestamp",
+        internalType: "uint256",
+        type: "uint256"
+      },
+      {
+        name: "maxAge",
+        internalType: "uint256",
+        type: "uint256"
+      }
+    ]
+  },
+  {
+    type: "error",
     name: "Allocate__InvalidAttestor",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Allocate__InvalidUser",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Allocate__InvalidMaster",
     inputs: []
   },
   {
@@ -634,12 +686,47 @@ export const puppetErrorAbi = [
   },
   {
     type: "error",
+    name: "Compact__InvalidOwnerSignature",
+    inputs: []
+  },
+  {
+    type: "error",
     name: "Compact__ExpiredDeadline",
     inputs: []
   },
   {
     type: "error",
     name: "Compact__ArrayLengthMismatch",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Compact__WrongSourceChain",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Compact__WrongDestChain",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Compact__ZeroAmount",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Compact__SameChain",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Compact__InvalidOwner",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "Compact__InvalidRecipient",
     inputs: []
   },
   {

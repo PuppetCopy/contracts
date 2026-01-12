@@ -3,6 +3,7 @@ pragma solidity ^0.8.33;
 
 import {IStage, Call} from "src/position/interface/IStage.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 import {CallType} from "modulekit/accounts/common/lib/ModeLib.sol";
 
 contract MockStage is IStage {
@@ -41,7 +42,7 @@ contract MockStage is IStage {
         mockToken = _token;
     }
 
-    function validate(address, address, uint, CallType, bytes calldata)
+    function validate(address, IERC7579Account, uint, CallType, bytes calldata)
         external
         view
         override
@@ -53,17 +54,17 @@ contract MockStage is IStage {
         hookData = abi.encode(mockPositionKey);
     }
 
-    function verify(address, IERC20, uint, uint, bytes calldata) external pure override {}
+    function verify(IERC7579Account, IERC20, uint, uint, bytes calldata) external pure override {}
 
     function getPositionValue(bytes32 _positionKey, IERC20) external view override returns (uint) {
         return positionValues[_positionKey];
     }
 
-    function verifyPositionOwner(bytes32 _positionKey, address _subaccount) external view override returns (bool) {
-        return positionOwners[_positionKey] == _subaccount;
+    function verifyPositionOwner(bytes32 _positionKey, IERC7579Account _master) external view override returns (bool) {
+        return positionOwners[_positionKey] == address(_master);
     }
 
-    function isOrderPending(bytes32 _orderKey, address) external view override returns (bool) {
+    function isOrderPending(bytes32 _orderKey, IERC7579Account) external view override returns (bool) {
         return pendingOrders[_orderKey];
     }
 }

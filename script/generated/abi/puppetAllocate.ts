@@ -16,27 +16,17 @@ export default [
         "internalType": "struct Allocate.Config",
         "components": [
           {
-            "name": "attest",
-            "type": "address",
-            "internalType": "contract Attest"
-          },
-          {
-            "name": "masterHook",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "compact",
-            "type": "address",
-            "internalType": "contract Compact"
-          },
-          {
             "name": "allocateGasLimit",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "withdrawGasLimit",
+            "name": "maxBlockStaleness",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxTimestampAge",
             "type": "uint256",
             "internalType": "uint256"
           }
@@ -48,19 +38,6 @@ export default [
   {
     "type": "function",
     "name": "ALLOCATE_ATTESTATION_TYPEHASH",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "WITHDRAW_ATTESTATION_TYPEHASH",
     "inputs": [],
     "outputs": [
       {
@@ -95,6 +72,21 @@ export default [
     "name": "allocate",
     "inputs": [
       {
+        "name": "_attest",
+        "type": "address",
+        "internalType": "contract Attest"
+      },
+      {
+        "name": "_compact",
+        "type": "address",
+        "internalType": "contract Compact"
+      },
+      {
+        "name": "_tokenRouter",
+        "type": "address",
+        "internalType": "contract TokenRouter"
+      },
+      {
         "name": "_matcher",
         "type": "address",
         "internalType": "contract Match"
@@ -120,6 +112,11 @@ export default [
         "internalType": "struct Allocate.AllocateAttestation",
         "components": [
           {
+            "name": "master",
+            "type": "address",
+            "internalType": "contract IERC7579Account"
+          },
+          {
             "name": "sharePrice",
             "type": "uint256",
             "internalType": "uint256"
@@ -133,6 +130,16 @@ export default [
             "name": "amountListHash",
             "type": "bytes32",
             "internalType": "bytes32"
+          },
+          {
+            "name": "blockNumber",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "blockTimestamp",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
             "name": "nonce",
@@ -200,11 +207,6 @@ export default [
         "name": "_master",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "_baseToken",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "outputs": [
@@ -222,27 +224,17 @@ export default [
     "inputs": [],
     "outputs": [
       {
-        "name": "attest",
-        "type": "address",
-        "internalType": "contract Attest"
-      },
-      {
-        "name": "masterHook",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "compact",
-        "type": "address",
-        "internalType": "contract Compact"
-      },
-      {
         "name": "allocateGasLimit",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "withdrawGasLimit",
+        "name": "maxBlockStaleness",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "maxTimestampAge",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -349,27 +341,17 @@ export default [
         "internalType": "struct Allocate.Config",
         "components": [
           {
-            "name": "attest",
-            "type": "address",
-            "internalType": "contract Attest"
-          },
-          {
-            "name": "masterHook",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "compact",
-            "type": "address",
-            "internalType": "contract Compact"
-          },
-          {
             "name": "allocateGasLimit",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "withdrawGasLimit",
+            "name": "maxBlockStaleness",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxTimestampAge",
             "type": "uint256",
             "internalType": "uint256"
           }
@@ -648,56 +630,6 @@ export default [
     "stateMutability": "view"
   },
   {
-    "type": "function",
-    "name": "withdraw",
-    "inputs": [
-      {
-        "name": "_attestation",
-        "type": "tuple",
-        "internalType": "struct Allocate.WithdrawAttestation",
-        "components": [
-          {
-            "name": "user",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "master",
-            "type": "address",
-            "internalType": "contract IERC7579Account"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "sharePrice",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "nonce",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "deadline",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "signature",
-            "type": "bytes",
-            "internalType": "bytes"
-          }
-        ]
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
     "type": "event",
     "name": "EIP712DomainChanged",
     "inputs": [],
@@ -742,6 +674,27 @@ export default [
   },
   {
     "type": "error",
+    "name": "Allocate__AttestationBlockStale",
+    "inputs": [
+      {
+        "name": "attestedBlock",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "currentBlock",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "maxStaleness",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "Allocate__AttestationExpired",
     "inputs": [
       {
@@ -751,6 +704,27 @@ export default [
       },
       {
         "name": "currentTime",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "Allocate__AttestationTimestampStale",
+    "inputs": [
+      {
+        "name": "attestedTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "currentTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "maxAge",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -774,16 +748,6 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocate__InsufficientBalance",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Allocate__InsufficientLiquidity",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "Allocate__InvalidAccountCodeHash",
     "inputs": []
   },
@@ -794,22 +758,12 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocate__InvalidAttestor",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Allocate__InvalidCompact",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "Allocate__InvalidGasLimit",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Allocate__InvalidMasterHook",
+    "name": "Allocate__InvalidMaster",
     "inputs": []
   },
   {
@@ -835,11 +789,6 @@ export default [
   {
     "type": "error",
     "name": "Allocate__ZeroAmount",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Allocate__ZeroShares",
     "inputs": []
   },
   {

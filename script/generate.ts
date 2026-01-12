@@ -1,12 +1,22 @@
 #!/usr/bin/env bun
 import { join } from 'path'
+import { parse as parseToml } from 'smol-toml'
 import { generateEventParamsCode, parseEventsFromSolidity } from './parse-events.js'
 
 const FORGE_ARTIFACTS_PATH = './forge-artifacts'
-const DEPLOYMENTS_PATH = './deployments.json'
+const DEPLOYMENTS_PATH = './deployments.toml'
 const BROADCAST_PATH = './broadcast'
 const ERROR_SOL_PATH = './src/utils/Error.sol'
 const OUTPUT_DIR = './script/generated'
+
+// Chain alias to chain ID mapping (matches Alloy/Foundry)
+const CHAIN_ID_MAP: Record<string, number> = {
+  mainnet: 1,
+  arbitrum: 42161,
+  optimism: 10,
+  base: 8453,
+  sepolia: 11155111
+}
 
 type ContractInfo = {
   name: string
@@ -28,7 +38,6 @@ type BroadcastArtifact = {
     blockNumber: string
   }[]
 }
-
 
 async function loadBlockNumbersFromBroadcasts(chainId: number): Promise<Map<string, number>> {
   const blockNumbers = new Map<string, number>()
@@ -144,33 +153,70 @@ export const puppetErrorAbi = ${JSON.stringify(errors, null, 2).replace(/"(\w+)"
   console.log(`  Generated error ABI with ${errors.length} errors`)
 }
 
+// Check if a contract name is a Puppet contract (PascalCase) vs external (lowercase/snake_case)
+function isPuppetContract(name: string): boolean {
+  return /^[A-Z]/.test(name)
+}
+
 async function generateContracts(): Promise<void> {
-  console.log('Loading Puppet contract deployments...')
+  console.log('Loading Puppet contract deployments from TOML...')
 
   const deploymentsFile = Bun.file(DEPLOYMENTS_PATH)
-  const deployments: Record<string, Record<string, string>> = await deploymentsFile.json()
+  const tomlContent = await deploymentsFile.text()
+  const deployments = parseToml(tomlContent) as Record<string, Record<string, unknown>>
 
   const contracts: ContractInfo[] = []
 
-  for (const chainIdStr of Object.keys(deployments)) {
-    const chainId = Number(chainIdStr)
-    const addresses = deployments[chainId]
+  // Load universal contracts (same address all chains, via CREATE2)
+  const universalAddresses = (deployments.universal as Record<string, unknown>)?.address as Record<string, string> | undefined
+  const universalContracts: Array<{ name: string; address: string }> = []
 
-    const contractNames = Object.keys(addresses)
-    console.log(`  Found ${contractNames.length} contracts on chain ${chainId}`)
+  if (universalAddresses) {
+    for (const [name, address] of Object.entries(universalAddresses)) {
+      if (address && address !== '0x0000000000000000000000000000000000000000') {
+        universalContracts.push({ name, address })
+      }
+    }
+    console.log(`  Found ${universalContracts.length} universal contracts`)
+  }
+
+  for (const chainAlias of Object.keys(deployments)) {
+    // Skip non-chain keys
+    if (chainAlias === 'universal') continue
+    const chainData = deployments[chainAlias]
+    if (!chainData || typeof chainData !== 'object') continue
+
+    // Resolve chain ID from alias or numeric string
+    const chainId = CHAIN_ID_MAP[chainAlias] ?? Number(chainAlias)
+    if (Number.isNaN(chainId)) continue
+
+    // Get address section
+    const addresses = (chainData as Record<string, unknown>).address as Record<string, string> | undefined
+    if (!addresses) continue
 
     // Load block numbers from broadcast files for this chain
     const blockNumbers = await loadBlockNumbersFromBroadcasts(chainId)
 
-    for (const contractName of contractNames) {
-      const abi = await findAbiFile(contractName)
-      const address = addresses[contractName]
+    // Add universal contracts for this chain
+    for (const { name, address } of universalContracts) {
+      const abi = await findAbiFile(name)
+      const blockNumber = blockNumbers.get(address.toLowerCase()) ?? 0
+      contracts.push({ name, address, chainId, blockNumber, abi })
+    }
 
-      // Look up block number from broadcast files (normalized to lowercase)
+    // Extract chain-specific Puppet contracts (PascalCase names only, skip external like usdc, weth, gmx_*)
+    const puppetContracts = Object.entries(addresses).filter(([name]) => isPuppetContract(name))
+    console.log(`  Found ${puppetContracts.length} chain-specific contracts on ${chainAlias} (${chainId})`)
+
+    for (const [name, address] of puppetContracts) {
+      // Skip zero addresses (not deployed yet)
+      if (address === '0x0000000000000000000000000000000000000000') continue
+
+      const abi = await findAbiFile(name)
       const blockNumber = blockNumbers.get(address.toLowerCase()) ?? 0
 
       contracts.push({
-        name: contractName,
+        name,
         address,
         chainId,
         blockNumber,
@@ -206,7 +252,7 @@ ${contracts
   await Bun.write(`${OUTPUT_DIR}/abi/index.ts`, abiIndexContent)
 
   // Generate contracts map
-  const contractsContent = `// This file is auto-generated from Puppet deployments.json and forge-artifacts
+  const contractsContent = `// This file is auto-generated from Puppet deployments.toml and forge-artifacts
 // Do not edit manually.
 
 ${contracts

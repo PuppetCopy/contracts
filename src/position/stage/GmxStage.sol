@@ -3,6 +3,7 @@ pragma solidity ^0.8.33;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 import {CallType, CALLTYPE_SINGLE} from "modulekit/accounts/common/lib/ModeLib.sol";
 import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
 
@@ -83,11 +84,9 @@ contract GmxStage is IStage {
 
     // ============ IStage Implementation ============
 
-    /// @notice Validate execution before it runs
-    /// @dev Token is extracted from execution data, not passed as parameter
     function validate(
         address,
-        address _master,
+        IERC7579Account _master,
         uint,
         CallType _callType,
         bytes calldata _execData
@@ -114,8 +113,7 @@ contract GmxStage is IStage {
         revert Error.GmxStage__InvalidAction();
     }
 
-    /// @notice Verify state after execution
-    function verify(address, IERC20, uint, uint, bytes calldata) external pure override {}
+    function verify(IERC7579Account, IERC20, uint, uint, bytes calldata) external pure override {}
 
     /// @notice Get position value in base token units
     /// @dev All GMX values are in USD (30 decimals), convert to base token at end
@@ -165,15 +163,11 @@ contract GmxStage is IStage {
         return uint(netValueUsd) * (10 ** baseDecimals) / (uint(basePrice) * 1e22);
     }
 
-    /// @notice Verify a position belongs to a master account
-    /// @dev Checks GMX dataStore for position account
-    function verifyPositionOwner(bytes32 positionKey, address master) external view override returns (bool) {
-        return dataStore.getAddress(keccak256(abi.encode(POSITION_ACCOUNT, positionKey))) == master;
+    function verifyPositionOwner(bytes32 positionKey, IERC7579Account master) external view override returns (bool) {
+        return dataStore.getAddress(keccak256(abi.encode(POSITION_ACCOUNT, positionKey))) == address(master);
     }
 
-    /// @notice Check if an order is still pending in GMX
-    /// @dev Queries GMX's global ORDER_LIST (matches OrderStoreUtils.get check)
-    function isOrderPending(bytes32 orderKey, address) external view override returns (bool) {
+    function isOrderPending(bytes32 orderKey, IERC7579Account) external view override returns (bool) {
         return dataStore.containsBytes32(ORDER_LIST, orderKey);
     }
 
@@ -223,16 +217,14 @@ contract GmxStage is IStage {
     // ============ Validators ============
 
     function _validateIncrease(
-        address _master,
+        IERC7579Account _master,
         Call[] memory _calls,
         IBaseOrderUtils.CreateOrderParams memory _params
     ) internal view returns (IERC20, bytes memory) {
         (bool _hasExecutionFee, bool _hasCollateral) = _validateCalls(_calls);
 
-        // Increase requires execution fee
         if (!_hasExecutionFee) revert Error.GmxStage__InvalidExecutionSequence();
 
-        // Collateral: WNT uses sendWnt (already counted), ERC20 requires sendTokens
         bool _isWntCollateral = _params.addresses.initialCollateralToken == wnt;
         if (!_isWntCollateral && !_hasCollateral) revert Error.GmxStage__InvalidExecutionSequence();
 
@@ -245,13 +237,12 @@ contract GmxStage is IStage {
     }
 
     function _validateDecrease(
-        address _master,
+        IERC7579Account _master,
         Call[] memory _calls,
         IBaseOrderUtils.CreateOrderParams memory _params
     ) internal view returns (IERC20, bytes memory) {
         (bool _hasExecutionFee,) = _validateCalls(_calls);
 
-        // Decrease requires execution fee
         if (!_hasExecutionFee) revert Error.GmxStage__InvalidExecutionSequence();
 
         _validateOrderParams(_master, _params);
@@ -279,21 +270,18 @@ contract GmxStage is IStage {
     }
 
     function _validateClaimFunding(
-        address _master,
+        IERC7579Account _master,
         Call[] memory _calls,
         bytes memory _actionData
     ) internal view returns (IERC20, bytes memory) {
-        // claimFundingFees(address[] markets, address[] tokens, address receiver)
         (,, address _receiver) = abi.decode(_actionData, (address[], address[], address));
 
-        if (_receiver != _master) revert Error.GmxStage__InvalidReceiver();
+        if (_receiver != address(_master)) revert Error.GmxStage__InvalidReceiver();
 
-        // Validate all calls target exchangeRouter
         for (uint _i = 0; _i < _calls.length; _i++) {
             if (_calls[_i].target != exchangeRouter) revert Error.GmxStage__InvalidCallData();
         }
 
-        // Claims may involve multiple tokens - no specific token tracking
         return (IERC20(address(0)), "");
     }
 
@@ -306,14 +294,13 @@ contract GmxStage is IStage {
     }
 
     function _validateOrderParams(
-        address _master,
+        IERC7579Account _master,
         IBaseOrderUtils.CreateOrderParams memory _params
     ) internal pure {
-        if (_params.addresses.receiver != _master) revert Error.GmxStage__InvalidReceiver();
+        if (_params.addresses.receiver != address(_master)) revert Error.GmxStage__InvalidReceiver();
         if (_params.addresses.cancellationReceiver != address(0)) {
-            if (_params.addresses.cancellationReceiver != _master) revert Error.GmxStage__InvalidReceiver();
+            if (_params.addresses.cancellationReceiver != address(_master)) revert Error.GmxStage__InvalidReceiver();
         }
-        // Token choice is validated at deposit time via tokenCapMap whitelist
         if (_params.addresses.swapPath.length > 0) revert Error.GmxStage__InvalidOrderType();
     }
 
@@ -345,15 +332,13 @@ contract GmxStage is IStage {
         return keccak256(abi.encode(dataStore, _currentNonce + 1));
     }
 
-    /// @notice Derive GMX position key
-    /// @dev Matches GMX's PositionStoreUtils key derivation
-    function _derivePositionKey(address _master, IBaseOrderUtils.CreateOrderParams memory _params)
+    function _derivePositionKey(IERC7579Account _master, IBaseOrderUtils.CreateOrderParams memory _params)
         internal
         pure
         returns (bytes32)
     {
         return keccak256(abi.encode(
-            _master,
+            address(_master),
             _params.addresses.market,
             _params.addresses.initialCollateralToken,
             _params.isLong

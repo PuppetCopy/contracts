@@ -29,10 +29,100 @@ export default [
             "name": "position",
             "type": "address",
             "internalType": "contract Position"
+          },
+          {
+            "name": "attest",
+            "type": "address",
+            "internalType": "contract Attest"
+          },
+          {
+            "name": "compact",
+            "type": "address",
+            "internalType": "contract Compact"
+          },
+          {
+            "name": "tokenRouter",
+            "type": "address",
+            "internalType": "contract TokenRouter"
+          },
+          {
+            "name": "masterHook",
+            "type": "address",
+            "internalType": "address"
           }
         ]
       }
     ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "allocate",
+    "inputs": [
+      {
+        "name": "_puppetList",
+        "type": "address[]",
+        "internalType": "address[]"
+      },
+      {
+        "name": "_requestedAmountList",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "_attestation",
+        "type": "tuple",
+        "internalType": "struct Allocate.AllocateAttestation",
+        "components": [
+          {
+            "name": "master",
+            "type": "address",
+            "internalType": "contract IERC7579Account"
+          },
+          {
+            "name": "sharePrice",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "puppetListHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "amountListHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "blockNumber",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "blockTimestamp",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "nonce",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "signature",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
@@ -91,6 +181,26 @@ export default [
         "name": "position",
         "type": "address",
         "internalType": "contract Position"
+      },
+      {
+        "name": "attest",
+        "type": "address",
+        "internalType": "contract Attest"
+      },
+      {
+        "name": "compact",
+        "type": "address",
+        "internalType": "contract Compact"
+      },
+      {
+        "name": "tokenRouter",
+        "type": "address",
+        "internalType": "contract TokenRouter"
+      },
+      {
+        "name": "masterHook",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -140,6 +250,56 @@ export default [
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getConfig",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct UserRouter.Config",
+        "components": [
+          {
+            "name": "allocation",
+            "type": "address",
+            "internalType": "contract Allocate"
+          },
+          {
+            "name": "matcher",
+            "type": "address",
+            "internalType": "contract Match"
+          },
+          {
+            "name": "position",
+            "type": "address",
+            "internalType": "contract Position"
+          },
+          {
+            "name": "attest",
+            "type": "address",
+            "internalType": "contract Attest"
+          },
+          {
+            "name": "compact",
+            "type": "address",
+            "internalType": "contract Compact"
+          },
+          {
+            "name": "tokenRouter",
+            "type": "address",
+            "internalType": "contract TokenRouter"
+          },
+          {
+            "name": "masterHook",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -271,9 +431,9 @@ export default [
     "name": "setPolicy",
     "inputs": [
       {
-        "name": "_trader",
+        "name": "_master",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC7579Account"
       },
       {
         "name": "_allowanceRate",
@@ -312,6 +472,66 @@ export default [
       }
     ],
     "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "withdraw",
+    "inputs": [
+      {
+        "name": "_attestation",
+        "type": "tuple",
+        "internalType": "struct Allocate.WithdrawAttestation",
+        "components": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "master",
+            "type": "address",
+            "internalType": "contract IERC7579Account"
+          },
+          {
+            "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "sharePrice",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "blockNumber",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "blockTimestamp",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "nonce",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "signature",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "error",

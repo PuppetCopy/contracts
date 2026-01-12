@@ -85,7 +85,11 @@ library Error {
     error Allocate__UninstallDisabled();
     error Allocate__InvalidAttestation();
     error Allocate__AttestationExpired(uint deadline, uint currentTime);
+    error Allocate__AttestationBlockStale(uint attestedBlock, uint currentBlock, uint maxStaleness);
+    error Allocate__AttestationTimestampStale(uint attestedTimestamp, uint currentTimestamp, uint maxAge);
     error Allocate__InvalidAttestor();
+    error Allocate__InvalidUser();
+    error Allocate__InvalidMaster();
 
     // Attest errors
     error Attest__InvalidAttestor();
@@ -94,8 +98,15 @@ library Error {
     // Compact errors
     error Compact__InvalidAttestor();
     error Compact__InvalidSignature();
+    error Compact__InvalidOwnerSignature();
     error Compact__ExpiredDeadline();
     error Compact__ArrayLengthMismatch();
+    error Compact__WrongSourceChain();
+    error Compact__WrongDestChain();
+    error Compact__ZeroAmount();
+    error Compact__SameChain();
+    error Compact__InvalidOwner();
+    error Compact__InvalidRecipient();
 
     // NonceLib errors
     error NonceLib__InvalidNonce(uint nonce);

@@ -24,8 +24,8 @@ contract MasterHook is IHook {
         router = _router;
     }
 
-    function preCheck(address msgSender, uint msgValue, bytes calldata msgData) external returns (bytes memory) {
-        return router.processPreCall(msgSender, msg.sender, msgValue, msgData);
+    function preCheck(address msgSender, uint msgValue, bytes calldata msgData) external view returns (bytes memory) {
+        return router.processPreCall(msgSender, IERC7579Account(msg.sender), msgValue, msgData);
     }
 
     function postCheck(bytes calldata hookData) external {

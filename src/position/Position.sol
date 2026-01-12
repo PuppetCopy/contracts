@@ -11,7 +11,7 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {IStage} from "./interface/IStage.sol";
 
 /// @title Position
-/// @notice Routes execute() calls to stage handlers for validation and tracks pending orders
+/// @notice Routes execute() calls to stage stageMap for validation and tracks pending orders
 contract Position is CoreContract {
     // ============ Constants ============
 
@@ -20,9 +20,9 @@ contract Position is CoreContract {
 
     // ============ State ============
 
-    mapping(address target => IStage) public handlers;
+    mapping(address target => IStage) public stageMap;
     mapping(IStage stage => bool) public validStages;
-    mapping(address master => uint) public pendingOrderCount;
+    mapping(IERC7579Account master => uint) public pendingOrderCount;
 
     // ============ Constructor ============
 
@@ -30,7 +30,7 @@ contract Position is CoreContract {
 
     // ============ Views ============
 
-    function processPreCall(address _msgSender, address _master, uint _msgValue, bytes calldata _msgData)
+    function processPreCall(address _msgSender, IERC7579Account _master, uint _msgValue, bytes calldata _msgData)
         external
         view
         returns (bytes memory _hookData)
@@ -47,7 +47,7 @@ contract Position is CoreContract {
         bytes calldata _execData = _msgData[36:];
 
         address _firstTarget = address(bytes20(_execData[:20]));
-        IStage _handler = handlers[_firstTarget];
+        IStage _handler = stageMap[_firstTarget];
         if (address(_handler) == address(0)) return "";
 
         (IERC20 _token, bytes memory _handlerData) = _handler.validate(_msgSender, _master, _msgValue, _callType, _execData);
@@ -59,13 +59,13 @@ contract Position is CoreContract {
             }
         }
 
-        uint _preBalance = address(_token) != address(0) ? _token.balanceOf(_master) : 0;
+        uint _preBalance = address(_token) != address(0) ? _token.balanceOf(address(_master)) : 0;
 
-        return abi.encode(_token, _preBalance, _handlerData, _handler);
+        return abi.encode(_token, _preBalance, _handlerData, _handler, _msgData);
     }
 
     function getNetValue(
-        address _master,
+        IERC7579Account _master,
         IERC20 _baseToken,
         IStage[] calldata _stages,
         bytes32[][] calldata _positionKeys
@@ -89,13 +89,13 @@ contract Position is CoreContract {
 
     // ============ Auth ============
 
-    function processPostCall(address _master, bytes calldata _hookData) external auth {
+    function processPostCall(IERC7579Account _master, bytes calldata _hookData) external auth {
         if (_hookData.length == 0) return;
 
-        (IERC20 _token, uint _preBalance, bytes memory _handlerData, IStage _handler) =
-            abi.decode(_hookData, (IERC20, uint, bytes, IStage));
+        (IERC20 _token, uint _preBalance, bytes memory _handlerData, IStage _handler, bytes memory _calldata) =
+            abi.decode(_hookData, (IERC20, uint, bytes, IStage, bytes));
 
-        uint _postBalance = address(_token) != address(0) ? _token.balanceOf(_master) : 0;
+        uint _postBalance = address(_token) != address(0) ? _token.balanceOf(address(_master)) : 0;
         _handler.verify(_master, _token, _preBalance, _postBalance, _handlerData);
 
         if (_handlerData.length > 0) {
@@ -104,28 +104,28 @@ contract Position is CoreContract {
             if (_actionType == ACTION_ORDER_CREATED) {
                 (, bytes32 _orderKey, bytes32 _positionKey,) =
                     abi.decode(_handlerData, (uint8, bytes32, bytes32, IERC20));
-                uint _newPendingCount = ++pendingOrderCount[_master];
-                _logEvent("CreateOrder", abi.encode(_master, _orderKey, _positionKey, _handler, _token, _newPendingCount));
+                uint _pendingCount = ++pendingOrderCount[_master];
+                _logEvent("CreateOrder", abi.encode(_master, _orderKey, _positionKey, _handler, _token, _pendingCount, _calldata));
             }
         }
     }
 
-    function setHandler(address _target, IStage _handler) external auth {
-        IStage _oldHandler = handlers[_target];
-        if (address(_oldHandler) != address(0)) {
-            validStages[_oldHandler] = false;
+    function setStage(address _target, IStage _stage) external auth {
+        IStage _oldStage = stageMap[_target];
+        if (address(_oldStage) != address(0)) {
+            validStages[_oldStage] = false;
         }
 
-        handlers[_target] = _handler;
-        if (address(_handler) != address(0)) {
-            validStages[_handler] = true;
+        stageMap[_target] = _stage;
+        if (address(_stage) != address(0)) {
+            validStages[_stage] = true;
         }
 
-        _logEvent("SetHandler", abi.encode(_target, _oldHandler, _handler));
+        _logEvent("SetStage", abi.encode(_target, _oldStage, _stage));
     }
 
     function settleOrders(
-        address _master,
+        IERC7579Account _master,
         IStage[] calldata _orderStages,
         bytes32[] calldata _orderKeys
     ) external auth {
@@ -143,10 +143,10 @@ contract Position is CoreContract {
         }
 
         uint _pending = pendingOrderCount[_master];
-        uint _newPendingCount = _pending > _orderLen ? _pending - _orderLen : 0;
-        pendingOrderCount[_master] = _newPendingCount;
+        uint _pendingCount = _pending > _orderLen ? _pending - _orderLen : 0;
+        pendingOrderCount[_master] = _pendingCount;
 
-        _logEvent("SettleOrders", abi.encode(_master, _orderKeys, _newPendingCount));
+        _logEvent("SettleOrders", abi.encode(_master, _orderKeys, _pendingCount));
     }
 
     // ============ Internal ============
