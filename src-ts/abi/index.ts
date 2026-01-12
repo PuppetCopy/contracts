@@ -1,5 +1,7 @@
 // This file is auto-generated. Do not edit manually.
 
+export { default as dictatorshipAbi } from './puppetDictatorship.js'
+export { default as withdrawAbi } from './puppetWithdraw.js'
 export { default as puppettokenAbi } from './puppetPuppetToken.js'
 export { default as puppetvotetokenAbi } from './puppetPuppetVoteToken.js'
 export { default as feemarketplacestoreAbi } from './puppetFeeMarketplaceStore.js'

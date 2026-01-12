@@ -25,8 +25,9 @@ interface EventDefinition {
 type TypeMap = Record<string, string>
 
 // Map Solidity contract names to deployment names (for CONTRACT_EVENT_MAP keys)
-// Currently no mappings needed - use Solidity contract names directly
-const CONTRACT_NAME_MAP: Record<string, string> = {}
+const CONTRACT_NAME_MAP: Record<string, string> = {
+  Position: 'Call'
+}
 
 const SOLIDITY_TO_ABI_TYPE: TypeMap = {
   uint: 'uint256',
@@ -656,7 +657,7 @@ if (import.meta.main) {
   const code = generateEventParamsCode(contractEvents)
 
   // Write to file
-  const outputPath = './script/generated/events.ts'
+  const outputPath = './src-ts/events.ts'
   await Bun.write(outputPath, code)
   console.log(`\nWritten to ${outputPath}`)
 }

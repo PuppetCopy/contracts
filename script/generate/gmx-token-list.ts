@@ -207,7 +207,7 @@ ${tokens
 ] as const
 `
 
-  const wasUpdated = await writeIfChanged('./script/generated/gmx/tokenList.ts', tokenListContent)
+  const wasUpdated = await writeIfChanged('./src-ts/gmx/tokenList.ts', tokenListContent)
 
   if (wasUpdated) {
     console.log(`✅ Successfully updated token list with ${tokens.length} tokens`)

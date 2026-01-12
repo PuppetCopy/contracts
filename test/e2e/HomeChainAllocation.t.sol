@@ -8,6 +8,7 @@ import {MODULE_TYPE_EXECUTOR} from "modulekit/module-bases/utils/ERC7579Constant
 import {Allocate} from "src/position/Allocate.sol";
 import {Match} from "src/position/Match.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
+import {Registry} from "src/account/Registry.sol";
 import {Withdraw} from "src/withdraw/Withdraw.sol";
 import {Precision} from "src/utils/Precision.sol";
 
@@ -19,6 +20,7 @@ contract HomeChainAllocationTest is BasicSetup {
     Allocate allocate;
     Match matcher;
     TokenRouter tokenRouter;
+    Registry registry;
     Withdraw withdraw;
     MockAllocator mockAllocator;
 
@@ -48,6 +50,15 @@ contract HomeChainAllocationTest is BasicSetup {
         matcher = new Match(dictator, Match.Config({minThrottlePeriod: 6 hours}));
         tokenRouter = new TokenRouter(dictator, TokenRouter.Config({transferGasLimit: GAS_LIMIT}));
 
+        // Build allowed code hash list for TestSmartAccount
+        bytes32[] memory codeList = new bytes32[](1);
+        codeList[0] = keccak256(type(TestSmartAccount).runtimeCode);
+
+        registry = new Registry(dictator, Registry.Config({
+            masterHook: users.owner,
+            account7579CodeList: codeList
+        }));
+
         allocate = new Allocate(
             dictator,
             Allocate.Config({
@@ -61,24 +72,23 @@ contract HomeChainAllocationTest is BasicSetup {
             dictator,
             Withdraw.Config({
                 attestor: mockAllocator.attestorAddress(),
-                gasLimit: GAS_LIMIT
+                gasLimit: GAS_LIMIT,
+                maxBlockStaleness: 240,
+                maxTimestampAge: 120
             })
         );
 
         dictator.registerContract(address(matcher));
         dictator.registerContract(address(tokenRouter));
         dictator.registerContract(address(allocate));
+        dictator.registerContract(address(registry));
         dictator.registerContract(address(withdraw));
 
-        dictator.setPermission(allocate, allocate.setCodeHash.selector, users.owner);
-        dictator.setPermission(allocate, allocate.createMaster.selector, users.owner);
+        dictator.setPermission(registry, registry.setTokenCap.selector, users.owner);
         dictator.setPermission(allocate, allocate.allocate.selector, users.owner);
-        dictator.setPermission(allocate, allocate.setTokenCap.selector, users.owner);
-        dictator.setPermission(allocate, allocate.disposeMaster.selector, users.owner);
         dictator.setPermission(matcher, matcher.recordMatchAmountList.selector, address(allocate));
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocate));
-
-        allocate.setCodeHash(keccak256(type(TestSmartAccount).runtimeCode), true);
+        dictator.setPermission(withdraw, withdraw.withdraw.selector, users.owner);
 
         master = new TestSmartAccount();
         puppet1 = new TestSmartAccount();
@@ -89,7 +99,7 @@ contract HomeChainAllocationTest is BasicSetup {
         puppet1.installModule(MODULE_TYPE_EXECUTOR, address(allocate), "");
         puppet2.installModule(MODULE_TYPE_EXECUTOR, address(allocate), "");
 
-        allocate.setTokenCap(usdc, TOKEN_CAP);
+        registry.setTokenCap(usdc, TOKEN_CAP);
 
         usdc.mint(address(puppet1), 1000e6);
         usdc.mint(address(puppet2), 1000e6);
@@ -122,7 +132,7 @@ contract HomeChainAllocationTest is BasicSetup {
     }
 
     function _registerMaster() internal {
-        allocate.createMaster(owner, signer, master, usdc, MASTER_NAME);
+        registry.createMaster(owner, signer, master, usdc, MASTER_NAME);
     }
 
     function testE2E_MasterOnlyAllocation() public {
@@ -137,7 +147,7 @@ contract HomeChainAllocationTest is BasicSetup {
             master, Precision.FLOAT_PRECISION, masterAmount, emptyPuppetList, emptyAmountList, 0
         );
 
-        allocate.allocate(tokenRouter, matcher, master, emptyPuppetList, emptyAmountList, attestation);
+        allocate.allocate(registry, tokenRouter, matcher, master, emptyPuppetList, emptyAmountList, attestation);
 
         assertEq(usdc.balanceOf(address(master)), masterAmount);
         assertEq(usdc.balanceOf(owner), 1000e6 - masterAmount);
@@ -158,7 +168,7 @@ contract HomeChainAllocationTest is BasicSetup {
             master, Precision.FLOAT_PRECISION, 0, puppetList, amountList, 0
         );
 
-        allocate.allocate(tokenRouter, matcher, master, puppetList, amountList, attestation);
+        allocate.allocate(registry, tokenRouter, matcher, master, puppetList, amountList, attestation);
 
         assertEq(usdc.balanceOf(address(master)), 500e6);
         assertEq(usdc.balanceOf(address(puppet1)), 800e6);
@@ -182,7 +192,7 @@ contract HomeChainAllocationTest is BasicSetup {
             master, Precision.FLOAT_PRECISION, masterAmount, puppetList, amountList, 0
         );
 
-        allocate.allocate(tokenRouter, matcher, master, puppetList, amountList, attestation);
+        allocate.allocate(registry, tokenRouter, matcher, master, puppetList, amountList, attestation);
 
         assertEq(usdc.balanceOf(address(master)), 1000e6);
         assertEq(usdc.balanceOf(owner), 500e6);
@@ -203,7 +213,7 @@ contract HomeChainAllocationTest is BasicSetup {
             master, Precision.FLOAT_PRECISION, 0, puppetList1, amountList1, 0
         );
 
-        allocate.allocate(tokenRouter, matcher, master, puppetList1, amountList1, attestation1);
+        allocate.allocate(registry, tokenRouter, matcher, master, puppetList1, amountList1, attestation1);
 
         assertEq(usdc.balanceOf(address(master)), 500e6);
 
@@ -224,7 +234,7 @@ contract HomeChainAllocationTest is BasicSetup {
             master, newSharePrice, 0, puppetList2, amountList2, 1
         );
 
-        allocate.allocate(tokenRouter, matcher, master, puppetList2, amountList2, attestation2);
+        allocate.allocate(registry, tokenRouter, matcher, master, puppetList2, amountList2, attestation2);
 
         assertEq(usdc.balanceOf(address(master)), 1500e6);
     }
@@ -242,7 +252,7 @@ contract HomeChainAllocationTest is BasicSetup {
             master, Precision.FLOAT_PRECISION, 0, puppetList, amountList, 0
         );
 
-        allocate.allocate(tokenRouter, matcher, master, puppetList, amountList, attestation1);
+        allocate.allocate(registry, tokenRouter, matcher, master, puppetList, amountList, attestation1);
 
         usdc.mint(address(master), 500e6);
 
@@ -259,7 +269,7 @@ contract HomeChainAllocationTest is BasicSetup {
             master, newSharePrice, masterAmount, emptyPuppetList, emptyAmountList, 1
         );
 
-        allocate.allocate(tokenRouter, matcher, master, emptyPuppetList, emptyAmountList, attestation2);
+        allocate.allocate(registry, tokenRouter, matcher, master, emptyPuppetList, emptyAmountList, attestation2);
 
         assertEq(usdc.balanceOf(address(master)), 1500e6);
         assertEq(usdc.balanceOf(owner), 500e6);
@@ -352,7 +362,7 @@ contract HomeChainAllocationTest is BasicSetup {
             master, Precision.FLOAT_PRECISION, 0, puppetList, amountList, 0
         );
 
-        allocate.allocate(tokenRouter, matcher, master, puppetList, amountList, attestation);
+        allocate.allocate(registry, tokenRouter, matcher, master, puppetList, amountList, attestation);
 
         assertEq(usdc.balanceOf(address(master)), 500e6);
         assertEq(usdc.balanceOf(address(puppet1)), 500e6);
@@ -388,7 +398,7 @@ contract HomeChainAllocationTest is BasicSetup {
             master, Precision.FLOAT_PRECISION, masterAmount, emptyPuppetList, emptyAmountList, 0
         );
 
-        allocate.allocate(tokenRouter, matcher, master, emptyPuppetList, emptyAmountList, attestation);
+        allocate.allocate(registry, tokenRouter, matcher, master, emptyPuppetList, emptyAmountList, attestation);
 
         assertEq(usdc.balanceOf(address(master)), masterAmount);
         assertEq(usdc.balanceOf(owner), 500e6);
@@ -425,7 +435,7 @@ contract HomeChainAllocationTest is BasicSetup {
             master, Precision.FLOAT_PRECISION, 0, puppetList, amountList, 0
         );
 
-        allocate.allocate(tokenRouter, matcher, master, puppetList, amountList, attestation);
+        allocate.allocate(registry, tokenRouter, matcher, master, puppetList, amountList, attestation);
 
         usdc.mint(address(master), 500e6);
 
@@ -462,7 +472,7 @@ contract HomeChainAllocationTest is BasicSetup {
             master, Precision.FLOAT_PRECISION, 0, puppetList, amountList, 0
         );
 
-        allocate.allocate(tokenRouter, matcher, master, puppetList, amountList, attestation);
+        allocate.allocate(registry, tokenRouter, matcher, master, puppetList, amountList, attestation);
 
         assertEq(usdc.balanceOf(address(master)), 500e6);
 
@@ -534,6 +544,8 @@ contract HomeChainAllocationTest is BasicSetup {
             token: address(usdc),
             shares: _shares,
             sharePrice: _sharePrice,
+            blockNumber: block.number,
+            blockTimestamp: block.timestamp,
             nonce: _nonce,
             deadline: deadline
         });
@@ -582,6 +594,8 @@ contract HomeChainAllocationTest is BasicSetup {
             attestation.token,
             attestation.shares,
             attestation.sharePrice,
+            attestation.blockNumber,
+            attestation.blockTimestamp,
             attestation.nonce,
             attestation.deadline
         ));

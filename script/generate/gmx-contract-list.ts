@@ -157,7 +157,7 @@ export const gmxErrorAbi = ${JSON.stringify(errors, null, 2)} as const
       return true // Content was written
     }
 
-    const wasUpdated = await writeIfChanged('./script/generated/gmx/abi/gmxErrors.ts', abiContent)
+    const wasUpdated = await writeIfChanged('./src-ts/gmx/abi/gmxErrors.ts', abiContent)
 
     if (wasUpdated) {
       console.log('📝 Generated GMX error ABI file')
@@ -235,7 +235,7 @@ try {
   for (const contract of contracts) {
     if (contract.abi) {
       const abiFileName = `gmx${contract.name.replace('Gmx', '')}`
-      const abiFilePath = `./script/generated/gmx/abi/${abiFileName}.ts`
+      const abiFilePath = `./src-ts/gmx/abi/${abiFileName}.ts`
 
       const abiContent = `// This file is auto-generated. Do not edit manually.
 // Source: GMX deployment files from lib/gmx-synthetics
@@ -284,7 +284,7 @@ ${contracts
 } as const
 `
 
-  const contractListUpdated = await writeIfChanged('./script/generated/gmx/gmxContracts.ts', contractListContent)
+  const contractListUpdated = await writeIfChanged('./src-ts/gmx/gmxContracts.ts', contractListContent)
 
   if (contractListUpdated) {
     console.log('📝 Updated main contract list')

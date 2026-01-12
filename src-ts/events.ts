@@ -5,15 +5,11 @@ export const CONTRACT_EVENT_MAP = {
   Allocate: {
     Allocate: {
       hash: '0x2d453a8b2eb4888bfee5a5b17781ba95747a5f795cd81b44fe943773178f8d8e',
-      args: [{type:"address",name:"master"},{type:"uint256",name:"allocated"},{type:"uint256",name:"sharesMinted"},{type:"uint256",name:"balance"},{type:"uint256",name:"sharePrice"},{type:"uint256",name:"nonce"}]
+      args: [{type:"address",name:"master"},{type:"uint256",name:"allocated"},{type:"uint256",name:"masterShares"},{type:"address[]",name:"puppetList"},{type:"uint256[]",name:"matchedAmountList"},{type:"uint256[]",name:"shareList"},{type:"uint256",name:"balance"},{type:"uint256",name:"sharePrice"},{type:"uint256",name:"nonce"}]
     },
     CreateMaster: {
       hash: '0x84f532c220fa6acb8fb9d0ffdba204004c6f1edc207d2379b0ab021c2c2b4e9e',
       args: [{type:"address",name:"master"},{type:"address",name:"user"},{type:"address",name:"signer"},{type:"address",name:"baseToken"},{type:"bytes32",name:"name"},{type:"uint256",name:"initialBalance"}]
-    },
-    DisposeMaster: {
-      hash: '0xea007810b4fa422870d04c740a0d30c4f1fb7277120707fe0e507cafc78602f4',
-      args: [{type:"address",name:"master"}]
     },
     SetCodeHash: {
       hash: '0xf2e7974b4b30b0f3c8dea8c83c030f6d6fd38ebdbaecdce207549e1feea8b303',
@@ -22,12 +18,6 @@ export const CONTRACT_EVENT_MAP = {
     SetTokenCap: {
       hash: '0x0eed9dd37bbcb01292183ae212328bd52aab55ce6eb475eb4fb6350de9286029',
       args: [{type:"address",name:"token"},{type:"uint256",name:"cap"}]
-    }
-  },
-  Attest: {
-    SetConfig: {
-      hash: '0xbddb5262e2648907cc1349d6bbee62517294644f7b13455710d911b3e9005b65',
-      args: [{type:"tuple",name:"newConfig",components:[{type:"uint256"}]}]
     }
   },
   FeeMarketplace: {
@@ -54,10 +44,14 @@ export const CONTRACT_EVENT_MAP = {
       args: [{type:"address",name:"puppet"},{type:"address",name:"master"},{type:"uint256",name:"nextAllowedTimestamp"},{type:"uint256",name:"cappedAmount"}]
     }
   },
-  Position: {
-    CreateOrder: {
-      hash: '0x955ac4f6e0bb2a94d08f77f71ab4b23bc953ceed54625cd77c25f38079079d19',
-      args: [{type:"address",name:"master"},{type:"bytes32",name:"orderKey"},{type:"bytes32",name:"positionKey"},{type:"address",name:"handler"},{type:"address",name:"token"},{type:"uint256",name:"pendingCount"},{type:"bytes",name:"calldataValue"}]
+  Call: {
+    MasterPostCall: {
+      hash: '0x67fbceb6f2eabc4a751ff467dbfc905fd42e69581d0845a7f5611b9f79f09c1a',
+      args: [{type:"address",name:"master"},{type:"address",name:"handler"},{type:"address",name:"baseToken"},{type:"uint256",name:"preBalance"},{type:"uint256",name:"postBalance"},{type:"bytes4",name:"actionType"},{type:"bytes32",name:"orderKey"},{type:"bytes32",name:"positionKey"},{type:"uint256",name:"pendingCount"}]
+    },
+    MasterPreCall: {
+      hash: '0x389ee61ca1d49ba21f3520a970719e8437bcad42343b87b9af0a03c3455783ac',
+      args: [{type:"address",name:"caller"},{type:"address",name:"master"},{type:"address",name:"handler"},{type:"bytes",name:"callData"}]
     },
     SetStage: {
       hash: '0x46bba7197d5e7af08dacd431dd788388211706a4472b21da0b1bd3b08ba558d9',
@@ -65,7 +59,7 @@ export const CONTRACT_EVENT_MAP = {
     },
     SettleOrders: {
       hash: '0x34e35d9c2270bbec97412cade1887c5ee3a88bb86c95a40f5b1e9ccbaffb4d2d',
-      args: [{type:"address",name:"master"},{type:"bytes32[]",name:"orderKeys"},{type:"uint256",name:"pendingCount"}]
+      args: [{type:"address",name:"master"},{type:"bytes32[]",name:"orderKeyList"},{type:"uint256",name:"pendingCount"}]
     }
   },
   TokenRouter: {
@@ -77,7 +71,7 @@ export const CONTRACT_EVENT_MAP = {
   Withdraw: {
     Withdraw: {
       hash: '0x8d7f87ab38a7f75a63dc465e10aadacecfca64c44ca774040b039bfb004e3367',
-      args: [{type:"address",name:"user"},{type:"address",name:"master"},{type:"address",name:"token"},{type:"uint256",name:"shares"},{type:"uint256",name:"amount"},{type:"uint256",name:"nonce"}]
+      args: [{type:"address",name:"user"},{type:"address",name:"master"},{type:"address",name:"token"},{type:"uint256",name:"shares"},{type:"uint256",name:"sharePrice"},{type:"uint256",name:"amount"},{type:"uint256",name:"nonce"}]
     }
   }
 } as const

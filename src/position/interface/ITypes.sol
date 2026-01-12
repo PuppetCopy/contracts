@@ -8,6 +8,10 @@ struct MasterInfo {
     address signer;
     IERC20 baseToken;
     bytes32 name;
-    bool disposed;
-    address stage;
+}
+
+/// @notice Action parsed from stage validation
+struct Action {
+    bytes4 actionType;   // Action type (e.g., CREATE_ORDER, CLAIM_FUNDING)
+    bytes data;          // Action-specific encoded data
 }

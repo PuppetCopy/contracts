@@ -37,6 +37,8 @@ contract AttestorMock is Test {
             token: token,
             shares: shares,
             sharePrice: sharePrice,
+            blockNumber: block.number,
+            blockTimestamp: block.timestamp,
             nonce: nonce,
             deadline: deadline
         });
@@ -49,6 +51,8 @@ contract AttestorMock is Test {
                 token,
                 shares,
                 sharePrice,
+                block.number,
+                block.timestamp,
                 nonce,
                 deadline
             )

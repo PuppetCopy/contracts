@@ -8,6 +8,7 @@ import {MODULE_TYPE_EXECUTOR} from "modulekit/module-bases/utils/ERC7579Constant
 import {Allocate} from "src/position/Allocate.sol";
 import {Match} from "src/position/Match.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
+import {Registry} from "src/account/Registry.sol";
 import {Withdraw} from "src/withdraw/Withdraw.sol";
 import {Precision} from "src/utils/Precision.sol";
 import {Error} from "src/utils/Error.sol";
@@ -23,6 +24,7 @@ contract EconomicAttacksTest is BasicSetup {
     Allocate allocate;
     Match matcher;
     TokenRouter tokenRouter;
+    Registry registry;
     Withdraw withdraw;
     AttestorMock attestorMock;
 
@@ -52,6 +54,15 @@ contract EconomicAttacksTest is BasicSetup {
         matcher = new Match(dictator, Match.Config({minThrottlePeriod: 6 hours}));
         tokenRouter = new TokenRouter(dictator, TokenRouter.Config({transferGasLimit: GAS_LIMIT}));
 
+        // Build allowed code hash list for TestSmartAccount
+        bytes32[] memory codeList = new bytes32[](1);
+        codeList[0] = keccak256(type(TestSmartAccount).runtimeCode);
+
+        registry = new Registry(dictator, Registry.Config({
+            masterHook: users.owner,
+            account7579CodeList: codeList
+        }));
+
         allocate = new Allocate(
             dictator,
             Allocate.Config({
@@ -65,23 +76,23 @@ contract EconomicAttacksTest is BasicSetup {
             dictator,
             Withdraw.Config({
                 attestor: attestorMock.attestorAddress(),
-                gasLimit: GAS_LIMIT
+                gasLimit: GAS_LIMIT,
+                maxBlockStaleness: 240,
+                maxTimestampAge: 120
             })
         );
 
         dictator.registerContract(address(matcher));
         dictator.registerContract(address(tokenRouter));
         dictator.registerContract(address(allocate));
+        dictator.registerContract(address(registry));
         dictator.registerContract(address(withdraw));
 
-        dictator.setPermission(allocate, allocate.setCodeHash.selector, users.owner);
-        dictator.setPermission(allocate, allocate.createMaster.selector, users.owner);
+        dictator.setPermission(registry, registry.setTokenCap.selector, users.owner);
         dictator.setPermission(allocate, allocate.allocate.selector, users.owner);
-        dictator.setPermission(allocate, allocate.setTokenCap.selector, users.owner);
         dictator.setPermission(matcher, matcher.recordMatchAmountList.selector, address(allocate));
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocate));
-
-        allocate.setCodeHash(keccak256(type(TestSmartAccount).runtimeCode), true);
+        dictator.setPermission(withdraw, withdraw.withdraw.selector, users.owner);
 
         master = new TestSmartAccount();
         puppet1 = new TestSmartAccount();
@@ -94,7 +105,7 @@ contract EconomicAttacksTest is BasicSetup {
         puppet2.installModule(MODULE_TYPE_EXECUTOR, address(allocate), "");
         attacker.installModule(MODULE_TYPE_EXECUTOR, address(allocate), "");
 
-        allocate.setTokenCap(usdc, TOKEN_CAP);
+        registry.setTokenCap(usdc, TOKEN_CAP);
 
         usdc.mint(address(puppet1), 10_000_000e6);
         usdc.mint(address(puppet2), 10_000_000e6);
@@ -133,7 +144,7 @@ contract EconomicAttacksTest is BasicSetup {
     }
 
     function _registerMaster() internal {
-        allocate.createMaster(owner, owner, master, usdc, MASTER_NAME);
+        registry.createMaster(owner, owner, master, usdc, MASTER_NAME);
     }
 
     // ============ Share Inflation Attack Tests ============
@@ -262,7 +273,7 @@ contract EconomicAttacksTest is BasicSetup {
         // Protocol correctly rejects zero-share allocations
         // This is GOOD - prevents dust attacks where funds are lost
         vm.expectRevert(Error.Allocate__ZeroAmount.selector);
-        allocate.allocate(tokenRouter, matcher, master, puppetList, amountList, attestation);
+        allocate.allocate(registry, tokenRouter, matcher, master, puppetList, amountList, attestation);
     }
 
     // ============ Rounding Exploitation Tests ============
@@ -739,7 +750,7 @@ contract EconomicAttacksTest is BasicSetup {
             timestamp + 1 hours
         );
 
-        allocate.allocate(tokenRouter, matcher, master, puppetList, amountList, attestation);
+        allocate.allocate(registry, tokenRouter, matcher, master, puppetList, amountList, attestation);
     }
 
     function _executeSingleWithdrawalAtTime(
@@ -837,7 +848,7 @@ contract EconomicAttacksTest is BasicSetup {
             block.timestamp + 1 hours
         );
 
-        allocate.allocate(tokenRouter, matcher, master, puppetList, amountList, attestation);
+        allocate.allocate(registry, tokenRouter, matcher, master, puppetList, amountList, attestation);
     }
 
     function _signUserIntent(

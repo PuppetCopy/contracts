@@ -8,6 +8,7 @@ import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Acco
 import {Allocate} from "src/position/Allocate.sol";
 import {Match} from "src/position/Match.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
+import {Registry} from "src/account/Registry.sol";
 import {Precision} from "src/utils/Precision.sol";
 
 contract MockAllocator {
@@ -44,6 +45,7 @@ contract MockAllocator {
 
     function allocate(
         Allocate _allocate,
+        Registry _registry,
         TokenRouter _tokenRouter,
         Match _matcher,
         IERC7579Account _master,
@@ -61,15 +63,16 @@ contract MockAllocator {
 
         uint256 _balanceBefore = _baseToken.balanceOf(address(_master));
 
-        _allocate.allocate(_tokenRouter, _matcher, _master, _puppetList, _amountList, _attestation);
+        _allocate.allocate(_registry, _tokenRouter, _matcher, _master, _puppetList, _amountList, _attestation);
 
         allocated = _baseToken.balanceOf(address(_master)) - _balanceBefore;
 
-        _updateShares(_master, _baseToken, _masterAmount, _puppetList, _amountList, _sharePrice);
+        _updateShares(_registry, _master, _baseToken, _masterAmount, _puppetList, _amountList, _sharePrice);
     }
 
     function allocateMasterOnly(
         Allocate _allocate,
+        Registry _registry,
         TokenRouter _tokenRouter,
         Match _matcher,
         IERC7579Account _master,
@@ -88,19 +91,20 @@ contract MockAllocator {
 
         uint256 _balanceBefore = _baseToken.balanceOf(address(_master));
 
-        _allocate.allocate(_tokenRouter, _matcher, _master, _emptyPuppetList, _emptyAmountList, _attestation);
+        _allocate.allocate(_registry, _tokenRouter, _matcher, _master, _emptyPuppetList, _emptyAmountList, _attestation);
 
         allocated = _baseToken.balanceOf(address(_master)) - _balanceBefore;
 
         if (_masterAmount > 0) {
             uint256 _masterShares = Precision.toFactor(_masterAmount, _sharePrice);
-            (address _user,,,,, ) = _allocate.registeredMap(_master);
+            address _user = _registry.getMasterInfo(_master).user;
             sharesMap[_master][_user] += _masterShares;
             totalSharesMap[_master] += _masterShares;
         }
     }
 
     function _updateShares(
+        Registry _registry,
         IERC7579Account _master,
         IERC20 _baseToken,
         uint256 _masterAmount,
@@ -110,7 +114,7 @@ contract MockAllocator {
     ) internal {
         if (_masterAmount > 0) {
             uint256 _masterShares = Precision.toFactor(_masterAmount, _sharePrice);
-            (address _user,,,,, ) = Allocate(msg.sender).registeredMap(_master);
+            address _user = _registry.getMasterInfo(_master).user;
             sharesMap[_master][_user] += _masterShares;
             totalSharesMap[_master] += _masterShares;
         }

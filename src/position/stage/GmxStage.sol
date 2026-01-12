@@ -12,7 +12,7 @@ import {IExchangeRouter} from "gmx-synthetics/router/IExchangeRouter.sol";
 import {IBaseOrderUtils} from "gmx-synthetics/order/IBaseOrderUtils.sol";
 import {Order} from "gmx-synthetics/order/Order.sol";
 
-import {IStage, Call} from "../interface/IStage.sol";
+import {IStage, Call, Action} from "../interface/IStage.sol";
 import {IGmxDataStore} from "../interface/IGmxDataStore.sol";
 import {IChainlinkAggregator} from "../interface/IChainlinkAggregator.sol";
 import {Error} from "../../utils/Error.sol";
@@ -61,10 +61,6 @@ contract GmxStage is IStage {
     bytes32 internal constant BORROWING_FACTOR = keccak256(abi.encode("BORROWING_FACTOR"));
     bytes32 internal constant CUMULATIVE_BORROWING_FACTOR = keccak256(abi.encode("CUMULATIVE_BORROWING_FACTOR"));
 
-    // ============ Action Types ============
-    // @dev Used in hookData to indicate what action was performed
-    uint8 public constant ACTION_NONE = 0;           // No order created (claims, etc.)
-    uint8 public constant ACTION_ORDER_CREATED = 1;  // Order was created
 
     // ============ Immutables ============
 
@@ -84,13 +80,14 @@ contract GmxStage is IStage {
 
     // ============ IStage Implementation ============
 
-    function validate(
+    function getAction(
         address,
         IERC7579Account _master,
+        IERC20,
         uint,
         CallType _callType,
         bytes calldata _execData
-    ) external view override returns (IERC20 _token, bytes memory _hookData) {
+    ) external view override returns (Action memory _result) {
         (Call[] memory _calls, bytes4 _action, bytes memory _actionData) = _decodeCalls(_callType, _execData);
 
         if (_action == CREATE_ORDER) {
@@ -220,7 +217,7 @@ contract GmxStage is IStage {
         IERC7579Account _master,
         Call[] memory _calls,
         IBaseOrderUtils.CreateOrderParams memory _params
-    ) internal view returns (IERC20, bytes memory) {
+    ) internal view returns (Action memory) {
         (bool _hasExecutionFee, bool _hasCollateral) = _validateCalls(_calls);
 
         if (!_hasExecutionFee) revert Error.GmxStage__InvalidExecutionSequence();
@@ -230,27 +227,33 @@ contract GmxStage is IStage {
 
         _validateOrderParams(_master, _params);
 
-        IERC20 _token = IERC20(_params.addresses.initialCollateralToken);
         bytes32 _orderKey = _deriveNextOrderKey();
         bytes32 _positionKey = _derivePositionKey(_master, _params);
-        return (_token, abi.encode(ACTION_ORDER_CREATED, _orderKey, _positionKey, _token));
+
+        return Action({
+            actionType: CREATE_ORDER,
+            data: abi.encode(_orderKey, _positionKey)
+        });
     }
 
     function _validateDecrease(
         IERC7579Account _master,
         Call[] memory _calls,
         IBaseOrderUtils.CreateOrderParams memory _params
-    ) internal view returns (IERC20, bytes memory) {
+    ) internal view returns (Action memory) {
         (bool _hasExecutionFee,) = _validateCalls(_calls);
 
         if (!_hasExecutionFee) revert Error.GmxStage__InvalidExecutionSequence();
 
         _validateOrderParams(_master, _params);
 
-        IERC20 _token = IERC20(_params.addresses.initialCollateralToken);
         bytes32 _orderKey = _deriveNextOrderKey();
         bytes32 _positionKey = _derivePositionKey(_master, _params);
-        return (_token, abi.encode(ACTION_ORDER_CREATED, _orderKey, _positionKey, _token));
+
+        return Action({
+            actionType: CREATE_ORDER,
+            data: abi.encode(_orderKey, _positionKey)
+        });
     }
 
     function _validateCalls(Call[] memory _calls) internal view returns (bool _hasExecutionFee, bool _hasCollateral) {
@@ -273,8 +276,9 @@ contract GmxStage is IStage {
         IERC7579Account _master,
         Call[] memory _calls,
         bytes memory _actionData
-    ) internal view returns (IERC20, bytes memory) {
-        (,, address _receiver) = abi.decode(_actionData, (address[], address[], address));
+    ) internal view returns (Action memory) {
+        (address[] memory _marketList, address[] memory _tokenList, address _receiver) =
+            abi.decode(_actionData, (address[], address[], address));
 
         if (_receiver != address(_master)) revert Error.GmxStage__InvalidReceiver();
 
@@ -282,7 +286,10 @@ contract GmxStage is IStage {
             if (_calls[_i].target != exchangeRouter) revert Error.GmxStage__InvalidCallData();
         }
 
-        return (IERC20(address(0)), "");
+        return Action({
+            actionType: CLAIM_FUNDING,
+            data: abi.encode(_marketList, _tokenList)
+        });
     }
 
     function _slice(bytes memory _data, uint _start) internal pure returns (bytes memory) {

@@ -1,6 +1,8 @@
 // This file is auto-generated from Puppet deployments.toml and forge-artifacts
 // Do not edit manually.
 
+import dictatorshipAbi from './abi/puppetDictatorship.js'
+import withdrawAbi from './abi/puppetWithdraw.js'
 import puppettokenAbi from './abi/puppetPuppetToken.js'
 import puppetvotetokenAbi from './abi/puppetPuppetVoteToken.js'
 import feemarketplacestoreAbi from './abi/puppetFeeMarketplaceStore.js'
@@ -15,28 +17,32 @@ import tokenrouterAbi from './abi/puppetTokenRouter.js'
 import proxyuserrouterAbi from './abi/puppetProxyUserRouter.js'
 
 export const PUPPET_CONTRACT_MAP = {
+  Dictatorship: {
+    address: '0x397CA6373D46a15510Ce3045d09b7cbB3Af68EAa',
+    abi: dictatorshipAbi
+  },
+  Withdraw: {
+    address: '0x4f87978d851D9D17B73D426A15A58CF9F064e16E',
+    abi: withdrawAbi
+  },
   PuppetToken: {
     address: '0x3b1A496303b8272C6558b1E9159074F13176adc8',
     chainId: 42161,
-    blockNumber: 0,
     abi: puppettokenAbi
   },
   PuppetVoteToken: {
     address: '0x95718B4EEC9316E3a61ef75A2BBD3951cF465Bff',
     chainId: 42161,
-    blockNumber: 0,
     abi: puppetvotetokenAbi
   },
   FeeMarketplaceStore: {
     address: '0xaF5798725AFA764748f9Dc85E8418510B459F722',
     chainId: 42161,
-    blockNumber: 0,
     abi: feemarketplacestoreAbi
   },
   FeeMarketplace: {
     address: '0x4d80C64A10e44c724203485A4349727e01A0BaDF',
     chainId: 42161,
-    blockNumber: 0,
     abi: feemarketplaceAbi
   },
   Match: {
@@ -65,8 +71,7 @@ export const PUPPET_CONTRACT_MAP = {
   },
   UserRouterImpl: {
     address: '0x0B1ba8b68CF1282a7770DecB650511126DF5142B',
-    chainId: 42161,
-    blockNumber: 0
+    chainId: 42161
   },
   MasterHook: {
     address: '0x0bf4f1740E9809b88c9B0317654EB80c35CEe33E',
@@ -83,7 +88,6 @@ export const PUPPET_CONTRACT_MAP = {
   TokenRouter: {
     address: '0x0c69DB327925cd9367E39B7CB773Fcf97005a02c',
     chainId: 42161,
-    blockNumber: 0,
     abi: tokenrouterAbi
   },
   ProxyUserRouter: {

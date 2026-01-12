@@ -16,9 +16,9 @@ export default [
         "internalType": "struct Allocate.Config",
         "components": [
           {
-            "name": "allocateGasLimit",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "attestor",
+            "type": "address",
+            "internalType": "address"
           },
           {
             "name": "maxBlockStaleness",
@@ -72,16 +72,6 @@ export default [
     "name": "allocate",
     "inputs": [
       {
-        "name": "_attest",
-        "type": "address",
-        "internalType": "contract Attest"
-      },
-      {
-        "name": "_compact",
-        "type": "address",
-        "internalType": "contract Compact"
-      },
-      {
         "name": "_tokenRouter",
         "type": "address",
         "internalType": "contract TokenRouter"
@@ -118,6 +108,11 @@ export default [
           },
           {
             "name": "sharePrice",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "masterAmount",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -201,32 +196,13 @@ export default [
   },
   {
     "type": "function",
-    "name": "computeTokenId",
-    "inputs": [
-      {
-        "name": "_master",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "pure"
-  },
-  {
-    "type": "function",
     "name": "config",
     "inputs": [],
     "outputs": [
       {
-        "name": "allocateGasLimit",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "attestor",
+        "type": "address",
+        "internalType": "address"
       },
       {
         "name": "maxBlockStaleness",
@@ -269,19 +245,6 @@ export default [
         "name": "_name",
         "type": "bytes32",
         "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "disposeMaster",
-    "inputs": [
-      {
-        "name": "_master",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
       }
     ],
     "outputs": [],
@@ -341,9 +304,9 @@ export default [
         "internalType": "struct Allocate.Config",
         "components": [
           {
-            "name": "allocateGasLimit",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "attestor",
+            "type": "address",
+            "internalType": "address"
           },
           {
             "name": "maxBlockStaleness",
@@ -395,16 +358,6 @@ export default [
             "name": "name",
             "type": "bytes32",
             "internalType": "bytes32"
-          },
-          {
-            "name": "disposed",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "stage",
-            "type": "address",
-            "internalType": "address"
           }
         ]
       }
@@ -505,16 +458,6 @@ export default [
         "name": "name",
         "type": "bytes32",
         "internalType": "bytes32"
-      },
-      {
-        "name": "disposed",
-        "type": "bool",
-        "internalType": "bool"
-      },
-      {
-        "name": "stage",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -758,17 +701,12 @@ export default [
   },
   {
     "type": "error",
-    "name": "Allocate__InvalidGasLimit",
+    "name": "Allocate__InvalidAttestor",
     "inputs": []
   },
   {
     "type": "error",
     "name": "Allocate__InvalidMaster",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "Allocate__MasterDisposed",
     "inputs": []
   },
   {

@@ -8,6 +8,7 @@ import {MODULE_TYPE_EXECUTOR} from "modulekit/module-bases/utils/ERC7579Constant
 import {Allocate} from "src/position/Allocate.sol";
 import {Match} from "src/position/Match.sol";
 import {TokenRouter} from "src/shared/TokenRouter.sol";
+import {Registry} from "src/account/Registry.sol";
 import {Withdraw} from "src/withdraw/Withdraw.sol";
 import {Precision} from "src/utils/Precision.sol";
 import {Error} from "src/utils/Error.sol";
@@ -23,6 +24,7 @@ contract TimingAttacksTest is BasicSetup {
     Allocate allocate;
     Match matcher;
     TokenRouter tokenRouter;
+    Registry registry;
     Withdraw withdraw;
     AttestorMock attestorMock;
 
@@ -51,6 +53,15 @@ contract TimingAttacksTest is BasicSetup {
         matcher = new Match(dictator, Match.Config({minThrottlePeriod: 6 hours}));
         tokenRouter = new TokenRouter(dictator, TokenRouter.Config({transferGasLimit: GAS_LIMIT}));
 
+        // Build allowed code hash list for TestSmartAccount
+        bytes32[] memory codeList = new bytes32[](1);
+        codeList[0] = keccak256(type(TestSmartAccount).runtimeCode);
+
+        registry = new Registry(dictator, Registry.Config({
+            masterHook: users.owner,
+            account7579CodeList: codeList
+        }));
+
         allocate = new Allocate(
             dictator,
             Allocate.Config({
@@ -64,7 +75,9 @@ contract TimingAttacksTest is BasicSetup {
             dictator,
             Withdraw.Config({
                 attestor: attestorMock.attestorAddress(),
-                gasLimit: GAS_LIMIT
+                gasLimit: GAS_LIMIT,
+                maxBlockStaleness: 240,
+                maxTimestampAge: 120
             })
         );
 
@@ -72,17 +85,15 @@ contract TimingAttacksTest is BasicSetup {
         dictator.registerContract(address(matcher));
         dictator.registerContract(address(tokenRouter));
         dictator.registerContract(address(allocate));
+        dictator.registerContract(address(registry));
         dictator.registerContract(address(withdraw));
 
         // Set permissions
-        dictator.setPermission(allocate, allocate.setCodeHash.selector, users.owner);
-        dictator.setPermission(allocate, allocate.createMaster.selector, users.owner);
+        dictator.setPermission(registry, registry.setTokenCap.selector, users.owner);
         dictator.setPermission(allocate, allocate.allocate.selector, users.owner);
-        dictator.setPermission(allocate, allocate.setTokenCap.selector, users.owner);
         dictator.setPermission(matcher, matcher.recordMatchAmountList.selector, address(allocate));
         dictator.setPermission(tokenRouter, tokenRouter.transfer.selector, address(allocate));
-
-        allocate.setCodeHash(keccak256(type(TestSmartAccount).runtimeCode), true);
+        dictator.setPermission(withdraw, withdraw.withdraw.selector, users.owner);
 
         // Create accounts
         master = new TestSmartAccount();
@@ -95,7 +106,7 @@ contract TimingAttacksTest is BasicSetup {
         puppet1.installModule(MODULE_TYPE_EXECUTOR, address(allocate), "");
         puppet2.installModule(MODULE_TYPE_EXECUTOR, address(allocate), "");
 
-        allocate.setTokenCap(usdc, TOKEN_CAP);
+        registry.setTokenCap(usdc, TOKEN_CAP);
 
         // Fund accounts
         usdc.mint(address(puppet1), 10_000e6);
@@ -130,7 +141,7 @@ contract TimingAttacksTest is BasicSetup {
     }
 
     function _registerMaster() internal {
-        allocate.createMaster(owner, owner, master, usdc, MASTER_NAME);
+        registry.createMaster(owner, owner, master, usdc, MASTER_NAME);
     }
 
     // ============ Stale Attestation Tests ============
@@ -236,7 +247,7 @@ contract TimingAttacksTest is BasicSetup {
         );
 
         // Should revert because attestor price < user's acceptable price
-        vm.expectRevert(Withdraw.SharePriceBelowMin.selector);
+        vm.expectRevert(Error.Withdraw__SharePriceBelowMin.selector);
         withdraw.withdraw(intent, attestation, intentSig, attestationSig);
     }
 
@@ -344,7 +355,7 @@ contract TimingAttacksTest is BasicSetup {
         // Warp past deadline
         vm.warp(block.timestamp + 60);
 
-        vm.expectRevert(Withdraw.ExpiredDeadline.selector);
+        vm.expectRevert(Error.Withdraw__ExpiredDeadline.selector);
         withdraw.withdraw(intent, attestation, intentSig, attestationSig);
     }
 
@@ -381,7 +392,7 @@ contract TimingAttacksTest is BasicSetup {
 
         // Should revert with block staleness error
         vm.expectRevert(); // Allocate__AttestationBlockStale
-        allocate.allocate(tokenRouter, matcher, master, puppetList, amountList, attestation);
+        allocate.allocate(registry, tokenRouter, matcher, master, puppetList, amountList, attestation);
     }
 
     /// @notice Test: Allocation attestation becomes stale (timestamp too old)
@@ -416,7 +427,7 @@ contract TimingAttacksTest is BasicSetup {
 
         // Should revert with timestamp staleness error
         vm.expectRevert(); // Allocate__AttestationTimestampStale
-        allocate.allocate(tokenRouter, matcher, master, puppetList, amountList, attestation);
+        allocate.allocate(registry, tokenRouter, matcher, master, puppetList, amountList, attestation);
     }
 
     // ============ Front-Running Tests ============
@@ -595,7 +606,7 @@ contract TimingAttacksTest is BasicSetup {
             block.timestamp + 1 hours
         );
 
-        allocate.allocate(tokenRouter, matcher, master, puppetList, amountList, attestation);
+        allocate.allocate(registry, tokenRouter, matcher, master, puppetList, amountList, attestation);
     }
 
     function _signUserIntent(

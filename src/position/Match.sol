@@ -10,8 +10,7 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {Precision} from "../utils/Precision.sol";
 
 contract Match is CoreContract {
-    uint constant DIM_STAGE = 0;
-    uint constant DIM_COLLATERAL = 1;
+    uint constant DIM_COLLATERAL = 0;
 
     struct Config {
         uint minThrottlePeriod;
@@ -43,20 +42,17 @@ contract Match is CoreContract {
 
     function recordMatchAmountList(
         IERC20 _baseToken,
-        address _stage,
         IERC7579Account _master,
         address[] calldata _puppetList,
         uint[] calldata _requestedAmountList
     ) external auth returns (uint[] memory _matchedAmountList, uint _totalMatched) {
         _matchedAmountList = new uint[](_puppetList.length);
 
-        bytes32 _stageKey = bytes32(uint(uint160(_stage)));
         bytes32 _collateralKey = bytes32(uint(uint160(address(_baseToken))));
 
         for (uint _i; _i < _puppetList.length; ++_i) {
             address _puppet = _puppetList[_i];
 
-            if (!_passesFilter(_puppet, DIM_STAGE, _stageKey)) continue;
             if (!_passesFilter(_puppet, DIM_COLLATERAL, _collateralKey)) continue;
             if (block.timestamp < throttleMap[_puppet][_master]) continue;
 

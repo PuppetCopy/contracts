@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.33;
 
-import {IStage, Call} from "src/position/interface/IStage.sol";
+import {IStage, Call, Action} from "src/position/interface/IStage.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Account.sol";
 import {CallType} from "modulekit/accounts/common/lib/ModeLib.sol";
@@ -42,16 +42,22 @@ contract MockStage is IStage {
         mockToken = _token;
     }
 
-    function validate(address, IERC7579Account, uint, CallType, bytes calldata)
+    bytes4 public mockAction;
+
+    function setMockAction(bytes4 _action) external {
+        mockAction = _action;
+    }
+
+    function getAction(address, IERC7579Account, IERC20, uint, CallType, bytes calldata)
         external
         view
         override
-        returns (IERC20 token, bytes memory hookData)
+        returns (Action memory _result)
     {
         if (shouldRevertValidation) revert(revertReason);
         if (positionValues[mockPositionKey] == type(uint).max) revert("MockStage: validation failed");
-        token = mockToken;
-        hookData = abi.encode(mockPositionKey);
+        _result.actionType = mockAction;
+        _result.data = mockPositionKey != bytes32(0) ? abi.encode(mockPositionKey, mockPositionKey) : bytes("");
     }
 
     function verify(IERC7579Account, IERC20, uint, uint, bytes calldata) external pure override {}

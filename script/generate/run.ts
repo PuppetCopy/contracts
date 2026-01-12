@@ -7,7 +7,7 @@ const FORGE_ARTIFACTS_PATH = './forge-artifacts'
 const DEPLOYMENTS_PATH = './deployments.toml'
 const BROADCAST_PATH = './broadcast'
 const ERROR_SOL_PATH = './src/utils/Error.sol'
-const OUTPUT_DIR = './script/generated'
+const OUTPUT_DIR = './src-ts'
 
 // Chain alias to chain ID mapping (matches Alloy/Foundry)
 const CHAIN_ID_MAP: Record<string, number> = {
@@ -21,8 +21,8 @@ const CHAIN_ID_MAP: Record<string, number> = {
 type ContractInfo = {
   name: string
   address: string
-  chainId: number
-  blockNumber: number
+  chainId?: number
+  blockNumber?: number
   abi?: unknown[]
 }
 
@@ -167,17 +167,19 @@ async function generateContracts(): Promise<void> {
 
   const contracts: ContractInfo[] = []
 
-  // Load universal contracts (same address all chains, via CREATE2)
-  const universalAddresses = (deployments.universal as Record<string, unknown>)?.address as Record<string, string> | undefined
-  const universalContracts: Array<{ name: string; address: string }> = []
+  // Load universal contracts (same address all chains, via CREATE2) - no chainId
+  const universalAddresses = (deployments.universal as Record<string, unknown>)?.address as
+    | Record<string, string>
+    | undefined
 
   if (universalAddresses) {
     for (const [name, address] of Object.entries(universalAddresses)) {
-      if (address && address !== '0x0000000000000000000000000000000000000000') {
-        universalContracts.push({ name, address })
+      if (address) {
+        const abi = await findAbiFile(name)
+        contracts.push({ name, address, abi })
       }
     }
-    console.log(`  Found ${universalContracts.length} universal contracts`)
+    console.log(`  Found ${contracts.length} universal contracts`)
   }
 
   for (const chainAlias of Object.keys(deployments)) {
@@ -197,31 +199,27 @@ async function generateContracts(): Promise<void> {
     // Load block numbers from broadcast files for this chain
     const blockNumbers = await loadBlockNumbersFromBroadcasts(chainId)
 
-    // Add universal contracts for this chain
-    for (const { name, address } of universalContracts) {
-      const abi = await findAbiFile(name)
-      const blockNumber = blockNumbers.get(address.toLowerCase()) ?? 0
-      contracts.push({ name, address, chainId, blockNumber, abi })
-    }
-
     // Extract chain-specific Puppet contracts (PascalCase names only, skip external like usdc, weth, gmx_*)
     const puppetContracts = Object.entries(addresses).filter(([name]) => isPuppetContract(name))
     console.log(`  Found ${puppetContracts.length} chain-specific contracts on ${chainAlias} (${chainId})`)
 
     for (const [name, address] of puppetContracts) {
-      // Skip zero addresses (not deployed yet)
-      if (address === '0x0000000000000000000000000000000000000000') continue
-
+      const isZeroAddress = address === '0x0000000000000000000000000000000000000000'
       const abi = await findAbiFile(name)
-      const blockNumber = blockNumbers.get(address.toLowerCase()) ?? 0
 
-      contracts.push({
-        name,
-        address,
-        chainId,
-        blockNumber,
-        abi
-      })
+      // For zero addresses, include contract definition but without chainId/blockNumber
+      if (isZeroAddress) {
+        contracts.push({ name, address, abi })
+      } else {
+        const blockNumber = blockNumbers.get(address.toLowerCase())
+        contracts.push({
+          name,
+          address,
+          chainId,
+          blockNumber,
+          abi
+        })
+      }
     }
   }
 
@@ -263,19 +261,14 @@ ${contracts
 export const PUPPET_CONTRACT_MAP = {
 ${contracts
   .map(contract => {
-    if (contract.abi) {
-      return `  ${contract.name}: {
-    address: '${contract.address}',
-    chainId: ${contract.chainId},
-    blockNumber: ${contract.blockNumber},
-    abi: ${contract.name.toLowerCase()}Abi
-  }`
-    }
-    return `  ${contract.name}: {
-    address: '${contract.address}',
-    chainId: ${contract.chainId},
-    blockNumber: ${contract.blockNumber}
-  }`
+    const hasChain = contract.chainId != null
+    const hasBlock = contract.blockNumber != null
+    const hasAbi = contract.abi != null
+    const lines: string[] = [`    address: '${contract.address}'`]
+    if (hasChain) lines.push(`    chainId: ${contract.chainId}`)
+    if (hasBlock) lines.push(`    blockNumber: ${contract.blockNumber}`)
+    if (hasAbi) lines.push(`    abi: ${contract.name.toLowerCase()}Abi`)
+    return `  ${contract.name}: {\n${lines.join(',\n')}\n  }`
   })
   .join(',\n')}
 } as const
@@ -329,9 +322,9 @@ async function generateGmx(): Promise<void> {
   await Bun.$`mkdir -p ${OUTPUT_DIR}/gmx/abi`
 
   // Run GMX generation scripts
-  await Bun.$`bun run script/generate-gmx-contract-list.ts`
-  await Bun.$`bun run script/generate-gmx-market-list.ts`
-  await Bun.$`bun run script/generate-gmx-token-list.ts`
+  await Bun.$`bun run script/generate/gmx-contract-list.ts`
+  await Bun.$`bun run script/generate/gmx-market-list.ts`
+  await Bun.$`bun run script/generate/gmx-token-list.ts`
 }
 
 async function generateGmxIndex(): Promise<void> {
@@ -390,7 +383,6 @@ async function main(): Promise<void> {
     Bun.env.SKIP_NETWORK === '1' ||
     Bun.env.SKIP_NETWORK === 'true'
   if (!skipGmx) {
-    // Check if gmx-synthetics lib exists before attempting GMX generation
     const gmxPath = './lib/gmx-synthetics'
     const gmxExists = await Bun.file(`${gmxPath}/deployments/arbitrum/Reader.json`)
       .exists()

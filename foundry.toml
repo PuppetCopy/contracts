@@ -2,10 +2,15 @@
 
 [profile.default]
   src = 'src'
+  script = 'script/deploy'
   out = 'forge-artifacts'
   cache_path = 'forge-cache'
   libs = ["lib"]
   ignored_error_codes = [2424, 4591]  # Suppress deprecated natspec memory-safe-assembly and "more than 256 warnings" warnings
+  fs_permissions = [
+    { access = "read-write", path = "./deployments.toml" },
+    { access = "read-write", path = "./broadcast" }
+  ]
   remappings = [
     "forge-std/=lib/modulekit/node_modules/forge-std/",
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
@@ -39,7 +44,7 @@
   cache_path = "forge-cache-prod"
   optimizer_runs = 100_000
   fs_permissions = [
-    { access = "read-write", path = "./deployments.json" },
+    { access = "read-write", path = "./deployments.toml" },
     { access = "read-write", path = "./broadcast" }
   ]
 
@@ -54,10 +59,13 @@
   int_types = "short"
 
 [rpc_endpoints]
-  arbitrum = { url = "${RPC_URL}", chain_id = 42161 }
+  mainnet = { url = "https://lb.drpc.live/ethereum/${RPC_KEY}", chain_id = 1 }
+  arbitrum = { url = "https://lb.drpc.live/arbitrum/${RPC_KEY}", chain_id = 42161 }
+  base = { url = "https://lb.drpc.live/base/${RPC_KEY}", chain_id = 8453 }
 
 [etherscan]
   arbitrum = { key = "${ETHERSCAN_API_KEY}" }
+  base = { key = "${ETHERSCAN_API_KEY}" }
 
 [lint]
   # Exclude test folder from linting

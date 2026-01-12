@@ -14,6 +14,7 @@ import {Precision} from "../utils/Precision.sol";
 import {TokenRouter} from "../shared/TokenRouter.sol";
 import {Match} from "./Match.sol";
 import {MasterInfo} from "./interface/ITypes.sol";
+import {Registry} from "../account/Registry.sol";
 
 /// @title Allocate
 /// @notice ERC-7579 Executor module for share-based fund allocation to master accounts
@@ -46,11 +47,6 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
 
     Config public config;
 
-    mapping(IERC20 token => uint) public tokenCapMap;
-    mapping(bytes32 codeHash => bool) public account7579CodeHashMap;
-
-    mapping(IERC7579Account master => MasterInfo) public registeredMap;
-
     constructor(IAuthority _authority, Config memory _config)
         CoreContract(_authority, abi.encode(_config))
         EIP712("Puppet Allocate", "1") {}
@@ -59,42 +55,8 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
         return config;
     }
 
-    function getMasterInfo(IERC7579Account _master) external view returns (MasterInfo memory) {
-        return registeredMap[_master];
-    }
-
-    function setTokenCap(IERC20 _token, uint _cap) external auth {
-        tokenCapMap[_token] = _cap;
-        _logEvent("SetTokenCap", abi.encode(_token, _cap));
-    }
-
-    function setCodeHash(bytes32 _codeHash, bool _allowed) external auth {
-        account7579CodeHashMap[_codeHash] = _allowed;
-        _logEvent("SetCodeHash", abi.encode(_codeHash, _allowed));
-    }
-
-    function createMaster(
-        address _user,
-        address _signer,
-        IERC7579Account _master,
-        IERC20 _baseToken,
-        bytes32 _name
-    ) external auth {
-        bytes32 _codeHash;
-        assembly { _codeHash := extcodehash(_master) }
-        if (!account7579CodeHashMap[_codeHash]) revert Error.Allocate__InvalidAccountCodeHash();
-        if (address(registeredMap[_master].baseToken) != address(0)) revert Error.Allocate__AlreadyRegistered();
-        if (tokenCapMap[_baseToken] == 0) revert Error.Allocate__TokenNotAllowed();
-
-        uint _initialBalance = _baseToken.balanceOf(address(_master));
-        if (_initialBalance > tokenCapMap[_baseToken]) revert Error.Allocate__DepositExceedsCap(_initialBalance, tokenCapMap[_baseToken]);
-
-        registeredMap[_master] = MasterInfo(_user, _signer, _baseToken, _name, false, address(0));
-
-        _logEvent("CreateMaster", abi.encode(_master, _user, _signer, _baseToken, _name, _initialBalance));
-    }
-
     function allocate(
+        Registry _registry,
         TokenRouter _tokenRouter,
         Match _matcher,
         IERC7579Account _master,
@@ -104,28 +66,15 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
     ) external auth {
         if (address(_attestation.master) != address(_master)) revert Error.Allocate__InvalidMaster();
 
-        MasterInfo memory _info = registeredMap[_master];
+        MasterInfo memory _info = _registry.getMasterInfo(_master);
         if (address(_info.baseToken) == address(0)) revert Error.Allocate__UnregisteredMaster();
-        if (_info.disposed) revert Error.Allocate__MasterDisposed();
-        if (tokenCapMap[_info.baseToken] == 0) revert Error.Allocate__TokenNotAllowed();
-        if (_puppetList.length != _requestedAmountList.length) {
-            revert Error.Allocate__ArrayLengthMismatch(_puppetList.length, _requestedAmountList.length);
-        }
-        if (block.timestamp > _attestation.deadline) {
-            revert Error.Allocate__AttestationExpired(_attestation.deadline, block.timestamp);
-        }
-        if (block.number - _attestation.blockNumber > config.maxBlockStaleness) {
-            revert Error.Allocate__AttestationBlockStale(_attestation.blockNumber, block.number, config.maxBlockStaleness);
-        }
-        if (block.timestamp - _attestation.blockTimestamp > config.maxTimestampAge) {
-            revert Error.Allocate__AttestationTimestampStale(_attestation.blockTimestamp, block.timestamp, config.maxTimestampAge);
-        }
-        if (_attestation.puppetListHash != keccak256(abi.encodePacked(_puppetList))) {
-            revert Error.Allocate__InvalidAttestation();
-        }
-        if (_attestation.amountListHash != keccak256(abi.encodePacked(_requestedAmountList))) {
-            revert Error.Allocate__InvalidAttestation();
-        }
+        if (_registry.tokenCapMap(_info.baseToken) == 0) revert Error.Allocate__TokenNotAllowed();
+        if (_puppetList.length != _requestedAmountList.length) revert Error.Allocate__ArrayLengthMismatch(_puppetList.length, _requestedAmountList.length);
+        if (block.timestamp > _attestation.deadline) revert Error.Allocate__AttestationExpired(_attestation.deadline, block.timestamp);
+        if (block.number - _attestation.blockNumber > config.maxBlockStaleness) revert Error.Allocate__AttestationBlockStale(_attestation.blockNumber, block.number, config.maxBlockStaleness);
+        if (block.timestamp - _attestation.blockTimestamp > config.maxTimestampAge) revert Error.Allocate__AttestationTimestampStale(_attestation.blockTimestamp, block.timestamp, config.maxTimestampAge);
+        if (_attestation.puppetListHash != keccak256(abi.encodePacked(_puppetList))) revert Error.Allocate__InvalidAttestation();
+        if (_attestation.amountListHash != keccak256(abi.encodePacked(_requestedAmountList))) revert Error.Allocate__InvalidAttestation();
 
         bytes32 _digest = _hashTypedDataV4(
             keccak256(
@@ -143,15 +92,14 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
                 )
             )
         );
-        if (!SignatureCheckerLib.isValidSignatureNow(config.attestor, _digest, _attestation.signature)) {
-            revert Error.Allocate__InvalidAttestation();
-        }
+        if (!SignatureCheckerLib.isValidSignatureNow(config.attestor, _digest, _attestation.signature)) revert Error.Allocate__InvalidAttestation();
+
         NonceLib.consume(_NONCE_SCOPE, _attestation.nonce);
 
         IERC20 _baseToken = _info.baseToken;
 
         (uint[] memory _matchedAmountList, uint _totalMatched) = _matcher.recordMatchAmountList(
-            _baseToken, _info.stage, _master, _puppetList, _requestedAmountList
+            _baseToken, _master, _puppetList, _requestedAmountList
         );
 
         if (_totalMatched == 0 && _attestation.masterAmount == 0) revert Error.Allocate__ZeroAmount();
@@ -194,7 +142,8 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
         if (_actualReceived != _allocated) revert Error.Allocate__AmountMismatch(_allocated, _actualReceived);
 
         uint _balance = _balanceBefore + _allocated;
-        if (_balance > tokenCapMap[_baseToken]) revert Error.Allocate__DepositExceedsCap(_balance, tokenCapMap[_baseToken]);
+        uint _tokenCap = _registry.tokenCapMap(_baseToken);
+        if (_balance > _tokenCap) revert Error.Allocate__DepositExceedsCap(_balance, _tokenCap);
 
         _logEvent(
             "Allocate",
@@ -210,15 +159,6 @@ contract Allocate is CoreContract, IExecutor, EIP712 {
                 _attestation.nonce
             )
         );
-    }
-
-    function disposeMaster(IERC7579Account _master) external auth {
-        if (address(registeredMap[_master].baseToken) == address(0)) return;
-        if (registeredMap[_master].disposed) return;
-
-        registeredMap[_master].disposed = true;
-
-        _logEvent("DisposeMaster", abi.encode(_master));
     }
 
     function _setConfig(bytes memory _data) internal override {

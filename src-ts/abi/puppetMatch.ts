@@ -168,11 +168,6 @@ export default [
         "internalType": "contract IERC20"
       },
       {
-        "name": "_stage",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "_master",
         "type": "address",
         "internalType": "contract IERC7579Account"

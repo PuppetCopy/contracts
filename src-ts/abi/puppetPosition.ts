@@ -15,32 +15,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "ACTION_NONE",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "uint8"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ACTION_ORDER_CREATED",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "uint8"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "authority",
     "inputs": [],
     "outputs": [
@@ -91,12 +65,12 @@ export default [
         "internalType": "contract IERC20"
       },
       {
-        "name": "_stages",
+        "name": "_stageList",
         "type": "address[]",
         "internalType": "contract IStage[]"
       },
       {
-        "name": "_positionKeys",
+        "name": "_positionKeyList",
         "type": "bytes32[][]",
         "internalType": "bytes32[][]"
       }
@@ -134,6 +108,11 @@ export default [
     "name": "processPostCall",
     "inputs": [
       {
+        "name": "_allocate",
+        "type": "address",
+        "internalType": "contract Allocate"
+      },
+      {
         "name": "_master",
         "type": "address",
         "internalType": "contract IERC7579Account"
@@ -152,7 +131,12 @@ export default [
     "name": "processPreCall",
     "inputs": [
       {
-        "name": "_msgSender",
+        "name": "_allocate",
+        "type": "address",
+        "internalType": "contract Allocate"
+      },
+      {
+        "name": "_caller",
         "type": "address",
         "internalType": "address"
       },
@@ -162,12 +146,12 @@ export default [
         "internalType": "contract IERC7579Account"
       },
       {
-        "name": "_msgValue",
+        "name": "_callValue",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "_msgData",
+        "name": "_callData",
         "type": "bytes",
         "internalType": "bytes"
       }
@@ -179,7 +163,7 @@ export default [
         "internalType": "bytes"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -245,12 +229,12 @@ export default [
         "internalType": "contract IERC7579Account"
       },
       {
-        "name": "_orderStages",
+        "name": "_stageList",
         "type": "address[]",
         "internalType": "contract IStage[]"
       },
       {
-        "name": "_orderKeys",
+        "name": "_orderKeyList",
         "type": "bytes32[]",
         "internalType": "bytes32[]"
       }
@@ -338,6 +322,16 @@ export default [
   {
     "type": "error",
     "name": "Position__DelegateCallBlocked",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Position__InvalidAction",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Position__InvalidBaseToken",
     "inputs": []
   },
   {

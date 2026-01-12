@@ -37,12 +37,22 @@ abstract contract BaseScript is Script {
         _toml = vm.readFile(DEPLOYMENTS_PATH);
     }
 
-    function _getUniversalAddress(string memory name) internal view returns (address) {
-        return _toml.readAddress(string.concat(".universal.address.", name));
+    function _getUniversalAddress(string memory name) internal view returns (address addr) {
+        addr = _toml.readAddress(string.concat(".universal.address.", name));
+        require(addr != address(0), string.concat("Universal address not found: ", name));
+        require(addr.code.length > 0, string.concat("Universal contract not deployed: ", name));
     }
 
-    function _getChainAddress(string memory name) internal view returns (address) {
-        return _toml.readAddress(string.concat(".", _chainKey(), ".address.", name));
+    function _getChainAddress(string memory name) internal view returns (address addr) {
+        addr = _toml.readAddress(string.concat(".", _chainKey(), ".address.", name));
+        require(addr != address(0), string.concat("Chain address not found: ", name));
+        require(addr.code.length > 0, string.concat("Chain contract not deployed: ", name));
+    }
+
+    function _getChainToken(string memory symbol) internal view returns (address addr) {
+        addr = _toml.readAddress(string.concat(".", _chainKey(), ".token.", symbol));
+        require(addr != address(0), string.concat("Chain token not found: ", symbol));
+        require(addr.code.length > 0, string.concat("Chain token not deployed: ", symbol));
     }
 
     function _setUniversalAddress(string memory name, address addr) internal {

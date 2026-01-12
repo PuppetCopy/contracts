@@ -30,32 +30,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "ACTION_NONE",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "uint8"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ACTION_ORDER_CREATED",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "uint8"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "APPROVE",
     "inputs": [],
     "outputs": [
@@ -199,6 +173,62 @@ export default [
   },
   {
     "type": "function",
+    "name": "getAction",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_master",
+        "type": "address",
+        "internalType": "contract IERC7579Account"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IERC20"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_callType",
+        "type": "bytes1",
+        "internalType": "CallType"
+      },
+      {
+        "name": "_execData",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "_result",
+        "type": "tuple",
+        "internalType": "struct Action",
+        "components": [
+          {
+            "name": "actionType",
+            "type": "bytes4",
+            "internalType": "bytes4"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getPositionValue",
     "inputs": [
       {
@@ -233,7 +263,7 @@ export default [
       {
         "name": "",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC7579Account"
       }
     ],
     "outputs": [
@@ -260,56 +290,12 @@ export default [
   },
   {
     "type": "function",
-    "name": "validate",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_master",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_callType",
-        "type": "bytes1",
-        "internalType": "CallType"
-      },
-      {
-        "name": "_execData",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "_token",
-        "type": "address",
-        "internalType": "contract IERC20"
-      },
-      {
-        "name": "_hookData",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "verify",
     "inputs": [
       {
         "name": "",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC7579Account"
       },
       {
         "name": "",
@@ -347,7 +333,7 @@ export default [
       {
         "name": "master",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC7579Account"
       }
     ],
     "outputs": [

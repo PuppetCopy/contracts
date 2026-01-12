@@ -31,16 +31,6 @@ export default [
             "internalType": "contract Position"
           },
           {
-            "name": "attest",
-            "type": "address",
-            "internalType": "contract Attest"
-          },
-          {
-            "name": "compact",
-            "type": "address",
-            "internalType": "contract Compact"
-          },
-          {
             "name": "tokenRouter",
             "type": "address",
             "internalType": "contract TokenRouter"
@@ -81,6 +71,11 @@ export default [
           },
           {
             "name": "sharePrice",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "masterAmount",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -183,16 +178,6 @@ export default [
         "internalType": "contract Position"
       },
       {
-        "name": "attest",
-        "type": "address",
-        "internalType": "contract Attest"
-      },
-      {
-        "name": "compact",
-        "type": "address",
-        "internalType": "contract Compact"
-      },
-      {
         "name": "tokenRouter",
         "type": "address",
         "internalType": "contract TokenRouter"
@@ -240,19 +225,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "disposeMaster",
-    "inputs": [
-      {
-        "name": "_master",
-        "type": "address",
-        "internalType": "contract IERC7579Account"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "getConfig",
     "inputs": [],
     "outputs": [
@@ -277,16 +249,6 @@ export default [
             "internalType": "contract Position"
           },
           {
-            "name": "attest",
-            "type": "address",
-            "internalType": "contract Attest"
-          },
-          {
-            "name": "compact",
-            "type": "address",
-            "internalType": "contract Compact"
-          },
-          {
             "name": "tokenRouter",
             "type": "address",
             "internalType": "contract TokenRouter"
@@ -303,7 +265,7 @@ export default [
   },
   {
     "type": "function",
-    "name": "isDisposed",
+    "name": "isRegistered",
     "inputs": [
       {
         "name": "_master",
@@ -338,22 +300,22 @@ export default [
     "name": "processPreCall",
     "inputs": [
       {
-        "name": "_msgSender",
+        "name": "_caller",
         "type": "address",
         "internalType": "address"
       },
       {
         "name": "_master",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC7579Account"
       },
       {
-        "name": "_msgValue",
+        "name": "_callValue",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "_msgData",
+        "name": "_callData",
         "type": "bytes",
         "internalType": "bytes"
       }
@@ -365,7 +327,7 @@ export default [
         "internalType": "bytes"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -472,66 +434,6 @@ export default [
       }
     ],
     "stateMutability": "pure"
-  },
-  {
-    "type": "function",
-    "name": "withdraw",
-    "inputs": [
-      {
-        "name": "_attestation",
-        "type": "tuple",
-        "internalType": "struct Allocate.WithdrawAttestation",
-        "components": [
-          {
-            "name": "user",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "master",
-            "type": "address",
-            "internalType": "contract IERC7579Account"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "sharePrice",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "blockNumber",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "blockTimestamp",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "nonce",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "deadline",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "signature",
-            "type": "bytes",
-            "internalType": "bytes"
-          }
-        ]
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "error",

@@ -6,10 +6,12 @@ import {IERC7579Account} from "modulekit/accounts/common/interfaces/IERC7579Acco
 import {IHook, MODULE_TYPE_HOOK} from "modulekit/accounts/common/interfaces/IERC7579Module.sol";
 
 import {Error} from "../utils/Error.sol";
-import {IUserRouter} from "../utils/interfaces/IUserRouter.sol";
+import {Position} from "../position/Position.sol";
+import {Registry} from "./Registry.sol";
 
 /// @title MasterHook
-/// @notice ERC-7579 Hook module for master accounts enabling fund-raising through Allocation
+/// @notice ERC-7579 Hook module for master accounts
+/// @dev Validates master account calls through Position. Registry stores master info.
 contract MasterHook is IHook {
     struct InstallParams {
         address user;
@@ -18,29 +20,32 @@ contract MasterHook is IHook {
         bytes32 name;
     }
 
-    IUserRouter public immutable router;
+    Position public immutable position;
+    Registry public immutable registry;
 
-    constructor(IUserRouter _router) {
-        router = _router;
+    constructor(Position _position, Registry _registry) {
+        position = _position;
+        registry = _registry;
     }
 
-    function preCheck(address msgSender, uint msgValue, bytes calldata msgData) external view returns (bytes memory) {
-        return router.processPreCall(msgSender, IERC7579Account(msg.sender), msgValue, msgData);
+    function preCheck(address caller, uint callValue, bytes calldata callData) external returns (bytes memory) {
+        IERC7579Account master = IERC7579Account(msg.sender);
+        return position.processPreCall(registry, caller, master, callValue, callData);
     }
 
     function postCheck(bytes calldata hookData) external {
-        router.processPostCall(hookData);
+        IERC7579Account master = IERC7579Account(msg.sender);
+        position.processPostCall(master, hookData);
     }
 
     function onInstall(bytes calldata _data) external {
         InstallParams memory params = abi.decode(_data, (InstallParams));
-        IERC7579Account _master = IERC7579Account(msg.sender);
-
-        router.createMaster(params.user, params.signer, _master, params.baseToken, params.name);
+        IERC7579Account master = IERC7579Account(msg.sender);
+        registry.createMaster(params.user, params.signer, master, params.baseToken, params.name);
     }
 
-    function onUninstall(bytes calldata) external {
-        router.disposeMaster(IERC7579Account(msg.sender));
+    function onUninstall(bytes calldata) external pure {
+        revert Error.MasterHook__UninstallDisabled();
     }
 
     function isModuleType(uint _moduleTypeId) external pure returns (bool) {
@@ -48,6 +53,6 @@ contract MasterHook is IHook {
     }
 
     function isInitialized(address _account) external view returns (bool) {
-        return !router.isDisposed(IERC7579Account(_account));
+        return registry.isRegistered(IERC7579Account(_account));
     }
 }

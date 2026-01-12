@@ -75,7 +75,7 @@ export default [
       }
     ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "pure"
   },
   {
     "type": "function",
@@ -95,17 +95,17 @@ export default [
     "name": "preCheck",
     "inputs": [
       {
-        "name": "msgSender",
+        "name": "caller",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "msgValue",
+        "name": "callValue",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "msgData",
+        "name": "callData",
         "type": "bytes",
         "internalType": "bytes"
       }
@@ -131,6 +131,11 @@ export default [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "error",
+    "name": "MasterHook__UninstallDisabled",
+    "inputs": []
   },
   {
     "type": "error",
