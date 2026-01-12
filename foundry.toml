@@ -9,6 +9,7 @@
   ignored_error_codes = [2424, 4591]  # Suppress deprecated natspec memory-safe-assembly and "more than 256 warnings" warnings
   fs_permissions = [
     { access = "read-write", path = "./deployments.toml" },
+    { access = "read", path = "./const.toml" },
     { access = "read-write", path = "./broadcast" }
   ]
   remappings = [

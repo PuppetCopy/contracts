@@ -86,10 +86,13 @@ contract Match is CoreContract {
         _logEvent("SetFilter", abi.encode(_puppet, _dim, _value, _allowed, _filterInitialized));
     }
 
-    function setPolicy(address _puppet, IERC7579Account _master, uint _allowanceRate, uint _throttlePeriod, uint _expiry)
-        external
-        auth
-    {
+    function setPolicy(
+      address _puppet,
+      IERC7579Account _master,
+      uint _allowanceRate,
+      uint _throttlePeriod,
+      uint _expiry
+    ) external auth {
         if (_expiry != 0 && _throttlePeriod < config.minThrottlePeriod) {
             revert Error.Match__ThrottlePeriodBelowMin(_throttlePeriod, config.minThrottlePeriod);
         }

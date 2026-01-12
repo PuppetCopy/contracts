@@ -13,8 +13,6 @@ import {BaseScript} from "./shared/BaseScript.s.sol";
 
 contract DeployUserRouter is BaseScript {
     function run() public {
-        _loadDeployments();
-
         Dictatorship dictatorship = Dictatorship(_getUniversalAddress("Dictatorship"));
         Registry registry = Registry(_getUniversalAddress("Registry"));
         Allocate allocation = Allocate(_getChainAddress("Allocate"));

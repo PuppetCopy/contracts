@@ -58,10 +58,8 @@ contract EconomicAttacksTest is BasicSetup {
         bytes32[] memory codeList = new bytes32[](1);
         codeList[0] = keccak256(type(TestSmartAccount).runtimeCode);
 
-        registry = new Registry(dictator, Registry.Config({
-            masterHook: users.owner,
-            account7579CodeList: codeList
-        }));
+        registry = new Registry(dictator, Registry.Config({account7579CodeList: codeList}));
+        dictator.setPermission(registry, registry.createMaster.selector, users.owner);
 
         allocate = new Allocate(
             dictator,

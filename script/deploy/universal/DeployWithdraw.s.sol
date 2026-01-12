@@ -8,11 +8,10 @@ import {Withdraw} from "src/withdraw/Withdraw.sol";
 contract DeployWithdraw is BaseScript {
     bytes32 constant SALT = bytes32(uint256(1));
     uint256 constant GAS_LIMIT = 200_000;
-    uint256 constant MAX_BLOCK_STALENESS = 60;  // ~1 minute on Arbitrum
-    uint256 constant MAX_TIMESTAMP_AGE = 120;    // 2 minutes
+    uint256 constant MAX_BLOCK_STALENESS = 60;
+    uint256 constant MAX_TIMESTAMP_AGE = 120;
 
     function run() public {
-        _loadDeployments();
         Dictatorship dictatorship = Dictatorship(_getUniversalAddress("Dictatorship"));
 
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);

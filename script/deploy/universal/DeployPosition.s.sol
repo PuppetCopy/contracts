@@ -6,24 +6,23 @@ import {Dictatorship} from "src/shared/Dictatorship.sol";
 import {Position} from "src/position/Position.sol";
 
 contract DeployPosition is BaseScript {
-    bytes32 constant POSITION_SALT = bytes32(uint256(1));
+    bytes32 constant POSITION_SALT = bytes32(uint(1));
 
     function run() public {
-        _loadDeployments();
         Dictatorship dictatorship = Dictatorship(_getUniversalAddress("Dictatorship"));
 
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
 
         address positionAddr = FACTORY.safeCreate2(
             POSITION_SALT,
-            abi.encodePacked(
-                type(Position).creationCode,
-                abi.encode(dictatorship)
-            )
+            abi.encodePacked(type(Position).creationCode, abi.encode(dictatorship))
         );
         _setUniversalAddress("Position", positionAddr);
 
         dictatorship.registerContract(positionAddr);
+
+        Position position = Position(positionAddr);
+        dictatorship.setPermission(position, position.setStage.selector, _dao());
 
         vm.stopBroadcast();
     }

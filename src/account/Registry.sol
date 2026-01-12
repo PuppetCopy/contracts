@@ -14,11 +14,10 @@ import {MasterInfo} from "../position/interface/ITypes.sol";
 /// @dev Universal contract deployed on all chains. MasterHook calls this during onInstall.
 contract Registry is CoreContract {
     struct Config {
-        address masterHook;
         bytes32[] account7579CodeList;
     }
 
-    Config public config;
+    Config internal config;
 
     /// @notice Token caps for allowed base tokens
     mapping(IERC20 token => uint) public tokenCapMap;
@@ -59,9 +58,7 @@ contract Registry is CoreContract {
         IERC7579Account _master,
         IERC20 _baseToken,
         bytes32 _name
-    ) external {
-        if (msg.sender != config.masterHook) revert Error.Registry__UnauthorizedCaller();
-
+    ) external auth {
         bytes32 _codeHash;
         assembly { _codeHash := extcodehash(_master) }
         if (!isAllowedCodeHash(_codeHash)) revert Error.Registry__InvalidAccountCodeHash();
@@ -75,7 +72,6 @@ contract Registry is CoreContract {
 
     function _setConfig(bytes memory _data) internal override {
         Config memory _config = abi.decode(_data, (Config));
-        require(_config.masterHook != address(0), "Registry: invalid masterHook");
         require(_config.account7579CodeList.length > 0, "Registry: empty code list");
         config = _config;
     }

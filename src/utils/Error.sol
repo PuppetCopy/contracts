@@ -46,7 +46,6 @@ library Error {
 
     error MasterHook__UninstallDisabled();
 
-    error Registry__UnauthorizedCaller();
     error Registry__InvalidAccountCodeHash();
     error Registry__AlreadyRegistered();
     error Registry__TokenNotAllowed();

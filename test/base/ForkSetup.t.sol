@@ -5,7 +5,6 @@ import {Test} from "forge-std/src/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Dictatorship} from "src/shared/Dictatorship.sol";
-import {Const} from "script/deploy/shared/Const.sol";
 
 /// @title ForkSetup
 /// @notice Base test setup for Arbitrum fork tests
@@ -20,16 +19,16 @@ abstract contract ForkSetup is Test {
     Users users;
 
     // Real Arbitrum tokens
-    IERC20 constant usdc = IERC20(Const.usdc);
-    IERC20 constant wnt = IERC20(Const.wnt);
+    IERC20 constant usdc = IERC20(0xaf88d065e77c8cC2239327C5EDb3A432268e5831);
+    IERC20 constant wnt = IERC20(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
 
-    // GMX V2 addresses
-    address constant gmxExchangeRouter = Const.gmxExchangeRouter;
-    address constant gmxRouter = Const.gmxRouter;
-    address constant gmxDataStore = Const.gmxDataStore;
-    address constant gmxOrderVault = Const.gmxOrderVault;
-    address constant gmxReferralStorage = Const.gmxReferralStorage;
-    address constant gmxEthUsdcMarket = Const.gmxEthUsdcMarket;
+    // GMX V2 addresses (Arbitrum)
+    address constant gmxExchangeRouter = 0x1C3fa76e6E1088bCE750f23a5BFcffa1efEF6A41;
+    address constant gmxRouter = 0x7452c558d45f8afC8c83dAe62C3f8A5BE19c71f6;
+    address constant gmxDataStore = 0xFD70de6b91282D8017aA4E741e9Ae325CAb992d8;
+    address constant gmxOrderVault = 0x31eF83a530Fde1B38EE9A18093A333D8Bbbc40D5;
+    address constant gmxReferralStorage = 0xe6fab3F0c7199b0d34d7FbE83394fc0e0D06e99d;
+    address constant gmxEthUsdcMarket = 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f;
 
     Dictatorship dictator;
 

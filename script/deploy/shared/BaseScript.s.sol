@@ -26,35 +26,43 @@ abstract contract BaseScript is Script {
     ImmutableCreate2Factory constant FACTORY = ImmutableCreate2Factory(0x0000000000FFe8B47B3e2130213B802212439497);
 
     string constant DEPLOYMENTS_PATH = "./deployments.toml";
+    string constant CONST_PATH = "./const.toml";
 
     uint256 internal immutable DEPLOYER_PRIVATE_KEY = vm.envUint("DEPLOYER_PRIVATE_KEY");
     address internal immutable DEPLOYER_ADDRESS = vm.addr(DEPLOYER_PRIVATE_KEY);
     address internal immutable ATTESTOR_ADDRESS = vm.envOr("ATTESTOR_ADDRESS", DEPLOYER_ADDRESS);
 
-    string internal _toml;
+    string internal _deployments = vm.readFile(DEPLOYMENTS_PATH);
+    string internal _const = vm.readFile(CONST_PATH);
 
-    function _loadDeployments() internal {
-        _toml = vm.readFile(DEPLOYMENTS_PATH);
+    // Protocol constants
+    function _dao() internal view returns (address) { return _const.readAddress(".protocol.dao"); }
+    function _latestAccount7579CodeHash() internal view returns (bytes32) { return _const.readBytes32(".protocol.latestAccount7579CodeHash"); }
+    function _theCompact() internal view returns (address) { return _const.readAddress(".protocol.theCompact"); }
+    function _referralCode() internal view returns (bytes32) { return _const.readBytes32(".protocol.referralCode"); }
+
+    // GMX constants
+    function _gmxExchangeRouter() internal view returns (address) { return _const.readAddress(".gmx.exchangeRouter"); }
+    function _gmxOrderVault() internal view returns (address) { return _const.readAddress(".gmx.orderVault"); }
+    function _gmxDataStore() internal view returns (address) { return _const.readAddress(".gmx.dataStore"); }
+
+    function _getChainToken(string memory symbol) internal view returns (address addr) {
+        addr = _const.readAddress(string.concat(".", _chainKey(), ".token.", symbol));
+        require(addr != address(0), string.concat("Chain token not found: ", symbol));
+        require(addr.code.length > 0, string.concat("Chain token not deployed: ", symbol));
     }
 
     function _getUniversalAddress(string memory name) internal view returns (address addr) {
-        addr = _toml.readAddress(string.concat(".universal.address.", name));
+        addr = _deployments.readAddress(string.concat(".universal.address.", name));
         require(addr != address(0), string.concat("Universal address not found: ", name));
         require(addr.code.length > 0, string.concat("Universal contract not deployed: ", name));
     }
 
     function _getChainAddress(string memory name) internal view returns (address addr) {
-        addr = _toml.readAddress(string.concat(".", _chainKey(), ".address.", name));
+        addr = _deployments.readAddress(string.concat(".", _chainKey(), ".address.", name));
         require(addr != address(0), string.concat("Chain address not found: ", name));
         require(addr.code.length > 0, string.concat("Chain contract not deployed: ", name));
     }
-
-    function _getChainToken(string memory symbol) internal view returns (address addr) {
-        addr = _toml.readAddress(string.concat(".", _chainKey(), ".token.", symbol));
-        require(addr != address(0), string.concat("Chain token not found: ", symbol));
-        require(addr.code.length > 0, string.concat("Chain token not deployed: ", symbol));
-    }
-
     function _setUniversalAddress(string memory name, address addr) internal {
         vm.writeToml(vm.toString(addr), DEPLOYMENTS_PATH, string.concat(".universal.address.", name));
     }
