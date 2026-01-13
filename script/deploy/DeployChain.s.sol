@@ -2,6 +2,7 @@
 pragma solidity ^0.8.33;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {stdToml} from "forge-std/src/StdToml.sol";
 
 import {BaseScript} from "./shared/BaseScript.s.sol";
 import {Dictatorship} from "src/shared/Dictatorship.sol";
@@ -16,6 +17,8 @@ import {ProxyUserRouter} from "src/utils/ProxyUserRouter.sol";
 import {IStage} from "src/position/interface/IStage.sol";
 
 contract DeployChain is BaseScript {
+    using stdToml for string;
+
     function run() public {
         address keeperAddress = vm.envOr("KEEPER_ADDRESS", DEPLOYER_ADDRESS);
 
@@ -56,9 +59,21 @@ contract DeployChain is BaseScript {
         );
         _setChainAddress("UserRouter", address(userRouterImpl));
 
-        GmxStage gmxStage = new GmxStage(_gmxDataStore(), _gmxExchangeRouter(), _gmxOrderVault(), _getChainToken("WETH"));
+        address gmxExchangeRouter = _const.readAddress(".gmx.exchangeRouter");
+        address gmxRouter = _const.readAddress(".gmx.router");
+
+        GmxStage gmxStage = new GmxStage(
+            _const.readAddress(".gmx.dataStore"),
+            gmxExchangeRouter,
+            gmxRouter,
+            _const.readAddress(".gmx.orderVault"),
+            _getChainToken("WETH")
+        );
         _setChainAddress("GmxStage", address(gmxStage));
-        position.setStage(_gmxExchangeRouter(), IStage(address(gmxStage)));
+        // Register exchangeRouter for order/multicall validation
+        position.setStage(gmxExchangeRouter, IStage(address(gmxStage)));
+        // Register router for approve spender validation (Position extracts spender from approve calls)
+        position.setStage(gmxRouter, IStage(address(gmxStage)));
 
         dictatorship.registerContract(address(tokenRouter));
         dictatorship.registerContract(address(proxyUserRouter));

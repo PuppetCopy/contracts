@@ -66,14 +66,16 @@ contract GmxStage is IStage {
 
     IGmxDataStore public immutable dataStore;
     address public immutable exchangeRouter;
+    address public immutable router; // GMX BaseRouter for token approvals
     address public immutable orderVault;
     IERC20 public immutable wnt;
 
     // ============ Constructor ============
 
-    constructor(address _dataStore, address _exchangeRouter, address _orderVault, IERC20 _wnt) {
+    constructor(address _dataStore, address _exchangeRouter, address _router, address _orderVault, IERC20 _wnt) {
         dataStore = IGmxDataStore(_dataStore);
         exchangeRouter = _exchangeRouter;
+        router = _router;
         orderVault = _orderVault;
         wnt = _wnt;
     }
@@ -88,7 +90,19 @@ contract GmxStage is IStage {
         CallType _callType,
         bytes calldata _execData
     ) external view override returns (Action memory _result) {
-        (Call[] memory _calls, bytes4 _action, bytes memory _actionData) = _decodeCalls(_callType, _execData);
+        if (CallType.unwrap(_callType) != CallType.unwrap(CALLTYPE_SINGLE)) revert Error.GmxStage__InvalidCallType();
+
+        (address _target, , bytes calldata _callData) = ExecutionLib.decodeSingle(_execData);
+
+        // Handle token approve calls (target is token, spender should be GMX contract)
+        if (_callData.length >= 4 && bytes4(_callData[:4]) == APPROVE) {
+            return _validateApprove(_callData);
+        }
+
+        // For all other calls, target must be exchangeRouter
+        if (_target != exchangeRouter) revert Error.GmxStage__InvalidTarget();
+
+        (Call[] memory _calls, bytes4 _action, bytes memory _actionData) = _decodeRouterCalls(_callData);
 
         if (_action == CREATE_ORDER) {
             IBaseOrderUtils.CreateOrderParams memory _params =
@@ -108,6 +122,18 @@ contract GmxStage is IStage {
 
         // TODO: handle CANCEL_ORDER, etc.
         revert Error.GmxStage__InvalidAction();
+    }
+
+    function _validateApprove(bytes calldata _callData) internal view returns (Action memory) {
+        if (_callData.length < 68) revert Error.GmxStage__InvalidCallData(); // 4 + 32 + 32
+        (address _spender, ) = abi.decode(_callData[4:], (address, uint256));
+
+        // Only allow approvals to known GMX contracts
+        if (_spender != router && _spender != exchangeRouter && _spender != orderVault) {
+            revert Error.GmxStage__InvalidReceiver();
+        }
+
+        return Action({actionType: APPROVE, data: ""});
     }
 
     function verify(IERC7579Account, IERC20, uint, uint, bytes calldata) external pure override {}
@@ -170,17 +196,12 @@ contract GmxStage is IStage {
 
     // ============ Decode ============
 
-    /// @dev Only CALLTYPE_SINGLE supported. Returns calls, action selector, and action data
-    function _decodeCalls(CallType _callType, bytes calldata _execData)
+    /// @dev Decode exchangeRouter calls. Returns calls array, action selector, and action data
+    function _decodeRouterCalls(bytes calldata _callData)
         internal
         view
         returns (Call[] memory _calls, bytes4 _action, bytes memory _actionData)
     {
-        if (CallType.unwrap(_callType) != CallType.unwrap(CALLTYPE_SINGLE)) revert Error.GmxStage__InvalidCallType();
-
-        (address _target, uint256 _value, bytes calldata _callData) = ExecutionLib.decodeSingle(_execData);
-        if (_target != exchangeRouter) revert Error.GmxStage__InvalidTarget();
-
         bytes memory _data = _callData;
         bytes4 _selector = _getSelector(_data);
 
@@ -203,7 +224,7 @@ contract GmxStage is IStage {
         } else {
             // Direct call
             _calls = new Call[](1);
-            _calls[0] = Call(_target, _value, _callData);
+            _calls[0] = Call(exchangeRouter, 0, _callData);
             _action = _selector;
             _actionData = _slice(_data, 4);
         }

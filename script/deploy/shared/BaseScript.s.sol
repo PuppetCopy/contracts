@@ -38,13 +38,6 @@ abstract contract BaseScript is Script {
 
     // Protocol constants
     function _dao() internal view returns (address) { return _const.readAddress(".protocol.dao"); }
-    function _theCompact() internal view returns (address) { return _const.readAddress(".protocol.theCompact"); }
-    function _referralCode() internal view returns (bytes32) { return _const.readBytes32(".protocol.referralCode"); }
-
-    // GMX constants
-    function _gmxExchangeRouter() internal view returns (address) { return _const.readAddress(".gmx.exchangeRouter"); }
-    function _gmxOrderVault() internal view returns (address) { return _const.readAddress(".gmx.orderVault"); }
-    function _gmxDataStore() internal view returns (address) { return _const.readAddress(".gmx.dataStore"); }
 
     function _getChainToken(string memory symbol) internal view returns (IERC20) {
         address addr = _const.readAddress(string.concat(".", _chainKey(), ".token.", symbol));
