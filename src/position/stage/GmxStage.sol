@@ -67,11 +67,11 @@ contract GmxStage is IStage {
     IGmxDataStore public immutable dataStore;
     address public immutable exchangeRouter;
     address public immutable orderVault;
-    address public immutable wnt;
+    IERC20 public immutable wnt;
 
     // ============ Constructor ============
 
-    constructor(address _dataStore, address _exchangeRouter, address _orderVault, address _wnt) {
+    constructor(address _dataStore, address _exchangeRouter, address _orderVault, IERC20 _wnt) {
         dataStore = IGmxDataStore(_dataStore);
         exchangeRouter = _exchangeRouter;
         orderVault = _orderVault;
@@ -222,7 +222,7 @@ contract GmxStage is IStage {
 
         if (!_hasExecutionFee) revert Error.GmxStage__InvalidExecutionSequence();
 
-        bool _isWntCollateral = _params.addresses.initialCollateralToken == wnt;
+        bool _isWntCollateral = _params.addresses.initialCollateralToken == address(wnt);
         if (!_isWntCollateral && !_hasCollateral) revert Error.GmxStage__InvalidExecutionSequence();
 
         _validateOrderParams(_master, _params);

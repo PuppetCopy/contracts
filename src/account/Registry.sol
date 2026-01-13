@@ -10,8 +10,9 @@ import {IAuthority} from "../utils/interfaces/IAuthority.sol";
 import {MasterInfo} from "../position/interface/ITypes.sol";
 
 /// @title Registry
-/// @notice Stores master account registrations for the Puppet protocol
+/// @notice Stores master account registrations and token mappings for the Puppet protocol
 /// @dev Universal contract deployed on all chains. MasterHook calls this during onInstall.
+///      Also maps chain-agnostic token IDs to actual token addresses per chain.
 contract Registry is CoreContract {
     struct Config {
         bytes32[] account7579CodeList;
@@ -19,10 +20,8 @@ contract Registry is CoreContract {
 
     Config internal config;
 
-    /// @notice Token caps for allowed base tokens
+    mapping(bytes32 tokenId => IERC20) public tokenMap;
     mapping(IERC20 token => uint) public tokenCapMap;
-
-    /// @notice Registered master accounts
     mapping(IERC7579Account master => MasterInfo) public registeredMap;
 
     constructor(IAuthority _authority, Config memory _config) CoreContract(_authority, abi.encode(_config)) {}
@@ -50,6 +49,13 @@ contract Registry is CoreContract {
     function setTokenCap(IERC20 _token, uint _cap) external auth {
         tokenCapMap[_token] = _cap;
         _logEvent("SetTokenCap", abi.encode(_token, _cap));
+    }
+
+    function setToken(bytes32 _tokenId, IERC20 _token) external auth {
+        if (_tokenId == bytes32(0)) revert Error.Registry__InvalidTokenId();
+        if (address(_token) == address(0)) revert Error.Registry__InvalidTokenAddress();
+        tokenMap[_tokenId] = _token;
+        _logEvent("SetToken", abi.encode(_tokenId, _token));
     }
 
     function createMaster(

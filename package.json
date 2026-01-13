@@ -10,8 +10,7 @@
     "test:fork": "forge test --match-contract TradingForkTest -vvvv --fork-url=arbitrum",
     "build": "forge build",
     "build:prod": "FOUNDRY_PROFILE=prod forge build",
-    "generate": "bun run script/generate/run.ts",
-    "build:ts": "tsc -b",
+    "generate": "bun run script/generate/run.ts && tsc -b",
     "docgen": "forge doc --out '.docgen' --build",
     "lint": "forge fmt --check",
     "lint:fmt": "forge fmt"

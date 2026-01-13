@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.33;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Script} from "forge-std/src/Script.sol";
 import {stdToml} from "forge-std/src/StdToml.sol";
 
@@ -37,7 +38,6 @@ abstract contract BaseScript is Script {
 
     // Protocol constants
     function _dao() internal view returns (address) { return _const.readAddress(".protocol.dao"); }
-    function _latestAccount7579CodeHash() internal view returns (bytes32) { return _const.readBytes32(".protocol.latestAccount7579CodeHash"); }
     function _theCompact() internal view returns (address) { return _const.readAddress(".protocol.theCompact"); }
     function _referralCode() internal view returns (bytes32) { return _const.readBytes32(".protocol.referralCode"); }
 
@@ -46,10 +46,11 @@ abstract contract BaseScript is Script {
     function _gmxOrderVault() internal view returns (address) { return _const.readAddress(".gmx.orderVault"); }
     function _gmxDataStore() internal view returns (address) { return _const.readAddress(".gmx.dataStore"); }
 
-    function _getChainToken(string memory symbol) internal view returns (address addr) {
-        addr = _const.readAddress(string.concat(".", _chainKey(), ".token.", symbol));
+    function _getChainToken(string memory symbol) internal view returns (IERC20) {
+        address addr = _const.readAddress(string.concat(".", _chainKey(), ".token.", symbol));
         require(addr != address(0), string.concat("Chain token not found: ", symbol));
         require(addr.code.length > 0, string.concat("Chain token not deployed: ", symbol));
+        return IERC20(addr);
     }
 
     function _getUniversalAddress(string memory name) internal view returns (address addr) {

@@ -23,7 +23,7 @@ export default [
       {
         "name": "_wnt",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC20"
       }
     ],
     "stateMutability": "nonpayable"
@@ -353,7 +353,7 @@ export default [
       {
         "name": "",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IERC20"
       }
     ],
     "stateMutability": "view"

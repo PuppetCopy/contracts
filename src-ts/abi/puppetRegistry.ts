@@ -16,11 +16,6 @@ export default [
         "internalType": "struct Registry.Config",
         "components": [
           {
-            "name": "masterHook",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
             "name": "account7579CodeList",
             "type": "bytes32[]",
             "internalType": "bytes32[]"
@@ -69,19 +64,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "config",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "masterHook",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "createMaster",
     "inputs": [
       {
@@ -123,11 +105,6 @@ export default [
         "type": "tuple",
         "internalType": "struct Registry.Config",
         "components": [
-          {
-            "name": "masterHook",
-            "type": "address",
-            "internalType": "address"
-          },
           {
             "name": "account7579CodeList",
             "type": "bytes32[]",
@@ -289,6 +266,24 @@ export default [
   },
   {
     "type": "function",
+    "name": "setToken",
+    "inputs": [
+      {
+        "name": "_tokenId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_token",
+        "type": "address",
+        "internalType": "contract IERC20"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setTokenCap",
     "inputs": [
       {
@@ -344,6 +339,25 @@ export default [
     "stateMutability": "view"
   },
   {
+    "type": "function",
+    "name": "tokenMap",
+    "inputs": [
+      {
+        "name": "tokenId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IERC20"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
     "type": "error",
     "name": "Permission__CallerNotAuthority",
     "inputs": []
@@ -370,12 +384,17 @@ export default [
   },
   {
     "type": "error",
-    "name": "Registry__TokenNotAllowed",
+    "name": "Registry__InvalidTokenAddress",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Registry__UnauthorizedCaller",
+    "name": "Registry__InvalidTokenId",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Registry__TokenNotAllowed",
     "inputs": []
   }
 ] as const

@@ -49,6 +49,9 @@ library Error {
     error Registry__InvalidAccountCodeHash();
     error Registry__AlreadyRegistered();
     error Registry__TokenNotAllowed();
+    error Registry__InvalidTokenId();
+    error Registry__InvalidTokenAddress();
+    error Registry__TokenNotFound();
 
     error Compact__ArrayLengthMismatch();
 
@@ -68,6 +71,7 @@ library Error {
     error Position__InvalidBaseToken();
     error Position__ArrayLengthMismatch();
     error Position__BatchOrderNotAllowed();
+    error Position__NoStageHandler(address target);
 
     error UserRouter__UnauthorizedCaller();
 

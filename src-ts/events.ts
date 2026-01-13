@@ -55,6 +55,10 @@ export const CONTRACT_EVENT_MAP = {
       hash: '0x84f532c220fa6acb8fb9d0ffdba204004c6f1edc207d2379b0ab021c2c2b4e9e',
       args: [{type:"address",name:"master"},{type:"address",name:"user"},{type:"address",name:"signer"},{type:"address",name:"baseToken"},{type:"bytes32",name:"name"}]
     },
+    SetToken: {
+      hash: '0xa1889ab2e3da12087e2d0d71b7c29f05459c1a316f34120bff7d5c6cbead6102',
+      args: [{type:"bytes32",name:"tokenId"},{type:"address",name:"token"}]
+    },
     SetTokenCap: {
       hash: '0x0eed9dd37bbcb01292183ae212328bd52aab55ce6eb475eb4fb6350de9286029',
       args: [{type:"address",name:"token"},{type:"uint256",name:"cap"}]

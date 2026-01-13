@@ -6,14 +6,9 @@ export default [
     "type": "constructor",
     "inputs": [
       {
-        "name": "_position",
+        "name": "_routerProxy",
         "type": "address",
-        "internalType": "contract Position"
-      },
-      {
-        "name": "_registry",
-        "type": "address",
-        "internalType": "contract Registry"
+        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"
@@ -23,7 +18,7 @@ export default [
     "name": "isInitialized",
     "inputs": [
       {
-        "name": "_account",
+        "name": "",
         "type": "address",
         "internalType": "address"
       }
@@ -35,7 +30,7 @@ export default [
         "internalType": "bool"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "pure"
   },
   {
     "type": "function",
@@ -84,19 +79,6 @@ export default [
   },
   {
     "type": "function",
-    "name": "position",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract Position"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "postCheck",
     "inputs": [
       {
@@ -139,13 +121,13 @@ export default [
   },
   {
     "type": "function",
-    "name": "registry",
+    "name": "router",
     "inputs": [],
     "outputs": [
       {
         "name": "",
         "type": "address",
-        "internalType": "contract Registry"
+        "internalType": "contract MasterRouter"
       }
     ],
     "stateMutability": "view"

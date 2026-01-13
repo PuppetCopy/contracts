@@ -22,7 +22,7 @@ contract DeployChain is BaseScript {
         Dictatorship dictatorship = Dictatorship(_getUniversalAddress("Dictatorship"));
         Position position = Position(_getUniversalAddress("Position"));
         Registry registry = Registry(_getUniversalAddress("Registry"));
-        address usdc = _getChainToken("USDC");
+        IERC20 usdc = _getChainToken("USDC");
 
         vm.startBroadcast(DEPLOYER_PRIVATE_KEY);
 
@@ -73,8 +73,6 @@ contract DeployChain is BaseScript {
 
         dictatorship.setAccess(proxyUserRouter, DEPLOYER_ADDRESS);
         proxyUserRouter.update(address(userRouterImpl));
-
-        registry.setTokenCap(IERC20(usdc), 100e6);
 
         vm.stopBroadcast();
     }

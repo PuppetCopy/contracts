@@ -14,6 +14,10 @@ import {Registry} from "../account/Registry.sol";
 /// @title Position
 /// @notice Routes execute() calls to stage stageMap for validation and tracks pending orders
 contract Position is CoreContract {
+    // ============ Constants ============
+
+    bytes4 constant APPROVE_SELECTOR = IERC20.approve.selector;
+
     // ============ State ============
 
     mapping(address target => IStage) public stageMap;
@@ -49,7 +53,21 @@ contract Position is CoreContract {
 
         address _firstTarget = address(bytes20(_execData[:20]));
         IStage _handler = stageMap[_firstTarget];
-        if (address(_handler) == address(0)) return "";
+
+        // If no handler for target, check if it's an approve call and use spender for lookup
+        if (address(_handler) == address(0)) {
+            // For CALLTYPE_SINGLE: execData = encodePacked(target[20], value[32], calldata[...])
+            // calldata starts at offset 52, selector is first 4 bytes
+            if (_execData.length >= 88) { // 20 + 32 + 4 + 32 = 88 minimum for approve
+                bytes4 _selector = bytes4(_execData[52:56]);
+                if (_selector == APPROVE_SELECTOR) {
+                    // approve(address spender, uint256 amount) - spender is at offset 56, padded to 32 bytes
+                    address _spender = address(bytes20(_execData[68:88])); // skip 12 bytes of padding
+                    _handler = stageMap[_spender];
+                }
+            }
+            if (address(_handler) == address(0)) revert Error.Position__NoStageHandler(_firstTarget);
+        }
 
         Action memory _action = _handler.getAction(_caller, _master, _baseToken, _callValue, _callType, _execData);
         if (_action.actionType == bytes4(0)) revert Error.Position__InvalidAction();

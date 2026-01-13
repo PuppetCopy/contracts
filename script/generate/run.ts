@@ -154,7 +154,9 @@ export const puppetErrorAbi = ${JSON.stringify(errors, null, 2).replace(/"(\w+)"
 }
 
 // Check if a contract name is a Puppet contract (PascalCase) vs external (lowercase/snake_case)
+// Skip names starting with __ (implementation details)
 function isPuppetContract(name: string): boolean {
+  if (name.startsWith('__')) return false
   return /^[A-Z]/.test(name)
 }
 
@@ -167,6 +169,23 @@ async function generateContracts(): Promise<void> {
 
   const contracts: ContractInfo[] = []
 
+  // Collect implementation ABIs from __X entries (proxy implementations)
+  const implAbiMap = new Map<string, unknown[]>()
+  for (const chainAlias of Object.keys(deployments)) {
+    const chainData = deployments[chainAlias]
+    if (!chainData || typeof chainData !== 'object') continue
+    const addresses = (chainData as Record<string, unknown>).address as Record<string, string> | undefined
+    if (!addresses) continue
+
+    for (const name of Object.keys(addresses)) {
+      if (name.startsWith('__')) {
+        const proxyName = name.slice(2)
+        const implAbi = await findAbiFile(proxyName)
+        if (implAbi) implAbiMap.set(proxyName, implAbi)
+      }
+    }
+  }
+
   // Load universal contracts (same address all chains, via CREATE2) - no chainId
   const universalAddresses = (deployments.universal as Record<string, unknown>)?.address as
     | Record<string, string>
@@ -175,7 +194,8 @@ async function generateContracts(): Promise<void> {
   if (universalAddresses) {
     for (const [name, address] of Object.entries(universalAddresses)) {
       if (address) {
-        const abi = await findAbiFile(name)
+        // Use implementation ABI if this is a proxy with __X entry
+        const abi = implAbiMap.get(name) ?? (await findAbiFile(name))
         contracts.push({ name, address, abi })
       }
     }
@@ -205,7 +225,8 @@ async function generateContracts(): Promise<void> {
 
     for (const [name, address] of puppetContracts) {
       const isZeroAddress = address === '0x0000000000000000000000000000000000000000'
-      const abi = await findAbiFile(name)
+      // Use implementation ABI if this is a proxy with __X entry
+      const abi = implAbiMap.get(name) ?? (await findAbiFile(name))
 
       // For zero addresses, include contract definition but without chainId/blockNumber
       if (isZeroAddress) {
